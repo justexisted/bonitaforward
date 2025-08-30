@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+	--font-sans: "Inter", ui-sans-serif, system-ui, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Base tweaks for smooth, minimalist UI */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-white text-neutral-800 antialiased;
+}
+
+/* Utility overrides */
+.container-px {
+  @apply px-4 sm:px-6 md:px-8;
+}
+
+.elevate {
+  @apply shadow-sm hover:shadow-md transition-shadow duration-200;
+}
