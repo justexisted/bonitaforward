@@ -1,10 +1,11 @@
 import { BrowserRouter, Routes, Route, Link, Outlet } from 'react-router-dom'
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import './index.css'
-import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles } from 'lucide-react'
+import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles, Menu, X } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
 import SignInPage from './pages/SignIn'
+import AdminPage from './pages/Admin'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -98,7 +99,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signInWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+    // Redirect back to the current page after Google OAuth to preserve funnel context
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } })
   }
 
   const signOut = async () => {
@@ -144,6 +146,7 @@ export function useAuth() {
 
 function Navbar() {
   const auth = useAuth()
+  const [open, setOpen] = useState(false)
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
       <Container className="flex items-center justify-between h-14">
@@ -153,23 +156,54 @@ function Navbar() {
           </span>
           <span className="font-semibold tracking-tight">Bonita Forward</span>
         </Link>
-        <nav className="flex items-center gap-3 text-sm">
-          <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/about">About</Link>
-          <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/contact">Get Featured</Link>
-          <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
-          {!auth.isAuthed ? (
-            <div className="flex items-center gap-2">
-              <Link to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign In</Link>
-              <button onClick={auth.signInWithGoogle} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Google</button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-neutral-600 hidden sm:inline">{auth.email}</span>
-              <button onClick={auth.signOut} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Sign out</button>
-            </div>
-          )}
-        </nav>
+        <div className="flex items-center gap-2">
+          <button aria-label="Menu" onClick={() => setOpen((v) => !v)} className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-xl hover:bg-neutral-100">
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+          <nav className="hidden sm:flex items-center gap-3 text-sm">
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/about">About</Link>
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/contact">Get Featured</Link>
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
+            {auth.isAuthed && (
+              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/admin">Admin</Link>
+            )}
+            {!auth.isAuthed ? (
+              <div className="flex items-center gap-2">
+                <Link to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign In</Link>
+                <button onClick={auth.signInWithGoogle} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Google</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-neutral-600 hidden sm:inline">{auth.email}</span>
+                <button onClick={auth.signOut} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Sign out</button>
+              </div>
+            )}
+          </nav>
+        </div>
       </Container>
+      {/* Mobile sheet */}
+      {open && (
+        <div className="sm:hidden border-t border-neutral-100 bg-white">
+          <Container className="py-3 text-sm">
+            <div className="flex flex-col gap-2">
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/about">About</Link>
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/contact">Get Featured</Link>
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
+              {auth.isAuthed && (
+                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/admin">Admin</Link>
+              )}
+              {!auth.isAuthed ? (
+                <>
+                  <Link onClick={() => setOpen(false)} to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-2 text-center">Sign In</Link>
+                  <button onClick={() => { setOpen(false); auth.signInWithGoogle() }} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-2 hover:bg-neutral-200 text-center">Continue with Google</button>
+                </>
+              ) : (
+                <button onClick={() => { setOpen(false); auth.signOut() }} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-2 hover:bg-neutral-200 text-center">Sign out</button>
+              )}
+            </div>
+          </Container>
+        </div>
+      )}
     </header>
   )
 }
@@ -529,6 +563,51 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
   return withScores.map((s) => s.p)
 }
 
+// Persist funnel answers per user to Supabase (if tables exist)
+async function persistFunnelForUser(params: { email?: string | null; category: CategoryKey; answers: Record<string, string> }) {
+  const { email, category, answers } = params
+  if (!email || !answers || !Object.keys(answers).length) return
+  try {
+    await supabase
+      .from('funnel_responses')
+      .upsert(
+        [
+          {
+            user_email: email,
+            category,
+            answers,
+          },
+        ],
+        { onConflict: 'user_email,category' }
+      )
+  } catch (err) {
+    // Silently ignore if table isn't created yet
+    console.warn('[Supabase] upsert funnel_responses failed (safe to ignore if table missing)', err)
+  }
+}
+
+// Create a booking row (if table exists)
+async function createBookingRow(params: { email?: string | null; category: CategoryKey; name?: string; notes?: string; answers?: Record<string, string> }) {
+  const { email, category, name, notes, answers } = params
+  if (!email) return
+  try {
+    await supabase
+      .from('bookings')
+      .insert([
+        {
+          user_email: email,
+          category,
+          name: name || null,
+          notes: notes || null,
+          answers: answers || null,
+          status: 'new',
+        },
+      ])
+  } catch (err) {
+    console.warn('[Supabase] insert bookings failed (safe to ignore if table missing)', err)
+  }
+}
+
 function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, string>): FunnelQuestion[] {
   if (categoryKey === 'real-estate') {
     const need = answers['need']
@@ -616,6 +695,25 @@ function Funnel({ category }: { category: typeof categories[number] }) {
   const questions = useMemo(() => getFunnelQuestions(category.key, answers), [category.key, answers])
   const current = questions[step]
   const auth = useAuth()
+  const initializedRef = useRef(false)
+
+  // On mount, hydrate answers from localStorage so users never re-enter
+  useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+    try {
+      const key = `bf-tracking-${category.key}`
+      const existing = JSON.parse(localStorage.getItem(key) || '{}')
+      if (existing && typeof existing === 'object') {
+        setAnswers(existing)
+        // fast-forward step to first unanswered question
+        const qs = getFunnelQuestions(category.key, existing)
+        const firstUnanswered = qs.findIndex((q) => !existing[q.id])
+        if (firstUnanswered >= 0) setStep(firstUnanswered)
+        else setStep(qs.length)
+      }
+    } catch {}
+  }, [category.key])
 
   function choose(option: FunnelOption) {
     trackChoice(category.key, current.id, option.id)
@@ -626,6 +724,12 @@ function Funnel({ category }: { category: typeof categories[number] }) {
       setAnim('in')
     }, 120)
   }
+
+  // Whenever answers change and user is authenticated, persist to Supabase
+  useEffect(() => {
+    if (!auth.email) return
+    persistFunnelForUser({ email: auth.email, category: category.key, answers })
+  }, [auth.email, category.key, answers])
 
   const done = step >= questions.length
 
@@ -686,7 +790,7 @@ function Funnel({ category }: { category: typeof categories[number] }) {
                 </div>
               )}
               <div className="mt-3 flex flex-col gap-2">
-                <Link to={`/book?category=${category.key}`} className="rounded-full bg-neutral-900 text-white px-4 py-2">Book Appointment</Link>
+                <Link to={`/book?category=${category.key}`} className="rounded-full bg-neutral-900 text-white px-4 py-2">Find Best Match</Link>
                 <button
                   onClick={() => {
                     try { localStorage.removeItem(`bf-tracking-${category.key}`) } catch {}
@@ -910,49 +1014,33 @@ function BookPage() {
     try { return JSON.parse(localStorage.getItem(`bf-tracking-${categoryKey}`) || '{}') } catch { return {} }
   }, [categoryKey])
   const auth = useAuth()
+
+  // Auto-generate results as soon as we can, so page never appears empty
+  useEffect(() => {
+    const ranked = scoreProviders(categoryKey, answers)
+    const fallback = providersByCategory[categoryKey] || []
+    setResults(ranked.length ? ranked : fallback)
+    if (auth.isAuthed) setSubmitted(true)
+  }, [categoryKey, auth.isAuthed, answers])
   return (
     <section className="py-8">
       <Container>
         <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate max-w-md mx-auto text-center">
           <h2 className="text-xl font-semibold tracking-tight">Search Bonita's top {category?.name.toLowerCase() || 'providers'}</h2>
           <p className="mt-1 text-neutral-600">Access to top Bonita {category?.name.toLowerCase() || 'providers'}.</p>
-          {!submitted && !auth.isAuthed ? (
-            <form
-              className="mt-4 grid grid-cols-1 gap-3 text-left"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const form = e.currentTarget as HTMLFormElement
-                const name = (form.elements.namedItem('name') as HTMLInputElement)?.value
-                const email = (form.elements.namedItem('email') as HTMLInputElement)?.value
-                const notes = (form.elements.namedItem('notes') as HTMLTextAreaElement)?.value
-                try {
-                  const data = { category: categoryKey, name, email, notes, answers, ts: Date.now() }
-                  const k = `bf-book-${categoryKey}`
-                  localStorage.setItem(k, JSON.stringify(data))
-                } catch {}
-                auth.signInLocal({ name, email })
-                const ranked = scoreProviders(categoryKey, answers)
-                setResults(ranked)
-                setSubmitted(true)
-              }}
-            >
-              <div>
-                <label className="block text-sm text-neutral-600">Full Name</label>
-                <input name="name" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Your full name" />
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-600">Email</label>
-                <input name="email" type="email" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="you@example.com" />
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-600">Notes (optional)</label>
-                <textarea name="notes" rows={3} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Anything else we should know?" />
-              </div>
-              <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Sign Up</button>
-            </form>
-          ) : (
+          {auth.isAuthed || submitted || results.length > 0 ? (
             <div className="mt-5 text-left">
-              <div className="text-sm text-neutral-500">Top matches</div>
+              {/* Example Businesses (placeholder) */}
+              <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
+                <div className="text-sm font-medium">Example Businesses</div>
+                <ul className="mt-2 text-sm text-neutral-600 list-disc list-inside">
+                  {(providersByCategory[categoryKey] || []).slice(0, 3).map((p) => (
+                    <li key={p.id}>{p.name}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="mt-4 text-sm text-neutral-500">Top matches</div>
               <div className="mt-2 grid grid-cols-1 gap-2">
                 {results.slice(0, 3).map((r) => (
                   <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
@@ -983,6 +1071,42 @@ function BookPage() {
                 </>
               )}
             </div>
+          ) : (
+            <form
+              className="mt-4 grid grid-cols-1 gap-3 text-left"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const form = e.currentTarget as HTMLFormElement
+                const name = (form.elements.namedItem('name') as HTMLInputElement)?.value
+                const email = (form.elements.namedItem('email') as HTMLInputElement)?.value
+                const notes = (form.elements.namedItem('notes') as HTMLTextAreaElement)?.value
+                try {
+                  const data = { category: categoryKey, name, email, notes, answers, ts: Date.now() }
+                  const k = `bf-book-${categoryKey}`
+                  localStorage.setItem(k, JSON.stringify(data))
+                } catch {}
+                auth.signInLocal({ name, email })
+                // Persist booking row if table exists
+                createBookingRow({ email, category: categoryKey, name, notes, answers })
+                const ranked = scoreProviders(categoryKey, answers)
+                setResults(ranked)
+                setSubmitted(true)
+              }}
+            >
+              <div>
+                <label className="block text-sm text-neutral-600">Full Name</label>
+                <input name="name" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Your full name" />
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-600">Email</label>
+                <input name="email" type="email" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="you@example.com" />
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-600">Notes (optional)</label>
+                <textarea name="notes" rows={3} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Anything else we should know?" />
+              </div>
+              <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Sign Up</button>
+            </form>
           )}
         </div>
       </Container>
@@ -1000,6 +1124,7 @@ export default function App() {
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="signin" element={<SignInPage />} />
+            <Route path="admin" element={<AdminPage />} />
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
             <Route path="category/:id" element={<CategoryPage />} />

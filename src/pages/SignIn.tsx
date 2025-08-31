@@ -115,7 +115,7 @@ export default function SignInPage() {
 
           {mode !== 'reset' && (
             <div className="mt-3">
-              <button onClick={async () => { await auth.signInWithGoogle() }} className="w-full rounded-full bg-neutral-100 text-neutral-900 py-2.5 hover:bg-neutral-200">
+              <button onClick={async () => { await auth.signInWithGoogle() }} className="w-full rounded-full bg-neutral-100 text-neutral-900 py-2.5 hover:bg-neutral-200 text-center">
                 Continue with Google
               </button>
             </div>
