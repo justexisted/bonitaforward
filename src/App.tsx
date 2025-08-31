@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
+import { supabase } from './lib/supabase'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -52,15 +53,18 @@ type AuthContextValue = {
   isAuthed: boolean
   name?: string
   email?: string
-  signIn: (data: { name?: string; email: string }) => void
+  signInLocal: (data: { name?: string; email: string }) => void
+  signInWithGoogle: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signIn: () => {} })
+const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInLocal: () => {}, signInWithGoogle: async () => {}, signOut: async () => {} })
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<{ name?: string; email?: string } | null>(null)
 
   useEffect(() => {
+    // Restore any local pseudo-auth (pre-supabase flow)
     try {
       const raw = localStorage.getItem('bf-auth')
       if (raw) {
@@ -68,20 +72,45 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         if (parsed?.email) setProfile({ name: parsed.name, email: parsed.email })
       }
     } catch {}
+
+    // Sync with Supabase session
+    supabase.auth.getSession().then(({ data }) => {
+      const email = data.session?.user?.email
+      const name = (data.session?.user?.user_metadata as any)?.name
+      if (email) setProfile({ name, email })
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const email = session?.user?.email
+      const name = (session?.user?.user_metadata as any)?.name
+      if (email) setProfile({ name, email })
+      else setProfile((curr) => curr && curr.email ? null : curr)
+    })
+    return () => { sub.subscription.unsubscribe() }
   }, [])
 
-  const signIn = (data: { name?: string; email: string }) => {
+  const signInLocal = (data: { name?: string; email: string }) => {
     setProfile({ name: data.name, email: data.email })
-    try {
-      localStorage.setItem('bf-auth', JSON.stringify({ ...data, ts: Date.now() }))
-    } catch {}
+    try { localStorage.setItem('bf-auth', JSON.stringify({ ...data, ts: Date.now() })) } catch {}
+  }
+
+  const signInWithGoogle = async () => {
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+  }
+
+  const signOut = async () => {
+    try { await supabase.auth.signOut() } finally {
+      setProfile(null)
+      try { localStorage.removeItem('bf-auth') } catch {}
+    }
   }
 
   const value: AuthContextValue = {
     isAuthed: Boolean(profile?.email),
     name: profile?.name,
     email: profile?.email,
-    signIn,
+    signInLocal,
+    signInWithGoogle,
+    signOut,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -92,6 +121,7 @@ function useAuth() {
 }
 
 function Navbar() {
+  const auth = useAuth()
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
       <Container className="flex items-center justify-between h-14">
@@ -105,6 +135,14 @@ function Navbar() {
           <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/about">About</Link>
           <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/contact">Get Featured</Link>
           <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
+          {!auth.isAuthed ? (
+            <button onClick={auth.signInWithGoogle} className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign in with Google</button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-600 hidden sm:inline">{auth.email}</span>
+              <button onClick={auth.signOut} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Sign out</button>
+            </div>
+          )}
         </nav>
       </Container>
     </header>
@@ -605,7 +643,7 @@ function Funnel({ category }: { category: typeof categories[number] }) {
                       e.preventDefault()
                       const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement)?.value
                       const email = (e.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value
-                      auth.signIn({ name, email })
+                      auth.signInLocal({ name, email })
                       try {
                         const key = `bf-signup-${category.key}`
                         localStorage.setItem(key, JSON.stringify({ email, answers }))
@@ -617,6 +655,9 @@ function Funnel({ category }: { category: typeof categories[number] }) {
                     <input name="email" type="email" required placeholder="you@example.com" className="flex-1 rounded-full border border-neutral-200 px-3 py-2 w-full m-0.5" />
                     <button className="rounded-full bg-neutral-900 text-white px-4 py-2">Sign Up</button>
                   </form>
+                  <div className="mt-2 text-center">
+                    <button onClick={auth.signInWithGoogle} className="text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Or continue with Google</button>
+                  </div>
                 </div>
               )}
               <div className="mt-3 flex flex-col gap-2">
@@ -864,7 +905,7 @@ function BookPage() {
                   const k = `bf-book-${categoryKey}`
                   localStorage.setItem(k, JSON.stringify(data))
                 } catch {}
-                auth.signIn({ name, email })
+                auth.signInLocal({ name, email })
                 const ranked = scoreProviders(categoryKey, answers)
                 setResults(ranked)
                 setSubmitted(true)
