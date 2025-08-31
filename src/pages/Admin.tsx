@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 
@@ -31,6 +31,8 @@ export default function AdminPage() {
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const adminList = (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+  const isAdmin = useMemo(() => !!auth.email && adminList.includes(auth.email.toLowerCase()), [auth.email, adminList])
 
   useEffect(() => {
     let cancelled = false
@@ -42,9 +44,11 @@ export default function AdminPage() {
       setLoading(true)
       setError(null)
       try {
+        const fQuery = supabase.from('funnel_responses').select('*').order('created_at', { ascending: false })
+        const bQuery = supabase.from('bookings').select('*').order('created_at', { ascending: false })
         const [{ data: fData, error: fErr }, { data: bData, error: bErr }] = await Promise.all([
-          supabase.from('funnel_responses').select('*').eq('user_email', auth.email).order('created_at', { ascending: false }),
-          supabase.from('bookings').select('*').eq('user_email', auth.email).order('created_at', { ascending: false }),
+          isAdmin ? fQuery : fQuery.eq('user_email', auth.email),
+          isAdmin ? bQuery : bQuery.eq('user_email', auth.email),
         ])
         if (cancelled) return
         if (fErr) setError(fErr.message)
@@ -61,7 +65,14 @@ export default function AdminPage() {
     return () => {
       cancelled = true
     }
-  }, [auth.email])
+  }, [auth.email, isAdmin])
+
+  const users = useMemo(() => {
+    const set = new Set<string>()
+    funnels.forEach((f) => set.add(f.user_email))
+    bookings.forEach((b) => set.add(b.user_email))
+    return Array.from(set).sort()
+  }, [funnels, bookings])
 
   if (!auth.email) {
     return (
@@ -78,11 +89,25 @@ export default function AdminPage() {
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-5xl">
-        <h1 className="text-2xl font-semibold tracking-tight">Your Data</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight">{isAdmin ? 'Admin' : 'Your Data'}</h1>
+          <button onClick={() => window.location.reload()} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200 text-sm">Refresh</button>
+        </div>
         {loading && <div className="mt-3 text-sm text-neutral-600">Loading…</div>}
         {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {isAdmin && (
+            <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
+              <div className="font-medium">Users (derived from submissions)</div>
+              <ul className="mt-2 text-sm">
+                {users.length === 0 && <li className="text-neutral-500">No users yet.</li>}
+                {users.map((u) => (
+                  <li key={u} className="py-1 border-b border-neutral-100 last:border-0">{u}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
             <div className="font-medium">Funnel Responses</div>
             <div className="mt-2 space-y-2 text-sm">
