@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link, Outlet } from 'react-router-dom'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles } from 'lucide-react'
+import SupabasePing from './components/SupabasePing'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -126,6 +127,7 @@ function Footer() {
 function Layout() {
   return (
     <div className="min-h-full flex flex-col">
+      <SupabasePing />
       <Navbar />
       <main className="flex-1">
         <Outlet />
