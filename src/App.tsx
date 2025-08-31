@@ -4,6 +4,7 @@ import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
+import SignInPage from './pages/SignIn'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -55,10 +56,13 @@ type AuthContextValue = {
   email?: string
   signInLocal: (data: { name?: string; email: string }) => void
   signInWithGoogle: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
+  signUpWithEmail: (email: string, password: string) => Promise<{ error?: string }>
+  resetPassword: (email: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInLocal: () => {}, signInWithGoogle: async () => {}, signOut: async () => {} })
+const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInLocal: () => {}, signInWithGoogle: async () => {}, signInWithEmail: async () => ({}), signUpWithEmail: async () => ({}), resetPassword: async () => ({}), signOut: async () => {} })
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<{ name?: string; email?: string } | null>(null)
@@ -104,19 +108,37 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const signInWithEmail = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return { error: error?.message }
+  }
+
+  const signUpWithEmail = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({ email, password })
+    return { error: error?.message }
+  }
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/signin' })
+    return { error: error?.message }
+  }
+
   const value: AuthContextValue = {
     isAuthed: Boolean(profile?.email),
     name: profile?.name,
     email: profile?.email,
     signInLocal,
     signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    resetPassword,
     signOut,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-function useAuth() {
+export function useAuth() {
   return useContext(AuthContext)
 }
 
@@ -136,7 +158,10 @@ function Navbar() {
           <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/contact">Get Featured</Link>
           <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
           {!auth.isAuthed ? (
-            <button onClick={auth.signInWithGoogle} className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign in with Google</button>
+            <div className="flex items-center gap-2">
+              <Link to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign In</Link>
+              <button onClick={auth.signInWithGoogle} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Google</button>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-neutral-600 hidden sm:inline">{auth.email}</span>
@@ -974,6 +999,7 @@ export default function App() {
             <Route index element={<HomePage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
+            <Route path="signin" element={<SignInPage />} />
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
             <Route path="category/:id" element={<CategoryPage />} />
