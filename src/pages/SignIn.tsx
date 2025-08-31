@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 
 /**
@@ -9,12 +10,22 @@ import { useAuth } from '../App'
  */
 export default function SignInPage() {
   const auth = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation() as any
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // If already authenticated, redirect away from Sign In
+  useEffect(() => {
+    if (auth.isAuthed) {
+      const target = location?.state?.from || '/'
+      navigate(target, { replace: true })
+    }
+  }, [auth.isAuthed, location?.state?.from, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -104,7 +115,7 @@ export default function SignInPage() {
 
           {mode !== 'reset' && (
             <div className="mt-3">
-              <button onClick={auth.signInWithGoogle} className="w-full rounded-full bg-neutral-100 text-neutral-900 py-2.5 hover:bg-neutral-200">
+              <button onClick={async () => { await auth.signInWithGoogle() }} className="w-full rounded-full bg-neutral-100 text-neutral-900 py-2.5 hover:bg-neutral-200">
                 Continue with Google
               </button>
             </div>
@@ -134,6 +145,7 @@ export default function SignInPage() {
     </section>
   )
 }
+
 
 
 
