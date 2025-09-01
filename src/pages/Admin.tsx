@@ -72,6 +72,7 @@ export default function AdminPage() {
       setLoading(true)
       setError(null)
       try {
+        console.log('[Admin] loading data. isAdmin?', isAdmin, 'selectedUser', selectedUser)
         const fQuery = supabase.from('funnel_responses').select('*').order('created_at', { ascending: false })
         const bQuery = supabase.from('bookings').select('*').order('created_at', { ascending: false })
         const fExec = isAdmin ? (selectedUser ? fQuery.eq('user_email', selectedUser) : fQuery) : fQuery.eq('user_email', auth.email!)
@@ -85,15 +86,20 @@ export default function AdminPage() {
           conQuery,
         ])
         if (cancelled) return
-        if (fErr) setError(fErr.message)
-        if (bErr) setError((prev) => prev ?? bErr.message)
-        if (bizErr) setError((prev) => prev ?? bizErr.message)
-        if (conErr) setError((prev) => prev ?? conErr.message)
+        if (fErr) { console.error('[Admin] funnels error', fErr); setError(fErr.message) }
+        if (bErr) { console.error('[Admin] bookings error', bErr); setError((prev) => prev ?? bErr.message) }
+        if (bizErr) { console.error('[Admin] business_applications error', bizErr); setError((prev) => prev ?? bizErr.message) }
+        if (conErr) { console.error('[Admin] contact_leads error', conErr); setError((prev) => prev ?? conErr.message) }
+        console.log('[Admin] funnels', fData)
+        console.log('[Admin] bookings', bData)
+        console.log('[Admin] business_applications', bizData)
+        console.log('[Admin] contact_leads', conData)
         setFunnels((fData as FunnelRow[]) || [])
         setBookings((bData as BookingRow[]) || [])
         setBizApps((bizData as BusinessApplicationRow[]) || [])
         setContactLeads((conData as ContactLeadRow[]) || [])
       } catch (err: any) {
+        console.error('[Admin] unexpected failure', err)
         if (!cancelled) setError(err?.message || 'Failed to load')
       } finally {
         if (!cancelled) setLoading(false)

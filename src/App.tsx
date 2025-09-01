@@ -687,8 +687,9 @@ async function createBookingRow(params: { email?: string | null; category: Categ
 
 // Track a business owner application
 async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string }) {
+  console.log('[BusinessApp] submitting application', params)
   try {
-    await supabase
+    const { data, error } = await supabase
       .from('business_applications')
       .insert([
         {
@@ -700,15 +701,24 @@ async function createBusinessApplication(params: { full_name?: string; business_
           challenge: params.challenge || null,
         },
       ])
+      .select('*')
+    if (error) {
+      console.error('[BusinessApp] insert error', error)
+    } else {
+      console.log('[BusinessApp] insert success', data)
+    }
+    return { data, error }
   } catch (err) {
-    console.warn('[Supabase] insert business_applications failed (safe to ignore if table missing)', err)
+    console.error('[BusinessApp] unexpected failure', err)
+    return { data: null, error: err as any }
   }
 }
 
 // Track a contact/get‑featured submission (simplified)
 async function createContactLead(params: { business_name?: string; contact_email?: string; details?: string }) {
+  console.log('[ContactLead] submitting lead', params)
   try {
-    await supabase
+    const { data, error } = await supabase
       .from('contact_leads')
       .insert([
         {
@@ -717,8 +727,16 @@ async function createContactLead(params: { business_name?: string; contact_email
           details: params.details || null,
         },
       ])
+      .select('*')
+    if (error) {
+      console.error('[ContactLead] insert error', error)
+    } else {
+      console.log('[ContactLead] insert success', data)
+    }
+    return { data, error }
   } catch (err) {
-    console.warn('[Supabase] insert contact_leads failed (safe to ignore if table missing)', err)
+    console.error('[ContactLead] unexpected failure', err)
+    return { data: null, error: err as any }
   }
 }
 
