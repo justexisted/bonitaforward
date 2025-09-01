@@ -1019,6 +1019,13 @@ function CategoryPage() {
   const category = categories.find((c) => c.key === path)
   if (!category) return <Container className="py-10">Category not found.</Container>
   const Icon = category.icon
+  const [, setVersion] = useState(0)
+  useEffect(() => {
+    function onUpdate() { setVersion((v: number) => v + 1) }
+    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
+    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
+  }, [])
+  const list = providersByCategory[category.key] || []
   return (
     <section className="py-8">
       <Container>
@@ -1036,12 +1043,21 @@ function CategoryPage() {
             <div className="flex-1">
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="rounded-xl border border-neutral-200 p-3">
-                  <div className="text-sm font-medium">Example Businesses</div>
-                  <ul className="mt-2 text-sm text-neutral-600 list-disc list-inside">
-                    <li>Placeholder One</li>
-                    <li>Placeholder Two</li>
-                    <li>Placeholder Three</li>
-                  </ul>
+                  <div className="text-sm font-medium">Businesses in {category.name}</div>
+                  {list.length > 0 ? (
+                    <ul className="mt-2 text-sm text-neutral-700 space-y-1">
+                      {list.map((p) => (
+                        <li key={p.id} className="flex items-center justify-between">
+                          <span>{p.name}</span>
+                          {typeof p.rating === 'number' && (
+                            <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="mt-2 text-neutral-500 text-sm">Loading businesses…</div>
+                  )}
                 </div>
                 <div className="rounded-xl border border-neutral-200 p-3">
                   <div className="text-sm font-medium mb-2"></div>
