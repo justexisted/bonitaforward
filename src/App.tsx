@@ -940,7 +940,7 @@ function Funnel({ category }: { category: typeof categories[number] }) {
           </div>
         ) : (
           <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-            <h3 className="text-lg font-semibold tracking-tight text-neutral-900">Great! Here’s your summary</h3>
+            <h3 className="text-lg font-semibold tracking-tight text-neutral-900">Great! Here's your summary</h3>
             <ul className="mt-3 text-sm text-neutral-700 text-left">
               {questions.map((q) => (
                 <li key={q.id} className="flex justify-between border-b border-neutral-100 py-2">
@@ -1020,12 +1020,15 @@ function CategoryPage() {
   if (!category) return <Container className="py-10">Category not found.</Container>
   const Icon = category.icon
   const [, setVersion] = useState(0)
+  const [showAll, setShowAll] = useState(false)
   useEffect(() => {
     function onUpdate() { setVersion((v: number) => v + 1) }
     window.addEventListener('bf-providers-updated', onUpdate as EventListener)
     return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
   }, [])
   const list = providersByCategory[category.key] || []
+  const featured = list.slice(0, 4)
+  const remaining = list.slice(4)
   return (
     <section className="py-8">
       <Container>
@@ -1036,7 +1039,6 @@ function CategoryPage() {
             </span>
             <div className="flex-1">
               <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{category.name}</h2>
-              <p className="mt-1 text-neutral-600">Why supporting them matters: Local jobs, local growth, and community resilience.</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -1044,17 +1046,38 @@ function CategoryPage() {
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="rounded-xl border border-neutral-200 p-3">
                   <div className="text-sm font-medium">Businesses in {category.name}</div>
-                  {list.length > 0 ? (
-                    <ul className="mt-2 text-sm text-neutral-700 space-y-1">
-                      {list.map((p) => (
-                        <li key={p.id} className="flex items-center justify-between">
-                          <span>{p.name}</span>
-                          {typeof p.rating === 'number' && (
-                            <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                  {featured.length > 0 ? (
+                    <>
+                      <ul className="mt-2 text-sm text-neutral-700 space-y-1">
+                        {featured.map((p) => (
+                          <li key={p.id} className="flex items-center justify-between">
+                            <span>{p.name}</span>
+                            {typeof p.rating === 'number' && (
+                              <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      {remaining.length > 0 && (
+                        <div className="mt-2">
+                          <button onClick={() => setShowAll((v) => !v)} className="btn btn-secondary text-xs">
+                            {showAll ? 'Show less' : 'Show more'}
+                          </button>
+                          <div className="collapsible mt-2" data-open={showAll ? 'true' : 'false'}>
+                            <ul className="text-sm text-neutral-700 space-y-1">
+                              {remaining.map((p) => (
+                                <li key={p.id} className="flex items-center justify-between">
+                                  <span>{p.name}</span>
+                                  {typeof p.rating === 'number' && (
+                                    <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="mt-2 text-neutral-500 text-sm">Loading businesses…</div>
                   )}
@@ -1078,7 +1101,7 @@ function AboutPage() {
       <Container>
         <div className="prose max-w-none">
           <h2 className="text-2xl font-semibold tracking-tight">About Bonita Forward</h2>
-          <p className="text-neutral-600">We promote and highlight the best businesses in San Diego’s Bonita community, encouraging residents to stay local and support local.</p>
+          <p className="text-neutral-600">We promote and highlight the best businesses in San Diego's Bonita community, encouraging residents to stay local and support local.</p>
           <p className="text-neutral-600">This site acts as a bridge into lead funnels so businesses gain exposure and customers while the community gets quality, trusted recommendations.</p>
         </div>
       </Container>
@@ -1092,7 +1115,7 @@ function ContactPage() {
       <Container>
         <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
           <h2 className="text-xl font-semibold tracking-tight">Get Featured</h2>
-          <p className="mt-1 text-neutral-600">Local business in Bonita? Request inclusion and we’ll reach out.</p>
+          <p className="mt-1 text-neutral-600">Local business in Bonita? Request inclusion and we'll reach out.</p>
           <form
             className="mt-4 grid grid-cols-1 gap-3"
             onSubmit={async (e) => {
@@ -1150,7 +1173,7 @@ function BusinessPage() {
         </div>
 
         <div className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
-          <h2 className="text-xl font-semibold tracking-tight">What’s a New Customer Worth to You?</h2>
+          <h2 className="text-xl font-semibold tracking-tight">What's a New Customer Worth to You?</h2>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
             <div>
               <label className="block text-sm text-neutral-600">Avg. Sale Value ($)</label>
@@ -1183,9 +1206,9 @@ function BusinessPage() {
           <h2 className="text-xl font-semibold tracking-tight">Bonita Businesses Already Growing</h2>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
-              '“Our real estate leads doubled in 30 days.”',
-              '“We had 47 new diners book in the first month.”',
-              '“Finally, a marketing solution built for Bonita.”',
+              '"Our real estate leads doubled in 30 days."',
+              '"We had 47 new diners book in the first month."',
+              '"Finally, a marketing solution built for Bonita."',
             ].map((t) => (
               <div key={t} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate text-sm text-neutral-700">{t}</div>
             ))}
@@ -1245,7 +1268,7 @@ function BusinessPage() {
               <option>Restaurants</option>
               <option>Professional Services</option>
             </select>
-            <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What’s your biggest growth challenge?" rows={4} />
+            <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} />
             <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Apply to Get Featured</button>
           </form>
           <p className="mt-2 text-xs text-neutral-500">Submission can auto-trigger Zapier → Google Sheets + HighLevel (to be wired).</p>
