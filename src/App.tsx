@@ -4,6 +4,7 @@ import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles, Menu, X } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
+import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets'
 import SignInPage from './pages/SignIn'
 import AdminPage from './pages/Admin'
 
@@ -580,7 +581,7 @@ function getProviderDetails(p: Provider): ProviderDetails {
   }
 }
 
-const providersByCategory: Record<CategoryKey, Provider[]> = {
+let providersByCategory: Record<CategoryKey, Provider[]> = {
   'real-estate': [
     { id: 're-1', name: 'Bonita Realty Group', category: 'real-estate', tags: ['buy', '0-3', 'entry', '2', '3'], rating: 4.9 },
     { id: 're-2', name: 'South Bay Homes', category: 'real-estate', tags: ['buy', '3-6', 'mid', '3', '4+'], rating: 4.8 },
@@ -621,6 +622,30 @@ const providersByCategory: Record<CategoryKey, Provider[]> = {
     { id: 'ps-5', name: 'Ledger Pros', category: 'professional-services', tags: ['accountant', 'advice', 'soon', 'med'], rating: 4.6 },
     { id: 'ps-6', name: 'Coastline Strategy', category: 'professional-services', tags: ['consultant', 'ongoing', 'flex', 'high'], rating: 4.5 },
   ],
+}
+
+async function loadProvidersFromSheet(): Promise<void> {
+  try {
+    const rows = await fetchSheetRows()
+    const mapped = mapRowsToProviders(rows)
+    const grouped: Record<CategoryKey, Provider[]> = {
+      'real-estate': [],
+      'home-services': [],
+      'health-wellness': [],
+      'restaurants-cafes': [],
+      'professional-services': [],
+    }
+    mapped.forEach((sp: SheetProvider) => {
+      const cat = (sp.category as CategoryKey)
+      if (grouped[cat]) {
+        grouped[cat].push({ id: sp.id, name: sp.name, category: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
+      }
+    })
+    providersByCategory = grouped
+    console.log('[Sheets] Providers loaded from Google Sheets', grouped)
+  } catch (err) {
+    console.warn('[Sheets] Failed to load providers from Google Sheets, using defaults', err)
+  }
 }
 
 function scoreProviders(category: CategoryKey, answers: Record<string, string>): Provider[] {
@@ -1025,16 +1050,20 @@ function ContactPage() {
           <p className="mt-1 text-neutral-600">Local business in Bonita? Request inclusion and we’ll reach out.</p>
           <form
             className="mt-4 grid grid-cols-1 gap-3"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault()
               const form = e.currentTarget as HTMLFormElement
               const business_name = (form.elements.item(0) as HTMLInputElement)?.value
               const contact_email = (form.elements.item(1) as HTMLInputElement)?.value
               const details = (form.elements.item(2) as HTMLTextAreaElement)?.value
               try { localStorage.setItem('bf-contact', JSON.stringify({ business_name, contact_email, details, ts: Date.now() })) } catch {}
-              createContactLead({ business_name, contact_email, details })
-              form.reset()
-              window.location.assign('/thank-you')
+              const { error } = await createContactLead({ business_name, contact_email, details })
+              if (!error) {
+                form.reset()
+                window.location.assign('/thank-you')
+              } else {
+                console.error('[ContactLead] submit failed, not redirecting')
+              }
             }}
           >
             <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business name" />
@@ -1139,7 +1168,7 @@ function BusinessPage() {
           <h2 className="text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
           <form
             className="mt-4 grid grid-cols-1 gap-3"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault()
               const form = e.currentTarget as HTMLFormElement
               const full_name = (form.elements.item(0) as HTMLInputElement)?.value
@@ -1149,9 +1178,13 @@ function BusinessPage() {
               const category = (form.elements.item(4) as HTMLSelectElement)?.value
               const challenge = (form.elements.item(5) as HTMLTextAreaElement)?.value
               try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, challenge, ts: Date.now() })) } catch {}
-              createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
-              form.reset()
-              window.location.assign('/thank-you')
+              const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
+              if (!error) {
+                form.reset()
+                window.location.assign('/thank-you')
+              } else {
+                console.error('[BusinessApp] submit failed, not redirecting')
+              }
             }}
           >
             <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" />
@@ -1363,10 +1396,18 @@ function BookPage() {
   )
 }
 
+function AppInit() {
+  useEffect(() => {
+    void loadProvidersFromSheet()
+  }, [])
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <AppInit />
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
