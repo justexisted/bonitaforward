@@ -559,6 +559,26 @@ type ProviderDetails = {
   posts?: { id: string; title: string; url?: string }[]
 }
 
+// Curated short descriptions for top real-estate brands (from the analytical report)
+const providerDescriptions: Record<string, string> = {
+  '24k international realty': 'Local, family-owned brokerage with 32+ years in Bonita & Downtown. Full sales plus 24K Property Management and probate expertise; serves entry to luxury.',
+  'kent realty (the gary kent team)': 'High-touch team led by veteran broker Gary Kent. Seller-focused, upper mid to luxury SFH expertise with institutional experience.',
+  'leilani sells homes (integrity first realty & loans)': 'Bonita-based specialist for VA and first‑time buyers. Integrated guidance on realty & loans; also offers flexible property management.',
+  'palisade realty, inc.': 'High-volume South Bay team (300+ Chula Vista sales). Aggressive marketing across all price points from entry to luxury.',
+  'broadpoint properties': 'One‑stop shop: buy/sell/rent with strong property management. Covers residential plus some commercial (office/retail/industrial).',
+  'coldwell banker west': 'Major franchise presence with powerful brand reach. Best paired with top local teams for South Bay success.',
+  'century 21 affiliated': 'Top C21 franchise with Market Specialties (Commercial, Fine Homes). Broad coverage across residential and commercial.',
+  'exp realty of southern california': 'Cloud‑based, tech‑forward network of entrepreneurial agents. Broad price coverage; strength in digital marketing.',
+  'compass': 'Technology‑driven brokerage with strong data tools and luxury dominance; extensive agent network countywide.',
+  'keller williams realty': 'Agent‑centric national brand. Strong local agents serve Bonita from nearby offices; broad residential coverage.',
+  'mckee properties': 'Focused property management for residential and small office/retail in Bonita and central/south San Diego.',
+}
+
+function getProviderDescription(p: Provider): string | undefined {
+  const key = p.name.trim().toLowerCase()
+  return providerDescriptions[key]
+}
+
 function getProviderDetails(p: Provider): ProviderDetails {
   // Placeholder details; in production, fetch from DB/API
   const seed = encodeURIComponent(p.id)
@@ -679,6 +699,60 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
 
 function scoreProviders(category: CategoryKey, answers: Record<string, string>): Provider[] {
   const providers = providersByCategory[category] || []
+  if (category === 'health-wellness') {
+    const values = new Set<string>(Object.values(answers))
+    const type = answers['type']
+    const goal = answers['goal'] || answers['salon_kind']
+    const when = answers['when']
+    const payment = answers['payment']
+    return providers
+      .map((p) => {
+        let score = 0
+        if (type && p.tags.includes(type)) score += 2
+        if (goal && p.tags.includes(goal)) score += 2
+        if (when && p.tags.includes(when)) score += 1
+        if (payment && p.tags.includes(payment)) score += 1
+        p.tags.forEach((t) => { if (values.has(t)) score += 0 })
+        return { p, score }
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        const ar = a.p.rating ?? 0
+        const br = b.p.rating ?? 0
+        if (br !== ar) return br - ar
+        return a.p.name.localeCompare(b.p.name)
+      })
+      .map((s) => s.p)
+  }
+  if (category === 'real-estate') {
+    const values = new Set<string>(Object.values(answers))
+    const need = answers['need']
+    const propertyType = answers['property_type']
+    return providers
+      .map((p) => {
+        let score = 0
+        // Strong signals
+        if (need && p.tags.includes(need)) score += 2
+        if (propertyType && p.tags.includes(propertyType)) score += 2
+        // Moderate signals
+        if (answers['timeline'] && p.tags.includes(answers['timeline'])) score += 1
+        if (answers['move_when'] && p.tags.includes(answers['move_when'])) score += 1
+        if (answers['budget'] && p.tags.includes(answers['budget'])) score += 1
+        if (answers['beds'] && p.tags.includes(answers['beds'])) score += 1
+        if (answers['staging'] === 'yes' && p.tags.includes('staging')) score += 1
+        // Generic tag match fallback
+        p.tags.forEach((t) => { if (values.has(t)) score += 0 })
+        return { p, score }
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        const ar = a.p.rating ?? 0
+        const br = b.p.rating ?? 0
+        if (br !== ar) return br - ar
+        return a.p.name.localeCompare(b.p.name)
+      })
+      .map((s) => s.p)
+  }
   const values = new Set<string>(Object.values(answers))
   const withScores = providers.map((p) => {
     const matches = p.tags.reduce((acc, t) => acc + (values.has(t) ? 1 : 0), 0)
@@ -795,9 +869,67 @@ async function createContactLead(params: { business_name?: string; contact_email
 }
 
 function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, string>): FunnelQuestion[] {
+  if (categoryKey === 'health-wellness') {
+    const type = answers['type']
+    const list: FunnelQuestion[] = []
+    // Q1: Service type
+    list.push({
+      id: 'type',
+      prompt: 'What are you looking for?',
+      options: [
+        { id: 'chiro', label: 'Chiropractor' },
+        { id: 'physical-therapy', label: 'Physical Therapy' },
+        { id: 'gym', label: 'Gym' },
+        { id: 'pilates-yoga', label: 'Pilates/Yoga' },
+        { id: 'salon', label: 'Salon' },
+        { id: 'medspa', label: 'Med Spa' },
+        { id: 'general-healthcare', label: 'General Healthcare' },
+        { id: 'naturopathic', label: 'Naturopathic' },
+        { id: 'dental', label: 'Dental' },
+        { id: 'mental-health', label: 'Mental Health' },
+      ],
+    })
+
+    if (!type) return list.slice(0, 1)
+
+    // Q2: Specialized goal/need by type
+    if (type === 'salon') {
+      list.push({ id: 'salon_kind', prompt: 'Salon service?', options: [ { id: 'salon-hair', label: 'Hair' }, { id: 'salon-nail', label: 'Nail' }, { id: 'salon-other', label: 'Other' } ] })
+    } else if (type === 'chiro') {
+      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'relief', label: 'Pain relief' }, { id: 'mobility', label: 'Mobility' }, { id: 'injury', label: 'Injury recovery' } ] })
+    } else if (type === 'physical-therapy') {
+      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'rehab', label: 'Rehab' }, { id: 'performance', label: 'Performance' }, { id: 'post-surgery', label: 'Post‑surgery' } ] })
+    } else if (type === 'gym' || type === 'pilates-yoga') {
+      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'fitness', label: 'Fitness' }, { id: 'strength', label: 'Strength' }, { id: 'classes', label: 'Classes' } ] })
+    } else if (type === 'medspa') {
+      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'beauty', label: 'Beauty' }, { id: 'wellness', label: 'Wellness' } ] })
+    } else if (type === 'general-healthcare' || type === 'naturopathic') {
+      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'wellness', label: 'Wellness' }, { id: 'general', label: 'General health' } ] })
+    } else if (type === 'dental') {
+      list.push({ id: 'goal', prompt: 'Dental need?', options: [ { id: 'cleaning', label: 'Cleaning' }, { id: 'emergency', label: 'Emergency' }, { id: 'ortho', label: 'Ortho' } ] })
+    } else if (type === 'mental-health') {
+      list.push({ id: 'goal', prompt: 'Support needed?', options: [ { id: 'therapy', label: 'Therapy' }, { id: 'counseling', label: 'Counseling' } ] })
+    }
+
+    // Q3: Urgency (generic, phrased naturally)
+    list.push({ id: 'when', prompt: 'When would you like to start?', options: [ { id: 'this-week', label: 'This week' }, { id: 'this-month', label: 'This month' }, { id: 'later', label: 'Later' } ] })
+
+    // Q4: Payment model only for gym/pilates (others default one‑off)
+    if (type === 'gym' || type === 'pilates-yoga') {
+      list.push({ id: 'payment', prompt: 'Payment preference?', options: [ { id: 'membership', label: 'Membership' }, { id: 'one-off', label: 'One‑off' } ] })
+    }
+
+    return list.slice(0, 4)
+  }
   if (categoryKey === 'real-estate') {
     const need = answers['need']
+    const propertyType = answers['property_type']
+    const isResidential = (pt?: string) => ['single-family','condo-townhome','apartment-multifamily'].includes(pt || '')
+    const isLandOrCommercial = (pt?: string) => ['land','office','retail','industrial-warehouse'].includes(pt || '')
+
     const list: FunnelQuestion[] = []
+
+    // Q1: Need
     list.push({
       id: 'need',
       prompt: 'What do you need help with?',
@@ -807,55 +939,60 @@ function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, st
         { id: 'rent', label: 'Renting' },
       ],
     })
+
+    // Q2: Property type (works for buy/sell/rent and drives conditionals)
+    list.push({
+      id: 'property_type',
+      prompt: 'Property type?',
+      options: [
+        { id: 'single-family', label: 'Single‑Family' },
+        { id: 'condo-townhome', label: 'Condo/Townhome' },
+        { id: 'apartment-multifamily', label: 'Apartment/Multifamily' },
+        { id: 'land', label: 'Land' },
+        { id: 'office', label: 'Office' },
+        { id: 'retail', label: 'Retail' },
+        { id: 'industrial-warehouse', label: 'Industrial/Warehouse' },
+      ],
+    })
+
     if (need === 'sell') {
+      // Q3: Staging toggle for sellers (relevant to presentation)
       list.push({
-        id: 'timeline',
-        prompt: 'When are you planning to list?',
-        options: [ { id: 'now', label: 'Now' }, { id: '30-60', label: '30–60 days' }, { id: '60+', label: '60+ days' } ],
+        id: 'staging',
+        prompt: 'Interested in home staging?',
+        options: [ { id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' } ],
       })
-      list.push({
-        id: 'price',
-        prompt: 'Expected price range?',
-        options: [ { id: 'sub750', label: 'Under $750k' }, { id: '750-1200', label: '$750k–$1.2M' }, { id: '1200+', label: '$1.2M+' } ],
-      })
-      list.push({
-        id: 'beds',
-        prompt: 'Bedrooms in your property?',
-        options: [ { id: '2', label: '2' }, { id: '3', label: '3' }, { id: '4+', label: '4+' } ],
-      })
-    } else if (need === 'rent') {
-      list.push({
-        id: 'timeline',
-        prompt: 'When do you plan to move?',
-        options: [ { id: 'this-week', label: 'This week' }, { id: 'this-month', label: 'This month' }, { id: 'later', label: 'Later' } ],
-      })
-      list.push({
-        id: 'budget',
-        prompt: 'Monthly budget?',
-        options: [ { id: 'low', label: '$' }, { id: 'med', label: '$$' }, { id: 'high', label: '$$$' } ],
-      })
-      list.push({
-        id: 'beds',
-        prompt: 'Bedrooms needed?',
-        options: [ { id: '1', label: '1' }, { id: '2', label: '2' }, { id: '3+', label: '3+' } ],
-      })
+      // Q4: Residential → Bedrooms; Land/Commercial → Listing timeline
+      if (isResidential(propertyType)) {
+        list.push({ id: 'beds', prompt: 'Bedrooms in your property?', options: [ { id: '2', label: '2' }, { id: '3', label: '3' }, { id: '4+', label: '4+' } ] })
+      } else {
+        list.push({ id: 'timeline', prompt: 'When are you planning to list?', options: [ { id: 'now', label: 'Now' }, { id: '30-60', label: '30–60 days' }, { id: '60+', label: '60+ days' } ] })
+      }
+      return list.slice(0, 4)
+    }
+
+    if (need === 'rent') {
+      // Q3: Monthly budget for rentals
+      list.push({ id: 'budget', prompt: 'Monthly budget?', options: [ { id: 'low', label: '$' }, { id: 'med', label: '$$' }, { id: 'high', label: '$$$' } ] })
+      // Q4: Residential → Bedrooms; Land/Commercial → Move timeline
+      if (isResidential(propertyType)) {
+        list.push({ id: 'beds', prompt: 'Bedrooms needed?', options: [ { id: '1', label: '1' }, { id: '2', label: '2' }, { id: '3+', label: '3+' } ] })
+      } else {
+        list.push({ id: 'move_when', prompt: 'When do you plan to start?', options: [ { id: 'this-week', label: 'This week' }, { id: 'this-month', label: 'This month' }, { id: 'later', label: 'Later' } ] })
+      }
+      return list.slice(0, 4)
+    }
+
+    // Default BUY flow
+    // Q3: Purchase budget
+    list.push({ id: 'budget', prompt: 'Purchase budget?', options: [ { id: 'entry', label: '$' }, { id: 'mid', label: '$$' }, { id: 'high', label: '$$$' } ] })
+    // Q4: Residential → Bedrooms; Land/Commercial → Timeline
+    if (isResidential(propertyType)) {
+      list.push({ id: 'beds', prompt: 'Bedrooms needed?', options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4+', label: '4+' } ] })
+    } else if (isLandOrCommercial(propertyType)) {
+      list.push({ id: 'timeline', prompt: 'What’s your timeline?', options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
     } else {
-      // default to buyer flow
-      list.push({
-        id: 'timeline',
-        prompt: 'What’s your timeline?',
-        options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ],
-      })
-      list.push({
-        id: 'budget',
-        prompt: 'Purchase budget?',
-        options: [ { id: 'entry', label: '$' }, { id: 'mid', label: '$$' }, { id: 'high', label: '$$$' } ],
-      })
-      list.push({
-        id: 'beds',
-        prompt: 'Bedrooms needed?',
-        options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4+', label: '4+' } ],
-      })
+      list.push({ id: 'timeline', prompt: 'What’s your timeline?', options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
     }
     return list.slice(0, 4)
   }
@@ -1050,10 +1187,16 @@ function CategoryPage() {
                     <>
                       <ul className="mt-2 text-sm text-neutral-700 space-y-1">
                         {featured.map((p) => (
-                          <li key={p.id} className="flex items-center justify-between">
-                            <span>{p.name}</span>
-                            {typeof p.rating === 'number' && (
-                              <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
+                          <li key={p.id} className="">
+                            <div className="flex items-center justify-between">
+                              <span>{p.name}</span>
+                              {typeof p.rating === 'number' && (
+                                <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
+                              )}
+                            </div>
+                            {/* Show short description for featured real-estate brands when available */}
+                            {getProviderDescription(p) && (
+                              <div className="text-xs text-neutral-600 mt-0.5">{getProviderDescription(p)}</div>
                             )}
                           </li>
                         ))}
