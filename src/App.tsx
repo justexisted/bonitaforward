@@ -5,6 +5,7 @@ import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles,
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets'
+import { fetchProvidersFromSupabase } from './lib/supabaseData'
 import SignInPage from './pages/SignIn'
 import AdminPage from './pages/Admin'
 
@@ -646,6 +647,34 @@ async function loadProvidersFromSheet(): Promise<void> {
   } catch (err) {
     console.warn('[Sheets] Failed to load providers from Google Sheets, using defaults', err)
   }
+  try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
+}
+
+async function loadProvidersFromSupabase(): Promise<boolean> {
+  const rows = await fetchProvidersFromSupabase()
+  if (!rows || rows.length === 0) return false
+  const grouped: Record<CategoryKey, Provider[]> = {
+    'real-estate': [],
+    'home-services': [],
+    'health-wellness': [],
+    'restaurants-cafes': [],
+    'professional-services': [],
+  }
+  rows.forEach((r) => {
+    const key = (r.category_key as CategoryKey)
+    if (!grouped[key]) return
+    grouped[key].push({
+      id: r.id,
+      name: r.name,
+      category: key,
+      tags: (r.tags as string[] | null) || (r.badges as string[] | null) || [],
+      rating: r.rating ?? undefined,
+    })
+  })
+  providersByCategory = grouped
+  console.log('[Supabase] Providers loaded', grouped)
+  try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
+  return true
 }
 
 function scoreProviders(category: CategoryKey, answers: Record<string, string>): Provider[] {
@@ -1228,13 +1257,22 @@ function BookPage() {
   }, [categoryKey])
   const auth = useAuth()
 
-  // Auto-generate results as soon as we can, so page never appears empty
-  useEffect(() => {
+  function recompute() {
     const ranked = scoreProviders(categoryKey, answers)
     const fallback = providersByCategory[categoryKey] || []
     setResults(ranked.length ? ranked : fallback)
+  }
+
+  useEffect(() => {
+    recompute()
     if (auth.isAuthed) setSubmitted(true)
   }, [categoryKey, auth.isAuthed, answers])
+
+  useEffect(() => {
+    function onUpdate() { recompute() }
+    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
+    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
+  }, [categoryKey, answers])
   return (
     <section className="py-8">
       <Container>
@@ -1398,7 +1436,10 @@ function BookPage() {
 
 function AppInit() {
   useEffect(() => {
-    void loadProvidersFromSheet()
+    ;(async () => {
+      const ok = await loadProvidersFromSupabase()
+      if (!ok) await loadProvidersFromSheet()
+    })()
   }, [])
   return null
 }
