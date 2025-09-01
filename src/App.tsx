@@ -223,7 +223,7 @@ function Footer() {
 
 function Layout() {
   return (
-    <div className="min-h-full flex flex-col">
+    <div className="min-h-full flex flex-col page-fade-in">
       <SupabasePing />
       <Navbar />
       <main className="flex-1">
@@ -245,14 +245,7 @@ function Hero() {
           <p className="mt-3 text-neutral-600">
             Minimal, modern, and made for our community. Explore top categories and get connected.
           </p>
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <Link to="#categories" className="rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">
-              Explore Local Businesses
-            </Link>
-            <Link to="/business" className="rounded-full bg-neutral-100 text-neutral-900 px-5 py-2.5 hover:bg-neutral-200 transition-colors">
-              Get Connected
-            </Link>
-          </div>
+          {/* CTAs removed per request */}
         </div>
       </Container>
     </section>
@@ -284,7 +277,7 @@ function CommunitySection() {
     { title: 'Wellness Spotlight', excerpt: 'Chiropractors, gyms, and med spas to try now.' },
   ]
   return (
-    <section className="py-8">
+    <section className="py-8 zoom-in">
       <Container>
         <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Community</h2>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -301,6 +294,47 @@ function CommunitySection() {
   )
 }
 
+function Confetti() {
+  // simple CSS confetti using pseudo-random gradients
+  const pieces = Array.from({ length: 40 })
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+      <div className="absolute inset-0">
+        {pieces.map((_, i) => (
+          <span
+            key={i}
+            className="absolute block h-1.5 w-3 rounded-sm opacity-80"
+            style={{
+              left: Math.random() * 100 + '%',
+              top: '-10px',
+              background: `hsl(${Math.floor(Math.random() * 360)}, 80%, 60%)`,
+              transform: `rotate(${Math.random() * 360}deg)`,
+              animation: `confetti-fall ${2000 + Math.random() * 1200}ms ease-in forwards`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ThankYouPage() {
+  return (
+    <section className="py-12">
+      <Container>
+        <div className="relative rounded-2xl border border-neutral-100 p-8 bg-white text-center elevate form-fade">
+          <Confetti />
+          <h1 className="text-2xl font-semibold tracking-tight">Thanks! 🎉</h1>
+          <p className="mt-2 text-neutral-600">Your request to be featured was successfully submitted.</p>
+          <div className="mt-5">
+            <Link to="/" className="btn btn-primary">Back to Home</Link>
+          </div>
+        </div>
+      </Container>
+    </section>
+  )
+}
+
 function HomePage() {
   return (
     <>
@@ -308,9 +342,19 @@ function HomePage() {
       <section id="categories" className="py-2">
         <Container>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {categories.map((c) => (
+            {categories.slice(0, 4).map((c) => (
               <CategoryCard cat={c} key={c.key} />
             ))}
+            <details className="rounded-2xl border border-neutral-100 p-4 bg-white elevate">
+              <summary className="cursor-pointer select-none text-sm text-neutral-700">See more</summary>
+              <div className="mt-3">
+                {categories.slice(4).map((c) => (
+                  <div key={c.key} className="mt-2">
+                    <CategoryCard cat={c} />
+                  </div>
+                ))}
+              </div>
+            </details>
           </div>
         </Container>
       </section>
@@ -503,6 +547,39 @@ type Provider = {
   rating?: number
 }
 
+type ProviderDetails = {
+  phone?: string
+  email?: string
+  website?: string
+  address?: string
+  images?: string[]
+  reviews?: { author: string; rating: number; text: string }[]
+  posts?: { id: string; title: string; url?: string }[]
+}
+
+function getProviderDetails(p: Provider): ProviderDetails {
+  // Placeholder details; in production, fetch from DB/API
+  const seed = encodeURIComponent(p.id)
+  return {
+    phone: '(619) 555-0123',
+    email: 'info@' + p.name.replace(/\s+/g, '').toLowerCase() + '.com',
+    website: 'https://example.com/' + seed,
+    address: 'Bonita, CA',
+    images: [
+      `https://picsum.photos/seed/${seed}-1/400/240`,
+      `https://picsum.photos/seed/${seed}-2/400/240`,
+    ],
+    reviews: [
+      { author: 'Local Resident', rating: (p.rating ?? 4.6), text: 'Great experience, highly recommend.' },
+      { author: 'Bonita Neighbor', rating: (p.rating ?? 4.5) - 0.2, text: 'Friendly and professional.' },
+    ],
+    posts: [
+      { id: p.id + '-post1', title: `Spotlight: ${p.name}` },
+      { id: p.id + '-post2', title: `${p.name} in the Community` },
+    ],
+  }
+}
+
 const providersByCategory: Record<CategoryKey, Provider[]> = {
   'real-estate': [
     { id: 're-1', name: 'Bonita Realty Group', category: 'real-estate', tags: ['buy', '0-3', 'entry', '2', '3'], rating: 4.9 },
@@ -605,6 +682,43 @@ async function createBookingRow(params: { email?: string | null; category: Categ
       ])
   } catch (err) {
     console.warn('[Supabase] insert bookings failed (safe to ignore if table missing)', err)
+  }
+}
+
+// Track a business owner application
+async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string }) {
+  try {
+    await supabase
+      .from('business_applications')
+      .insert([
+        {
+          full_name: params.full_name || null,
+          business_name: params.business_name || null,
+          email: params.email || null,
+          phone: params.phone || null,
+          category: params.category || null,
+          challenge: params.challenge || null,
+        },
+      ])
+  } catch (err) {
+    console.warn('[Supabase] insert business_applications failed (safe to ignore if table missing)', err)
+  }
+}
+
+// Track a contact/get‑featured submission (simplified)
+async function createContactLead(params: { business_name?: string; contact_email?: string; details?: string }) {
+  try {
+    await supabase
+      .from('contact_leads')
+      .insert([
+        {
+          business_name: params.business_name || null,
+          contact_email: params.contact_email || null,
+          details: params.details || null,
+        },
+      ])
+  } catch (err) {
+    console.warn('[Supabase] insert contact_leads failed (safe to ignore if table missing)', err)
   }
 }
 
@@ -745,7 +859,7 @@ function Funnel({ category }: { category: typeof categories[number] }) {
                 <button
                   key={opt.id}
                   onClick={() => choose(opt)}
-                  className="rounded-full border border-neutral-200 px-4 py-3 bg-white text-neutral-900 hover:bg-neutral-50 active:scale-[0.99] transition-all duration-150"
+                  className="btn btn-secondary sparkle border border-neutral-200"
                 >
                   {opt.label}
                 </button>
@@ -782,23 +896,40 @@ function Funnel({ category }: { category: typeof categories[number] }) {
                   >
                     <input name="name" placeholder="Your name" className="flex-1 rounded-full border border-neutral-200 px-3 py-2 w-full m-0.5" />
                     <input name="email" type="email" required placeholder="you@example.com" className="flex-1 rounded-full border border-neutral-200 px-3 py-2 w-full m-0.5" />
-                    <button className="rounded-full bg-neutral-900 text-white px-4 py-2">Sign Up</button>
+                    <button className="btn btn-primary">Sign Up</button>
                   </form>
                   <div className="mt-2 text-center">
-                    <button onClick={auth.signInWithGoogle} className="text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Or continue with Google</button>
+                    <button onClick={auth.signInWithGoogle} className="btn btn-secondary text-sm">Or continue with Google</button>
                   </div>
                 </div>
               )}
               <div className="mt-3 flex flex-col gap-2">
-                <Link to={`/book?category=${category.key}`} className="rounded-full bg-neutral-900 text-white px-4 py-2">Find Best Match</Link>
+                <Link
+                  to={`/book?category=${category.key}`}
+                  onClick={(e) => {
+                    const card = (e.currentTarget.closest('section') as HTMLElement) || document.body
+                    card.classList.add('slide-out-right')
+                    setTimeout(() => {
+                      // allow navigation after animation; Link will handle it
+                    }, 160)
+                  }}
+                  className="btn btn-primary"
+                >
+                  Find Best Match
+                </Link>
                 <button
                   onClick={() => {
-                    try { localStorage.removeItem(`bf-tracking-${category.key}`) } catch {}
-                    setAnswers({})
-                    setStep(0)
-                    setAnim('in')
+                    const container = (document.querySelector('section') as HTMLElement)
+                    if (container) container.classList.add('slide-out-left')
+                    setTimeout(() => {
+                      try { localStorage.removeItem(`bf-tracking-${category.key}`) } catch {}
+                      setAnswers({})
+                      setStep(0)
+                      setAnim('in')
+                      if (container) container.classList.remove('slide-out-left')
+                    }, 160)
                   }}
-                  className="rounded-full bg-neutral-100 text-neutral-900 px-4 py-2 hover:bg-neutral-200"
+                  className="btn btn-secondary"
                 >
                   Edit Answers
                 </button>
@@ -874,11 +1005,24 @@ function ContactPage() {
         <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
           <h2 className="text-xl font-semibold tracking-tight">Get Featured</h2>
           <p className="mt-1 text-neutral-600">Local business in Bonita? Request inclusion and we’ll reach out.</p>
-          <form className="mt-4 grid grid-cols-1 gap-3">
+          <form
+            className="mt-4 grid grid-cols-1 gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const form = e.currentTarget as HTMLFormElement
+              const business_name = (form.elements.item(0) as HTMLInputElement)?.value
+              const contact_email = (form.elements.item(1) as HTMLInputElement)?.value
+              const details = (form.elements.item(2) as HTMLTextAreaElement)?.value
+              try { localStorage.setItem('bf-contact', JSON.stringify({ business_name, contact_email, details, ts: Date.now() })) } catch {}
+              createContactLead({ business_name, contact_email, details })
+              form.reset()
+              window.location.assign('/thank-you')
+            }}
+          >
             <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business name" />
             <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Contact email" />
             <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What do you offer?" rows={4} />
-            <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Request Inclusion</button>
+            <button className="btn btn-primary w-full">Request Inclusion</button>
           </form>
         </div>
       </Container>
@@ -907,13 +1051,13 @@ function BusinessPage() {
             { title: 'Step 3: Growth', text: 'You receive qualified leads weekly — no more chasing, just closing.' },
           ].map((s) => (
             <div key={s.title} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-              <div className="font-medium">{s.title}</div>
+              <div className="font-medium select-none cursor-default">{s.title}</div>
               <div className="text-sm text-neutral-600 mt-1">{s.text}</div>
             </div>
           ))}
         </div>
 
-        <div className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate">
+        <div className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
           <h2 className="text-xl font-semibold tracking-tight">What’s a New Customer Worth to You?</h2>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
             <div>
@@ -973,9 +1117,25 @@ function BusinessPage() {
           </div>
         </div>
 
-        <div id="apply" className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate">
+        <div id="apply" className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
           <h2 className="text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
-          <form className="mt-4 grid grid-cols-1 gap-3">
+          <form
+            className="mt-4 grid grid-cols-1 gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const form = e.currentTarget as HTMLFormElement
+              const full_name = (form.elements.item(0) as HTMLInputElement)?.value
+              const business_name = (form.elements.item(1) as HTMLInputElement)?.value
+              const email = (form.elements.item(2) as HTMLInputElement)?.value
+              const phone = (form.elements.item(3) as HTMLInputElement)?.value
+              const category = (form.elements.item(4) as HTMLSelectElement)?.value
+              const challenge = (form.elements.item(5) as HTMLTextAreaElement)?.value
+              try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, challenge, ts: Date.now() })) } catch {}
+              createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
+              form.reset()
+              window.location.assign('/thank-you')
+            }}
+          >
             <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" />
             <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1010,6 +1170,8 @@ function BookPage() {
   const category = categories.find((c) => c.key === categoryKey)
   const [submitted, setSubmitted] = useState(false)
   const [results, setResults] = useState<Provider[]>([])
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [contactOpen, setContactOpen] = useState<Record<string, boolean>>({})
   const answers = useMemo(() => {
     try { return JSON.parse(localStorage.getItem(`bf-tracking-${categoryKey}`) || '{}') } catch { return {} }
   }, [categoryKey])
@@ -1042,31 +1204,100 @@ function BookPage() {
 
               <div className="mt-4 text-sm text-neutral-500">Top matches</div>
               <div className="mt-2 grid grid-cols-1 gap-2">
-                {results.slice(0, 3).map((r) => (
-                  <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{r.name}</div>
-                      <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                {results.slice(0, 3).map((r) => {
+                  const d = getProviderDetails(r)
+                  const open = !!contactOpen[r.id]
+                  const showTags = (r.tags || []).slice(0, 3)
+                  return (
+                    <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{r.name}</div>
+                        <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                      </div>
+                      {showTags.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {showTags.map((t) => (
+                            <span key={t} className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-700 px-2 py-0.5 text-[11px]">{t}</span>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setContactOpen((m: Record<string, boolean>) => ({ ...m, [r.id]: !open }))}
+                        className="mt-2 text-sm btn btn-primary"
+                      >
+                        {open ? 'Hide Contact' : 'Contact'}
+                      </button>
+                      <div className="collapsible mt-2 text-sm" data-open={open ? 'true' : 'false'}>
+                        <div>Phone: {d.phone}</div>
+                        <div>Email: {d.email}</div>
+                        <div>Website: <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
+                        <div>Address: {d.address}</div>
+                      </div>
                     </div>
-                    <div className="text-xs text-neutral-500 mt-1">Tags: {r.tags.join(', ')}</div>
-                    <button className="mt-2 text-sm rounded-full bg-neutral-900 text-white px-3 py-1.5">Contact</button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               {results.length > 3 && (
                 <>
                   <div className="mt-5 text-sm text-neutral-500">Other providers</div>
                   <div className="mt-2 grid grid-cols-1 gap-2">
-                    {results.slice(3).map((r) => (
-                      <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">{r.name}</div>
-                          <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                    {results.slice(3).map((r) => {
+                      const open = !!expanded[r.id]
+                      const d = getProviderDetails(r)
+                      return (
+                        <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="font-medium">{r.name}</div>
+                            <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                          </div>
+                          {(r.tags && r.tags.length > 0) && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {r.tags.slice(0, 3).map((t) => (
+                                <span key={t} className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-700 px-2 py-0.5 text-[11px]">{t}</span>
+                              ))}
+                            </div>
+                          )}
+                          <button onClick={() => setExpanded((e: Record<string, boolean>) => ({ ...e, [r.id]: !open }))} className="mt-2 text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5">{open ? 'Hide' : 'View'}</button>
+                          <div className="collapsible mt-3 text-sm" data-open={open ? 'true' : 'false'}>
+                              {d.images && (
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                  {d.images.map((src, idx) => (
+                                    <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
+                                  ))}
+                                </div>
+                              )}
+                              {d.reviews && (
+                                <div className="mt-2">
+                                  <div className="font-medium">Reviews</div>
+                                  <ul className="mt-1 space-y-1">
+                                    {d.reviews.map((rv, idx) => (
+                                      <li key={idx} className="text-neutral-700">
+                                        <span className="text-neutral-500">{rv.author}</span> — {rv.rating.toFixed(1)}★ — {rv.text}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {d.posts && (
+                                <div className="mt-2">
+                                  <div className="font-medium">Related Posts</div>
+                                  <ul className="mt-1 list-disc list-inside">
+                                    {d.posts.map((ps) => (
+                                      <li key={ps.id}><a className="text-neutral-700 hover:underline" href={ps.url || '#'}>{ps.title}</a></li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              <div className="mt-2">
+                                <div>Phone: {d.phone}</div>
+                                <div>Email: {d.email}</div>
+                                <div>Website: <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
+                                <div>Address: {d.address}</div>
+                              </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-neutral-500 mt-1">Tags: {r.tags.join(', ')}</div>
-                        <button className="mt-2 text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5">View</button>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </>
               )}
@@ -1128,6 +1359,7 @@ export default function App() {
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
             <Route path="category/:id" element={<CategoryPage />} />
+            <Route path="thank-you" element={<ThankYouPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

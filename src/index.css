@@ -21,3 +21,120 @@ body {
 .elevate {
   @apply shadow-sm hover:shadow-md transition-shadow duration-200;
 }
+
+/* Consistent buttons */
+.btn {
+  @apply rounded-full px-4 py-2 text-sm transition-colors duration-200;
+}
+.btn-primary {
+  @apply bg-neutral-900 text-white hover:bg-neutral-800;
+}
+.btn-secondary {
+  @apply bg-neutral-100 text-neutral-900 hover:bg-neutral-200;
+}
+
+/* Interactive UI helpers */
+.hover-gradient {
+  @apply hover:bg-gradient-to-br hover:from-neutral-50 hover:to-white;
+}
+
+.interactive-card {
+  @apply transition-transform duration-200 will-change-transform hover:-translate-y-0.5;
+}
+
+.btn-soft {
+  @apply transition-colors duration-200 hover:bg-neutral-200;
+}
+
+/* Skeleton loaders */
+.skeleton {
+  @apply animate-pulse bg-neutral-100 rounded-2xl;
+}
+
+.skeleton-inner {
+  @apply p-4;
+}
+
+.skeleton-line {
+  @apply h-3 w-full bg-neutral-200 rounded;
+}
+
+.skeleton-chip {
+  @apply h-4 w-24 bg-neutral-200 rounded-full;
+}
+
+/* Zoom-in on page mount */
+@keyframes bf-zoom-in { from { transform: scale(0.97); opacity: 0.96; } to { transform: scale(1); opacity: 1; } }
+.zoom-in { animation: bf-zoom-in 220ms ease-out both; }
+
+/* Global page fade on route change */
+@keyframes bf-fade-in { from { opacity: 0.0; } to { opacity: 1; } }
+.page-fade-in { animation: bf-fade-in 200ms ease-out both; }
+
+/* Slide out helpers */
+@keyframes bf-slide-out-left { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-12px); opacity: 0.96; } }
+@keyframes bf-slide-out-right { from { transform: translateX(0); opacity: 1; } to { transform: translateX(12px); opacity: 0.96; } }
+.slide-out-left { animation: bf-slide-out-left 180ms ease-in both; }
+.slide-out-right { animation: bf-slide-out-right 180ms ease-in both; }
+
+/* Slide-down/collapse helpers */
+.collapse { overflow: hidden; }
+.collapse > .collapse-content { max-height: 0; opacity: 0; transition: max-height 220ms ease, opacity 220ms ease; }
+.collapse[open] > .collapse-content { max-height: 600px; opacity: 1; }
+
+.collapsible { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 220ms ease, opacity 220ms ease; }
+.collapsible[data-open="true"] { max-height: 1200px; opacity: 1; }
+
+/* Form fade-in */
+@keyframes bf-form-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.form-fade { animation: bf-form-fade 220ms ease-out both; }
+
+/* Anchor target reveal (e.g., #apply) */
+#apply:target { animation: bf-form-fade 240ms ease-out both; }
+
+/* Confetti animation */
+@keyframes confetti-fall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(360deg); opacity: 0.9; }
+}
+
+/* Subtle sparkle on tap */
+.sparkle { position: relative; overflow: hidden; }
+.sparkle::after {
+  content: ""; position: absolute; inset: -40%;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.9), rgba(255,255,255,0) 40%);
+  opacity: 0; transform: scale(0.85);
+  animation: bf-sparkle 220ms ease-out;
+}
+@keyframes bf-sparkle { 0% { opacity: 0; transform: scale(0.85); } 50% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+
+/* Interactive UI helpers */
+.hover-gradient {
+  @apply hover:bg-gradient-to-br hover:from-neutral-50 hover:to-white;
+}
+
+.interactive-card {
+  @apply transition-transform duration-200 will-change-transform hover:-translate-y-0.5;
+}
+
+.btn-soft {
+  @apply transition-colors duration-200 hover:bg-neutral-200;
+}
+
+/* Skeleton loaders */
+.skeleton {
+  @apply animate-pulse bg-neutral-100 rounded-2xl;
+}
+
+.skeleton-inner {
+  @apply p-4;
+}
+
+.skeleton-line {
+  @apply h-3 w-full bg-neutral-200 rounded;
+}
+
+.skeleton-chip {
+  @apply h-4 w-24 bg-neutral-200 rounded-full;
+}
