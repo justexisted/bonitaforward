@@ -32,10 +32,12 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // Admins (comma-separated) can view all users' data. Example .env: VITE_ADMIN_EMAILS=you@example.com,other@example.com
-  const adminList = (import.meta.env.VITE_ADMIN_EMAILS || '')
+  // Default to the owner email if no env var is set.
+  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
     .split(',')
     .map((s: string) => s.trim().toLowerCase())
     .filter(Boolean)
+  const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
   const isAdmin = useMemo(() => !!auth.email && adminList.includes(auth.email.toLowerCase()), [auth.email, adminList])
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
 
@@ -90,6 +92,18 @@ export default function AdminPage() {
     )
   }
 
+  if (!isAdmin) {
+    return (
+      <section className="py-8">
+        <div className="container-px mx-auto max-w-3xl">
+          <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
+            Unauthorized. This page is restricted to administrators.
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-5xl">
@@ -132,6 +146,7 @@ export default function AdminPage() {
                 <div key={row.id} className="rounded-xl border border-neutral-200 p-3">
                   <div className="text-neutral-800 font-medium">{row.category}</div>
                   <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
+                  <div className="mt-1 text-xs text-neutral-600">User: {row.user_email}</div>
                   <ul className="mt-2 list-disc list-inside">
                     {Object.entries(row.answers).map(([k, v]) => (
                       <li key={k}>
