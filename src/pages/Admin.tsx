@@ -585,7 +585,18 @@ export default function AdminPage() {
                     <option value="professional-services">Professional Services — Top Professional Services of Bonita</option>
                   </select>
                   <input value={blogDraft.title} onChange={(e) => setBlogDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Post title" className="rounded-xl border border-neutral-200 px-3 py-2" />
-                  <textarea value={blogDraft.content} onChange={(e) => setBlogDraft((d) => ({ ...d, content: e.target.value }))} placeholder="Content (markdown/plain)" rows={8} className="rounded-xl border border-neutral-200 px-3 py-2"></textarea>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-neutral-500">Insert:</span>
+                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\n1. " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Numbered Title</button>
+                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\nThe vibe: " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">The vibe</button>
+                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\nWhy it makes the list: " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Why it makes the list</button>
+                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\nWhat to order: " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">What to order</button>
+                    <span className="text-neutral-500 ml-2">Emoji:</span>
+                    {['🍽️','🏠','💆','🏡','⭐','🔥','🥇','🍔','🍣','💡','📣','🏋️','💅','🧘','🏘️'].map((e) => (
+                      <button key={e} type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + e }))} className="px-2 py-1">{e}</button>
+                    ))}
+                  </div>
+                  <textarea value={blogDraft.content} onChange={(e) => setBlogDraft((d) => ({ ...d, content: e.target.value }))} placeholder="Write your post. Lines starting with '1. ...' render as big bold titles. Lines starting with 'The vibe:', 'Why it makes the list:', 'What to order:' are bolded labels." rows={10} className="rounded-xl border border-neutral-200 px-3 py-2"></textarea>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {

@@ -5,7 +5,7 @@ import { fetchLatestBlogPostByCategory, type BlogPost } from '../lib/supabaseDat
 const categoryToTitle: Record<string, string> = {
   'restaurants-cafes': 'Top 5 Restaurants This Month',
   'home-services': 'Bonita Home Service Deals',
-  'health-wellness': 'Wellness Spotlight',
+  'health-wellness': 'Wellness & Beauty Spotlight',
   'real-estate': 'Property Opportunities in Bonita',
   'professional-services': 'Top Professional Services of Bonita',
 }
@@ -64,7 +64,7 @@ export function CommunityPost() {
                 <article>
                   <h2 className="text-xl font-semibold">{post.title}</h2>
                   <div className="mt-1 text-xs text-neutral-500">{new Date(post.created_at).toLocaleString()}</div>
-                  <div className="mt-3 whitespace-pre-wrap">{post.content}</div>
+                  <div className="mt-3 space-y-2">{renderStyledContent(post.content)}</div>
                 </article>
               ) : (
                 <div className="text-neutral-600 text-sm">No post yet for this category.</div>
@@ -75,6 +75,39 @@ export function CommunityPost() {
       </div>
     </section>
   )
+}
+
+function renderStyledContent(content: string) {
+  const labelPatterns = [/^The vibe:/i, /^Why it makes the list:/i, /^What to order:/i]
+  const lines = content.split(/\r?\n/)
+  return lines.map((line, idx) => {
+    const numbered = line.match(/^\s*(\d+)\.\s+(.*)$/)
+    if (numbered) {
+      const num = numbered[1]
+      const rest = numbered[2]
+      return (
+        <div key={idx} className="mt-4">
+          <div className="text-lg sm:text-xl font-semibold">{num}. {rest}</div>
+        </div>
+      )
+    }
+    // Bold known labels at start of line
+    for (const pat of labelPatterns) {
+      if (pat.test(line)) {
+        const [label, body] = [line.match(pat)![0], line.replace(pat, '').trimStart()]
+        return (
+          <div key={idx} className="text-sm text-neutral-800">
+            <span className="font-semibold">{label} </span>
+            <span>{body}</span>
+          </div>
+        )
+      }
+    }
+    // Default paragraph
+    return (
+      <div key={idx} className="text-sm text-neutral-800 whitespace-pre-wrap">{line}</div>
+    )
+  })
 }
 
 
