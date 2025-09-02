@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
+import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, type BlogPost } from '../lib/supabaseData'
 
 type ProviderRow = {
   id: string
@@ -70,6 +71,9 @@ export default function AdminPage() {
   const [bizApps, setBizApps] = useState<BusinessApplicationRow[]>([])
   const [contactLeads, setContactLeads] = useState<ContactLeadRow[]>([])
   const [message, setMessage] = useState<string | null>(null)
+  const [confirmDeleteProviderId, setConfirmDeleteProviderId] = useState<string | null>(null)
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
+  const [blogDraft, setBlogDraft] = useState<{ id?: string; category_key: string; title: string; content: string }>({ category_key: 'restaurants-cafes', title: '', content: '' })
   // Admins (comma-separated) can view all users' data. Example .env: VITE_ADMIN_EMAILS=you@example.com,other@example.com
   // Default to the owner email if no env var is set.
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
@@ -123,6 +127,10 @@ export default function AdminPage() {
           if (pErr) { console.error('[Admin] providers error', pErr); setError((prev) => prev ?? pErr.message) }
           setProviders((pData as ProviderRow[]) || [])
         }
+        try {
+          const posts = await fetchAllBlogPosts()
+          setBlogPosts(posts)
+        } catch {}
       } catch (err: any) {
         console.error('[Admin] unexpected failure', err)
         if (!cancelled) setError(err?.message || 'Failed to load')
@@ -228,6 +236,54 @@ export default function AdminPage() {
       setMessage('Provider saved')
       try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
     }
+  }
+
+  async function deleteProvider(providerId: string) {
+    setMessage(null)
+    setConfirmDeleteProviderId(null)
+    const res = await supabase.from('providers').delete().eq('id', providerId).select('id')
+    if (res.error) {
+      setError(res.error.message)
+      return
+    }
+    const deletedCount = Array.isArray(res.data) ? res.data.length : 0
+    if (deletedCount === 0) {
+      // Fallback: soft-delete by tagging as 'deleted' if hard delete is not permitted
+      try {
+        const { data: row, error: selErr } = await supabase.from('providers').select('badges').eq('id', providerId).single()
+        if (selErr) {
+          setError('Delete failed and could not load row for archive. Check permissions.')
+          return
+        }
+        const badges = Array.isArray(row?.badges) ? row?.badges as string[] : []
+        const next = Array.from(new Set([...(badges || []), 'deleted']))
+        const { error: updErr } = await supabase.from('providers').update({ badges: next as any }).eq('id', providerId)
+        if (updErr) {
+          setError('Delete failed and archive failed. Check permissions.')
+          return
+        }
+        setMessage('Provider archived (soft-deleted)')
+      } catch {
+        setError('Delete failed and archive failed. Check permissions.')
+        return
+      }
+    }
+    else {
+      setMessage(`Provider deleted (${deletedCount})`)
+    }
+
+    // In both cases (hard/soft), refresh the providers list from DB
+    try {
+      const { data: pData, error: pErr } = await supabase.from('providers').select('*').order('name', { ascending: true })
+      if (pErr) {
+        setProviders((arr) => arr.filter((p) => p.id !== providerId))
+      } else {
+        setProviders((pData as ProviderRow[]) || [])
+      }
+    } catch {
+      setProviders((arr) => arr.filter((p) => p.id !== providerId))
+    }
+    try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
   }
 
   if (!auth.email) {
@@ -494,6 +550,19 @@ export default function AdminPage() {
                       </div>
                       <div className="mt-2">
                         <button onClick={() => saveProvider(providers[0])} className="btn btn-secondary text-xs">Save</button>
+                        <button
+                          onClick={() => {
+                            const id = providers[0].id
+                            if (confirmDeleteProviderId === id) deleteProvider(id)
+                            else setConfirmDeleteProviderId(id)
+                          }}
+                          className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs ml-2"
+                        >
+                          {confirmDeleteProviderId === providers[0].id ? 'Confirm' : 'Delete'}
+                        </button>
+                        {confirmDeleteProviderId === providers[0].id && (
+                          <button onClick={() => setConfirmDeleteProviderId(null)} className="text-xs underline text-neutral-500 ml-2">Cancel</button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -502,9 +571,69 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+        {isAdmin && (
+          <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white">
+            <div className="font-medium">Blog Post Manager</div>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="md:col-span-2">
+                <div className="grid grid-cols-1 gap-2">
+                  <select value={blogDraft.category_key} onChange={(e) => setBlogDraft((d) => ({ ...d, category_key: e.target.value }))} className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
+                    <option value="restaurants-cafes">Restaurants & Cafés — Top 5 Restaurants This Month</option>
+                    <option value="home-services">Home Services — Bonita Home Service Deals</option>
+                    <option value="health-wellness">Health & Wellness — Wellness Spotlight</option>
+                    <option value="real-estate">Real Estate — Property Opportunities in Bonita</option>
+                    <option value="professional-services">Professional Services — Top Professional Services of Bonita</option>
+                  </select>
+                  <input value={blogDraft.title} onChange={(e) => setBlogDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Post title" className="rounded-xl border border-neutral-200 px-3 py-2" />
+                  <textarea value={blogDraft.content} onChange={(e) => setBlogDraft((d) => ({ ...d, content: e.target.value }))} placeholder="Content (markdown/plain)" rows={8} className="rounded-xl border border-neutral-200 px-3 py-2"></textarea>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        setError(null); setMessage(null)
+                        const { error } = await upsertBlogPost({ id: blogDraft.id, category_key: blogDraft.category_key, title: blogDraft.title, content: blogDraft.content } as any)
+                        if (error) setError(error)
+                        else {
+                          setMessage('Blog post saved')
+                          const posts = await fetchAllBlogPosts()
+                          setBlogPosts(posts)
+                          setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })
+                        }
+                      }}
+                      className="btn btn-secondary text-xs"
+                    >
+                      Save Post
+                    </button>
+                    {blogDraft.id && (
+                      <button onClick={() => setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })} className="text-xs underline">New</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 mb-1">Existing Posts</div>
+                <div className="space-y-2 max-h-80 overflow-auto pr-1">
+                  {blogPosts.length === 0 && <div className="text-neutral-500">No posts yet.</div>}
+                  {blogPosts.map((bp) => (
+                    <div key={bp.id} className="rounded-xl border border-neutral-200 p-2">
+                      <div className="font-medium text-sm">{bp.title}</div>
+                      <div className="text-[11px] text-neutral-500">{bp.category_key} • {new Date(bp.created_at).toLocaleString()}</div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <button onClick={() => setBlogDraft({ id: bp.id, category_key: bp.category_key, title: bp.title, content: bp.content })} className="btn btn-secondary text-xs">Edit</button>
+                        <button onClick={async () => { const { error } = await deleteBlogPost(bp.id); if (error) setError(error); else { setMessage('Post deleted'); setBlogPosts((arr) => arr.filter((p) => p.id !== bp.id)) } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
 }
+
+// Blog Post Manager UI block will be rendered below the providers section
+// Inserted at bottom of file in the returned JSX above
 
 

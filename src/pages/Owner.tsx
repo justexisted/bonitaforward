@@ -15,6 +15,7 @@ type ProviderRow = {
   address: string | null
   images: string[] | null
   owner_user_id: string | null
+  is_member?: boolean | null
 }
 
 export default function OwnerPage() {
@@ -22,6 +23,7 @@ export default function OwnerPage() {
   const [loading, setLoading] = useState(true)
   const [providers, setProviders] = useState<ProviderRow[]>([])
   const [message, setMessage] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -77,6 +79,41 @@ export default function OwnerPage() {
     else setMessage('Saved')
   }
 
+  async function deleteProvider(id: string) {
+    setMessage(null)
+    // Only allow delete for owned rows (RLS should enforce; we also guard client-side)
+    const row = providers.find((p) => p.id === id)
+    if (!row || row.owner_user_id !== userId) {
+      setMessage('You can only delete businesses you own')
+      return
+    }
+    const { error } = await supabase.from('providers').delete().eq('id', id)
+    if (error) setMessage('Delete failed: ' + error.message)
+    else {
+      setMessage('Business deleted')
+      void load()
+    }
+  }
+
+  async function requestFeatured(p: ProviderRow) {
+    setMessage(null)
+    try {
+      const payload = {
+        full_name: null as any,
+        business_name: p.name as any,
+        email: (email || p.email || null) as any,
+        phone: (p.phone || null) as any,
+        category: p.category_key as any,
+        challenge: 'Request to be Featured — $100/mo' as any,
+      }
+      const { error } = await supabase.from('business_applications').insert([payload])
+      if (error) setMessage('Request failed: ' + error.message)
+      else setMessage('Request sent. We will contact you about featuring ($100/mo).')
+    } catch (err: any) {
+      setMessage('Request failed: ' + (err?.message || 'Unknown error'))
+    }
+  }
+
   if (!userId) {
     return <div className="py-8"><div className="rounded-2xl border border-neutral-100 p-5 bg-white">Please sign in to manage your business.</div></div>
   }
@@ -100,6 +137,12 @@ export default function OwnerPage() {
                     <div>
                       <div className="font-medium">{p.name}</div>
                       <div className="text-xs text-neutral-500">Category: {p.category_key}</div>
+                      <div className="text-xs mt-1">
+                        <span className="text-neutral-500">Featured:</span>{' '}
+                        <span className={p.is_member ? 'text-emerald-700' : 'text-neutral-700'}>
+                          {p.is_member ? 'Yes' : 'No'}
+                        </span>
+                      </div>
                     </div>
                     {!p.owner_user_id && p.email && email && p.email.toLowerCase() === email.toLowerCase() ? (
                       <button onClick={() => claimProvider(p.id)} className="btn btn-primary text-xs">Claim</button>
@@ -115,6 +158,20 @@ export default function OwnerPage() {
                   </div>
                   <div className="mt-3">
                     <button onClick={() => saveProvider(p)} className="btn btn-secondary">Save</button>
+                    {p.owner_user_id === userId && (
+                      <button
+                        onClick={() => {
+                          if (confirmDeleteId === p.id) deleteProvider(p.id)
+                          else setConfirmDeleteId(p.id)
+                        }}
+                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs ml-2"
+                      >
+                        {confirmDeleteId === p.id ? 'Confirm' : 'Delete'}
+                      </button>
+                    )}
+                    {!p.is_member && (
+                      <button onClick={() => requestFeatured(p)} className="ml-2 btn btn-primary text-xs">Request to be Featured ($100/mo)</button>
+                    )}
                   </div>
                 </div>
               ))}

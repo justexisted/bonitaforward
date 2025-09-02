@@ -1,12 +1,13 @@
-import { BrowserRouter, Routes, Route, Link, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate } from 'react-router-dom'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles, Menu, X } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
-import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets'
-import { fetchProvidersFromSupabase } from './lib/supabaseData'
+import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
+import { fetchProvidersFromSupabase } from './lib/supabaseData.ts'
 import SignInPage from './pages/SignIn'
+import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
 
@@ -154,6 +155,12 @@ export function useAuth() {
 function Navbar() {
   const auth = useAuth()
   const [open, setOpen] = useState(false)
+  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
+    .split(',')
+    .map((s: string) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
+  const isAdmin = !!auth.email && adminList.includes(auth.email.toLowerCase())
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
       <Container className="flex items-center justify-between h-14">
@@ -169,12 +176,12 @@ function Navbar() {
           </button>
           <nav className="hidden sm:flex items-center gap-3 text-sm">
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/about">About</Link>
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/contact">Get Featured</Link>
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/community">Community</Link>
             {auth.isAuthed && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/owner">My Business</Link>
             )}
-            {auth.isAuthed && (
+            {isAdmin && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/admin">Admin</Link>
             )}
             {!auth.isAuthed ? (
@@ -197,12 +204,12 @@ function Navbar() {
           <Container className="py-3 text-sm">
             <div className="flex flex-col gap-2">
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/about">About</Link>
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/contact">Get Featured</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/community">Community</Link>
               {auth.isAuthed && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/owner">My Business</Link>
               )}
-              {auth.isAuthed && (
+              {isAdmin && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/admin">Admin</Link>
               )}
               {!auth.isAuthed ? (
@@ -284,22 +291,24 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
 }
 
 function CommunitySection() {
-  const posts = [
-    { title: 'Top 5 Restaurants This Month', excerpt: 'Discover trending dining spots loved by Bonita locals.' },
-    { title: 'Bonita Home Service Deals', excerpt: 'Seasonal offers from trusted local pros.' },
-    { title: 'Wellness Spotlight', excerpt: 'Chiropractors, gyms, and med spas to try now.' },
+  const cards = [
+    { category: 'restaurants-cafes', title: 'Top 5 Restaurants This Month', excerpt: 'Discover trending dining spots loved by Bonita locals.' },
+    { category: 'home-services', title: 'Bonita Home Service Deals', excerpt: 'Seasonal offers from trusted local pros.' },
+    { category: 'health-wellness', title: 'Wellness Spotlight', excerpt: 'Chiropractors, gyms, and med spas to try now.' },
+    { category: 'real-estate', title: 'Property Opportunities in Bonita', excerpt: 'Latest properties and market highlights.' },
+    { category: 'professional-services', title: 'Top Professional Services of Bonita', excerpt: 'Standout legal, accounting, and consulting pros.' },
   ]
   return (
     <section className="py-8 zoom-in">
       <Container>
         <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Community</h2>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {posts.map((p) => (
-            <div key={p.title} className="rounded-2xl border border-neutral-100 p-4 bg-white elevate">
-              <div className="font-medium">{p.title}</div>
-              <div className="text-sm text-neutral-600 mt-1">{p.excerpt}</div>
-              <button className="mt-3 text-sm text-neutral-700 hover:text-neutral-900">Read more</button>
-            </div>
+          {cards.map((c) => (
+            <Link key={c.title} to={`/community/${c.category}`} className="rounded-2xl border border-neutral-100 p-4 bg-white elevate block hover:shadow-sm">
+              <div className="font-medium">{c.title}</div>
+              <div className="text-sm text-neutral-600 mt-1">{c.excerpt}</div>
+              <span className="mt-3 inline-flex items-center text-sm text-neutral-700 hover:text-neutral-900">Read more</span>
+            </Link>
           ))}
         </div>
       </Container>
@@ -393,7 +402,7 @@ const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
   'real-estate': [
     // real-estate is built dynamically via getFunnelQuestions; this serves as a fallback
     { id: 'need', prompt: 'What do you need help with?', options: [ { id: 'buy', label: 'Buying' }, { id: 'sell', label: 'Selling' }, { id: 'rent', label: 'Renting' } ] },
-    { id: 'timeline', prompt: 'What’s your timeline?', options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] },
+    { id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] },
     { id: 'budget', prompt: 'Approximate budget?', options: [ { id: 'entry', label: '$' }, { id: 'mid', label: '$$' }, { id: 'high', label: '$$$' } ] },
     { id: 'beds', prompt: 'Bedrooms', options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4', label: '4+' } ] },
   ],
@@ -765,7 +774,13 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
     const values = new Set<string>(Object.values(answers))
     const need = answers['need']
     const propertyType = answers['property_type']
+    const wantsStaging = answers['staging'] === 'yes'
+    const stagerTags = new Set(['stager','staging'])
     return providers
+      .filter((p) => {
+        const isStager = (p.tags || []).some((t) => stagerTags.has(t))
+        return wantsStaging ? true : !isStager
+      })
       .map((p) => {
         let score = 0
         // Strong signals
@@ -776,7 +791,7 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         if (answers['move_when'] && p.tags.includes(answers['move_when'])) score += 1
         if (answers['budget'] && p.tags.includes(answers['budget'])) score += 1
         if (answers['beds'] && p.tags.includes(answers['beds'])) score += 1
-        if (answers['staging'] === 'yes' && p.tags.includes('staging')) score += 1
+        if (wantsStaging && (p.tags.includes('staging') || p.tags.includes('stager'))) score += 1
         // Generic tag match fallback
         p.tags.forEach((t) => { if (values.has(t)) score += 0 })
         return { p, score }
@@ -1029,9 +1044,9 @@ function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, st
     if (isResidential(propertyType)) {
       list.push({ id: 'beds', prompt: 'Bedrooms needed?', options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4+', label: '4+' } ] })
     } else if (isLandOrCommercial(propertyType)) {
-      list.push({ id: 'timeline', prompt: 'What’s your timeline?', options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
+      list.push({ id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
     } else {
-      list.push({ id: 'timeline', prompt: 'What’s your timeline?', options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
+      list.push({ id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
     }
     return list.slice(0, 4)
   }
@@ -1058,6 +1073,7 @@ function Funnel({ category }: { category: typeof categories[number] }) {
   const current = questions[step]
   const auth = useAuth()
   const initializedRef = useRef(false)
+  const navigate = useNavigate()
 
   // On mount, hydrate answers from localStorage so users never re-enter
   useEffect(() => {
@@ -1126,35 +1142,19 @@ function Funnel({ category }: { category: typeof categories[number] }) {
               ))}
             </ul>
             <div className="mt-4">
-              {!auth.isAuthed && (
-                <div className="rounded-xl border border-neutral-200 p-3">
-                  <div className="text-sm text-neutral-600">Sign up for discounts</div>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement)?.value
-                      const email = (e.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value
-                      auth.signInLocal({ name, email })
-                      try {
-                        const key = `bf-signup-${category.key}`
-                        localStorage.setItem(key, JSON.stringify({ email, answers }))
-                      } catch {}
-                    }}
-                    className="mt-2 flex-col sm:flex-row gap-2"
-                  >
-                    <input name="name" placeholder="Your name" className="flex-1 rounded-full border border-neutral-200 px-3 py-2 w-full m-0.5" />
-                    <input name="email" type="email" required placeholder="you@example.com" className="flex-1 rounded-full border border-neutral-200 px-3 py-2 w-full m-0.5" />
-                    <button className="btn btn-primary">Sign Up</button>
-                  </form>
-                  <div className="mt-2 text-center">
-                    <button onClick={auth.signInWithGoogle} className="btn btn-secondary text-sm">Or continue with Google</button>
-                  </div>
-                </div>
-              )}
-              <div className="mt-3 flex flex-col gap-2">
+              <div className="flex flex-col gap-2">
                 <Link
                   to={`/book?category=${category.key}`}
                   onClick={(e) => {
+                    if (!auth.isAuthed) {
+                      e.preventDefault()
+                      const card = (e.currentTarget.closest('section') as HTMLElement) || document.body
+                      card.classList.add('slide-out-right')
+                      setTimeout(() => {
+                        navigate('/signin', { state: { from: `/book?category=${category.key}` } })
+                      }, 160)
+                      return
+                    }
                     const card = (e.currentTarget.closest('section') as HTMLElement) || document.body
                     card.classList.add('slide-out-right')
                     setTimeout(() => {
@@ -1197,12 +1197,21 @@ function CategoryPage() {
   const Icon = category.icon
   const [, setVersion] = useState(0)
   const [showAll, setShowAll] = useState(false)
+  const answers = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem(`bf-tracking-${category.key}`) || '{}') } catch { return {} }
+  }, [category.key])
   useEffect(() => {
     function onUpdate() { setVersion((v: number) => v + 1) }
     window.addEventListener('bf-providers-updated', onUpdate as EventListener)
     return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
   }, [])
-  const list = providersByCategory[category.key] || []
+  const listAll = providersByCategory[category.key] || []
+  const wantsStaging = answers['staging'] === 'yes'
+  const list = listAll.filter((p) => {
+    const tags = (p.tags || []) as string[]
+    const isStager = tags.includes('stager') || tags.includes('staging')
+    return wantsStaging ? true : !isStager
+  })
   const featured = list.slice(0, 4)
   const remaining = list.slice(4)
   return (
@@ -1728,6 +1737,8 @@ export default function App() {
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="signin" element={<SignInPage />} />
+            <Route path="community" element={<CommunityIndex />} />
+            <Route path="community/:category" element={<CommunityPost />} />
             <Route path="admin" element={<AdminPage />} />
             <Route path="owner" element={<OwnerPage />} />
             <Route path="book" element={<BookPage />} />
