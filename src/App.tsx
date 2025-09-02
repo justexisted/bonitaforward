@@ -558,7 +558,28 @@ type Provider = {
   category: CategoryKey
   tags: string[]
   rating?: number
+  phone?: string | null
+  email?: string | null
+  website?: string | null
+  address?: string | null
+  isMember?: boolean
 }
+function ensureDemoMembers(input: Record<CategoryKey, Provider[]>): Record<CategoryKey, Provider[]> {
+  const out: Record<CategoryKey, Provider[]> = {
+    'real-estate': [],
+    'home-services': [],
+    'health-wellness': [],
+    'restaurants-cafes': [],
+    'professional-services': [],
+  };
+  (Object.keys(input) as CategoryKey[]).forEach((k: CategoryKey) => {
+    const key = k
+    const arr = input[key] || []
+    out[key] = arr.map((p: Provider, idx: number) => ({ ...p, isMember: Boolean(p.isMember) || idx < 3 }))
+  })
+  return out
+}
+
 
 type ProviderDetails = {
   phone?: string
@@ -594,10 +615,10 @@ function getProviderDetails(p: Provider): ProviderDetails {
   // Placeholder details; in production, fetch from DB/API
   const seed = encodeURIComponent(p.id)
   return {
-    phone: '(619) 555-0123',
-    email: 'info@' + p.name.replace(/\s+/g, '').toLowerCase() + '.com',
-    website: 'https://example.com/' + seed,
-    address: 'Bonita, CA',
+    phone: p.phone || undefined,
+    email: p.email || undefined,
+    website: p.website || undefined,
+    address: p.address || undefined,
     images: [
       `https://picsum.photos/seed/${seed}-1/400/240`,
       `https://picsum.photos/seed/${seed}-2/400/240`,
@@ -615,41 +636,41 @@ function getProviderDetails(p: Provider): ProviderDetails {
 
 let providersByCategory: Record<CategoryKey, Provider[]> = {
   'real-estate': [
-    { id: 're-1', name: 'Bonita Realty Group', category: 'real-estate', tags: ['buy', '0-3', 'entry', '2', '3'], rating: 4.9 },
-    { id: 're-2', name: 'South Bay Homes', category: 'real-estate', tags: ['buy', '3-6', 'mid', '3', '4+'], rating: 4.8 },
-    { id: 're-3', name: 'Vista Property Pros', category: 'real-estate', tags: ['sell', 'now', '750-1200', '3', '4+'], rating: 4.7 },
+    { id: 're-1', name: 'Bonita Realty Group', category: 'real-estate', tags: ['buy', '0-3', 'entry', '2', '3'], rating: 4.9, isMember: true },
+    { id: 're-2', name: 'South Bay Homes', category: 'real-estate', tags: ['buy', '3-6', 'mid', '3', '4+'], rating: 4.8, isMember: true },
+    { id: 're-3', name: 'Vista Property Pros', category: 'real-estate', tags: ['sell', 'now', '750-1200', '3', '4+'], rating: 4.7, isMember: true },
     { id: 're-4', name: 'Bonita Rentals Co', category: 'real-estate', tags: ['rent', 'this-month', 'low', '1', '2'], rating: 4.6 },
     { id: 're-5', name: 'Canyon Estates', category: 'real-estate', tags: ['sell', '60+', '1200+', '4+'], rating: 4.6 },
     { id: 're-6', name: 'Coastal Keys', category: 'real-estate', tags: ['buy', '6+', 'high', '4+'], rating: 4.5 },
   ],
   'home-services': [
-    { id: 'hs-1', name: 'GreenLeaf Landscaping', category: 'home-services', tags: ['landscaping', 'asap', 'house', 'low'], rating: 4.9 },
-    { id: 'hs-2', name: 'SunBright Solar', category: 'home-services', tags: ['solar', 'this-month', 'house', 'high'], rating: 4.8 },
-    { id: 'hs-3', name: 'Sparkle Clean', category: 'home-services', tags: ['cleaning', 'asap', 'condo', 'low'], rating: 4.7 },
+    { id: 'hs-1', name: 'GreenLeaf Landscaping', category: 'home-services', tags: ['landscaping', 'asap', 'house', 'low'], rating: 4.9, isMember: true },
+    { id: 'hs-2', name: 'SunBright Solar', category: 'home-services', tags: ['solar', 'this-month', 'house', 'high'], rating: 4.8, isMember: true },
+    { id: 'hs-3', name: 'Sparkle Clean', category: 'home-services', tags: ['cleaning', 'asap', 'condo', 'low'], rating: 4.7, isMember: true },
     { id: 'hs-4', name: 'Bonita Remodel Co', category: 'home-services', tags: ['remodeling', 'flexible', 'house', 'med'], rating: 4.7 },
     { id: 'hs-5', name: 'CondoCare Pros', category: 'home-services', tags: ['cleaning', 'this-month', 'condo', 'med'], rating: 4.6 },
     { id: 'hs-6', name: 'YardWorks', category: 'home-services', tags: ['landscaping', 'flexible', 'house', 'med'], rating: 4.5 },
   ],
   'health-wellness': [
-    { id: 'hw-1', name: 'Bonita Chiro Clinic', category: 'health-wellness', tags: ['chiro', 'relief', 'this-week', 'one-off'], rating: 4.9 },
-    { id: 'hw-2', name: 'Peak Fitness Gym', category: 'health-wellness', tags: ['gym', 'fitness', 'this-month', 'membership'], rating: 4.8 },
-    { id: 'hw-3', name: 'Glow Salon', category: 'health-wellness', tags: ['salon', 'beauty', 'this-week', 'one-off'], rating: 4.7 },
+    { id: 'hw-1', name: 'Bonita Chiro Clinic', category: 'health-wellness', tags: ['chiro', 'relief', 'this-week', 'one-off'], rating: 4.9, isMember: true },
+    { id: 'hw-2', name: 'Peak Fitness Gym', category: 'health-wellness', tags: ['gym', 'fitness', 'this-month', 'membership'], rating: 4.8, isMember: true },
+    { id: 'hw-3', name: 'Glow Salon', category: 'health-wellness', tags: ['salon', 'beauty', 'this-week', 'one-off'], rating: 4.7, isMember: true },
     { id: 'hw-4', name: 'Serene Med Spa', category: 'health-wellness', tags: ['medspa', 'beauty', 'later', 'one-off'], rating: 4.7 },
     { id: 'hw-5', name: 'Core Strength Club', category: 'health-wellness', tags: ['gym', 'fitness', 'later', 'membership'], rating: 4.6 },
     { id: 'hw-6', name: 'Align & Thrive', category: 'health-wellness', tags: ['chiro', 'relief', 'this-month', 'one-off'], rating: 4.6 },
   ],
   'restaurants-cafes': [
-    { id: 'rc-1', name: 'Casa Bonita', category: 'restaurants-cafes', tags: ['mexican', 'casual', 'low', 'dine'], rating: 4.8 },
-    { id: 'rc-2', name: 'Bamboo Grove', category: 'restaurants-cafes', tags: ['asian', 'date', 'med', 'dine'], rating: 4.7 },
-    { id: 'rc-3', name: 'Bluebird Café', category: 'restaurants-cafes', tags: ['cafes', 'casual', 'low', 'takeout'], rating: 4.7 },
+    { id: 'rc-1', name: 'Casa Bonita', category: 'restaurants-cafes', tags: ['mexican', 'casual', 'low', 'dine'], rating: 4.8, isMember: true },
+    { id: 'rc-2', name: 'Bamboo Grove', category: 'restaurants-cafes', tags: ['asian', 'date', 'med', 'dine'], rating: 4.7, isMember: true },
+    { id: 'rc-3', name: 'Bluebird Café', category: 'restaurants-cafes', tags: ['cafes', 'casual', 'low', 'takeout'], rating: 4.7, isMember: true },
     { id: 'rc-4', name: 'Bonita Grill', category: 'restaurants-cafes', tags: ['american', 'family', 'med', 'dine'], rating: 4.6 },
     { id: 'rc-5', name: 'Salsa Verde', category: 'restaurants-cafes', tags: ['mexican', 'family', 'med', 'dine'], rating: 4.6 },
     { id: 'rc-6', name: 'Noodle Haus', category: 'restaurants-cafes', tags: ['asian', 'casual', 'low', 'takeout'], rating: 4.5 },
   ],
   'professional-services': [
-    { id: 'ps-1', name: 'Bonita Legal', category: 'professional-services', tags: ['attorney', 'advice', 'now', 'med'], rating: 4.9 },
-    { id: 'ps-2', name: 'Summit Accounting', category: 'professional-services', tags: ['accountant', 'ongoing', 'soon', 'low'], rating: 4.8 },
-    { id: 'ps-3', name: 'Citrus Consulting', category: 'professional-services', tags: ['consultant', 'project', 'flex', 'high'], rating: 4.7 },
+    { id: 'ps-1', name: 'Bonita Legal', category: 'professional-services', tags: ['attorney', 'advice', 'now', 'med'], rating: 4.9, isMember: true },
+    { id: 'ps-2', name: 'Summit Accounting', category: 'professional-services', tags: ['accountant', 'ongoing', 'soon', 'low'], rating: 4.8, isMember: true },
+    { id: 'ps-3', name: 'Citrus Consulting', category: 'professional-services', tags: ['consultant', 'project', 'flex', 'high'], rating: 4.7, isMember: true },
     { id: 'ps-4', name: 'South Bay Counsel', category: 'professional-services', tags: ['attorney', 'project', 'now', 'high'], rating: 4.7 },
     { id: 'ps-5', name: 'Ledger Pros', category: 'professional-services', tags: ['accountant', 'advice', 'soon', 'med'], rating: 4.6 },
     { id: 'ps-6', name: 'Coastline Strategy', category: 'professional-services', tags: ['consultant', 'ongoing', 'flex', 'high'], rating: 4.5 },
@@ -673,7 +694,7 @@ async function loadProvidersFromSheet(): Promise<void> {
         grouped[cat].push({ id: sp.id, name: sp.name, category: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
       }
     })
-    providersByCategory = grouped
+    providersByCategory = ensureDemoMembers(grouped)
     console.log('[Sheets] Providers loaded from Google Sheets', grouped)
   } catch (err) {
     console.warn('[Sheets] Failed to load providers from Google Sheets, using defaults', err)
@@ -700,9 +721,14 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       category: key,
       tags: (r.tags as string[] | null) || (r.badges as string[] | null) || [],
       rating: r.rating ?? undefined,
+      phone: r.phone ?? null,
+      email: r.email ?? null,
+      website: r.website ?? null,
+      address: r.address ?? null,
+      isMember: Boolean((r as any).is_member ?? (r as any).member ?? ((r as any).plan === 'paid') ?? ((r as any).tier === 'paid')),
     })
   })
-  providersByCategory = grouped
+  providersByCategory = ensureDemoMembers(grouped)
   console.log('[Supabase] Providers loaded', grouped)
   try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
   return true
@@ -767,7 +793,9 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
   const values = new Set<string>(Object.values(answers))
   const withScores = providers.map((p) => {
     const matches = p.tags.reduce((acc, t) => acc + (values.has(t) ? 1 : 0), 0)
-    return { p, score: matches }
+    // Paid members get a slight priority bump so they float up in "Other providers"
+    const bonus = p.isMember ? 0.5 : 0
+    return { p, score: matches + bonus }
   })
   withScores.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score
@@ -1200,7 +1228,12 @@ function CategoryPage() {
                         {featured.map((p) => (
                           <li key={p.id} className="">
                             <div className="flex items-center justify-between">
-                              <span>{p.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span>{p.name}</span>
+                                {p.isMember && (
+                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
+                                )}
+                              </div>
                               {typeof p.rating === 'number' && (
                                 <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
                               )}
@@ -1221,7 +1254,12 @@ function CategoryPage() {
                             <ul className="text-sm text-neutral-700 space-y-1">
                               {remaining.map((p) => (
                                 <li key={p.id} className="flex items-center justify-between">
-                                  <span>{p.name}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span>{p.name}</span>
+                                    {p.isMember && (
+                                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
+                                    )}
+                                  </div>
                                   {typeof p.rating === 'number' && (
                                     <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
                                   )}
@@ -1316,8 +1354,8 @@ function BusinessPage() {
         <div id="how" className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { title: 'Step 1: Exposure', text: 'Your business gets featured on Bonita Forward — the local hub residents already trust.' },
-            { title: 'Step 2: Lead Capture', text: 'We build a smart funnel that captures Bonita residents ready to buy.' },
-            { title: 'Step 3: Growth', text: 'You receive qualified leads weekly — no more chasing, just closing.' },
+            { title: 'Step 2: Customers Find You', text: 'We ask Bonita residents what they want.' },
+            { title: 'Step 3: Growth', text: 'You receive customers weekly — no more chasing, just closing.' },
           ].map((s) => (
             <div key={s.title} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
               <div className="font-medium select-none cursor-default">{s.title}</div>
@@ -1480,24 +1518,20 @@ function BookPage() {
           <p className="mt-1 text-neutral-600">Access to top Bonita {category?.name.toLowerCase() || 'providers'}.</p>
           {auth.isAuthed || submitted || results.length > 0 ? (
             <div className="mt-5 text-left">
-              {/* Example Businesses (placeholder) */}
-              <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
-                <div className="text-sm font-medium">Example Businesses</div>
-                <ul className="mt-2 text-sm text-neutral-600 list-disc list-inside">
-                  {(providersByCategory[categoryKey] || []).slice(0, 3).map((p) => (
-                    <li key={p.id}>{p.name}</li>
-                  ))}
-                </ul>
-              </div>
-
               <div className="mt-4 text-sm text-neutral-500">Top matches</div>
               <div className="mt-2 grid grid-cols-1 gap-2">
                 {results.slice(0, 3).map((r) => {
                   const d = getProviderDetails(r)
+                  const canShowRich = Boolean(r.isMember)
                   return (
                     <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                       <div className="flex items-center justify-between">
-                        <div className="font-medium">{r.name}</div>
+                        <div className="font-medium flex items-center gap-2">
+                          {r.name}
+                          {r.isMember && (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
+                          )}
+                        </div>
                         <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                       </div>
                       {isAdmin && (r.tags && r.tags.length > 0) && (
@@ -1507,14 +1541,14 @@ function BookPage() {
                           ))}
                         </div>
                       )}
-                      {d.images && (
+                      {canShowRich && d.images && (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           {d.images.map((src, idx) => (
                             <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
                           ))}
                         </div>
                       )}
-                      {d.reviews && (
+                      {canShowRich && d.reviews && (
                         <div className="mt-3">
                           <div className="font-medium text-sm">Reviews</div>
                           <ul className="mt-1 space-y-1 text-sm">
@@ -1526,7 +1560,7 @@ function BookPage() {
                           </ul>
                         </div>
                       )}
-                      {d.posts && (
+                      {canShowRich && d.posts && (
                         <div className="mt-3">
                           <div className="font-medium text-sm">Related Posts</div>
                           <ul className="mt-1 list-disc list-inside text-sm">
@@ -1537,10 +1571,12 @@ function BookPage() {
                         </div>
                       )}
                       <div className="mt-3 text-sm">
-                        <div>Phone: {d.phone}</div>
-                        <div>Email: {d.email}</div>
-                        <div>Website: <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
-                        <div>Address: {d.address}</div>
+                        {d.phone && <div>📞 {d.phone}</div>}
+                        {canShowRich && d.email && <div>✉️ {d.email}</div>}
+                        {canShowRich && d.website && (
+                          <div>🔗 <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
+                        )}
+                        {d.address && <div>📍 {d.address}</div>}
                       </div>
                     </div>
                   )
@@ -1556,7 +1592,12 @@ function BookPage() {
                       return (
                         <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                           <div className="flex items-center justify-between">
-                            <div className="font-medium">{r.name}</div>
+                            <div className="font-medium flex items-center gap-2">
+                              {r.name}
+                              {r.isMember && (
+                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
+                              )}
+                            </div>
                             <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                           </div>
                           {isAdmin && (r.tags && r.tags.length > 0) && (
@@ -1568,14 +1609,14 @@ function BookPage() {
                           )}
                           <button onClick={() => setExpanded((e: Record<string, boolean>) => ({ ...e, [r.id]: !open }))} className="mt-2 text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5">{open ? 'Hide' : 'View'}</button>
                           <div className="collapsible mt-3 text-sm" data-open={open ? 'true' : 'false'}>
-                              {d.images && (
+                              {r.isMember && d.images && (
                                 <div className="grid grid-cols-2 gap-2 mb-2">
                                   {d.images.map((src, idx) => (
                                     <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
                                   ))}
                                 </div>
                               )}
-                              {d.reviews && (
+                              {r.isMember && d.reviews && (
                                 <div className="mt-2">
                                   <div className="font-medium">Reviews</div>
                                   <ul className="mt-1 space-y-1">
@@ -1587,7 +1628,7 @@ function BookPage() {
                                   </ul>
                                 </div>
                               )}
-                              {d.posts && (
+                              {r.isMember && d.posts && (
                                 <div className="mt-2">
                                   <div className="font-medium">Related Posts</div>
                                   <ul className="mt-1 list-disc list-inside">
@@ -1598,10 +1639,12 @@ function BookPage() {
                                 </div>
                               )}
                               <div className="mt-2">
-                                <div>Phone: {d.phone}</div>
-                                <div>Email: {d.email}</div>
-                                <div>Website: <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
-                                <div>Address: {d.address}</div>
+                                {d.phone && <div>📞 {d.phone}</div>}
+                                {r.isMember && d.email && <div>✉️ {d.email}</div>}
+                                {r.isMember && d.website && (
+                                  <div>🔗 <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
+                                )}
+                                {d.address && <div>📍 {d.address}</div>}
                               </div>
                           </div>
                         </div>
