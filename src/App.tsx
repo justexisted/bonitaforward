@@ -8,6 +8,7 @@ import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sh
 import { fetchProvidersFromSupabase } from './lib/supabaseData'
 import SignInPage from './pages/SignIn'
 import AdminPage from './pages/Admin'
+import OwnerPage from './pages/Owner'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -57,6 +58,7 @@ type AuthContextValue = {
   isAuthed: boolean
   name?: string
   email?: string
+  userId?: string
   signInLocal: (data: { name?: string; email: string }) => void
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
@@ -68,7 +70,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInLocal: () => {}, signInWithGoogle: async () => {}, signInWithEmail: async () => ({}), signUpWithEmail: async () => ({}), resetPassword: async () => ({}), signOut: async () => {} })
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [profile, setProfile] = useState<{ name?: string; email?: string } | null>(null)
+  const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string } | null>(null)
 
   useEffect(() => {
     // Restore any local pseudo-auth (pre-supabase flow)
@@ -84,12 +86,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       const email = data.session?.user?.email
       const name = (data.session?.user?.user_metadata as any)?.name
-      if (email) setProfile({ name, email })
+      const userId = data.session?.user?.id
+      if (email) setProfile({ name, email, userId })
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const email = session?.user?.email
       const name = (session?.user?.user_metadata as any)?.name
-      if (email) setProfile({ name, email })
+      const userId = session?.user?.id
+      if (email) setProfile({ name, email, userId })
       else setProfile((curr) => curr && curr.email ? null : curr)
     })
     return () => { sub.subscription.unsubscribe() }
@@ -131,6 +135,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthed: Boolean(profile?.email),
     name: profile?.name,
     email: profile?.email,
+    userId: profile?.userId,
     signInLocal,
     signInWithGoogle,
     signInWithEmail,
@@ -167,6 +172,9 @@ function Navbar() {
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/contact">Get Featured</Link>
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
             {auth.isAuthed && (
+              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/owner">My Business</Link>
+            )}
+            {auth.isAuthed && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/admin">Admin</Link>
             )}
             {!auth.isAuthed ? (
@@ -191,6 +199,9 @@ function Navbar() {
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/about">About</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/contact">Get Featured</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
+              {auth.isAuthed && (
+                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/owner">My Business</Link>
+              )}
               {auth.isAuthed && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/admin">Admin</Link>
               )}
@@ -1433,11 +1444,17 @@ function BookPage() {
   const [submitted, setSubmitted] = useState(false)
   const [results, setResults] = useState<Provider[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [contactOpen, setContactOpen] = useState<Record<string, boolean>>({})
+  // Removed contact toggle for top matches (always expanded)
   const answers = useMemo(() => {
     try { return JSON.parse(localStorage.getItem(`bf-tracking-${categoryKey}`) || '{}') } catch { return {} }
   }, [categoryKey])
   const auth = useAuth()
+  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
+    .split(',')
+    .map((s: string) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
+  const isAdmin = !!auth.email && adminList.includes(auth.email.toLowerCase())
 
   function recompute() {
     const ranked = scoreProviders(categoryKey, answers)
@@ -1477,28 +1494,49 @@ function BookPage() {
               <div className="mt-2 grid grid-cols-1 gap-2">
                 {results.slice(0, 3).map((r) => {
                   const d = getProviderDetails(r)
-                  const open = !!contactOpen[r.id]
-                  const showTags = (r.tags || []).slice(0, 3)
                   return (
                     <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                       <div className="flex items-center justify-between">
                         <div className="font-medium">{r.name}</div>
                         <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                       </div>
-                      {showTags.length > 0 && (
+                      {isAdmin && (r.tags && r.tags.length > 0) && (
                         <div className="mt-1 flex flex-wrap gap-1">
-                          {showTags.map((t) => (
+                          {r.tags.slice(0, 3).map((t) => (
                             <span key={t} className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-700 px-2 py-0.5 text-[11px]">{t}</span>
                           ))}
                         </div>
                       )}
-                      <button
-                        onClick={() => setContactOpen((m: Record<string, boolean>) => ({ ...m, [r.id]: !open }))}
-                        className="mt-2 text-sm btn btn-primary"
-                      >
-                        {open ? 'Hide Contact' : 'Contact'}
-                      </button>
-                      <div className="collapsible mt-2 text-sm" data-open={open ? 'true' : 'false'}>
+                      {d.images && (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          {d.images.map((src, idx) => (
+                            <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
+                          ))}
+                        </div>
+                      )}
+                      {d.reviews && (
+                        <div className="mt-3">
+                          <div className="font-medium text-sm">Reviews</div>
+                          <ul className="mt-1 space-y-1 text-sm">
+                            {d.reviews.map((rv, idx) => (
+                              <li key={idx} className="text-neutral-700">
+                                <span className="text-neutral-500">{rv.author}</span> — {rv.rating.toFixed(1)}★ — {rv.text}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {d.posts && (
+                        <div className="mt-3">
+                          <div className="font-medium text-sm">Related Posts</div>
+                          <ul className="mt-1 list-disc list-inside text-sm">
+                            {d.posts.map((ps) => (
+                              <li key={ps.id}><a className="text-neutral-700 hover:underline" href={ps.url || '#'}>{ps.title}</a></li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="mt-3 text-sm">
                         <div>Phone: {d.phone}</div>
                         <div>Email: {d.email}</div>
                         <div>Website: <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
@@ -1521,7 +1559,7 @@ function BookPage() {
                             <div className="font-medium">{r.name}</div>
                             <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                           </div>
-                          {(r.tags && r.tags.length > 0) && (
+                          {isAdmin && (r.tags && r.tags.length > 0) && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {r.tags.slice(0, 3).map((t) => (
                                 <span key={t} className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-700 px-2 py-0.5 text-[11px]">{t}</span>
@@ -1638,6 +1676,7 @@ export default function App() {
             <Route path="contact" element={<ContactPage />} />
             <Route path="signin" element={<SignInPage />} />
             <Route path="admin" element={<AdminPage />} />
+            <Route path="owner" element={<OwnerPage />} />
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
             <Route path="category/:id" element={<CategoryPage />} />

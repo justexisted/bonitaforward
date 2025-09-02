@@ -2,6 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 
+type ProviderRow = {
+  id: string
+  name: string
+  category_key: string
+  tags: string[] | null
+  badges: string[] | null
+  rating: number | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  address: string | null
+  images: string[] | null
+  owner_user_id: string | null
+}
+
 type FunnelRow = {
   id: string
   user_email: string
@@ -48,10 +63,12 @@ export default function AdminPage() {
   const auth = useAuth()
   const [funnels, setFunnels] = useState<FunnelRow[]>([])
   const [bookings, setBookings] = useState<BookingRow[]>([])
+  const [providers, setProviders] = useState<ProviderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [bizApps, setBizApps] = useState<BusinessApplicationRow[]>([])
   const [contactLeads, setContactLeads] = useState<ContactLeadRow[]>([])
+  const [message, setMessage] = useState<string | null>(null)
   // Admins (comma-separated) can view all users' data. Example .env: VITE_ADMIN_EMAILS=you@example.com,other@example.com
   // Default to the owner email if no env var is set.
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
@@ -79,11 +96,13 @@ export default function AdminPage() {
         const bExec = isAdmin ? (selectedUser ? bQuery.eq('user_email', selectedUser) : bQuery) : bQuery.eq('user_email', auth.email!)
         const bizQuery = supabase.from('business_applications').select('*').order('created_at', { ascending: false })
         const conQuery = supabase.from('contact_leads').select('*').order('created_at', { ascending: false })
-        const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }] = await Promise.all([
+        const provQuery = isAdmin ? supabase.from('providers').select('*').order('name', { ascending: true }) : null
+        const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
           fExec,
           bExec,
           bizQuery,
           conQuery,
+          provQuery as any,
         ])
         if (cancelled) return
         if (fErr) { console.error('[Admin] funnels error', fErr); setError(fErr.message) }
@@ -98,6 +117,11 @@ export default function AdminPage() {
         setBookings((bData as BookingRow[]) || [])
         setBizApps((bizData as BusinessApplicationRow[]) || [])
         setContactLeads((conData as ContactLeadRow[]) || [])
+        if (provRes && 'data' in (provRes as any)) {
+          const { data: pData, error: pErr } = (provRes as any)
+          if (pErr) { console.error('[Admin] providers error', pErr); setError((prev) => prev ?? pErr.message) }
+          setProviders((pData as ProviderRow[]) || [])
+        }
       } catch (err: any) {
         console.error('[Admin] unexpected failure', err)
         if (!cancelled) setError(err?.message || 'Failed to load')
@@ -124,6 +148,69 @@ export default function AdminPage() {
     contactLeads.forEach((c) => { if (c.contact_email) set.add(c.contact_email) })
     return Array.from(set).sort()
   }, [bizApps, contactLeads])
+
+  // Inline helpers for admin edits
+  const [appEdits, setAppEdits] = useState<Record<string, { category_key: string; tagsInput: string }>>({})
+
+  const catOptions: { key: string; name: string }[] = [
+    { key: 'real-estate', name: 'Real Estate' },
+    { key: 'home-services', name: 'Home Services' },
+    { key: 'health-wellness', name: 'Health & Wellness' },
+    { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
+    { key: 'professional-services', name: 'Professional Services' },
+  ]
+
+  async function approveApplication(appId: string) {
+    setMessage(null)
+    const app = bizApps.find((b) => b.id === appId)
+    if (!app) return
+    const draft = appEdits[appId] || { category_key: 'professional-services', tagsInput: '' }
+    const tags = draft.tagsInput.split(',').map((s) => s.trim()).filter(Boolean)
+    const payload: Partial<ProviderRow> = {
+      name: (app.business_name || 'Unnamed Business') as any,
+      category_key: draft.category_key as any,
+      tags: tags as any,
+      phone: (app.phone || null) as any,
+      email: (app.email || null) as any,
+      website: null as any,
+      address: null as any,
+      images: [] as any,
+      owner_user_id: (auth.userId || null) as any,
+    }
+    const { error } = await supabase.from('providers').insert([payload as any])
+    if (error) {
+      setError(error.message)
+    } else {
+      setMessage('Application approved and provider created')
+      // Optionally remove from list
+      setBizApps((rows) => rows.filter((r) => r.id !== appId))
+      // Refresh providers
+      try {
+        const { data: pData } = await supabase.from('providers').select('*').order('name', { ascending: true })
+        setProviders((pData as ProviderRow[]) || [])
+      } catch {}
+    }
+  }
+
+  async function saveProvider(p: ProviderRow) {
+    setMessage(null)
+    const { error } = await supabase
+      .from('providers')
+      .update({
+        name: p.name,
+        category_key: p.category_key,
+        tags: p.tags || [],
+        rating: p.rating,
+        phone: p.phone,
+        email: p.email,
+        website: p.website,
+        address: p.address,
+        images: p.images || [],
+      })
+      .eq('id', p.id)
+    if (error) setError(error.message)
+    else setMessage('Provider saved')
+  }
 
   if (!auth.email) {
     return (
@@ -183,6 +270,7 @@ export default function AdminPage() {
           </div>
         )}
         {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+        {message && <div className="mt-3 text-sm text-green-700">{message}</div>}
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           {isAdmin && (
@@ -197,8 +285,28 @@ export default function AdminPage() {
                       <div className="text-xs text-neutral-500">{new Date(row.created_at).toLocaleString()}</div>
                     </div>
                     <div className="text-xs text-neutral-600 mt-1">Contact: {row.full_name || '-'} • {row.email || '-'} • {row.phone || '-'}</div>
-                    <div className="text-xs text-neutral-600 mt-1">Category: {row.category || '-'}</div>
+                    <div className="text-xs text-neutral-600 mt-1">Category (requested): {row.category || '-'}</div>
                     <div className="text-xs text-neutral-600 mt-1">Challenge: {row.challenge || '-'}</div>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <select
+                        value={(appEdits[row.id]?.category_key) || 'professional-services'}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
+                        className="rounded-xl border border-neutral-200 px-3 py-2 bg-white text-xs"
+                      >
+                        {catOptions.map((opt) => (
+                          <option key={opt.key} value={opt.key}>{opt.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        placeholder="tags (comma separated)"
+                        value={appEdits[row.id]?.tagsInput || ''}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: m[row.id]?.category_key || 'professional-services', tagsInput: e.target.value } }))}
+                        className="rounded-xl border border-neutral-200 px-3 py-2 text-xs sm:col-span-2"
+                      />
+                    </div>
+                    <div className="mt-2">
+                      <button onClick={() => approveApplication(row.id)} className="btn btn-primary text-xs">Approve & Create Provider</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -294,6 +402,83 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+        {isAdmin && (
+          <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
+            <div className="font-medium">Providers (Edit existing)</div>
+            <div className="mt-2 text-sm">
+              {providers.length === 0 && <div className="text-neutral-500">No providers found.</div>}
+              {providers.length > 0 && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input
+                      list="providers-list"
+                      placeholder="Type to search provider"
+                      onChange={(e) => {
+                        const name = e.target.value
+                        const match = providers.find((p) => p.name.toLowerCase() === name.toLowerCase())
+                        if (match) {
+                          // Move selected to front so the edit card binds to it
+                          setProviders((arr) => {
+                            const sel = arr.find((p) => p.id === match.id)
+                            if (!sel) return arr
+                            return [sel, ...arr.filter((p) => p.id !== match.id)]
+                          })
+                        }
+                      }}
+                      className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2"
+                    />
+                    <select
+                      onChange={(e) => {
+                        const id = e.target.value
+                        if (!id) return
+                        // Move selected to front for editing
+                        setProviders((arr) => {
+                          const sel = arr.find((p) => p.id === id)
+                          if (!sel) return arr
+                          return [sel, ...arr.filter((p) => p.id !== id)]
+                        })
+                      }}
+                      className="rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                    >
+                      <option value="">Select provider…</option>
+                      {providers.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <datalist id="providers-list">
+                      {providers.map((p) => (
+                        <option key={p.id} value={p.name}></option>
+                      ))}
+                    </datalist>
+                  </div>
+                  {/* Single edit card bound to the first provider in array */}
+                  {providers[0] && (
+                    <div className="rounded-xl border border-neutral-200 p-3">
+                      <div className="text-neutral-700 font-medium mb-2">Editing: {providers[0].name}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <input value={providers[0].name} onChange={(e) => setProviders((arr) => [{ ...arr[0], name: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Name" />
+                        <select value={providers[0].category_key} onChange={(e) => setProviders((arr) => [{ ...arr[0], category_key: e.target.value } as any, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
+                          {catOptions.map((opt) => (
+                            <option key={opt.key} value={opt.key}>{opt.name}</option>
+                          ))}
+                        </select>
+                        <input value={(providers[0].tags || []).join(', ')} onChange={(e) => setProviders((arr) => [{ ...arr[0], tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Tags" />
+                        <input value={providers[0].phone || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], phone: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" />
+                        <input value={providers[0].email || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], email: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" />
+                        <input value={providers[0].website || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], website: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Website" />
+                        <input value={providers[0].address || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], address: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Address" />
+                        <input value={(providers[0].images || []).join(', ')} onChange={(e) => setProviders((arr) => [{ ...arr[0], images: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-3" placeholder="Image URLs" />
+                      </div>
+                      <div className="mt-2">
+                        <button onClick={() => saveProvider(providers[0])} className="btn btn-secondary text-xs">Save</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
