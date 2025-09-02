@@ -15,6 +15,7 @@ type ProviderRow = {
   address: string | null
   images: string[] | null
   owner_user_id: string | null
+  is_member?: boolean | null
 }
 
 type FunnelRow = {
@@ -182,13 +183,26 @@ export default function AdminPage() {
       setError(error.message)
     } else {
       setMessage('Application approved and provider created')
-      // Optionally remove from list
-      setBizApps((rows) => rows.filter((r) => r.id !== appId))
+      // Delete the application now that it has been approved
+      try {
+        await supabase.from('business_applications').delete().eq('id', appId)
+        setBizApps((rows) => rows.filter((r) => r.id !== appId))
+      } catch {}
       // Refresh providers
       try {
         const { data: pData } = await supabase.from('providers').select('*').order('name', { ascending: true })
         setProviders((pData as ProviderRow[]) || [])
       } catch {}
+    }
+  }
+
+  async function deleteApplication(appId: string) {
+    setMessage(null)
+    const { error } = await supabase.from('business_applications').delete().eq('id', appId)
+    if (error) setError(error.message)
+    else {
+      setMessage('Application deleted')
+      setBizApps((rows) => rows.filter((r) => r.id !== appId))
     }
   }
 
@@ -200,16 +214,20 @@ export default function AdminPage() {
         name: p.name,
         category_key: p.category_key,
         tags: p.tags || [],
-        rating: p.rating,
+        rating: p.rating ?? undefined,
         phone: p.phone,
         email: p.email,
         website: p.website,
         address: p.address,
         images: p.images || [],
+        is_member: p.is_member === true,
       })
       .eq('id', p.id)
     if (error) setError(error.message)
-    else setMessage('Provider saved')
+    else {
+      setMessage('Provider saved')
+      try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
+    }
   }
 
   if (!auth.email) {
@@ -304,8 +322,9 @@ export default function AdminPage() {
                         className="rounded-xl border border-neutral-200 px-3 py-2 text-xs sm:col-span-2"
                       />
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <button onClick={() => approveApplication(row.id)} className="btn btn-primary text-xs">Approve & Create Provider</button>
+                      <button onClick={() => deleteApplication(row.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
                     </div>
                   </div>
                 ))}
@@ -463,6 +482,10 @@ export default function AdminPage() {
                           ))}
                         </select>
                         <input value={(providers[0].tags || []).join(', ')} onChange={(e) => setProviders((arr) => [{ ...arr[0], tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Tags" />
+                        <label className="inline-flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={providers[0].is_member === true} onChange={(e) => setProviders((arr) => [{ ...arr[0], is_member: e.target.checked }, ...arr.slice(1)])} />
+                          <span>Featured (Paid)</span>
+                        </label>
                         <input value={providers[0].phone || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], phone: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" />
                         <input value={providers[0].email || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], email: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" />
                         <input value={providers[0].website || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], website: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Website" />

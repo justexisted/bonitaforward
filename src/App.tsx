@@ -273,10 +273,10 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50">
           <Icon className="h-5 w-5 text-neutral-700" />
         </span>
-        <div>
+      <div>
           <div className="font-medium text-neutral-900">{cat.name}</div>
           <div className="text-sm text-neutral-600">{cat.description}</div>
-        </div>
+      </div>
         <ArrowRight className="ml-auto h-4 w-4 text-neutral-400" />
       </div>
     </Link>
@@ -728,7 +728,7 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       isMember: Boolean((r as any).is_member ?? (r as any).member ?? ((r as any).plan === 'paid') ?? ((r as any).tier === 'paid')),
     })
   })
-  providersByCategory = ensureDemoMembers(grouped)
+  providersByCategory = grouped
   console.log('[Supabase] Providers loaded', grouped)
   try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
   return true
@@ -1110,9 +1110,9 @@ function Funnel({ category }: { category: typeof categories[number] }) {
                   className="btn btn-secondary sparkle border border-neutral-200"
                 >
                   {opt.label}
-                </button>
+        </button>
               ))}
-            </div>
+      </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
@@ -1703,6 +1703,16 @@ function AppInit() {
       const ok = await loadProvidersFromSupabase()
       if (!ok) await loadProvidersFromSheet()
     })()
+    function onRefresh() {
+      ;(async () => {
+        const ok = await loadProvidersFromSupabase()
+        if (!ok) await loadProvidersFromSheet()
+      })()
+    }
+    window.addEventListener('bf-refresh-providers', onRefresh as EventListener)
+    return () => {
+      window.removeEventListener('bf-refresh-providers', onRefresh as EventListener)
+    }
   }, [])
   return null
 }
