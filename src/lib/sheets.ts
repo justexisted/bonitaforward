@@ -16,7 +16,7 @@ export async function fetchSheetRows(): Promise<SheetRow[]> {
   return []
 }
 
-export function mapRowsToProviders(rows: SheetRow[]): SheetProvider[] {
+export function mapRowsToProviders(_rows: SheetRow[]): SheetProvider[] {
   // Stub mapping: no-op until Google Sheets integration is added
   return []
 }
