@@ -275,7 +275,7 @@ function Hero() {
 function CategoryCard({ cat }: { cat: typeof categories[number] }) {
   const Icon = cat.icon
   return (
-    <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white border border-neutral-100 p-4 elevate">
+    <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4 elevate">
       <div className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50">
           <Icon className="h-5 w-5 text-neutral-700" />
@@ -1196,24 +1196,13 @@ function CategoryPage() {
   if (!category) return <Container className="py-10">Category not found.</Container>
   const Icon = category.icon
   const [, setVersion] = useState(0)
-  const [showAll, setShowAll] = useState(false)
-  const answers = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem(`bf-tracking-${category.key}`) || '{}') } catch { return {} }
-  }, [category.key])
+  
   useEffect(() => {
     function onUpdate() { setVersion((v: number) => v + 1) }
     window.addEventListener('bf-providers-updated', onUpdate as EventListener)
     return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
   }, [])
-  const listAll = providersByCategory[category.key] || []
-  const wantsStaging = answers['staging'] === 'yes'
-  const list = listAll.filter((p) => {
-    const tags = (p.tags || []) as string[]
-    const isStager = tags.includes('stager') || tags.includes('staging')
-    return wantsStaging ? true : !isStager
-  })
-  const featured = list.slice(0, 4)
-  const remaining = list.slice(4)
+  
   return (
     <section className="py-8">
       <Container>
@@ -1228,63 +1217,9 @@ function CategoryPage() {
           </div>
           <div className="flex items-start gap-3">
             <div className="flex-1">
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="rounded-xl border border-neutral-200 p-3">
-                  <div className="text-sm font-medium">Businesses in {category.name}</div>
-                  {featured.length > 0 ? (
-                    <>
-                      <ul className="mt-2 text-sm text-neutral-700 space-y-1">
-                        {featured.map((p) => (
-                          <li key={p.id} className="">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span>{p.name}</span>
-                                {p.isMember && (
-                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
-                                )}
-                              </div>
-                              {typeof p.rating === 'number' && (
-                                <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
-                              )}
-                            </div>
-                            {/* Show short description for featured real-estate brands when available */}
-                            {getProviderDescription(p) && (
-                              <div className="text-xs text-neutral-600 mt-0.5">{getProviderDescription(p)}</div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      {remaining.length > 0 && (
-                        <div className="mt-2">
-                          <button onClick={() => setShowAll((v) => !v)} className="btn btn-secondary text-xs">
-                            {showAll ? 'Show less' : 'Show more'}
-                          </button>
-                          <div className="collapsible mt-2" data-open={showAll ? 'true' : 'false'}>
-                            <ul className="text-sm text-neutral-700 space-y-1">
-                              {remaining.map((p) => (
-                                <li key={p.id} className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <span>{p.name}</span>
-                                    {p.isMember && (
-                                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
-                                    )}
-                                  </div>
-                                  {typeof p.rating === 'number' && (
-                                    <span className="text-xs text-neutral-500">{p.rating.toFixed(1)}★</span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="mt-2 text-neutral-500 text-sm">Loading businesses…</div>
-                  )}
-                </div>
-                <div className="rounded-xl border border-neutral-200 p-3">
-                  <div className="text-sm font-medium mb-2"></div>
+              <div className="mt-4">
+                <div className="rounded-xl p-3">
+                  <div className="text-lg font-medium mb-2 text-center">{`Let's find the best match for you in ${category.name}`}</div>
                   <Funnel category={category} />
                 </div>
               </div>
@@ -1348,6 +1283,18 @@ function ContactPage() {
 
 function BusinessPage() {
   // simple ROI calculator state is kept local via uncontrolled inputs and live compute
+  useEffect(() => {
+    // If user arrived with #apply or prefill params, scroll to and focus form
+    const hasPrefill = new URLSearchParams(window.location.search).toString().length > 0
+    if (window.location.hash === '#apply' || hasPrefill) {
+      setTimeout(() => {
+        const el = document.getElementById('apply')
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const inputs = el?.querySelectorAll('input')
+        ;(inputs && inputs[1] as HTMLInputElement | undefined)?.focus() // Business Name field
+      }, 50)
+    }
+  }, [])
   return (
     <section className="py-8">
       <Container>
@@ -1456,20 +1403,21 @@ function BusinessPage() {
               }
             }}
           >
-            <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" />
-            <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" />
+            <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={(new URLSearchParams(window.location.search)).get('full_name') || ''} />
+            <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={(new URLSearchParams(window.location.search)).get('business_name') || ''} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" />
-              <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" />
+              <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={(new URLSearchParams(window.location.search)).get('email') || ''} />
+              <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={(new URLSearchParams(window.location.search)).get('phone') || ''} />
             </div>
-            <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
-              <option>Real Estate</option>
-              <option>Home Services</option>
-              <option>Health & Wellness</option>
-              <option>Restaurants</option>
-              <option>Professional Services</option>
+            <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={(new URLSearchParams(window.location.search)).get('category') || ''}>
+              <option value="">Select category…</option>
+              <option value="Real Estate">Real Estate</option>
+              <option value="Home Services">Home Services</option>
+              <option value="Health & Wellness">Health & Wellness</option>
+              <option value="Restaurants">Restaurants</option>
+              <option value="Professional Services">Professional Services</option>
             </select>
-            <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} />
+            <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={(new URLSearchParams(window.location.search)).get('challenge') || ''} />
             <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Apply to Get Featured</button>
           </form>
           <p className="mt-2 text-xs text-neutral-500">Submission can auto-trigger Zapier → Google Sheets + HighLevel (to be wired).</p>
@@ -1491,6 +1439,7 @@ function BookPage() {
   const [submitted, setSubmitted] = useState(false)
   const [results, setResults] = useState<Provider[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [claimAsk, setClaimAsk] = useState<Record<string, boolean>>({})
   // Removed contact toggle for top matches (always expanded)
   const answers = useMemo(() => {
     try { return JSON.parse(localStorage.getItem(`bf-tracking-${categoryKey}`) || '{}') } catch { return {} }
@@ -1522,9 +1471,8 @@ function BookPage() {
   return (
     <section className="py-8">
       <Container>
-        <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate max-w-md mx-auto text-center">
-          <h2 className="text-xl font-semibold tracking-tight">Search Bonita's top {category?.name.toLowerCase() || 'providers'}</h2>
-          <p className="mt-1 text-neutral-600">Access to top Bonita {category?.name.toLowerCase() || 'providers'}.</p>
+        <div className="rounded-2xl bg-white max-w-md mx-auto text-center">
+          <h2 className="text-xl font-semibold tracking-tight">Bonita's top {category?.name.toLowerCase() || 'providers'}</h2>
           {auth.isAuthed || submitted || results.length > 0 ? (
             <div className="mt-5 text-left">
               <div className="mt-4 text-sm text-neutral-500">Top matches</div>
@@ -1586,6 +1534,38 @@ function BookPage() {
                           <div>🔗 <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
                         )}
                         {d.address && <div>📍 {d.address}</div>}
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            title="Claim this business"
+                            className="text-[11px] text-neutral-600 hover:text-neutral-900"
+                            onClick={() => {
+                              if (claimAsk[r.id]) {
+                                const catLabel = ((): string => {
+                                  switch (categoryKey) {
+                                    case 'restaurants-cafes': return 'Restaurants'
+                                    case 'home-services': return 'Home Services'
+                                    case 'health-wellness': return 'Health & Wellness'
+                                    case 'real-estate': return 'Real Estate'
+                                    case 'professional-services': return 'Professional Services'
+                                    default: return ''
+                                  }
+                                })()
+                                const q = new URLSearchParams({
+                                  business_name: r.name,
+                                  email: d.email || '',
+                                  phone: d.phone || '',
+                                  challenge: `I would like to claim ${r.name}.`,
+                                  category: catLabel,
+                                })
+                                window.location.assign(`/business?${q.toString()}#apply`)
+                              } else {
+                                setClaimAsk((m) => ({ ...m, [r.id]: true }))
+                              }
+                            }}
+                          >
+                            {claimAsk[r.id] ? 'Claim this business' : '🏢'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -1654,6 +1634,38 @@ function BookPage() {
                                   <div>🔗 <a className="text-neutral-700 hover:underline" href={d.website} target="_blank" rel="noreferrer">{d.website}</a></div>
                                 )}
                                 {d.address && <div>📍 {d.address}</div>}
+                                <div className="mt-2 flex justify-end">
+                                  <button
+                                    title="Claim this business"
+                                    className="text-[11px] text-neutral-600 hover:text-neutral-900"
+                                    onClick={() => {
+                                      if (claimAsk[r.id]) {
+                                        const catLabel = ((): string => {
+                                          switch (categoryKey) {
+                                            case 'restaurants-cafes': return 'Restaurants'
+                                            case 'home-services': return 'Home Services'
+                                            case 'health-wellness': return 'Health & Wellness'
+                                            case 'real-estate': return 'Real Estate'
+                                            case 'professional-services': return 'Professional Services'
+                                            default: return ''
+                                          }
+                                        })()
+                                        const q = new URLSearchParams({
+                                          business_name: r.name,
+                                          email: d.email || '',
+                                          phone: d.phone || '',
+                                          challenge: `I would like to claim ${r.name}.`,
+                                          category: catLabel,
+                                        })
+                                        window.location.assign(`/business?${q.toString()}#apply`)
+                                      } else {
+                                        setClaimAsk((m) => ({ ...m, [r.id]: true }))
+                                      }
+                                    }}
+                                  >
+                                    {claimAsk[r.id] ? 'Claim this business' : '🏢'}
+                                  </button>
+                                </div>
                               </div>
                           </div>
                         </div>

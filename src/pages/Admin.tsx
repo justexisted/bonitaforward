@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, type BlogPost } from '../lib/supabaseData'
@@ -74,6 +74,74 @@ export default function AdminPage() {
   const [confirmDeleteProviderId, setConfirmDeleteProviderId] = useState<string | null>(null)
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
   const [blogDraft, setBlogDraft] = useState<{ id?: string; category_key: string; title: string; content: string }>({ category_key: 'restaurants-cafes', title: '', content: '' })
+  const editorRef = useRef<HTMLDivElement | null>(null)
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const [emojiQuery, setEmojiQuery] = useState('')
+
+  useEffect(() => {
+    // Load content into editor when switching drafts
+    if (editorRef.current) {
+      editorRef.current.innerHTML = blogDraft.content || ''
+    }
+  }, [blogDraft.id])
+
+  function syncEditorToState() {
+    if (!editorRef.current) return
+    setBlogDraft((d) => ({ ...d, content: editorRef.current!.innerHTML }))
+  }
+
+  function applyFormat(cmd: string, value?: string) {
+    try {
+      editorRef.current?.focus()
+      document.execCommand(cmd, false, value)
+      syncEditorToState()
+    } catch {}
+  }
+
+  function wrapSelectionWith(tag: string, className?: string, style?: string) {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return
+    const text = sel.toString()
+    if (!text) return
+    const cls = className ? ` class=\"${className}\"` : ''
+    const st = style ? ` style=\"${style}\"` : ''
+    const html = `<${tag}${cls}${st}>${text}</${tag}>`
+    document.execCommand('insertHTML', false, html)
+    syncEditorToState()
+    editorRef.current?.focus()
+  }
+
+  function applyHeading(level: 2 | 3) {
+    try {
+      const block = level === 2 ? 'H2' : 'H3'
+      editorRef.current?.focus()
+      document.execCommand('formatBlock', false, block)
+      syncEditorToState()
+    } catch {
+      // Fallback wrap
+      wrapSelectionWith(level === 2 ? 'h2' : 'h3')
+    }
+  }
+
+  function clearFormattingToNormal() {
+    try {
+      editorRef.current?.focus()
+      document.execCommand('removeFormat')
+      document.execCommand('formatBlock', false, 'P')
+      syncEditorToState()
+    } catch {}
+  }
+
+  function insertEmoji(emoji: string) {
+    try {
+      document.execCommand('insertText', false, emoji)
+      syncEditorToState()
+      editorRef.current?.focus()
+    } catch {}
+  }
+
+  const allEmojis = ['😀','😁','😂','🤣','😊','😇','🙂','😉','😍','😘','😋','😎','🤩','🥳','🤗','🤔','😴','🤤','🤓','🫶','👍','🔥','⭐','✨','💫','🎉','🏆','🥇','💡','📣','✅','🍔','🍟','🌮','🍣','🍕','🥗','🍜','🍩','☕','🍵','🍺','🍷','🥂','🏡','🏠','🏘️','🔑','📈','💼','⚖️','🧮','🤝','🧘','🏋️','💆','💅','🧴','🧑‍🍳','👨‍🍳','🧑‍🏫','📚','🛠️','🔧','🌿','🌞','🌧️','🌈']
+  const filteredEmojis = allEmojis.filter((e) => e.includes(emojiQuery.trim()))
   // Admins (comma-separated) can view all users' data. Example .env: VITE_ADMIN_EMAILS=you@example.com,other@example.com
   // Default to the owner email if no env var is set.
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
@@ -586,17 +654,42 @@ export default function AdminPage() {
                   </select>
                   <input value={blogDraft.title} onChange={(e) => setBlogDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Post title" className="rounded-xl border border-neutral-200 px-3 py-2" />
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="text-neutral-500">Insert:</span>
-                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\n1. " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Numbered Title</button>
-                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\nThe vibe: " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">The vibe</button>
-                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\nWhy it makes the list: " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Why it makes the list</button>
-                    <button type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + "\n\nWhat to order: " }))} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">What to order</button>
-                    <span className="text-neutral-500 ml-2">Emoji:</span>
-                    {['🍽️','🏠','💆','🏡','⭐','🔥','🥇','🍔','🍣','💡','📣','🏋️','💅','🧘','🏘️'].map((e) => (
-                      <button key={e} type="button" onClick={() => setBlogDraft((d) => ({ ...d, content: d.content + e }))} className="px-2 py-1">{e}</button>
-                    ))}
+                    <span className="text-neutral-500">Format:</span>
+                    <button type="button" onClick={() => applyFormat('bold')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white font-semibold">B</button>
+                    <button type="button" onClick={() => applyFormat('italic')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white italic">I</button>
+                    <button type="button" onClick={() => applyFormat('underline')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white underline">U</button>
+                    <button type="button" onClick={() => applyHeading(2)} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">H2</button>
+                    <button type="button" onClick={() => applyHeading(3)} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">H3</button>
+                    <button type="button" onClick={() => wrapSelectionWith('span', undefined, 'font-size:20px;')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Large</button>
+                    <button type="button" onClick={() => wrapSelectionWith('span', undefined, 'font-size:24px; font-weight:700;')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">XL Bold</button>
+                    <button type="button" onClick={clearFormattingToNormal} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Normal</button>
+                    <button type="button" onClick={() => setEmojiOpen(true)} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Emoji</button>
                   </div>
-                  <textarea value={blogDraft.content} onChange={(e) => setBlogDraft((d) => ({ ...d, content: e.target.value }))} placeholder="Write your post. Lines starting with '1. ...' render as big bold titles. Lines starting with 'The vibe:', 'Why it makes the list:', 'What to order:' are bolded labels." rows={10} className="rounded-xl border border-neutral-200 px-3 py-2"></textarea>
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={syncEditorToState}
+                    className="rounded-xl border border-neutral-200 px-3 py-2 min-h-[200px] bg-white prose max-w-none space-y-4"
+                    style={{ outline: 'none' as any }}
+                  />
+                  {emojiOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/20" onClick={() => setEmojiOpen(false)}></div>
+                      <div className="relative rounded-2xl border border-neutral-200 bg-white p-3 w-[380px] max-h-[70vh] flex flex-col shadow-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-sm">Choose Emoji</div>
+                          <button className="text-sm" onClick={() => setEmojiOpen(false)}>Close</button>
+                        </div>
+                        <input value={emojiQuery} onChange={(e) => setEmojiQuery(e.target.value)} placeholder="Search…" className="mt-2 rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+                        <div className="mt-2 grid grid-cols-8 gap-1 overflow-auto">
+                          {filteredEmojis.map((e, i) => (
+                            <button key={i} type="button" onClick={() => { insertEmoji(e); setEmojiOpen(false) }} className="h-9 w-9 rounded-lg hover:bg-neutral-100 flex items-center justify-center text-lg">{e}</button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {

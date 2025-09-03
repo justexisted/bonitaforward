@@ -59,12 +59,21 @@ export function CommunityPost() {
           {loading && <div className="mt-3 text-sm text-neutral-600">Loading…</div>}
           {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
           {!loading && !error && (
-            <div className="prose mt-3">
+            <div className="prose prose-neutral max-w-none mt-3">
               {post ? (
                 <article>
                   <h2 className="text-xl font-semibold">{post.title}</h2>
                   <div className="mt-1 text-xs text-neutral-500">{new Date(post.created_at).toLocaleString()}</div>
-                  <div className="mt-3 space-y-2">{renderStyledContent(post.content)}</div>
+                  <div className="mt-3">
+                    {containsHtml(post.content) ? (
+                      <div
+                        className="bf-post-content space-y-4 [&>p]:my-3 [&>div]:my-3 [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-2 [&_br]:block [&_br]:h-4"
+                        dangerouslySetInnerHTML={{ __html: sanitizePostHtml(post.content) }}
+                      />
+                    ) : (
+                      <div className="space-y-2">{renderStyledContent(post.content)}</div>
+                    )}
+                  </div>
                 </article>
               ) : (
                 <div className="text-neutral-600 text-sm">No post yet for this category.</div>
@@ -108,6 +117,52 @@ function renderStyledContent(content: string) {
       <div key={idx} className="text-sm text-neutral-800 whitespace-pre-wrap">{line}</div>
     )
   })
+}
+
+function containsHtml(text: string): boolean {
+  return /<\w|&[a-zA-Z]+;/.test(text)
+}
+
+function sanitizePostHtml(html: string): string {
+  try {
+    const d = document.implementation.createHTMLDocument('bf')
+    d.body.innerHTML = html
+    // Remove script/style
+    d.body.querySelectorAll('script,style,link,iframe').forEach((n) => n.remove())
+    // Whitelist attributes
+    d.body.querySelectorAll('*').forEach((el) => {
+      ;[...el.attributes].forEach((attr) => {
+        const name = attr.name.toLowerCase()
+        const value = attr.value
+        const ok = (
+          name === 'style' ||
+          name === 'class' ||
+          name === 'href' ||
+          name === 'src' ||
+          name === 'alt'
+        )
+        if (!ok) el.removeAttribute(name)
+        if (name === 'href' && value && !value.startsWith('/') && !value.startsWith('http')) el.removeAttribute('href')
+      })
+    })
+    // Keep author-entered breaks; do not normalize here to preserve caret behavior in editor
+    // Enforce typographic defaults for inline styles
+    d.body.querySelectorAll('[style]')
+      .forEach((el) => {
+        const style = (el.getAttribute('style') || '').toLowerCase()
+        // allow only font-size, font-weight, font-style, text-decoration, color
+        const allowed = style
+          .split(';')
+          .map((s) => s.trim())
+          .filter((s) => /^(font-size|font-weight|font-style|text-decoration|color)\s*:/i.test(s))
+          .join('; ')
+        if (allowed) el.setAttribute('style', allowed)
+        else el.removeAttribute('style')
+      })
+    return d.body.innerHTML
+  } catch {
+    return html
+  }
 }
 
 
