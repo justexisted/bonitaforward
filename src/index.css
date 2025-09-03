@@ -151,7 +151,7 @@ body {
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0) 0%,   /* Light dark at the very top */
-    rgba(0, 0, 0, 0.5) 50%,   /* Darkest in the middle */
+    rgba(0, 0, 0, 0.4) 45%,   /* Darkest in the middle */
     rgba(0, 0, 0, 0) 100%   /* Light dark at the very bottom */
   );
   /* Make sure this z-index is higher than other elements within the relative div if any */
