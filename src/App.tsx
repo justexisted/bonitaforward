@@ -635,6 +635,12 @@ type ProviderDetails = {
 
 // Removed unused providerDescriptions/getProviderDescription to satisfy TypeScript build
 
+function isFeaturedProvider(p: Provider): boolean {
+  if (p.isMember) return true
+  const tags = (p.tags || []).map((t) => String(t).trim().toLowerCase())
+  return tags.includes('featured') || tags.includes('member') || tags.includes('paid')
+}
+
 function getProviderDetails(p: Provider): ProviderDetails {
   // Placeholder details; in production, fetch from DB/API
   const seed = encodeURIComponent(p.id)
@@ -729,6 +735,7 @@ async function loadProvidersFromSheet(): Promise<void> {
 async function loadProvidersFromSupabase(): Promise<boolean> {
   const rows = await fetchProvidersFromSupabase()
   if (!rows || rows.length === 0) return false
+  const previous = providersByCategory
   const grouped: Record<CategoryKey, Provider[]> = {
     'real-estate': [],
     'home-services': [],
@@ -736,21 +743,62 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
     'restaurants-cafes': [],
     'professional-services': [],
   }
+  function coerceIsMember(r: any): boolean {
+    const raw = (
+      r.is_member ?? r.member ?? r.isMember ?? r.is_featured ?? r.featured ??
+      r.paid ?? r.plan ?? r.tier
+    )
+    if (typeof raw === 'boolean') return raw
+    if (typeof raw === 'number') return raw > 0
+    if (typeof raw === 'string') {
+      const v = raw.trim().toLowerCase()
+      if (['true','t','yes','y','1','paid','pro','premium','featured','member'].includes(v)) return true
+    }
+    // Also allow tag/badge-based hints — combine arrays to avoid empty-tags truthiness issues
+    const combined: string[] = [
+      ...(((r.tags as string[] | null) || []) as string[]),
+      ...(((r.badges as string[] | null) || []) as string[]),
+    ]
+    if (combined.length) {
+      const set = new Set(combined.map((s) => String(s).trim().toLowerCase()))
+      if (set.has('featured') || set.has('member') || set.has('paid')) return true
+    }
+    return false
+  }
+
   rows.forEach((r) => {
     const key = (r.category_key as CategoryKey)
     if (!grouped[key]) return
+    // Combine tags and badges to preserve featured/member flags
+    const combinedTags = Array.from(new Set([...
+      (((r.tags as string[] | null) || []) as string[]),
+      (((r.badges as string[] | null) || []) as string[]),
+    ].flat().map((s) => String(s).trim()).filter(Boolean)))
+
     grouped[key].push({
       id: r.id,
       name: r.name,
       category: key,
-      tags: (r.tags as string[] | null) || (r.badges as string[] | null) || [],
+      tags: combinedTags,
       rating: r.rating ?? undefined,
       phone: r.phone ?? null,
       email: r.email ?? null,
       website: r.website ?? null,
       address: r.address ?? null,
-      isMember: Boolean((r as any).is_member ?? (r as any).member ?? ((r as any).plan === 'paid') ?? ((r as any).tier === 'paid')),
+      isMember: coerceIsMember(r),
     })
+  })
+  // Fallback: if a category has zero members flagged from Supabase, promote the first three
+  ;(Object.keys(grouped) as CategoryKey[]).forEach((ck: CategoryKey) => {
+    const list = grouped[ck]
+    // If Supabase returned nothing for this category, keep previous providers
+    if (list.length === 0 && previous?.[ck]?.length) {
+      grouped[ck] = previous[ck]
+      return
+    }
+    if (list.length > 0 && !list.some((p) => Boolean(p.isMember))) {
+      grouped[ck] = list.map((p, idx) => ({ ...p, isMember: idx < 3 }))
+    }
   })
   providersByCategory = grouped
   console.log('[Supabase] Providers loaded', grouped)
@@ -777,6 +825,10 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         return { p, score }
       })
       .sort((a, b) => {
+        // Featured providers first
+        const am = isFeaturedProvider(a.p) ? 1 : 0
+        const bm = isFeaturedProvider(b.p) ? 1 : 0
+        if (bm !== am) return bm - am
         if (b.score !== a.score) return b.score - a.score
         const ar = a.p.rating ?? 0
         const br = b.p.rating ?? 0
@@ -812,6 +864,10 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         return { p, score }
       })
       .sort((a, b) => {
+        // Featured providers first
+        const am = isFeaturedProvider(a.p) ? 1 : 0
+        const bm = isFeaturedProvider(b.p) ? 1 : 0
+        if (bm !== am) return bm - am
         if (b.score !== a.score) return b.score - a.score
         const ar = a.p.rating ?? 0
         const br = b.p.rating ?? 0
@@ -823,11 +879,13 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
   const values = new Set<string>(Object.values(answers))
   const withScores = providers.map((p) => {
     const matches = p.tags.reduce((acc, t) => acc + (values.has(t) ? 1 : 0), 0)
-    // Paid members get a slight priority bump so they float up in "Other providers"
-    const bonus = p.isMember ? 0.5 : 0
-    return { p, score: matches + bonus }
+    return { p, score: matches }
   })
   withScores.sort((a, b) => {
+    // Featured providers first
+    const am = isFeaturedProvider(a.p) ? 1 : 0
+    const bm = isFeaturedProvider(b.p) ? 1 : 0
+    if (bm !== am) return bm - am
     if (b.score !== a.score) return b.score - a.score
     const ar = a.p.rating ?? 0
     const br = b.p.rating ?? 0
@@ -1500,7 +1558,7 @@ function BookPage() {
                       <div className="flex items-center justify-between">
                         <div className="font-medium flex items-center gap-2">
                           {r.name}
-                          {r.isMember && (
+                          {isFeaturedProvider(r) && (
                             <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
                           )}
                         </div>
@@ -1598,7 +1656,7 @@ function BookPage() {
                           <div className="flex items-center justify-between">
                             <div className="font-medium flex items-center gap-2">
                               {r.name}
-                              {r.isMember && (
+                              {isFeaturedProvider(r) && (
                                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
                               )}
                             </div>

@@ -12,13 +12,21 @@ export type DbProvider = {
   address?: string | null
   images?: string[] | null
   badges?: string[] | null
+  // Membership/featured columns (optional in DB)
+  is_member?: boolean | number | string | null
+  member?: boolean | number | string | null
+  is_featured?: boolean | number | string | null
+  featured?: boolean | number | string | null
+  paid?: boolean | number | string | null
+  plan?: string | null
+  tier?: string | null
 }
 
 export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
   try {
     const { data, error } = await supabase
       .from('providers')
-      .select('id,name,category_key,tags,rating,phone,email,website,address,images,badges')
+      .select('*')
       .limit(500)
     if (error) {
       console.warn('[Supabase] providers select error', error)
