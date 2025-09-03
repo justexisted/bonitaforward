@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import './index.css'
-import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Sparkles, Menu, X } from 'lucide-react'
+import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Menu, X } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
@@ -165,9 +165,7 @@ function Navbar() {
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
       <Container className="flex items-center justify-between h-14">
         <Link to="/" className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500 text-white">
-            <Sparkles className="h-4 w-4" />
-          </span>
+          <img src="/images/top-left-logo.png" alt="Bonita Forward" className="h-8 w-8 rounded" />
           <span className="font-semibold tracking-tight">Bonita Forward</span>
         </Link>
         <div className="flex items-center gap-2">
@@ -255,17 +253,126 @@ function Layout() {
 }
 
 function Hero() {
+  const navigate = useNavigate()
+  const [query, setQuery] = useState<string>('')
+  const [results, setResults] = useState<Provider[]>([])
+  const [open, setOpen] = useState<boolean>(false)
+
+  function getAllProviders(): Provider[] {
+    const keys: CategoryKey[] = ['real-estate','home-services','health-wellness','restaurants-cafes','professional-services']
+    return keys.flatMap((k) => providersByCategory[k] || [])
+  }
+
+  function recompute(q: string) {
+    const text = q.trim().toLowerCase()
+    if (!text) { setResults([]); return }
+    const all = getAllProviders()
+    const scored = all
+      .map((p) => {
+        const name = p.name.toLowerCase()
+        const matchName = name.includes(text) ? 2 : 0
+        const matchTag = (p.tags || []).some((t) => String(t).toLowerCase().includes(text)) ? 1 : 0
+        const match = matchName + matchTag + (p.isMember ? 0.5 : 0)
+        return { p, match }
+      })
+      .filter((s) => s.match > 0)
+      .sort((a, b) => b.match - a.match || (b.p.rating ?? 0) - (a.p.rating ?? 0) || a.p.name.localeCompare(b.p.name))
+      .slice(0, 8)
+      .map((s) => s.p)
+    setResults(scored)
+  }
+
+  useEffect(() => {
+    function onUpdate() { if (query) recompute(query) }
+    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
+    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
+  }, [query])
+
   return (
-    <section className="py-10 sm:py-12">
+    <section className="relative overflow-hidden" style={{ minHeight: '33vh', overflow: 'visible' }}>
+      <img
+        src="/images/bonita-cartoon-hero.jpeg"
+        alt=""
+        loading="eager"
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover"
+        onError={(e) => {
+          const img = e.currentTarget as HTMLImageElement
+          img.onerror = null
+          img.src = `https://picsum.photos/seed/landing-hero-fallback/1600/900`
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/60 via-neutral-900/20 to-transparent" aria-hidden></div>
+      <div className="relative" style={{ minHeight: '33vh', alignContent: 'center' }}>
+      <div className="gradient-overlay"></div>
+        <Container>
+          <div className="py-10 sm:py-12 text-center">
+            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white" style={{ position: 'relative', zIndex: 2 }}>
+              Discover, Support, and Grow Local Bonita Businesses.
+            </h1>
+            <p className="mt-3 text-neutral-100" style={{ position: 'relative', zIndex: 2 }}>
+              Minimal, modern, and made for our community. Explore top categories and get connected.
+            </p>
+            <div className="mt-4 mx-auto max-w-md text-left" style={{ position: 'relative', zIndex: 2 }}>
+              <div className="relative">
+                <div className="flex items-center rounded-full bg-white border border-neutral-200 px-3 py-2 shadow-sm">
+                  <span className="mr-2 select-none">🔎</span>
+                  <input
+                    value={query}
+                    onChange={(e) => { setQuery(e.target.value); setOpen(true); recompute(e.target.value) }}
+                    onFocus={() => { if (results.length) setOpen(true) }}
+                    onBlur={() => setTimeout(() => setOpen(false), 120)}
+                    placeholder="Discover Bonita"
+                    className="flex-1 outline-none text-sm bg-transparent placeholder:text-neutral-400"
+                  />
+                </div>
+                {open && results.length > 0 && (
+                  <div className="absolute z-20 mt-2 w-full rounded-2xl border border-neutral-100 bg-white shadow-sm overflow-hidden">
+                    <ul className="max-h-64 overflow-auto">
+                      {results.map((r) => (
+                        <li key={r.id}>
+                          <button
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => { setOpen(false); setQuery(''); navigate(`/provider/${encodeURIComponent(r.id)}`) }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 flex items-center justify-between"
+                          >
+                            <span className="truncate mr-2">{r.name}</span>
+                            <span className="text-[11px] text-neutral-500">{r.category.replace('-', ' ')}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* CTAs removed per request */}
+          </div>
+        </Container>
+      </div>
+    </section>
+  )
+}
+
+function ProviderPage() {
+  const params = useParams()
+  const providerId = params.id as string
+  const all: Provider[] = (['real-estate','home-services','health-wellness','restaurants-cafes','professional-services'] as CategoryKey[])
+    .flatMap((k) => providersByCategory[k] || [])
+  const provider = all.find((p) => p.id === providerId)
+  return (
+    <section className="py-8">
       <Container>
-        <div className="text-center">
-          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-900">
-            Discover, Support, and Grow Local Bonita Businesses.
-          </h1>
-          <p className="mt-3 text-neutral-600">
-            Minimal, modern, and made for our community. Explore top categories and get connected.
-          </p>
-          {/* CTAs removed per request */}
+        <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
+          {!provider ? (
+            <div className="text-sm text-neutral-600">Provider not found.</div>
+          ) : (
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">{provider.name}</h1>
+              <div className="mt-1 text-sm text-neutral-500">Category: {provider.category}</div>
+              <div className="mt-4 text-sm text-neutral-700">Dedicated provider page — details coming soon.</div>
+            </div>
+          )}
         </div>
       </Container>
     </section>
@@ -1829,6 +1936,7 @@ export default function App() {
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
             <Route path="category/:id" element={<CategoryPage />} />
+            <Route path="provider/:id" element={<ProviderPage />} />
             <Route path="thank-you" element={<ThankYouPage />} />
           </Route>
         </Routes>

@@ -138,3 +138,22 @@ body {
 .skeleton-chip {
   @apply h-4 w-24 bg-neutral-200 rounded-full;
 }
+
+/* In your CSS file (e.g., App.css, index.css, or a module.css file) */
+
+.gradient-overlay {
+  position: absolute; /* Essential for overlaying */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Allows clicks to pass through to the div below */
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,   /* Light dark at the very top */
+    rgba(0, 0, 0, 0.5) 50%,   /* Darkest in the middle */
+    rgba(0, 0, 0, 0) 100%   /* Light dark at the very bottom */
+  );
+  /* Make sure this z-index is higher than other elements within the relative div if any */
+  z-index: 1; 
+}
