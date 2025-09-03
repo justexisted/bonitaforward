@@ -273,7 +273,6 @@ function Hero() {
 }
 
 function CategoryCard({ cat }: { cat: typeof categories[number] }) {
-  const Icon = cat.icon
   const emojiMap: Record<CategoryKey, string> = {
     'real-estate': '🏠',
     'home-services': '🛠️',
@@ -634,25 +633,7 @@ type ProviderDetails = {
   posts?: { id: string; title: string; url?: string }[]
 }
 
-// Curated short descriptions for top real-estate brands (from the analytical report)
-const providerDescriptions: Record<string, string> = {
-  '24k international realty': 'Local, family-owned brokerage with 32+ years in Bonita & Downtown. Full sales plus 24K Property Management and probate expertise; serves entry to luxury.',
-  'kent realty (the gary kent team)': 'High-touch team led by veteran broker Gary Kent. Seller-focused, upper mid to luxury SFH expertise with institutional experience.',
-  'leilani sells homes (integrity first realty & loans)': 'Bonita-based specialist for VA and first‑time buyers. Integrated guidance on realty & loans; also offers flexible property management.',
-  'palisade realty, inc.': 'High-volume South Bay team (300+ Chula Vista sales). Aggressive marketing across all price points from entry to luxury.',
-  'broadpoint properties': 'One‑stop shop: buy/sell/rent with strong property management. Covers residential plus some commercial (office/retail/industrial).',
-  'coldwell banker west': 'Major franchise presence with powerful brand reach. Best paired with top local teams for South Bay success.',
-  'century 21 affiliated': 'Top C21 franchise with Market Specialties (Commercial, Fine Homes). Broad coverage across residential and commercial.',
-  'exp realty of southern california': 'Cloud‑based, tech‑forward network of entrepreneurial agents. Broad price coverage; strength in digital marketing.',
-  'compass': 'Technology‑driven brokerage with strong data tools and luxury dominance; extensive agent network countywide.',
-  'keller williams realty': 'Agent‑centric national brand. Strong local agents serve Bonita from nearby offices; broad residential coverage.',
-  'mckee properties': 'Focused property management for residential and small office/retail in Bonita and central/south San Diego.',
-}
-
-function getProviderDescription(p: Provider): string | undefined {
-  const key = p.name.trim().toLowerCase()
-  return providerDescriptions[key]
-}
+// Removed unused providerDescriptions/getProviderDescription to satisfy TypeScript build
 
 function getProviderDetails(p: Provider): ProviderDetails {
   // Placeholder details; in production, fetch from DB/API
