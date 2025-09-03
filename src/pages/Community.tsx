@@ -18,11 +18,11 @@ export function CommunityIndex() {
         <h1 className="text-2xl font-semibold tracking-tight">Community</h1>
         <div className="mt-4 grid grid-cols-1 gap-3">
           {cats.map((ck) => (
-            <div key={ck} className="rounded-2xl border border-neutral-100 p-5 bg-white">
+            <Link key={ck} to={`/community/${ck}`} className="rounded-2xl border border-neutral-100 p-5 bg-white hover:shadow-sm">
               <div className="font-medium">{categoryToTitle[ck]}</div>
               <div className="mt-2 text-sm text-neutral-600">Read the latest post for this category.</div>
-              <Link className="btn btn-secondary mt-3 inline-block" to={`/community/${ck}`}>Read more</Link>
-            </div>
+              <span className="mt-3 inline-block text-sm" style={{ color: '#7070e3' }}>Read more</span>
+            </Link>
           ))}
         </div>
       </div>

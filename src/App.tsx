@@ -243,7 +243,7 @@ function Footer() {
 
 function Layout() {
   return (
-    <div className="min-h-full flex flex-col page-fade-in">
+    <div className="min-h-full flex flex-col">
       <SupabasePing />
       <Navbar />
       <main className="flex-1">
@@ -274,11 +274,18 @@ function Hero() {
 
 function CategoryCard({ cat }: { cat: typeof categories[number] }) {
   const Icon = cat.icon
+  const emojiMap: Record<CategoryKey, string> = {
+    'real-estate': '🏠',
+    'home-services': '🛠️',
+    'health-wellness': '🧘',
+    'restaurants-cafes': '🍽️',
+    'professional-services': '💼',
+  }
   return (
     <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4 elevate">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50">
-          <Icon className="h-5 w-5 text-neutral-700" />
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50 text-xl">
+          <span aria-hidden>{emojiMap[cat.key]}</span>
         </span>
       <div>
           <div className="font-medium text-neutral-900">{cat.name}</div>
@@ -299,17 +306,44 @@ function CommunitySection() {
     { category: 'professional-services', title: 'Top Professional Services of Bonita', excerpt: 'Standout legal, accounting, and consulting pros.' },
   ]
   return (
-    <section className="py-8 zoom-in">
+    <section className="py-8">
       <Container>
         <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Community</h2>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {cards.map((c) => (
-            <Link key={c.title} to={`/community/${c.category}`} className="rounded-2xl border border-neutral-100 p-4 bg-white elevate block hover:shadow-sm">
-              <div className="font-medium">{c.title}</div>
-              <div className="text-sm text-neutral-600 mt-1">{c.excerpt}</div>
-              <span className="mt-3 inline-flex items-center text-sm text-neutral-700 hover:text-neutral-900">Read more</span>
-            </Link>
-          ))}
+          {cards.map((c) => {
+            const bgMap: Record<string, string> = {
+              'restaurants-cafes': "https://picsum.photos/seed/restaurants-cafes/800/400",
+              'home-services': "https://picsum.photos/seed/home-services/800/400",
+              'health-wellness': "https://picsum.photos/seed/health-wellness/800/400",
+              'real-estate': "https://picsum.photos/seed/real-estate/800/400",
+              'professional-services': "https://picsum.photos/seed/professional-services/800/400",
+            }
+            const bg = bgMap[c.category as CategoryKey]
+            return (
+              <Link key={c.title} to={`/community/${c.category}`} className="relative rounded-2xl overflow-hidden block hover:shadow-sm border border-white/40">
+                <img
+                  src={bg}
+                  alt=""
+                  loading="eager"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => {
+                    const img = e.currentTarget as HTMLImageElement
+                    img.onerror = null
+                    img.src = `https://picsum.photos/seed/${c.category}-fallback/800/400`
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/60 via-neutral-900/20 to-transparent" aria-hidden></div>
+                <div className="relative z-10 p-4 min-h-[160px] flex flex-col justify-between">
+                  <div>
+                    <div className="font-medium text-white">{c.title}</div>
+                    <div className="text-sm text-neutral-100 mt-1">{c.excerpt}</div>
+                  </div>
+                  <span className="mt-3 inline-block text-sm px-2 py-2 text-center full-w-bg self-center" style={{ color: 'white' }}>Read more</span>
+                </div>
+              </Link>
+            )
+          })}
         </div>
       </Container>
     </section>
@@ -367,8 +401,8 @@ function HomePage() {
             {categories.slice(0, 4).map((c) => (
               <CategoryCard cat={c} key={c.key} />
             ))}
-            <details className="rounded-2xl border border-neutral-100 p-4 bg-white elevate">
-              <summary className="cursor-pointer select-none text-sm text-neutral-700">See more</summary>
+            <details className="rounded-2xl p-4 bg-white elevate">
+              <summary className="cursor-pointer select-none text-sm" style={{ color: '#7070e3' }}>See more</summary>
               <div className="mt-3">
                 {categories.slice(4).map((c) => (
                   <div key={c.key} className="mt-2">
