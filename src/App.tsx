@@ -166,13 +166,16 @@ function Navbar() {
     return (
       <span className="relative block h-5 w-5">
         <span
-          className={`absolute left-1/2 top-[6px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transition-transform duration-1000 ease-in-out ${open ? 'rotate-45 translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
+          className={`absolute left-1/2 top-[6px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transform-gpu ${open ? 'rotate-45 translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
+          style={{ transition: 'transform 1000ms ease-in-out' }}
         />
         <span
-          className={`absolute left-1/2 top-[11px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center transition-opacity duration-1000 ease-in-out ${open ? 'opacity-0' : 'opacity-100'}`}
+          className={`absolute left-1/2 top-[11px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center ${open ? 'opacity-0' : 'opacity-100'}`}
+          style={{ transition: 'opacity 1000ms ease-in-out' }}
         />
         <span
-          className={`absolute left-1/2 top-[16px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transition-transform duration-1000 ease-in-out ${open ? '-rotate-45 -translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
+          className={`absolute left-1/2 top-[16px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transform-gpu ${open ? '-rotate-45 -translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
+          style={{ transition: 'transform 1000ms ease-in-out' }}
         />
       </span>
     )
