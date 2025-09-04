@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import './index.css'
-import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, Menu, X } from 'lucide-react'
+import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
@@ -162,6 +162,21 @@ function Navbar() {
     .filter(Boolean)
   const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
   const isAdmin = !!auth.email && adminList.includes(auth.email.toLowerCase())
+  function HamburgerIcon({ open }: { open: boolean }) {
+    return (
+      <span className="relative block h-5 w-5">
+        <span
+          className={`absolute left-1/2 top-[6px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transition-transform duration-1000 ease-in-out ${open ? 'rotate-45 translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
+        />
+        <span
+          className={`absolute left-1/2 top-[11px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center transition-opacity duration-1000 ease-in-out ${open ? 'opacity-0' : 'opacity-100'}`}
+        />
+        <span
+          className={`absolute left-1/2 top-[16px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transition-transform duration-1000 ease-in-out ${open ? '-rotate-45 -translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
+        />
+      </span>
+    )
+  }
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
       <Container className="flex items-center justify-between h-14">
@@ -170,8 +185,13 @@ function Navbar() {
           <span className="font-semibold tracking-tight">Bonita Forward</span>
         </Link>
         <div className="flex items-center gap-2">
-          <button aria-label="Menu" onClick={() => setOpen((v) => !v)} className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-xl hover:bg-neutral-100">
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <button 
+            id="hamburger-btn" 
+            aria-label="Menu"
+            aria-expanded={open ? 'true' : 'false'} 
+            onClick={() => setOpen((v) => !v)} 
+            className={`sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-xl hover:bg-neutral-100 ${open ? 'active' : ''}`}>
+            <HamburgerIcon open={open} />
           </button>
           <nav className="hidden sm:flex items-center gap-3 text-sm">
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/about">About</Link>
@@ -237,9 +257,9 @@ function Footer() {
   return (
     <footer className="mt-16 border-t border-neutral-100">
       <Container className="py-8 text-xs text-neutral-500">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-center justify-between gap-4 p-4 text-center md:flex-row md:text-left">
           <div>© {new Date().getFullYear()} Bonita Forward — Community powered, locally focused.</div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link to="/business" className="text-neutral-700 hover:text-neutral-900">📈 Have a Business?</Link>
             <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Privacy Policy</a>
             <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Terms</a>

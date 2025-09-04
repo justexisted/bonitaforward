@@ -157,3 +157,6 @@ body {
   /* Make sure this z-index is higher than other elements within the relative div if any */
   z-index: 1; 
 }
+
+/* Target the SVG paths */
+/* Remove old SVG hamburger animation (replaced by CSS spans) */
