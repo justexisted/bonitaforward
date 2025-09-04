@@ -232,7 +232,11 @@ function Footer() {
       <Container className="py-8 text-xs text-neutral-500">
         <div className="flex items-center justify-between">
           <div>© {new Date().getFullYear()} Bonita Forward — Community powered, locally focused.</div>
-          <Link to="/business" className="text-neutral-700 hover:text-neutral-900">📈 Have a Business?</Link>
+          <div className="flex items-center gap-3">
+            <Link to="/business" className="text-neutral-700 hover:text-neutral-900">📈 Have a Business?</Link>
+            <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Privacy Policy</a>
+            <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Terms</a>
+          </div>
         </div>
       </Container>
     </footer>

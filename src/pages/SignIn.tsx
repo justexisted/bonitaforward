@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 
@@ -18,6 +19,7 @@ export default function SignInPage() {
   const [confirm, setConfirm] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
   // If already authenticated, redirect away from Sign In
   useEffect(() => {
@@ -52,6 +54,41 @@ export default function SignInPage() {
       setBusy(false)
     }
   }
+
+  useEffect(() => {
+    if (!clientId) return
+    // @ts-expect-error: google injected by GIS script
+    const google = (window as any).google
+    if (!google || !google.accounts || !google.accounts.id) return
+
+    google.accounts.id.initialize({
+      client_id: clientId,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      itp_support: true,
+      callback: async (response: { credential: string }) => {
+        try {
+          const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: response.credential })
+          if (error) {
+            setMessage(error.message || 'Google sign-in failed')
+          }
+        } catch (err: any) {
+          setMessage(err?.message || 'Google sign-in failed')
+        }
+      },
+    })
+    const container = document.getElementById('google-btn')
+    if (container) {
+      google.accounts.id.renderButton(container, {
+        theme: 'outline',
+        size: 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        logo_alignment: 'left',
+      })
+    }
+    // Do NOT auto-open One Tap; only show when user clicks the button above
+  }, [clientId])
 
   return (
     <section className="py-10">
@@ -115,9 +152,7 @@ export default function SignInPage() {
 
           {mode !== 'reset' && (
             <div className="mt-3">
-              <button onClick={async () => { await auth.signInWithGoogle() }} className="w-full rounded-full bg-neutral-100 text-neutral-900 py-2.5 hover:bg-neutral-200 text-center">
-                Continue with Google
-              </button>
+              <div id="google-btn" className="flex justify-center"></div>
             </div>
           )}
 
