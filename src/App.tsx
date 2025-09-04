@@ -7,6 +7,7 @@ import { supabase } from './lib/supabase'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
 import { fetchProvidersFromSupabase } from './lib/supabaseData.ts'
 import SignInPage from './pages/SignIn'
+import AccountPage from './pages/Account'
 import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
@@ -179,6 +180,9 @@ function Navbar() {
             {auth.isAuthed && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/owner">My Business</Link>
             )}
+            {auth.isAuthed && (
+              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/account">Account</Link>
+            )}
             {isAdmin && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/admin">Admin</Link>
             )}
@@ -206,6 +210,9 @@ function Navbar() {
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/community">Community</Link>
               {auth.isAuthed && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/owner">My Business</Link>
+              )}
+              {auth.isAuthed && (
+                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/account">Account</Link>
               )}
               {isAdmin && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/admin">Admin</Link>
@@ -236,6 +243,11 @@ function Footer() {
             <Link to="/business" className="text-neutral-700 hover:text-neutral-900">📈 Have a Business?</Link>
             <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Privacy Policy</a>
             <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Terms</a>
+            <a href="/contact" className="text-neutral-700 hover:text-neutral-900">Contact</a>
+            <span className="hidden sm:inline text-neutral-400">·</span>
+            <a href="tel:+16197075351" className="text-neutral-700 hover:text-neutral-900">(619) 707-5351</a>
+            <span className="hidden sm:inline text-neutral-400">·</span>
+            <a href="mailto:bonitaforward@gmail.com" className="text-neutral-700 hover:text-neutral-900">bonitaforward@gmail.com</a>
           </div>
         </div>
       </Container>
@@ -1080,31 +1092,8 @@ async function createBusinessApplication(params: { full_name?: string; business_
   }
 }
 
-// Track a contact/get‑featured submission (simplified)
-async function createContactLead(params: { business_name?: string; contact_email?: string; details?: string }) {
-  console.log('[ContactLead] submitting lead', params)
-  try {
-    const { data, error } = await supabase
-      .from('contact_leads')
-      .insert([
-        {
-          business_name: params.business_name || null,
-          contact_email: params.contact_email || null,
-          details: params.details || null,
-        },
-      ])
-      .select('*')
-    if (error) {
-      console.error('[ContactLead] insert error', error)
-    } else {
-      console.log('[ContactLead] insert success', data)
-    }
-    return { data, error }
-  } catch (err) {
-    console.error('[ContactLead] unexpected failure', err)
-    return { data: null, error: err as any }
-  }
-}
+// (Kept for backward compatibility with older forms)
+// Removed unused createContactLead implementation after migrating contact to general user form
 
 function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, string>): FunnelQuestion[] {
   if (categoryKey === 'health-wellness') {
@@ -1433,31 +1422,41 @@ function ContactPage() {
   return (
     <section className="py-8">
       <Container>
-        <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-          <h2 className="text-xl font-semibold tracking-tight">Get Featured</h2>
-          <p className="mt-1 text-neutral-600">Local business in Bonita? Request inclusion and we'll reach out.</p>
+        <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate max-w-xl mx-auto">
+          <h2 className="text-xl font-semibold tracking-tight">Contact Bonita Forward</h2>
+          <p className="mt-1 text-neutral-600">Have a question or feedback? Reach us at <a href="mailto:bonitaforward@gmail.com" className="underline">bonitaforward@gmail.com</a> or call <a href="tel:+16197075351" className="underline">(619) 707-5351</a>.</p>
           <form
             className="mt-4 grid grid-cols-1 gap-3"
-            onSubmit={async (e) => {
+            onSubmit={(e) => {
               e.preventDefault()
               const form = e.currentTarget as HTMLFormElement
-              const business_name = (form.elements.item(0) as HTMLInputElement)?.value
-              const contact_email = (form.elements.item(1) as HTMLInputElement)?.value
-              const details = (form.elements.item(2) as HTMLTextAreaElement)?.value
-              try { localStorage.setItem('bf-contact', JSON.stringify({ business_name, contact_email, details, ts: Date.now() })) } catch {}
-              const { error } = await createContactLead({ business_name, contact_email, details })
-              if (!error) {
-                form.reset()
-                window.location.assign('/thank-you')
-              } else {
-                console.error('[ContactLead] submit failed, not redirecting')
-              }
+              const name = (form.elements.namedItem('name') as HTMLInputElement)?.value
+              const email = (form.elements.namedItem('email') as HTMLInputElement)?.value
+              const subject = (form.elements.namedItem('subject') as HTMLInputElement)?.value
+              const message = (form.elements.namedItem('message') as HTMLTextAreaElement)?.value
+              try { localStorage.setItem('bf-user-contact', JSON.stringify({ name, email, subject, message, ts: Date.now() })) } catch {}
+              form.reset()
+              window.location.assign('/thank-you')
             }}
           >
-            <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business name" />
-            <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Contact email" />
-            <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What do you offer?" rows={4} />
-            <button className="btn btn-primary w-full">Request Inclusion</button>
+            <div>
+              <label className="block text-sm text-neutral-600">Full Name</label>
+              <input name="name" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Your full name" />
+            </div>
+            <div>
+              <label className="block text-sm text-neutral-600">Email</label>
+              <input name="email" type="email" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="you@example.com" />
+            </div>
+            <div>
+              <label className="block text-sm text-neutral-600">Subject</label>
+              <input name="subject" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="How can we help?" />
+            </div>
+            <div>
+              <label className="block text-sm text-neutral-600">Message</label>
+              <textarea name="message" rows={5} required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Write your message here" />
+            </div>
+            <div className="text-xs text-neutral-500">By submitting, you agree to our <a className="underline" href="/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a> and <a className="underline" href="/terms.html" target="_blank" rel="noreferrer">Terms</a>.</div>
+            <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Send Message</button>
           </form>
         </div>
       </Container>
@@ -1937,6 +1936,7 @@ export default function App() {
             <Route path="community/:category" element={<CommunityPost />} />
             <Route path="admin" element={<AdminPage />} />
             <Route path="owner" element={<OwnerPage />} />
+            <Route path="account" element={<AccountPage />} />
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
             <Route path="category/:id" element={<CategoryPage />} />
