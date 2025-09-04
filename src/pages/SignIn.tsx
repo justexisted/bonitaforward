@@ -57,7 +57,6 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (!clientId) return
-    // @ts-expect-error: google injected by GIS script
     const google = (window as any).google
     if (!google || !google.accounts || !google.accounts.id) return
 
@@ -68,7 +67,7 @@ export default function SignInPage() {
       itp_support: true,
       callback: async (response: { credential: string }) => {
         try {
-          const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: response.credential })
+          const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: response.credential })
           if (error) {
             setMessage(error.message || 'Google sign-in failed')
           }
