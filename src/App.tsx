@@ -212,7 +212,6 @@ function Navbar() {
             {!auth.isAuthed ? (
               <div className="flex items-center gap-2">
                 <Link to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign In</Link>
-                <button onClick={auth.signInWithGoogle} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Google</button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
