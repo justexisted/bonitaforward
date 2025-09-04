@@ -24,7 +24,11 @@ export default function SignInPage() {
   // If already authenticated, redirect away from Sign In
   useEffect(() => {
     if (auth.isAuthed) {
-      const target = location?.state?.from || '/'
+      const stored = (() => {
+        try { return localStorage.getItem('bf-return-url') || null } catch { return null }
+      })()
+      const target = location?.state?.from || stored || '/'
+      try { localStorage.removeItem('bf-return-url') } catch {}
       navigate(target, { replace: true })
     }
   }, [auth.isAuthed, location?.state?.from, navigate])
@@ -150,9 +154,24 @@ export default function SignInPage() {
           </form>
 
           {mode !== 'reset' && (
-            <div className="mt-3">
-              <div id="google-btn" className="flex justify-center"></div>
-            </div>
+            <>
+              <div className="mt-3">
+                <div id="google-btn" className="flex justify-center"></div>
+              </div>
+              <div className="my-3 flex items-center gap-3 text-xs text-neutral-400">
+                <div className="h-px flex-1 bg-neutral-200"></div>
+                <span>or</span>
+                <div className="h-px flex-1 bg-neutral-200"></div>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => auth.signInWithGoogle()}
+                className="hidden w-full rounded-full border border-neutral-200 bg-white text-neutral-900 py-2.5 hover:bg-neutral-50 elevate"
+              >
+                Continue with Google
+              </button>
+            </>
           )}
 
           <div className="mt-4 text-center text-sm text-neutral-600">

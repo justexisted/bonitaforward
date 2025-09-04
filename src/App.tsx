@@ -107,8 +107,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signInWithGoogle = async () => {
-    // Redirect back to the current page after Google OAuth to preserve funnel context
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } })
+    // Send users back to a safe, whitelisted URL; SignIn will forward to intended page
+    const redirectTo = window.location.origin + '/signin'
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
   }
 
   const signOut = async () => {
@@ -180,6 +181,12 @@ function Navbar() {
       </span>
     )
   }
+  function saveReturnUrl() {
+    try {
+      const url = window.location.pathname + window.location.search + window.location.hash
+      localStorage.setItem('bf-return-url', url)
+    } catch {}
+  }
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
       <Container className="flex items-center justify-between h-14">
@@ -211,7 +218,7 @@ function Navbar() {
             )}
             {!auth.isAuthed ? (
               <div className="flex items-center gap-2">
-                <Link to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign In</Link>
+                <Link onClick={saveReturnUrl} to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign In</Link>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -222,9 +229,9 @@ function Navbar() {
           </nav>
         </div>
       </Container>
-      {/* Mobile sheet */}
+      {/* Mobile sheet (fixed overlay to avoid layout shift) */}
       {open && (
-        <div className="sm:hidden border-t border-neutral-100 bg-white">
+        <div className="fixed inset-x-0 top-14 z-50 sm:hidden border-t border-neutral-100 bg-white shadow-md">
           <Container className="py-3 text-sm">
             <div className="flex flex-col gap-2">
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/about">About</Link>
@@ -241,8 +248,7 @@ function Navbar() {
               )}
               {!auth.isAuthed ? (
                 <>
-                  <Link onClick={() => setOpen(false)} to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-2 text-center">Sign In</Link>
-                  <button onClick={() => { setOpen(false); auth.signInWithGoogle() }} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-2 hover:bg-neutral-200 text-center">Continue with Google</button>
+                  <Link onClick={() => { saveReturnUrl(); setOpen(false) }} to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-2 text-center">Sign In</Link>
                 </>
               ) : (
                 <button onClick={() => { setOpen(false); auth.signOut() }} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-2 hover:bg-neutral-200 text-center">Sign out</button>
