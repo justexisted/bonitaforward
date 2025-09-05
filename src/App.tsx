@@ -204,9 +204,9 @@ function Navbar() {
             <HamburgerIcon open={open} />
           </button>
           <nav className="hidden sm:flex items-center gap-3 text-sm">
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/about">About</Link>
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/community">Community</Link>
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/about">About</Link>
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/community">Community</Link>
             {auth.isAuthed && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/owner">My Business</Link>
             )}
@@ -234,9 +234,9 @@ function Navbar() {
         <div className="fixed inset-x-0 top-14 z-50 sm:hidden border-t border-neutral-100 bg-white shadow-md">
           <Container className="py-3 text-sm">
             <div className="flex flex-col gap-2">
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/about">About</Link>
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/business">📈 Have a Business?</Link>
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100" to="/community">Community</Link>
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/about">About</Link>
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/community">Community</Link>
               {auth.isAuthed && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/owner">My Business</Link>
               )}
@@ -263,7 +263,7 @@ function Navbar() {
 
 function Footer() {
   return (
-    <footer className="mt-16 border-t border-neutral-100">
+    <footer className="mt-16 border-t border-neutral-100 bg-white">
       <Container className="py-8 text-xs text-neutral-500">
         <div className="flex flex-col items-center justify-between gap-4 p-4 text-center md:flex-row md:text-left">
           <div>© {new Date().getFullYear()} Bonita Forward — Community powered, locally focused.</div>
@@ -1434,12 +1434,49 @@ function CategoryPage() {
 
 function AboutPage() {
   return (
-    <section className="py-8">
+    <section className="py-3">
       <Container>
         <div className="prose max-w-none">
+        <img
+          src="/images/bonita-cartoon-hero.jpeg"
+          alt=""
+          loading="eager"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement
+            img.onerror = null
+            img.src = `https://picsum.photos/seed/landing-hero-fallback/1600/900`
+          }}
+          style={{ position: 'absolute', objectPosition: 'top', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: -1 }}
+        />
           <h2 className="text-2xl font-semibold tracking-tight">About Bonita Forward</h2>
-          <p className="text-neutral-600">We promote and highlight the best businesses in San Diego's Bonita community, encouraging residents to stay local and support local.</p>
-          <p className="text-neutral-600">This site acts as a bridge into lead funnels so businesses gain exposure and customers while the community gets quality, trusted recommendations.</p>
+          <br />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="text-neutral-600 bg-white p-6 rounded-xl text-center shadow-md hover:shadow-xl transition-shadow flex flex-col">
+              <div className="flex-1">
+                  <p className="text-lg font-semibold text-neutral-900">We Highlight Bonita Businesses</p>
+                  <p className="text-neutral-700 mt-2">We encourage residents to stay local and support local businesses.</p>
+              </div>
+              <p className="text-4xl mt-4">✔️</p>
+            </div>
+
+            <div className="text-neutral-600 bg-white p-6 rounded-xl text-center shadow-md hover:shadow-xl transition-shadow flex flex-col">
+              <div className="flex-1">
+                  <p className="text-lg font-semibold text-neutral-900">Reduce your carbon footprint</p>
+                  <p className="text-neutral-700 mt-2">Shop local, save gas, time, and money.</p>
+              </div>
+              <p className="text-4xl mt-4">💚</p>
+            </div>
+
+            <div className="text-neutral-600 bg-white p-6 rounded-xl text-center shadow-md hover:shadow-xl transition-shadow flex flex-col">
+              <div className="flex-1">
+                  <p className="text-lg font-semibold text-neutral-900">Bridge the gap</p>
+                  <p className="text-neutral-700 mt-2">This site is a bridge between the community and businesses, the community gets trusted recommendations and businesses get customers.</p>
+              </div>
+              <p className="text-4xl mt-4">🌉</p>
+            </div>
+          </div>
         </div>
       </Container>
     </section>
