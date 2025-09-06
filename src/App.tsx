@@ -64,7 +64,7 @@ type AuthContextValue = {
   signInLocal: (data: { name?: string; email: string }) => void
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
-  signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string }>
+  signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string; session?: unknown | null }>
   resetPassword: (email: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
@@ -157,8 +157,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signUpWithEmail = async (email: string, password: string, name?: string, role?: 'business' | 'community') => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name, role } } })
-    return { error: error?.message }
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name, role } } })
+    return { error: error?.message, session: data?.session ?? null }
   }
 
   const resetPassword = async (email: string) => {

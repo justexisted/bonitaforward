@@ -51,21 +51,23 @@ export default function SignInPage() {
             setMessage('Please select an account type')
             return
           }
-          const { error } = await auth.signUpWithEmail(email, password, name, accountType || undefined)
+          const { error, session } = await auth.signUpWithEmail(email, password, name, accountType || undefined)
           if (!error) {
             try {
               localStorage.removeItem('bf-signup-prefill')
               localStorage.setItem('bf-pending-profile', JSON.stringify({ name, email, role: accountType }))
             } catch {}
-            // Try to sign the user in immediately (works if email confirmations are disabled)
-            const { error: signInErr } = await auth.signInWithEmail(email, password)
-            if (!signInErr) {
-              const params = new URLSearchParams(location?.search || '')
-              const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
-              navigate(next, { replace: true })
-            } else {
-              setMessage('Check your email to confirm your account, then sign in.')
+            if (!session) {
+              // Fallback: try sign-in if no session returned (some configs)
+              const { error: signInErr } = await auth.signInWithEmail(email, password)
+              if (signInErr) {
+                setMessage('Account created. Please sign in to continue.')
+                return
+              }
             }
+            const params = new URLSearchParams(location?.search || '')
+            const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
+            navigate(next, { replace: true })
           } else {
             setMessage(error)
           }
