@@ -436,6 +436,21 @@ function ProviderPage() {
   const all: Provider[] = (['real-estate','home-services','health-wellness','restaurants-cafes','professional-services'] as CategoryKey[])
     .flatMap((k) => providersByCategory[k] || [])
   const provider = all.find((p) => p.id === providerId)
+  const [jobs, setJobs] = useState<{ id: string; title: string; description?: string | null; apply_url?: string | null; salary_range?: string | null }[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadJobs() {
+      try {
+        if (!provider) return
+        const { listJobPostsByProvider } = await import('./lib/supabaseData')
+        const rows = await listJobPostsByProvider(provider.id)
+        if (!cancelled) setJobs(rows)
+      } catch {}
+    }
+    void loadJobs()
+    return () => { cancelled = true }
+  }, [provider?.id])
   return (
     <section className="py-8">
       <Container>
@@ -447,6 +462,21 @@ function ProviderPage() {
               <h1 className="text-2xl font-semibold tracking-tight">{provider.name}</h1>
               <div className="mt-1 text-sm text-neutral-500">Category: {provider.category}</div>
               <div className="mt-4 text-sm text-neutral-700">Dedicated provider page — details coming soon.</div>
+              {jobs.length > 0 && (
+                <div className="mt-6">
+                  <div className="text-sm font-medium">Open Roles</div>
+                  <div className="mt-2 space-y-2">
+                    {jobs.map((j) => (
+                      <div key={j.id} className="rounded-xl border border-neutral-200 p-3">
+                        <div className="font-medium text-sm">{j.title}</div>
+                        {j.salary_range && <div className="text-xs text-neutral-600">{j.salary_range}</div>}
+                        {j.description && <div className="mt-1 text-sm text-neutral-700 whitespace-pre-wrap">{j.description}</div>}
+                        {j.apply_url && <div className="mt-1"><a className="text-xs underline" href={j.apply_url} target="_blank" rel="noreferrer">Apply</a></div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

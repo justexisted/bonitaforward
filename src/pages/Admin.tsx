@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, type BlogPost } from '../lib/supabaseData'
+import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 type ProviderRow = {
   id: string
@@ -77,6 +78,8 @@ export default function AdminPage() {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiQuery, setEmojiQuery] = useState('')
+  const [changeRequests, setChangeRequests] = useState<ProviderChangeRequest[]>([])
+  const [jobPosts, setJobPosts] = useState<ProviderJobPost[]>([])
 
   useEffect(() => {
     // Load content into editor when switching drafts
@@ -198,6 +201,14 @@ export default function AdminPage() {
         try {
           const posts = await fetchAllBlogPosts()
           setBlogPosts(posts)
+        } catch {}
+        try {
+          const { data: crData } = await supabase.from('provider_change_requests').select('*').order('created_at', { ascending: false })
+          setChangeRequests((crData as ProviderChangeRequest[]) || [])
+        } catch {}
+        try {
+          const { data: jpData } = await supabase.from('provider_job_posts').select('*').order('created_at', { ascending: false })
+          setJobPosts((jpData as ProviderJobPost[]) || [])
         } catch {}
       } catch (err: any) {
         console.error('[Admin] unexpected failure', err)
@@ -352,6 +363,79 @@ export default function AdminPage() {
       setProviders((arr) => arr.filter((p) => p.id !== providerId))
     }
     try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
+  }
+
+  async function notifyUser(user_id: string | null | undefined, subject: string, body?: string, data?: any) {
+    if (!user_id) return
+    try { await supabase.from('user_notifications').insert([{ user_id, subject, body: body || null, data: data || null }]) } catch {}
+  }
+
+  async function approveChangeRequest(req: ProviderChangeRequest) {
+    setMessage(null)
+    try {
+      if (req.type === 'update') {
+        const { error } = await supabase.from('providers').update(req.changes as any).eq('id', req.provider_id)
+        if (error) throw new Error(error.message)
+      } else if (req.type === 'delete') {
+        const res = await supabase.from('providers').delete().eq('id', req.provider_id).select('id')
+        if (res.error) {
+          // If cannot hard delete, soft-delete by adding 'deleted' badge
+          const { data: row } = await supabase.from('providers').select('badges').eq('id', req.provider_id).single()
+          const badges = Array.isArray((row as any)?.badges) ? ((row as any)?.badges as string[]) : []
+          const next = Array.from(new Set([...(badges || []), 'deleted']))
+          await supabase.from('providers').update({ badges: next as any }).eq('id', req.provider_id)
+        }
+      } else if (req.type === 'feature_request') {
+        const { error } = await supabase.from('providers').update({ is_member: true }).eq('id', req.provider_id)
+        if (error) throw new Error(error.message)
+      } else if (req.type === 'claim') {
+        const { error } = await supabase.from('providers').update({ owner_user_id: req.owner_user_id }).eq('id', req.provider_id)
+        if (error) throw new Error(error.message)
+      }
+      await supabase.from('provider_change_requests').update({ status: 'approved', decided_at: new Date().toISOString() as any }).eq('id', req.id)
+      await notifyUser(req.owner_user_id, 'Request approved', `Your ${req.type} request was approved.`, { reqId: req.id })
+      setChangeRequests((arr) => arr.map((r) => r.id === req.id ? { ...r, status: 'approved', decided_at: new Date().toISOString() as any } : r))
+      setMessage('Change request approved')
+      try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
+    } catch (err: any) {
+      setError(err?.message || 'Failed to approve request')
+    }
+  }
+
+  async function rejectChangeRequest(req: ProviderChangeRequest, reason?: string) {
+    setMessage(null)
+    try {
+      await supabase.from('provider_change_requests').update({ status: 'rejected', reason: reason || null, decided_at: new Date().toISOString() as any }).eq('id', req.id)
+      await notifyUser(req.owner_user_id, 'Request rejected', reason || `Your ${req.type} request was rejected.`, { reqId: req.id })
+      setChangeRequests((arr) => arr.map((r) => r.id === req.id ? { ...r, status: 'rejected', reason: reason || r.reason, decided_at: new Date().toISOString() as any } : r))
+      setMessage('Change request rejected')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reject request')
+    }
+  }
+
+  async function approveJobPost(job: ProviderJobPost) {
+    setMessage(null)
+    try {
+      await supabase.from('provider_job_posts').update({ status: 'approved', decided_at: new Date().toISOString() as any }).eq('id', job.id)
+      await notifyUser(job.owner_user_id, 'Job post approved', `Your job post "${job.title}" was approved.`, { jobId: job.id })
+      setJobPosts((arr) => arr.map((j) => j.id === job.id ? { ...j, status: 'approved', decided_at: new Date().toISOString() as any } : j))
+      setMessage('Job post approved')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to approve job post')
+    }
+  }
+
+  async function rejectJobPost(job: ProviderJobPost, reason?: string) {
+    setMessage(null)
+    try {
+      await supabase.from('provider_job_posts').update({ status: 'rejected', decided_at: new Date().toISOString() as any }).eq('id', job.id)
+      await notifyUser(job.owner_user_id, 'Job post rejected', reason || `Your job post "${job.title}" was rejected.`, { jobId: job.id })
+      setJobPosts((arr) => arr.map((j) => j.id === job.id ? { ...j, status: 'rejected', decided_at: new Date().toISOString() as any } : j))
+      setMessage('Job post rejected')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reject job post')
+    }
   }
 
   if (!auth.email) {
@@ -636,6 +720,53 @@ export default function AdminPage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
+            <div className="font-medium">Owner Change Requests</div>
+            <div className="mt-2 space-y-2 text-sm">
+              {changeRequests.length === 0 && <div className="text-neutral-500">No requests yet.</div>}
+              {changeRequests.filter((r) => r.status === 'pending').map((r) => (
+                <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{r.type}</div>
+                    <div className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</div>
+                  </div>
+                  {r.changes && (
+                    <pre className="mt-1 text-xs bg-neutral-50 border border-neutral-100 rounded p-2 overflow-auto max-h-40">{JSON.stringify(r.changes, null, 2)}</pre>
+                  )}
+                  <div className="mt-2 flex items-center gap-2">
+                    <button onClick={() => approveChangeRequest(r)} className="btn btn-primary text-xs">Approve</button>
+                    <button onClick={() => rejectChangeRequest(r)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {isAdmin && (
+          <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
+            <div className="font-medium">Job Posts</div>
+            <div className="mt-2 space-y-2 text-sm">
+              {jobPosts.length === 0 && <div className="text-neutral-500">No job posts yet.</div>}
+              {jobPosts.filter((j) => j.status === 'pending').map((j) => (
+                <div key={j.id} className="rounded-xl border border-neutral-200 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{j.title}</div>
+                    <div className="text-xs text-neutral-500">{new Date(j.created_at).toLocaleString()}</div>
+                  </div>
+                  {j.description && <div className="mt-1 text-xs text-neutral-700 whitespace-pre-wrap">{j.description}</div>}
+                  <div className="mt-1 text-xs text-neutral-600">Apply: {j.apply_url || '-'}</div>
+                  <div className="mt-1 text-xs text-neutral-600">Salary: {j.salary_range || '-'}</div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <button onClick={() => approveJobPost(j)} className="btn btn-primary text-xs">Approve</button>
+                    <button onClick={() => rejectJobPost(j)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Reject</button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

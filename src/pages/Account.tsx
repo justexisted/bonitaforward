@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
+import { Link } from 'react-router-dom'
 
 export default function AccountPage() {
   const auth = useAuth()
@@ -8,10 +9,21 @@ export default function AccountPage() {
   const [name, setName] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [ownedProviders, setOwnedProviders] = useState<{ id: string; name: string }[]>([])
 
   useEffect(() => {
     setEmail(auth.email || '')
     setName(auth.name || '')
+    async function loadOwned() {
+      if (!auth.userId) { setOwnedProviders([]); return }
+      try {
+        const { data } = await supabase.from('providers').select('id,name').eq('owner_user_id', auth.userId).order('name', { ascending: true })
+        setOwnedProviders(((data as any[]) || []).map((r) => ({ id: r.id, name: r.name })))
+      } catch {
+        setOwnedProviders([])
+      }
+    }
+    void loadOwned()
   }, [auth.email, auth.name])
 
   async function saveProfile() {
@@ -86,6 +98,20 @@ export default function AccountPage() {
             <button disabled={busy} onClick={saveProfile} className="rounded-full bg-neutral-900 text-white py-2.5 elevate">{busy ? 'Saving…' : 'Save Changes'}</button>
           </div>
 
+          <div className="mt-6 border-t border-neutral-100 pt-4">
+            <div className="text-sm font-medium">My Businesses</div>
+            <div className="mt-2 text-sm">
+              {ownedProviders.length === 0 && <div className="text-neutral-600">No businesses found.</div>}
+              <ul className="space-y-1">
+                {ownedProviders.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between">
+                    <span>{p.name}</span>
+                    <Link to={`/owner`} className="text-xs underline">Manage</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
           <div className="mt-6 border-t border-neutral-100 pt-4">
             <div className="text-sm text-neutral-700 font-medium">Delete Account</div>
             <p className="text-xs text-neutral-500 mt-1">This will permanently remove your account and access. For compliance, final deletion will be confirmed via email.</p>

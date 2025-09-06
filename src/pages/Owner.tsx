@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
+import { createJobPost, createProviderChangeRequest, listOwnerChangeRequests, type ProviderChangeRequest } from '../lib/supabaseData'
 
 type ProviderRow = {
   id: string
@@ -16,6 +17,7 @@ type ProviderRow = {
   images: string[] | null
   owner_user_id: string | null
   is_member?: boolean | null
+  blog_opt_in?: boolean | null
 }
 
 export default function OwnerPage() {
@@ -24,6 +26,8 @@ export default function OwnerPage() {
   const [providers, setProviders] = useState<ProviderRow[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [requests, setRequests] = useState<ProviderChangeRequest[]>([])
+  const [jobDrafts, setJobDrafts] = useState<Record<string, { title: string; description: string; apply_url: string; salary_range: string }>>({})
 
   async function load() {
     setLoading(true)
@@ -41,6 +45,12 @@ export default function OwnerPage() {
       const filtered = rows.filter((r) => r.owner_user_id === userId || (!r.owner_user_id && r.email && email && r.email.toLowerCase() === email.toLowerCase()))
       setProviders(filtered)
     }
+    try {
+      if (userId) {
+        const list = await listOwnerChangeRequests(userId)
+        setRequests(list)
+      }
+    } catch {}
     setLoading(false)
   }
 
@@ -51,67 +61,54 @@ export default function OwnerPage() {
 
   async function claimProvider(id: string) {
     setMessage(null)
-    const { error } = await supabase
-      .from('providers')
-      .update({ owner_user_id: userId })
-      .eq('id', id)
-    if (error) setMessage('Claim failed: ' + error.message)
-    else {
-      setMessage('Business claimed successfully')
-      void load()
-    }
+    const { error } = await createProviderChangeRequest({ provider_id: id, owner_user_id: userId!, type: 'claim', changes: {}, reason: null })
+    if (error) setMessage('Claim request failed: ' + error)
+    else { setMessage('Claim requested. Awaiting admin approval.'); void load() }
   }
 
   async function saveProvider(p: ProviderRow) {
     setMessage(null)
-    const { error } = await supabase
-      .from('providers')
-      .update({
-        phone: p.phone,
-        email: p.email,
-        website: p.website,
-        address: p.address,
-        tags: p.tags || [],
-        images: p.images || [],
-      })
-      .eq('id', p.id)
-    if (error) setMessage('Save failed: ' + error.message)
-    else setMessage('Saved')
+    const changes: Record<string, any> = {
+      name: p.name,
+      address: p.address,
+      phone: p.phone,
+      email: p.email,
+      website: p.website,
+      tags: p.tags || [],
+      images: p.images || [],
+      blog_opt_in: p.blog_opt_in === true,
+    }
+    const { error } = await createProviderChangeRequest({ provider_id: p.id, owner_user_id: userId!, type: 'update', changes, reason: null })
+    if (error) setMessage('Request failed: ' + error)
+    else setMessage('Changes submitted for approval')
   }
 
   async function deleteProvider(id: string) {
     setMessage(null)
-    // Only allow delete for owned rows (RLS should enforce; we also guard client-side)
     const row = providers.find((p) => p.id === id)
     if (!row || row.owner_user_id !== userId) {
-      setMessage('You can only delete businesses you own')
+      setMessage('You can only request deletion for businesses you own')
       return
     }
-    const { error } = await supabase.from('providers').delete().eq('id', id)
-    if (error) setMessage('Delete failed: ' + error.message)
-    else {
-      setMessage('Business deleted')
-      void load()
-    }
+    const { error } = await createProviderChangeRequest({ provider_id: id, owner_user_id: userId!, type: 'delete', changes: {}, reason: null })
+    if (error) setMessage('Delete request failed: ' + error)
+    else { setMessage('Delete requested. Awaiting admin approval.'); void load() }
   }
 
   async function requestFeatured(p: ProviderRow) {
     setMessage(null)
-    try {
-      const payload = {
-        full_name: null as any,
-        business_name: p.name as any,
-        email: (email || p.email || null) as any,
-        phone: (p.phone || null) as any,
-        category: p.category_key as any,
-        challenge: 'Request to be Featured — $100/mo' as any,
-      }
-      const { error } = await supabase.from('business_applications').insert([payload])
-      if (error) setMessage('Request failed: ' + error.message)
-      else setMessage('Request sent. We will contact you about featuring ($100/mo).')
-    } catch (err: any) {
-      setMessage('Request failed: ' + (err?.message || 'Unknown error'))
-    }
+    const { error } = await createProviderChangeRequest({ provider_id: p.id, owner_user_id: userId!, type: 'feature_request', changes: {}, reason: 'Request to be Featured — $100/mo' })
+    if (error) setMessage('Request failed: ' + error)
+    else setMessage('Request sent. Awaiting admin approval.')
+  }
+
+  async function submitJob(p: ProviderRow) {
+    setMessage(null)
+    const draft = jobDrafts[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }
+    if (!draft.title.trim()) { setMessage('Please provide a job title.'); return }
+    const { error } = await createJobPost({ provider_id: p.id, owner_user_id: userId!, title: draft.title.trim(), description: draft.description || null, apply_url: draft.apply_url || null, salary_range: draft.salary_range || null })
+    if (error) setMessage('Job post failed: ' + error)
+    else { setMessage('Job post submitted for approval'); setJobDrafts((m) => ({ ...m, [p.id]: { title: '', description: '', apply_url: '', salary_range: '' } })) }
   }
 
   if (!userId) {
@@ -135,7 +132,7 @@ export default function OwnerPage() {
                 <div key={p.id} className="rounded-xl border border-neutral-200 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-medium">{p.name}</div>
+                      <input value={p.name} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, name: e.target.value } : it))} className="font-medium rounded-md px-2 py-1 border border-neutral-200" />
                       <div className="text-xs text-neutral-500">Category: {p.category_key}</div>
                       <div className="text-xs mt-1">
                         <span className="text-neutral-500">Featured:</span>{' '}
@@ -149,12 +146,16 @@ export default function OwnerPage() {
                     ) : null}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    <input value={p.address ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, address: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Address" />
                     <input value={p.phone ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, phone: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" />
                     <input value={p.email ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, email: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" />
                     <input value={p.website ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, website: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Website" />
-                    <input value={p.address ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, address: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Address" />
                     <input value={(p.tags || []).join(', ')} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : it))} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Tags (comma separated)" />
                     <input value={(p.images || []).join(', ')} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, images: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : it))} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Image URLs (comma separated)" />
+                    <label className="inline-flex items-center gap-2 text-sm sm:col-span-2">
+                      <input type="checkbox" checked={p.blog_opt_in === true} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, blog_opt_in: e.target.checked } : it))} />
+                      <span>Opt-in to be included in Bonita blog posts</span>
+                    </label>
                   </div>
                   <div className="mt-3">
                     <button onClick={() => saveProvider(p)} className="btn btn-secondary">Save</button>
@@ -173,8 +174,33 @@ export default function OwnerPage() {
                       <button onClick={() => requestFeatured(p)} className="ml-2 btn btn-primary text-xs">Request to be Featured ($100/mo)</button>
                     )}
                   </div>
+                  <div className="mt-4 border-t border-neutral-100 pt-3">
+                    <div className="text-sm font-medium">Job Postings</div>
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      <input value={jobDrafts[p.id]?.title || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), title: e.target.value } }))} placeholder="Title" className="rounded-xl border border-neutral-200 px-3 py-2" />
+                      <input value={jobDrafts[p.id]?.apply_url || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), apply_url: e.target.value } }))} placeholder="Apply URL" className="rounded-xl border border-neutral-200 px-3 py-2" />
+                      <input value={jobDrafts[p.id]?.salary_range || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), salary_range: e.target.value } }))} placeholder="Salary Range (optional)" className="rounded-xl border border-neutral-200 px-3 py-2" />
+                      <textarea value={jobDrafts[p.id]?.description || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), description: e.target.value } }))} placeholder="Description" className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2 min-h-[80px]" />
+                    </div>
+                    <div className="mt-2">
+                      <button onClick={() => submitJob(p)} className="btn btn-secondary text-xs">Submit Job for Approval</button>
+                    </div>
+                  </div>
                 </div>
               ))}
+              {requests.length > 0 && (
+                <div className="rounded-xl border border-neutral-200 p-4">
+                  <div className="text-sm font-medium">Recent Requests</div>
+                  <ul className="mt-2 text-sm space-y-1">
+                    {requests.slice(0, 5).map((r) => (
+                      <li key={r.id} className="flex items-center justify-between">
+                        <span>{r.type} • {r.status}</span>
+                        <span className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

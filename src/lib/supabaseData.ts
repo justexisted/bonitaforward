@@ -113,6 +113,131 @@ export async function deleteBlogPost(id: string): Promise<{ error?: string }> {
   }
 }
 
+// Business owner change request workflow
+export type ProviderChangeRequest = {
+  id: string
+  provider_id: string
+  owner_user_id: string
+  type: 'update' | 'delete' | 'feature_request' | 'claim'
+  changes: Record<string, any> | null
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  reason: string | null
+  created_at: string
+  decided_at?: string | null
+}
 
+export async function createProviderChangeRequest(payload: Omit<ProviderChangeRequest, 'id' | 'status' | 'created_at' | 'decided_at'> & { status?: ProviderChangeRequest['status'] }): Promise<{ error?: string; id?: string }> {
+  try {
+    const insertPayload: any = {
+      provider_id: payload.provider_id,
+      owner_user_id: payload.owner_user_id,
+      type: payload.type,
+      changes: payload.changes || {},
+      status: payload.status || 'pending',
+      reason: payload.reason || null,
+    }
+    const { data, error } = await supabase.from('provider_change_requests').insert([insertPayload]).select('id').single()
+    if (error) return { error: error.message }
+    return { id: (data as any)?.id as string }
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to submit change request' }
+  }
+}
 
+export async function listOwnerChangeRequests(owner_user_id: string): Promise<ProviderChangeRequest[]> {
+  try {
+    const { data, error } = await supabase
+      .from('provider_change_requests')
+      .select('*')
+      .eq('owner_user_id', owner_user_id)
+      .order('created_at', { ascending: false })
+    if (error) return []
+    return (data || []) as ProviderChangeRequest[]
+  } catch {
+    return []
+  }
+}
 
+// Job posts
+export type ProviderJobPost = {
+  id: string
+  provider_id: string
+  owner_user_id: string
+  title: string
+  description: string | null
+  apply_url: string | null
+  salary_range: string | null
+  status: 'pending' | 'approved' | 'rejected' | 'archived'
+  created_at: string
+  decided_at?: string | null
+}
+
+export async function createJobPost(payload: Omit<ProviderJobPost, 'id' | 'status' | 'created_at' | 'decided_at'> & { status?: ProviderJobPost['status'] }): Promise<{ error?: string; id?: string }> {
+  try {
+    const insertPayload: any = {
+      provider_id: payload.provider_id,
+      owner_user_id: payload.owner_user_id,
+      title: payload.title,
+      description: payload.description || null,
+      apply_url: payload.apply_url || null,
+      salary_range: payload.salary_range || null,
+      status: payload.status || 'pending',
+    }
+    const { data, error } = await supabase.from('provider_job_posts').insert([insertPayload]).select('id').single()
+    if (error) return { error: error.message }
+    return { id: (data as any)?.id as string }
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to create job post' }
+  }
+}
+
+export async function listJobPostsByProvider(provider_id: string): Promise<ProviderJobPost[]> {
+  try {
+    const { data, error } = await supabase
+      .from('provider_job_posts')
+      .select('*')
+      .eq('provider_id', provider_id)
+      .in('status', ['approved'])
+      .order('created_at', { ascending: false })
+    if (error) return []
+    return (data || []) as ProviderJobPost[]
+  } catch {
+    return []
+  }
+}
+
+// Notifications
+export type UserNotification = {
+  id: string
+  user_id: string
+  subject: string
+  body: string | null
+  data: Record<string, any> | null
+  read_at: string | null
+  created_at: string
+}
+
+export async function listUserNotifications(user_id: string): Promise<UserNotification[]> {
+  try {
+    const { data, error } = await supabase
+      .from('user_notifications')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (error) return []
+    return (data || []) as UserNotification[]
+  } catch {
+    return []
+  }
+}
+
+export async function markNotificationRead(id: string): Promise<{ error?: string }> {
+  try {
+    const { error } = await supabase.from('user_notifications').update({ read_at: new Date().toISOString() as any }).eq('id', id)
+    if (error) return { error: error.message }
+    return {}
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to mark as read' }
+  }
+}
