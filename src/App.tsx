@@ -64,7 +64,7 @@ type AuthContextValue = {
   signInLocal: (data: { name?: string; email: string }) => void
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
-  signUpWithEmail: (email: string, password: string) => Promise<{ error?: string }>
+  signUpWithEmail: (email: string, password: string, name?: string) => Promise<{ error?: string }>
   resetPassword: (email: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
@@ -84,12 +84,36 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {}
 
+    // Helper: ensure a profile row exists with role/name
+    async function ensureProfile(userId?: string | null, email?: string | null, name?: string | null) {
+      if (!userId || !email) return
+      try {
+        let role: 'business' | 'community' | undefined
+        try {
+          const raw = localStorage.getItem('bf-pending-profile')
+          if (raw) {
+            const pref = JSON.parse(raw) as { name?: string; email?: string; role?: 'business' | 'community' }
+            if (pref?.role === 'business' || pref?.role === 'community') role = pref.role
+            if (!name && pref?.name) name = pref.name
+            if (pref && (pref.email === email || !pref.email)) {
+              // keep until successfully saved
+            }
+          }
+        } catch {}
+        const payload: any = { id: userId, email, name: name || null }
+        if (role) payload.role = role
+        await supabase.from('profiles').upsert([payload], { onConflict: 'id' })
+        try { localStorage.removeItem('bf-pending-profile') } catch {}
+      } catch {}
+    }
+
     // Sync with Supabase session
     supabase.auth.getSession().then(({ data }) => {
       const email = data.session?.user?.email
       const name = (data.session?.user?.user_metadata as any)?.name
       const userId = data.session?.user?.id
       if (email) setProfile({ name, email, userId })
+      void ensureProfile(userId || null, email || null, name || null)
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const email = session?.user?.email
@@ -97,6 +121,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       const userId = session?.user?.id
       if (email) setProfile({ name, email, userId })
       else setProfile((curr) => curr && curr.email ? null : curr)
+      if (email && userId) void ensureProfile(userId, email, name)
     })
     return () => { sub.subscription.unsubscribe() }
   }, [])
@@ -124,8 +149,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message }
   }
 
-  const signUpWithEmail = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password })
+  const signUpWithEmail = async (email: string, password: string, name?: string) => {
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
     return { error: error?.message }
   }
 
@@ -1095,7 +1120,7 @@ async function createBookingRow(params: { email?: string | null; category: Categ
 async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string }) {
   console.log('[BusinessApp] submitting application', params)
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('business_applications')
       .insert([
         {
@@ -1107,13 +1132,12 @@ async function createBusinessApplication(params: { full_name?: string; business_
           challenge: params.challenge || null,
         },
       ])
-      .select('*')
     if (error) {
       console.error('[BusinessApp] insert error', error)
     } else {
-      console.log('[BusinessApp] insert success', data)
+      console.log('[BusinessApp] insert success')
     }
-    return { data, error }
+    return { data: null, error }
   } catch (err) {
     console.error('[BusinessApp] unexpected failure', err)
     return { data: null, error: err as any }
@@ -1645,7 +1669,10 @@ function BusinessPage() {
               const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
               if (!error) {
                 form.reset()
-                window.location.assign('/thank-you')
+                try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
+                const next = '/thank-you'
+                const q = new URLSearchParams({ mode: 'signup', name: full_name || '', email: email || '', type: 'business', next })
+                window.location.assign(`/signin?${q.toString()}`)
               } else {
                 console.error('[BusinessApp] submit failed, not redirecting')
               }

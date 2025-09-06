@@ -14,9 +14,11 @@ export default function SignInPage() {
   const navigate = useNavigate()
   const location = useLocation() as any
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [accountType, setAccountType] = useState<'business' | 'community' | ''>('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -45,9 +47,28 @@ export default function SignInPage() {
         if (password !== confirm) {
           setMessage('Passwords do not match')
         } else {
-          const { error } = await auth.signUpWithEmail(email, password)
-          if (!error) setMessage('Check your email to confirm your account')
-          else setMessage(error)
+          if (!accountType) {
+            setMessage('Please select an account type')
+            return
+          }
+          const { error } = await auth.signUpWithEmail(email, password, name)
+          if (!error) {
+            try {
+              localStorage.removeItem('bf-signup-prefill')
+              localStorage.setItem('bf-pending-profile', JSON.stringify({ name, email, role: accountType }))
+            } catch {}
+            // Try to sign the user in immediately (works if email confirmations are disabled)
+            const { error: signInErr } = await auth.signInWithEmail(email, password)
+            if (!signInErr) {
+              const params = new URLSearchParams(location?.search || '')
+              const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
+              navigate(next, { replace: true })
+            } else {
+              setMessage('Check your email to confirm your account, then sign in.')
+            }
+          } else {
+            setMessage(error)
+          }
         }
       } else if (mode === 'reset') {
         const { error } = await auth.resetPassword(email)
@@ -93,6 +114,29 @@ export default function SignInPage() {
     // Do NOT auto-open One Tap; only show when user clicks the button above
   }, [clientId])
 
+  // Prefill from query params or localStorage
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location?.search || '')
+      const qMode = params.get('mode')
+      const qEmail = params.get('email')
+      const qName = params.get('name')
+      const qType = params.get('type')
+      if (qMode === 'signup') setMode('signup')
+      if (qEmail) setEmail(qEmail)
+      if (qName) setName(qName)
+      if (qType === 'business' || qType === 'community') setAccountType(qType)
+      if (!qEmail || !qName) {
+        const raw = localStorage.getItem('bf-signup-prefill')
+        if (raw) {
+          const pref = JSON.parse(raw) as { name?: string; email?: string }
+          if (!qName && pref?.name) setName(pref.name)
+          if (!qEmail && pref?.email) setEmail(pref.email)
+        }
+      }
+    } catch {}
+  }, [location?.search])
+
   return (
     <section className="py-10">
       <div className="container-px mx-auto max-w-md">
@@ -104,6 +148,34 @@ export default function SignInPage() {
           </h1>
 
           <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-sm text-neutral-600">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2"
+                  placeholder="Your name"
+                />
+              </div>
+            )}
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-sm text-neutral-600">Account Type</label>
+                <select
+                  required
+                  value={accountType}
+                  onChange={(e) => setAccountType((e.target.value as any) || '')}
+                  className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                >
+                  <option value="">Select…</option>
+                  <option value="business">I have a business</option>
+                  <option value="community">I am a community member</option>
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm text-neutral-600">Email</label>
               <input
