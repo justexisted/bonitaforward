@@ -64,7 +64,7 @@ type AuthContextValue = {
   signInLocal: (data: { name?: string; email: string }) => void
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
-  signUpWithEmail: (email: string, password: string, name?: string) => Promise<{ error?: string }>
+  signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string }>
   resetPassword: (email: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
 }
@@ -85,7 +85,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
 
     // Helper: ensure a profile row exists with role/name
-    async function ensureProfile(userId?: string | null, email?: string | null, name?: string | null) {
+    async function ensureProfile(userId?: string | null, email?: string | null, name?: string | null, metadataRole?: any) {
       if (!userId || !email) return
       try {
         let role: 'business' | 'community' | undefined
@@ -100,6 +100,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } catch {}
+        if (!role && (metadataRole === 'business' || metadataRole === 'community')) {
+          role = metadataRole
+        }
         const payload: any = { id: userId, email, name: name || null }
         if (role) payload.role = role
         await supabase.from('profiles').upsert([payload], { onConflict: 'id' })
@@ -110,18 +113,22 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     // Sync with Supabase session
     supabase.auth.getSession().then(({ data }) => {
       const email = data.session?.user?.email
-      const name = (data.session?.user?.user_metadata as any)?.name
+      const meta = (data.session?.user?.user_metadata as any) || {}
+      const name = meta?.name
+      const role = meta?.role
       const userId = data.session?.user?.id
       if (email) setProfile({ name, email, userId })
-      void ensureProfile(userId || null, email || null, name || null)
+      void ensureProfile(userId || null, email || null, name || null, role)
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const email = session?.user?.email
-      const name = (session?.user?.user_metadata as any)?.name
+      const meta = (session?.user?.user_metadata as any) || {}
+      const name = meta?.name
+      const role = meta?.role
       const userId = session?.user?.id
       if (email) setProfile({ name, email, userId })
       else setProfile((curr) => curr && curr.email ? null : curr)
-      if (email && userId) void ensureProfile(userId, email, name)
+      if (email && userId) void ensureProfile(userId, email, name, role)
     })
     return () => { sub.subscription.unsubscribe() }
   }, [])
@@ -149,8 +156,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message }
   }
 
-  const signUpWithEmail = async (email: string, password: string, name?: string) => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
+  const signUpWithEmail = async (email: string, password: string, name?: string, role?: 'business' | 'community') => {
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name, role } } })
     return { error: error?.message }
   }
 

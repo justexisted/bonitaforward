@@ -51,7 +51,7 @@ export default function SignInPage() {
             setMessage('Please select an account type')
             return
           }
-          const { error } = await auth.signUpWithEmail(email, password, name)
+          const { error } = await auth.signUpWithEmail(email, password, name, accountType || undefined)
           if (!error) {
             try {
               localStorage.removeItem('bf-signup-prefill')
