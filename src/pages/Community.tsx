@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { fetchLatestBlogPostByCategory, type BlogPost } from '../lib/supabaseData'
+import { fetchBlogPostsByCategory, type BlogPost } from '../lib/supabaseData'
 
 const categoryToTitle: Record<string, string> = {
   'restaurants-cafes': 'Top 5 Restaurants This Month',
@@ -34,7 +34,7 @@ export function CommunityPost() {
   const params = useParams()
   const categoryKey = params.category as string
   const title = categoryToTitle[categoryKey] || 'Community Post'
-  const [post, setPost] = useState<BlogPost | null>(null)
+  const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,9 +43,9 @@ export function CommunityPost() {
     setLoading(true)
     setError(null)
     ;(async () => {
-      const data = await fetchLatestBlogPostByCategory(categoryKey)
+      const data = await fetchBlogPostsByCategory(categoryKey)
       if (cancelled) return
-      setPost(data)
+      setPosts(data)
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -59,22 +59,24 @@ export function CommunityPost() {
           {loading && <div className="mt-3 text-sm text-neutral-600">Loading…</div>}
           {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
           {!loading && !error && (
-            <div className="prose prose-neutral max-w-none mt-3">
-              {post ? (
-                <article>
-                  <h2 className="text-xl font-semibold">{post.title}</h2>
-                  <div className="mt-1 text-xs text-neutral-500">{new Date(post.created_at).toLocaleString()}</div>
-                  <div className="mt-3">
-                    {containsHtml(post.content) ? (
-                      <div
-                        className="bf-post-content space-y-4 [&>p]:my-3 [&>div]:my-3 [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-2 [&_br]:block [&_br]:h-4"
-                        dangerouslySetInnerHTML={{ __html: sanitizePostHtml(post.content) }}
-                      />
-                    ) : (
-                      <div className="space-y-2">{renderStyledContent(post.content)}</div>
-                    )}
-                  </div>
-                </article>
+            <div className="prose prose-neutral max-w-none mt-3 space-y-8">
+              {posts.length > 0 ? (
+                posts.map((post) => (
+                  <article key={post.id}>
+                    <h2 className="text-xl font-semibold">{post.title}</h2>
+                    <div className="mt-1 text-xs text-neutral-500">{new Date(post.created_at).toLocaleString()}</div>
+                    <div className="mt-3">
+                      {containsHtml(post.content) ? (
+                        <div
+                          className="bf-post-content space-y-4 [&>p]:my-3 [&>div]:my-3 [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-2 [&_br]:block [&_br]:h-4"
+                          dangerouslySetInnerHTML={{ __html: sanitizePostHtml(post.content) }}
+                        />
+                      ) : (
+                        <div className="space-y-2">{renderStyledContent(post.content)}</div>
+                      )}
+                    </div>
+                  </article>
+                ))
               ) : (
                 <div className="text-neutral-600 text-sm">No post yet for this category.</div>
               )}

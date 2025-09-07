@@ -87,6 +87,24 @@ export async function fetchLatestBlogPostByCategory(category_key: string): Promi
   }
 }
 
+export async function fetchBlogPostsByCategory(category_key: string): Promise<BlogPost[]> {
+  try {
+    const { data, error } = await supabase
+      .from('blog_posts')
+      .select('id,category_key,title,content,created_at,updated_at')
+      .eq('category_key', category_key)
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.warn('[Supabase] blog_posts select by category (all) error', error)
+      return []
+    }
+    return (data || []) as BlogPost[]
+  } catch (err) {
+    console.warn('[Supabase] blog_posts select by category (all) failed', err)
+    return []
+  }
+}
+
 export async function upsertBlogPost(post: Partial<BlogPost>): Promise<{ error?: string }> {
   try {
     const payload: any = {

@@ -82,14 +82,22 @@ export default function AccountPage() {
   }
 
   async function deleteAccount() {
-    if (!confirm('Delete your account? This action cannot be undone.')) return
+    if (!confirm('Delete your account? This will permanently remove your data.')) return
     setBusy(true)
     setMessage(null)
     try {
-      // On client plans, direct user deletion typically requires admin/service role via edge function.
-      // Fall back to support email for deletion request, but try sign-out to ensure session cleared.
+      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+      const url = fnBase ? `${fnBase}/.netlify/functions/user-delete` : '/.netlify/functions/user-delete'
+      const { data: session } = await supabase.auth.getSession()
+      const token = session.session?.access_token
+      const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } })
+      if (!res.ok) {
+        const text = await res.text()
+        setMessage(`Delete failed: ${text || res.status}`)
+        return
+      }
       await supabase.auth.signOut()
-      setMessage('Account deletion request received. Please email bonitaforward@gmail.com to finalize deletion.')
+      setMessage('Your account has been deleted. You can now create a new account with the same email.')
     } finally {
       setBusy(false)
     }
