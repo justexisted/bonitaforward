@@ -217,9 +217,13 @@ export default function AdminPage() {
         } catch {}
         try {
           if (isAdmin) {
-            const res = await supabase.functions.invoke('admin-list-profiles', { body: {} })
-            const payload = (res as any)?.data as { profiles?: ProfileRow[] } | undefined
-            if (payload && Array.isArray(payload.profiles)) setProfiles(payload.profiles)
+            const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+            const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-profiles` : '/.netlify/functions/admin-list-profiles'
+            const res = await fetch(url, { method: 'POST' })
+            if (res.ok) {
+              const payload = await res.json() as { profiles?: ProfileRow[] }
+              if (payload?.profiles) setProfiles(payload.profiles)
+            }
           }
         } catch {}
         try {
