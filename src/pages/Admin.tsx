@@ -58,6 +58,13 @@ type ContactLeadRow = {
   created_at: string
 }
 
+type ProfileRow = {
+  id: string
+  email: string | null
+  name: string | null
+  role?: string | null
+}
+
 /**
  * Admin page (per-user): Lists the authenticated user's saved funnel responses and bookings.
  * Requires RLS policies to allow users to select their own rows.
@@ -80,6 +87,8 @@ export default function AdminPage() {
   const [emojiQuery, setEmojiQuery] = useState('')
   const [changeRequests, setChangeRequests] = useState<ProviderChangeRequest[]>([])
   const [jobPosts, setJobPosts] = useState<ProviderJobPost[]>([])
+  const [profiles, setProfiles] = useState<ProfileRow[]>([])
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
 
   useEffect(() => {
     // Load content into editor when switching drafts
@@ -201,6 +210,12 @@ export default function AdminPage() {
         try {
           const posts = await fetchAllBlogPosts()
           setBlogPosts(posts)
+        } catch {}
+        try {
+          if (isAdmin) {
+            const { data: profData } = await supabase.from('profiles').select('id,email,name,role').order('email', { ascending: true })
+            setProfiles((profData as ProfileRow[]) || [])
+          }
         } catch {}
         try {
           const { data: crData } = await supabase.from('provider_change_requests').select('*').order('created_at', { ascending: false })
@@ -438,6 +453,22 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteUser(userId: string) {
+    setMessage(null)
+    setDeletingUserId(userId)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', { body: { user_id: userId } })
+      if (error) throw new Error(error.message || String(error))
+      // Remove from local list
+      setProfiles((arr) => arr.filter((p) => p.id !== userId))
+      setMessage('User deleted')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete user')
+    } finally {
+      setDeletingUserId(null)
+    }
+  }
+
   if (!auth.email) {
     return (
       <section className="py-8">
@@ -579,6 +610,37 @@ export default function AdminPage() {
                   <li key={u} className="py-1 border-b border-neutral-100 last:border-0">{u}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
+              <div className="font-medium">Users</div>
+              <div className="mt-2 text-sm">
+                {profiles.length === 0 && <div className="text-neutral-500">No users found.</div>}
+                {profiles.length > 0 && (
+                  <div className="space-y-1">
+                    {profiles.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between py-1 border-b border-neutral-100 last:border-0">
+                        <div>
+                          <div className="font-medium text-sm">{p.email || '(no email)'}</div>
+                          <div className="text-xs text-neutral-500">{p.name || '—'}{p.role ? ` • ${p.role}` : ''}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {deletingUserId === p.id ? (
+                            <>
+                              <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
+                              <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
+                            </>
+                          ) : (
+                            <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">

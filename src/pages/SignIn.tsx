@@ -69,7 +69,22 @@ export default function SignInPage() {
             const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
             navigate(next, { replace: true })
           } else {
-            setMessage(error)
+            const emsg = String(error || '').toLowerCase()
+            if (emsg.includes('already') || emsg.includes('registered') || emsg.includes('exists')) {
+              // Try signing in directly with the provided password
+              const { error: signInErr } = await auth.signInWithEmail(email, password)
+              if (!signInErr) {
+                const params = new URLSearchParams(location?.search || '')
+                const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
+                navigate(next, { replace: true })
+              } else {
+                // Guide the user to reset password if sign-in failed
+                setMode('reset')
+                setMessage('This email already has an account. Reset your password to continue.')
+              }
+            } else {
+              setMessage(error)
+            }
           }
         }
       } else if (mode === 'reset') {
