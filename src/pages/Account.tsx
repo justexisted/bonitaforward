@@ -69,6 +69,20 @@ export default function AccountPage() {
     }
   }
 
+  async function updatePassword() {
+    const pw = prompt('Enter a new password (min 8 characters):') || ''
+    if (!pw || pw.length < 8) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pw })
+      if (error) setMessage(error.message)
+      else setMessage('Password updated.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!auth.isAuthed) {
     return (
       <section className="py-8">
@@ -112,6 +126,11 @@ export default function AccountPage() {
               </ul>
             </div>
           </div>
+          <div className="mt-6 border-t border-neutral-100 pt-4">
+            <div className="text-sm text-neutral-700 font-medium">Security</div>
+            <button disabled={busy} onClick={updatePassword} className="mt-2 rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Change Password</button>
+          </div>
+
           <div className="mt-6 border-t border-neutral-100 pt-4">
             <div className="text-sm text-neutral-700 font-medium">Delete Account</div>
             <p className="text-xs text-neutral-500 mt-1">This will permanently remove your account and access. For compliance, final deletion will be confirmed via email.</p>

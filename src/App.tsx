@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight } from 'lucide-react'
 import SupabasePing from './components/SupabasePing'
@@ -2061,6 +2062,7 @@ export default function App() {
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="signin" element={<SignInPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="community" element={<CommunityIndex />} />
             <Route path="community/:category" element={<CommunityPost />} />
             <Route path="admin" element={<AdminPage />} />

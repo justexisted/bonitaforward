@@ -48,7 +48,10 @@ export default function OwnerPage() {
       setMessage('Failed to fetch providers')
     } else {
       const rows = (data as unknown as ProviderRow[]) || []
-      const filtered = rows.filter((r) => r.owner_user_id === userId || (!r.owner_user_id && r.email && email && r.email.toLowerCase() === email.toLowerCase()))
+      // Show owned businesses, or claimable if emails match (normalize case/whitespace)
+      const norm = (s?: string | null) => String(s || '').trim().toLowerCase()
+      const userEmail = norm(email)
+      const filtered = rows.filter((r) => r.owner_user_id === userId || (!r.owner_user_id && norm(r.email) && userEmail && norm(r.email) === userEmail))
       setProviders(filtered)
     }
     try {

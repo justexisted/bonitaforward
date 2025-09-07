@@ -71,16 +71,24 @@ export default function SignInPage() {
           } else {
             const emsg = String(error || '').toLowerCase()
             if (emsg.includes('already') || emsg.includes('registered') || emsg.includes('exists')) {
-              // Try signing in directly with the provided password
+              // Likely an unconfirmed signup from a prior attempt. Re-send confirmation email.
+              try {
+                const { error: resendErr } = await supabase.auth.resend({ type: 'signup', email })
+                if (!resendErr) {
+                  setMessage('We re-sent your confirmation email. Please check your inbox to complete setup.')
+                  return
+                }
+              } catch {}
+              // Fallback: try signing in with provided password (in case user actually created a password)
               const { error: signInErr } = await auth.signInWithEmail(email, password)
               if (!signInErr) {
                 const params = new URLSearchParams(location?.search || '')
                 const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
                 navigate(next, { replace: true })
               } else {
-                // Guide the user to reset password if sign-in failed
+                // Final fallback: offer password reset
                 setMode('reset')
-                setMessage('This email already has an account. Reset your password to continue.')
+                setMessage('This email may have a previous signup. We couldn\'t sign in — reset your password to continue.')
               }
             } else {
               setMessage(error)
