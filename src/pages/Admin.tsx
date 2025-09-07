@@ -240,21 +240,29 @@ export default function AdminPage() {
     return () => {
       cancelled = true
     }
-  }, [auth.email, isAdmin, selectedUser])
+  }, [auth.email, isAdmin, selectedUser, section])
 
-  const users = useMemo(() => {
-    const set = new Set<string>()
-    funnels.forEach((f) => set.add(f.user_email))
-    bookings.forEach((b) => set.add(b.user_email))
-    return Array.from(set).sort()
-  }, [funnels, bookings])
+  // Emails of business owners (from profiles)
+  const businessEmails = useMemo(() => {
+    return new Set(
+      profiles
+        .filter((p) => String(p.role || '').toLowerCase() === 'business')
+        .map((p) => String(p.email || '').toLowerCase())
+        .filter(Boolean)
+    )
+  }, [profiles])
 
-  const businessAccounts = useMemo(() => {
+  // Customer users: emails present in funnels/bookings, excluding business owner emails
+  const customerUsers = useMemo(() => {
     const set = new Set<string>()
-    bizApps.forEach((b) => { if (b.email) set.add(b.email) })
-    contactLeads.forEach((c) => { if (c.contact_email) set.add(c.contact_email) })
-    return Array.from(set).sort()
-  }, [bizApps, contactLeads])
+    funnels.forEach((f) => { if (f.user_email) set.add(f.user_email) })
+    bookings.forEach((b) => { if (b.user_email) set.add(b.user_email) })
+    return Array.from(set)
+      .filter((e) => !businessEmails.has(String(e).toLowerCase()))
+      .sort()
+  }, [funnels, bookings, businessEmails])
+
+  // Removed legacy businessAccounts (email-derived). Business accounts now come from profiles.role === 'business'.
 
   // Inline helpers for admin edits
   const [appEdits, setAppEdits] = useState<Record<string, { category_key: string; tagsInput: string }>>({})
@@ -540,14 +548,14 @@ export default function AdminPage() {
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-5xl">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:items-start md:flex-row md:items-center justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">{isAdmin ? 'Admin' : 'Your Data'}</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col lg:items-start md:flex-row md:items-center gap-2">
             {isAdmin && (
               <>
                 <select value={selectedUser || ''} onChange={(e) => setSelectedUser(e.target.value || null)} className="rounded-xl border border-neutral-200 px-3 py-1.5 text-sm bg-white">
                   <option value="">All users</option>
-                  {users.map((u) => (
+                  {customerUsers.map((u) => (
                     <option key={u} value={u}>{u}</option>
                   ))}
                 </select>
@@ -587,7 +595,7 @@ export default function AdminPage() {
         {message && <div className="mt-3 text-sm text-green-700">{message}</div>}
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {isAdmin && (
+          {isAdmin && section === 'business-applications' && (
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
               <div className="font-medium">Business Applications</div>
               <div className="mt-2 space-y-2 text-sm">
@@ -628,7 +636,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {isAdmin && (
+          {isAdmin && section === 'contact-leads' && (
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
               <div className="font-medium">Contact / Get Featured</div>
               <div className="mt-2 space-y-2 text-sm">
@@ -650,8 +658,8 @@ export default function AdminPage() {
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
               <div className="font-medium">Customer Users</div>
               <ul className="mt-2 text-sm">
-                {users.length === 0 && <li className="text-neutral-500">No users yet.</li>}
-                {users.map((u) => (
+                {customerUsers.length === 0 && <li className="text-neutral-500">No users yet.</li>}
+                {customerUsers.map((u) => (
                   <li key={u} className="py-1 border-b border-neutral-100 last:border-0 flex items-center justify-between">
                     <span>{u}</span>
                     {deletingCustomerEmail === u ? (
@@ -672,8 +680,8 @@ export default function AdminPage() {
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
               <div className="font-medium">Business Accounts</div>
               <div className="mt-2 text-sm">
-                {profiles.filter((p) => (p.role || 'community') === 'business').length === 0 && <div className="text-neutral-500">No business accounts yet.</div>}
-                {profiles.filter((p) => (p.role || 'community') === 'business').map((p) => (
+                {profiles.filter((p) => String(p.role || '').toLowerCase() === 'business').length === 0 && <div className="text-neutral-500">No business accounts yet.</div>}
+                {profiles.filter((p) => String(p.role || '').toLowerCase() === 'business').map((p) => (
                   <div key={p.id} className="flex items-center justify-between py-1 border-b border-neutral-100 last:border-0">
                     <div>
                       <div className="font-medium text-sm">{p.email || '(no email)'}</div>
