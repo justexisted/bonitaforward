@@ -28,6 +28,7 @@ export default function OwnerPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [requests, setRequests] = useState<ProviderChangeRequest[]>([])
   const [jobDrafts, setJobDrafts] = useState<Record<string, { title: string; description: string; apply_url: string; salary_range: string }>>({})
+  const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
 
   async function load() {
     setLoading(true)
@@ -49,6 +50,18 @@ export default function OwnerPage() {
       if (userId) {
         const list = await listOwnerChangeRequests(userId)
         setRequests(list)
+      }
+    } catch {}
+    try {
+      if (email) {
+        const { data } = await supabase
+          .from('business_applications')
+          .select('id,business_name,created_at,email')
+          .eq('email', email)
+          .order('created_at', { ascending: false })
+          .limit(10)
+        const rows = ((data as any[]) || []).map((r) => ({ id: r.id, business_name: r.business_name, created_at: r.created_at }))
+        setPendingApps(rows)
       }
     } catch {}
     setLoading(false)
@@ -188,6 +201,19 @@ export default function OwnerPage() {
                   </div>
                 </div>
               ))}
+              {(pendingApps.length > 0) && (
+                <div className="rounded-xl border border-neutral-200 p-4">
+                  <div className="text-sm font-medium">Pending Applications</div>
+                  <ul className="mt-2 text-sm space-y-1">
+                    {pendingApps.map((a) => (
+                      <li key={a.id} className="flex items-center justify-between">
+                        <span>{a.business_name || 'Unnamed Business'}</span>
+                        <span className="text-xs text-neutral-500">{new Date(a.created_at).toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {requests.length > 0 && (
                 <div className="rounded-xl border border-neutral-200 p-4">
                   <div className="text-sm font-medium">Recent Requests</div>

@@ -269,6 +269,18 @@ export default function AdminPage() {
     if (!app) return
     const draft = appEdits[appId] || { category_key: 'professional-services', tagsInput: '' }
     const tags = draft.tagsInput.split(',').map((s) => s.trim()).filter(Boolean)
+    // Attempt to find a profile/user by the application's email so we can assign ownership to the applicant
+    let ownerUserId: string | null = null
+    try {
+      if (app.email) {
+        const { data: profRows } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', app.email)
+          .limit(1)
+        ownerUserId = ((profRows as any[])?.[0]?.id as string | undefined) || null
+      }
+    } catch {}
     const payload: Partial<ProviderRow> = {
       name: (app.business_name || 'Unnamed Business') as any,
       category_key: draft.category_key as any,
@@ -278,7 +290,7 @@ export default function AdminPage() {
       website: null as any,
       address: null as any,
       images: [] as any,
-      owner_user_id: (auth.userId || null) as any,
+      owner_user_id: (ownerUserId || null) as any,
     }
     const { error } = await supabase.from('providers').insert([payload as any])
     if (error) {
