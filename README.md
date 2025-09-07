@@ -1,3 +1,60 @@
+Missing tables (optional Admin features)
+--------------------------------------
+
+Create these if you want Owner Change Requests and Job Posts to work:
+
+```sql
+create extension if not exists pgcrypto;
+
+create table if not exists provider_change_requests (
+  id uuid primary key default gen_random_uuid(),
+  provider_id uuid not null,
+  owner_user_id uuid not null,
+  type text not null check (type in ('update','delete','feature_request','claim')),
+  changes jsonb,
+  status text not null default 'pending' check (status in ('pending','approved','rejected','cancelled')),
+  reason text,
+  created_at timestamptz default now(),
+  decided_at timestamptz
+);
+
+create table if not exists provider_job_posts (
+  id uuid primary key default gen_random_uuid(),
+  provider_id uuid not null,
+  owner_user_id uuid not null,
+  title text not null,
+  description text,
+  apply_url text,
+  salary_range text,
+  status text not null default 'pending' check (status in ('pending','approved','rejected','archived')),
+  created_at timestamptz default now(),
+  decided_at timestamptz
+);
+```
+
+Environment setup
+-----------------
+
+Create a local env file (not committed):
+
+1) Copy `.env.example` to `.env.local` and fill in values:
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_GOOGLE_CLIENT_ID=
+VITE_ADMIN_EMAILS=
+```
+
+2) Do NOT commit secrets. Ensure your gitignore ignores env files.
+
+3) In production (Netlify/Vercel), set environment variables in the dashboard.
+
+Server-only keys
+----------------
+
+`SUPABASE_SERVICE_ROLE` must only be set on the serverless platform environment (e.g., Netlify) and must never be exposed in browser `.env` (avoid any `VITE_` prefix for it).
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

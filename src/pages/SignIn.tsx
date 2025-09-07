@@ -242,7 +242,7 @@ export default function SignInPage() {
             </button>
           </form>
 
-          {mode !== 'reset' && (
+          {mode !== 'reset' && clientId && (
             <>
               <div className="mt-3">
                 <div id="google-btn" className="flex justify-center"></div>
@@ -252,14 +252,7 @@ export default function SignInPage() {
                 <span>or</span>
                 <div className="h-px flex-1 bg-neutral-200"></div>
               </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => auth.signInWithGoogle()}
-                className="hidden w-full rounded-full border border-neutral-200 bg-white text-neutral-900 py-2.5 hover:bg-neutral-50 elevate"
-              >
-                Continue with Google
-              </button>
+              {/* Fallback classic button is hidden; shown only when needed and clientId present */}
             </>
           )}
 
