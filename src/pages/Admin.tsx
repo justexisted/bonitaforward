@@ -217,8 +217,9 @@ export default function AdminPage() {
         } catch {}
         try {
           if (isAdmin) {
-            const { data: profData } = await supabase.from('profiles').select('id,email,name,role').order('email', { ascending: true })
-            setProfiles((profData as ProfileRow[]) || [])
+            const res = await supabase.functions.invoke('admin-list-profiles', { body: {} })
+            const payload = (res as any)?.data as { profiles?: ProfileRow[] } | undefined
+            if (payload && Array.isArray(payload.profiles)) setProfiles(payload.profiles)
           }
         } catch {}
         try {

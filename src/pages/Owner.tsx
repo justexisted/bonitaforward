@@ -161,9 +161,9 @@ export default function OwnerPage() {
                       <input value={p.name} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, name: e.target.value } : it))} className="font-medium rounded-md px-2 py-1 border border-neutral-200" />
                       <div className="text-xs text-neutral-500">Category: {p.category_key}</div>
                     </div>
-                    {!p.owner_user_id && p.email && email && p.email.toLowerCase() === email.toLowerCase() ? (
-                      <button onClick={() => claimProvider(p.id)} className="btn btn-primary text-xs">Claim</button>
-                    ) : null}
+                    {!p.is_member && (
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] ml-auto">Get Featured • $100/mo</span>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 gap-3 mt-3">
                     <input value={p.address ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, address: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Address" />

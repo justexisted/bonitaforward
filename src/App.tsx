@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight } from 'lucide-react'
+import CreateBusinessForm from './pages/CreateBusinessForm'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
@@ -1592,6 +1593,9 @@ function ContactPage() {
 }
 
 function BusinessPage() {
+  const auth = useAuth()
+  const [sent, setSent] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
   // simple ROI calculator state is kept local via uncontrolled inputs and live compute
   useEffect(() => {
     // If user arrived with #apply or prefill params, scroll to and focus form
@@ -1691,49 +1695,59 @@ function BusinessPage() {
         </div>
 
         <div id="apply" className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
-          <h2 className="text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
-          <form
-            className="mt-4 grid grid-cols-1 gap-3"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              const form = e.currentTarget as HTMLFormElement
-              const full_name = (form.elements.item(0) as HTMLInputElement)?.value
-              const business_name = (form.elements.item(1) as HTMLInputElement)?.value
-              const email = (form.elements.item(2) as HTMLInputElement)?.value
-              const phone = (form.elements.item(3) as HTMLInputElement)?.value
-              const category = (form.elements.item(4) as HTMLSelectElement)?.value
-              const challenge = (form.elements.item(5) as HTMLTextAreaElement)?.value
-              try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, challenge, ts: Date.now() })) } catch {}
-              const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
-              if (!error) {
-                form.reset()
-                try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
-                const next = '/thank-you'
-                const q = new URLSearchParams({ mode: 'signup', name: full_name || '', email: email || '', type: 'business', next })
-                window.location.assign(`/signin?${q.toString()}`)
-              } else {
-                console.error('[BusinessApp] submit failed, not redirecting')
-              }
-            }}
-          >
-            <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={(new URLSearchParams(window.location.search)).get('full_name') || ''} />
-            <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={(new URLSearchParams(window.location.search)).get('business_name') || ''} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={(new URLSearchParams(window.location.search)).get('email') || ''} />
-              <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={(new URLSearchParams(window.location.search)).get('phone') || ''} />
-            </div>
-            <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={(new URLSearchParams(window.location.search)).get('category') || ''}>
-              <option value="">Select category…</option>
-              <option value="Real Estate">Real Estate</option>
-              <option value="Home Services">Home Services</option>
-              <option value="Health & Wellness">Health & Wellness</option>
-              <option value="Restaurants">Restaurants</option>
-              <option value="Professional Services">Professional Services</option>
-            </select>
-            <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={(new URLSearchParams(window.location.search)).get('challenge') || ''} />
-            <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Apply to Get Featured</button>
-          </form>
-          <p className="mt-2 text-xs text-neutral-500">Submission can auto-trigger Zapier → Google Sheets + HighLevel (to be wired).</p>
+          {!auth.isAuthed || String((auth as any)?.role || '').toLowerCase() !== 'business' ? (
+            <>
+              <h2 className="text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
+              <form
+                className="mt-4 grid grid-cols-1 gap-3"
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  const form = e.currentTarget as HTMLFormElement
+                  const full_name = (form.elements.item(0) as HTMLInputElement)?.value
+                  const business_name = (form.elements.item(1) as HTMLInputElement)?.value
+                  const email = (form.elements.item(2) as HTMLInputElement)?.value
+                  const phone = (form.elements.item(3) as HTMLInputElement)?.value
+                  const category = (form.elements.item(4) as HTMLSelectElement)?.value
+                  const challenge = (form.elements.item(5) as HTMLTextAreaElement)?.value
+                  try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, challenge, ts: Date.now() })) } catch {}
+                  const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
+                  if (!error) {
+                    setSent(true); setMsg('Thanks! We received your application. We’ll follow up shortly.')
+                    form.reset()
+                    try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
+                    // Do not redirect; show success message instead
+                  } else {
+                    setMsg('We could not submit your application. Please try again.')
+                  }
+                }}
+              >
+                <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={(new URLSearchParams(window.location.search)).get('full_name') || ''} />
+                <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={(new URLSearchParams(window.location.search)).get('business_name') || ''} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={(new URLSearchParams(window.location.search)).get('email') || ''} />
+                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={(new URLSearchParams(window.location.search)).get('phone') || ''} />
+                </div>
+                <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={(new URLSearchParams(window.location.search)).get('category') || ''}>
+                  <option value="">Select category…</option>
+                  <option value="Real Estate">Real Estate</option>
+                  <option value="Home Services">Home Services</option>
+                  <option value="Health & Wellness">Health & Wellness</option>
+                  <option value="Restaurants">Restaurants</option>
+                  <option value="Professional Services">Professional Services</option>
+                </select>
+                <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={(new URLSearchParams(window.location.search)).get('challenge') || ''} />
+                <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Apply to Get Featured</button>
+              </form>
+              {msg && <p className="mt-2 text-sm text-neutral-700">{msg}</p>}
+              <p className="mt-2 text-xs text-neutral-500">Submission can auto-trigger Zapier → Google Sheets + HighLevel (to be wired).</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-semibold tracking-tight">Create Your Business</h2>
+              <p className="mt-2 text-sm text-neutral-700">You’re signed in as a business. Share your details below to add your business.</p>
+              <CreateBusinessForm />
+            </>
+          )}
         </div>
 
         <div className="mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-5 text-center">

@@ -10,6 +10,8 @@ export default function AccountPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [ownedProviders, setOwnedProviders] = useState<{ id: string; name: string }[]>([])
+  const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
+  const [role, setRole] = useState<string>('')
 
   useEffect(() => {
     setEmail(auth.email || '')
@@ -17,10 +19,34 @@ export default function AccountPage() {
     async function loadOwned() {
       if (!auth.userId) { setOwnedProviders([]); return }
       try {
-        const { data } = await supabase.from('providers').select('id,name').eq('owner_user_id', auth.userId).order('name', { ascending: true })
-        setOwnedProviders(((data as any[]) || []).map((r) => ({ id: r.id, name: r.name })))
+        // Load providers owned by user OR claimable by email
+        const { data: prov } = await supabase
+          .from('providers')
+          .select('id,name,email,owner_user_id')
+          .or(`owner_user_id.eq.${auth.userId},owner_user_id.is.null`)
+          .order('name', { ascending: true })
+        const normalize = (s?: string | null) => String(s || '').trim().toLowerCase()
+        const userEmail = normalize(auth.email)
+        const rows = ((prov as any[]) || []).filter((r) => r.owner_user_id === auth.userId || (!r.owner_user_id && normalize(r.email) && normalize(r.email) === userEmail))
+        setOwnedProviders(rows.map((r) => ({ id: r.id, name: r.name })))
+        // Load pending business applications for this email
+        if (auth.email) {
+          const { data: apps } = await supabase
+            .from('business_applications')
+            .select('id,business_name,created_at,email')
+            .eq('email', auth.email)
+            .order('created_at', { ascending: false })
+            .limit(10)
+          setPendingApps(((apps as any[]) || []).map((r) => ({ id: r.id, business_name: r.business_name, created_at: r.created_at })))
+        } else {
+          setPendingApps([])
+        }
+        // Load profile role for label
+        const { data: prof } = await supabase.from('profiles').select('role').eq('id', auth.userId).maybeSingle()
+        setRole(String((prof as any)?.role || ''))
       } catch {
         setOwnedProviders([])
+        setPendingApps([])
       }
     }
     void loadOwned()
@@ -98,6 +124,7 @@ export default function AccountPage() {
       <div className="container-px mx-auto max-w-xl">
         <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
           <h1 className="text-xl font-semibold tracking-tight">Account</h1>
+          {role && <div className="mt-1 text-xs text-neutral-500">Type: {String(role).toLowerCase() === 'business' ? 'Business account' : 'Community account'}</div>}
           {message && <div className="mt-2 text-sm text-neutral-700">{message}</div>}
 
           <div className="mt-4 grid grid-cols-1 gap-3">
@@ -126,6 +153,21 @@ export default function AccountPage() {
               </ul>
             </div>
           </div>
+          {pendingApps.length > 0 && (
+            <div className="mt-6 border-t border-neutral-100 pt-4">
+              <div className="text-sm font-medium">Pending Applications</div>
+              <div className="mt-2 text-sm">
+                <ul className="space-y-1">
+                  {pendingApps.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between">
+                      <span>{a.business_name || 'Unnamed Business'}</span>
+                      <span className="text-xs text-neutral-500">{new Date(a.created_at).toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
           <div className="mt-6 border-t border-neutral-100 pt-4">
             <div className="text-sm text-neutral-700 font-medium">Security</div>
             <button disabled={busy} onClick={updatePassword} className="mt-2 rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Change Password</button>
