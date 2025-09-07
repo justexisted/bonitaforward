@@ -485,8 +485,8 @@ export default function AdminPage() {
     setMessage(null)
     setDeletingUserId(userId)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-delete-user', { body: { user_id: userId } })
-      if (error) throw new Error(error.message || String(error))
+      const { error } = await supabase.functions.invoke('admin-delete-user', { body: { user_id: userId } })
+      if (error) throw new Error((error as any)?.message || String(error))
       // Remove from local list
       setProfiles((arr) => arr.filter((p) => p.id !== userId))
       setMessage('User deleted')

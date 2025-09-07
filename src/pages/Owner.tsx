@@ -121,14 +121,7 @@ export default function OwnerPage() {
     else setMessage('Request sent. Awaiting admin approval.')
   }
 
-  async function submitJob(p: ProviderRow) {
-    setMessage(null)
-    const draft = jobDrafts[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }
-    if (!draft.title.trim()) { setMessage('Please provide a job title.'); return }
-    const { error } = await createJobPost({ provider_id: p.id, owner_user_id: userId!, title: draft.title.trim(), description: draft.description || null, apply_url: draft.apply_url || null, salary_range: draft.salary_range || null })
-    if (error) setMessage('Job post failed: ' + error)
-    else { setMessage('Job post submitted for approval'); setJobDrafts((m) => ({ ...m, [p.id]: { title: '', description: '', apply_url: '', salary_range: '' } })) }
-  }
+  // submitJob temporarily disabled; job posting UI was removed from owner view
 
   if (!userId) {
     return <div className="py-8"><div className="rounded-2xl border border-neutral-100 p-5 bg-white">Please sign in to manage your business.</div></div>
