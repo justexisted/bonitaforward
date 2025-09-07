@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
-import { createJobPost, createProviderChangeRequest, listOwnerChangeRequests, type ProviderChangeRequest } from '../lib/supabaseData'
+import { createProviderChangeRequest, listOwnerChangeRequests, type ProviderChangeRequest } from '../lib/supabaseData'
 
 type ProviderRow = {
   id: string
@@ -33,7 +33,6 @@ export default function OwnerPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [requests, setRequests] = useState<ProviderChangeRequest[]>([])
-  const [jobDrafts, setJobDrafts] = useState<Record<string, { title: string; description: string; apply_url: string; salary_range: string }>>({})
   const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
 
   async function load() {

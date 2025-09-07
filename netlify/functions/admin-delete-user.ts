@@ -1,4 +1,10 @@
-import type { Handler } from '@netlify/functions'
+// Local minimal Netlify Handler type to avoid requiring '@netlify/functions' types at build time
+type Handler = (event: {
+  httpMethod: string
+  headers: Record<string, string>
+  body?: string | null
+  clientContext?: any
+}, context: any) => Promise<{ statusCode: number; headers?: Record<string, string>; body?: string }>
 import { createClient } from '@supabase/supabase-js'
 
 // Netlify function to delete a user via Supabase Admin API (service role)
