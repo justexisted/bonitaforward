@@ -9,6 +9,7 @@ import { supabase } from './lib/supabase'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
 import { fetchProvidersFromSupabase } from './lib/supabaseData.ts'
 import SignInPage from './pages/SignIn'
+import OnboardingPage from './pages/Onboarding'
 import AccountPage from './pages/Account'
 import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
@@ -63,7 +64,6 @@ type AuthContextValue = {
   name?: string
   email?: string
   userId?: string
-  signInLocal: (data: { name?: string; email: string }) => void
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
   signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string; session?: unknown | null }>
@@ -71,20 +71,12 @@ type AuthContextValue = {
   signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInLocal: () => {}, signInWithGoogle: async () => {}, signInWithEmail: async () => ({}), signUpWithEmail: async () => ({}), resetPassword: async () => ({}), signOut: async () => {} })
+const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInWithGoogle: async () => {}, signInWithEmail: async () => ({}), signUpWithEmail: async () => ({}), resetPassword: async () => ({}), signOut: async () => {} })
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string } | null>(null)
 
   useEffect(() => {
-    // Restore any local pseudo-auth (pre-supabase flow)
-    try {
-      const raw = localStorage.getItem('bf-auth')
-      if (raw) {
-        const parsed = JSON.parse(raw) as { name?: string; email?: string }
-        if (parsed?.email) setProfile({ name: parsed.name, email: parsed.email })
-      }
-    } catch {}
 
     // Helper: ensure a profile row exists with role/name
     async function ensureProfile(userId?: string | null, email?: string | null, name?: string | null, metadataRole?: any) {
@@ -135,14 +127,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { sub.subscription.unsubscribe() }
   }, [])
 
-  const signInLocal = (data: { name?: string; email: string }) => {
-    setProfile({ name: data.name, email: data.email })
-    try { localStorage.setItem('bf-auth', JSON.stringify({ ...data, ts: Date.now() })) } catch {}
-  }
+  // Removed legacy local sign-in helper
 
   const signInWithGoogle = async () => {
-    // Send users back to a safe, whitelisted URL; SignIn will forward to intended page
-    const redirectTo = window.location.origin + '/signin'
+    const redirectTo = window.location.origin + '/onboarding'
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
   }
 
@@ -173,7 +161,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     name: profile?.name,
     email: profile?.email,
     userId: profile?.userId,
-    signInLocal,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
@@ -2015,7 +2002,7 @@ function BookPage() {
                   const k = `bf-book-${categoryKey}`
                   localStorage.setItem(k, JSON.stringify(data))
                 } catch {}
-                auth.signInLocal({ name, email })
+                // Removed local pseudo-auth; require real sign-in
                 // Persist booking row if table exists
                 createBookingRow({ email, category: categoryKey, name, notes, answers })
                 const ranked = scoreProviders(categoryKey, answers)
@@ -2075,6 +2062,7 @@ export default function App() {
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="signin" element={<SignInPage />} />
+            <Route path="onboarding" element={<OnboardingPage />} />
             <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="community" element={<CommunityIndex />} />
             <Route path="community/:category" element={<CommunityPost />} />
