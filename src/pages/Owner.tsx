@@ -22,6 +22,12 @@ type ProviderRow = {
 
 export default function OwnerPage() {
   const { userId, email } = useAuth()
+  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
+    .split(',')
+    .map((s: string) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
+  const isAdmin = !!email && adminList.includes(email.toLowerCase())
   const [loading, setLoading] = useState(true)
   const [providers, setProviders] = useState<ProviderRow[]>([])
   const [message, setMessage] = useState<string | null>(null)
@@ -128,6 +134,18 @@ export default function OwnerPage() {
     return <div className="py-8"><div className="rounded-2xl border border-neutral-100 p-5 bg-white">Please sign in to manage your business.</div></div>
   }
 
+  if (isAdmin) {
+    return (
+      <section className="py-8">
+        <div className="container-px mx-auto max-w-3xl">
+          <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
+            Admins manage businesses in the Admin page. The owner dashboard is hidden for admins.
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-3xl">
@@ -147,28 +165,14 @@ export default function OwnerPage() {
                     <div>
                       <input value={p.name} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, name: e.target.value } : it))} className="font-medium rounded-md px-2 py-1 border border-neutral-200" />
                       <div className="text-xs text-neutral-500">Category: {p.category_key}</div>
-                      <div className="text-xs mt-1">
-                        <span className="text-neutral-500">Featured:</span>{' '}
-                        <span className={p.is_member ? 'text-emerald-700' : 'text-neutral-700'}>
-                          {p.is_member ? 'Yes' : 'No'}
-                        </span>
-                      </div>
                     </div>
                     {!p.owner_user_id && p.email && email && p.email.toLowerCase() === email.toLowerCase() ? (
                       <button onClick={() => claimProvider(p.id)} className="btn btn-primary text-xs">Claim</button>
                     ) : null}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    <input value={p.address ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, address: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Address" />
-                    <input value={p.phone ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, phone: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" />
-                    <input value={p.email ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, email: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" />
-                    <input value={p.website ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, website: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Website" />
-                    <input value={(p.tags || []).join(', ')} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : it))} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Tags (comma separated)" />
-                    <input value={(p.images || []).join(', ')} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, images: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : it))} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Image URLs (comma separated)" />
-                    <label className="inline-flex items-center gap-2 text-sm sm:col-span-2">
-                      <input type="checkbox" checked={p.blog_opt_in === true} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, blog_opt_in: e.target.checked } : it))} />
-                      <span>Opt-in to be included in Bonita blog posts</span>
-                    </label>
+                  <div className="grid grid-cols-1 gap-3 mt-3">
+                    <input value={p.address ?? ''} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, address: e.target.value } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Address" />
+                    <input value={(p.images || []).join(', ')} onChange={(e) => setProviders((arr) => arr.map((it) => it.id === p.id ? { ...it, images: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : it))} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Image URLs (comma separated)" />
                   </div>
                   <div className="mt-3">
                     <button onClick={() => saveProvider(p)} className="btn btn-secondary">Save</button>
@@ -187,18 +191,7 @@ export default function OwnerPage() {
                       <button onClick={() => requestFeatured(p)} className="ml-2 btn btn-primary text-xs">Request to be Featured ($100/mo)</button>
                     )}
                   </div>
-                  <div className="mt-4 border-t border-neutral-100 pt-3">
-                    <div className="text-sm font-medium">Job Postings</div>
-                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                      <input value={jobDrafts[p.id]?.title || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), title: e.target.value } }))} placeholder="Title" className="rounded-xl border border-neutral-200 px-3 py-2" />
-                      <input value={jobDrafts[p.id]?.apply_url || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), apply_url: e.target.value } }))} placeholder="Apply URL" className="rounded-xl border border-neutral-200 px-3 py-2" />
-                      <input value={jobDrafts[p.id]?.salary_range || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), salary_range: e.target.value } }))} placeholder="Salary Range (optional)" className="rounded-xl border border-neutral-200 px-3 py-2" />
-                      <textarea value={jobDrafts[p.id]?.description || ''} onChange={(e) => setJobDrafts((m) => ({ ...m, [p.id]: { ...(m[p.id] || { title: '', description: '', apply_url: '', salary_range: '' }), description: e.target.value } }))} placeholder="Description" className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2 min-h-[80px]" />
-                    </div>
-                    <div className="mt-2">
-                      <button onClick={() => submitJob(p)} className="btn btn-secondary text-xs">Submit Job for Approval</button>
-                    </div>
-                  </div>
+                  {/* Job posting section intentionally removed from owner view per requirements clarification */}
                 </div>
               ))}
               {(pendingApps.length > 0) && (

@@ -89,6 +89,7 @@ export default function AdminPage() {
   const [jobPosts, setJobPosts] = useState<ProviderJobPost[]>([])
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
 
   useEffect(() => {
     // Load content into editor when switching drafts
@@ -481,6 +482,34 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteCustomerUser(email: string) {
+    setMessage(null)
+    setDeletingCustomerEmail(email)
+    try {
+      // Remove funnel responses and bookings for this email
+      try { await supabase.from('funnel_responses').delete().eq('user_email', email) } catch {}
+      try { await supabase.from('bookings').delete().eq('user_email', email) } catch {}
+      // If an auth profile exists (and is not a business owner), delete the auth user as well
+      try {
+        const { data: prof } = await supabase.from('profiles').select('id,role').eq('email', email).limit(1).maybeSingle()
+        const pid = (prof as any)?.id as string | undefined
+        const role = (prof as any)?.role as string | undefined
+        if (pid && role !== 'business') {
+          await supabase.functions.invoke('admin-delete-user', { body: { user_id: pid } })
+          setProfiles((arr) => arr.filter((p) => p.id !== pid))
+        }
+      } catch {}
+      // Update local UI lists
+      setFunnels((arr) => arr.filter((f) => f.user_email !== email))
+      setBookings((arr) => arr.filter((b) => b.user_email !== email))
+      setMessage('Customer user deleted')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete customer user')
+    } finally {
+      setDeletingCustomerEmail(null)
+    }
+  }
+
   if (!auth.email) {
     return (
       <section className="py-8">
@@ -607,7 +636,17 @@ export default function AdminPage() {
               <ul className="mt-2 text-sm">
                 {users.length === 0 && <li className="text-neutral-500">No users yet.</li>}
                 {users.map((u) => (
-                  <li key={u} className="py-1 border-b border-neutral-100 last:border-0">{u}</li>
+                  <li key={u} className="py-1 border-b border-neutral-100 last:border-0 flex items-center justify-between">
+                    <span>{u}</span>
+                    {deletingCustomerEmail === u ? (
+                      <span className="flex items-center gap-2">
+                        <button onClick={() => deleteCustomerUser(u)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
+                        <button onClick={() => setDeletingCustomerEmail(null)} className="text-xs underline">Cancel</button>
+                      </span>
+                    ) : (
+                      <button onClick={() => setDeletingCustomerEmail(u)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -626,34 +665,56 @@ export default function AdminPage() {
           )}
 
           {isAdmin && (
-            <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
-              <div className="font-medium">Users</div>
-              <div className="mt-2 text-sm">
-                {profiles.length === 0 && <div className="text-neutral-500">No users found.</div>}
-                {profiles.length > 0 && (
-                  <div className="space-y-1">
-                    {profiles.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between py-1 border-b border-neutral-100 last:border-0">
-                        <div>
-                          <div className="font-medium text-sm">{p.email || '(no email)'}</div>
-                          <div className="text-xs text-neutral-500">{p.name || '—'}{p.role ? ` • ${p.role}` : ''}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {deletingUserId === p.id ? (
-                            <>
-                              <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
-                              <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
-                            </>
-                          ) : (
-                            <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
-                          )}
-                        </div>
+            <>
+              <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
+                <div className="font-medium">Business Owners</div>
+                <div className="mt-2 text-sm">
+                  {profiles.filter((p) => (p.role || 'community') === 'business').length === 0 && <div className="text-neutral-500">No business owners found.</div>}
+                  {profiles.filter((p) => (p.role || 'community') === 'business').map((p) => (
+                    <div key={p.id} className="flex items-center justify-between py-1 border-b border-neutral-100 last:border-0">
+                      <div>
+                        <div className="font-medium text-sm">{p.email || '(no email)'}</div>
+                        <div className="text-xs text-neutral-500">{p.name || '—'} • business</div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="flex items-center gap-2">
+                        {deletingUserId === p.id ? (
+                          <>
+                            <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
+                            <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
+                          </>
+                        ) : (
+                          <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+              <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
+                <div className="font-medium">Users</div>
+                <div className="mt-2 text-sm">
+                  {profiles.filter((p) => (p.role || 'community') !== 'business').length === 0 && <div className="text-neutral-500">No users found.</div>}
+                  {profiles.filter((p) => (p.role || 'community') !== 'business').map((p) => (
+                    <div key={p.id} className="flex items-center justify-between py-1 border-b border-neutral-100 last:border-0">
+                      <div>
+                        <div className="font-medium text-sm">{p.email || '(no email)'}</div>
+                        <div className="text-xs text-neutral-500">{p.name || '—'}{p.role ? ` • ${p.role}` : ''}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {deletingUserId === p.id ? (
+                          <>
+                            <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
+                            <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
+                          </>
+                        ) : (
+                          <button onClick={() => setDeletingUserId(p.id)} disabled={auth.email?.toLowerCase() === (p.email || '').toLowerCase()} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs disabled:opacity-50">Delete</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Funnel Responses</div>
