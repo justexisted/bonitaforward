@@ -242,12 +242,16 @@ export default function AdminPage() {
     }
   }, [auth.email, isAdmin, selectedUser, section])
 
+  // Normalizers
+  const normalizeEmail = (e?: string | null) => String(e || '').trim().toLowerCase()
+  const normalizeRole = (r?: string | null) => String(r || '').trim().toLowerCase()
+
   // Emails of business owners (from profiles)
   const businessEmails = useMemo(() => {
     return new Set(
       profiles
-        .filter((p) => String(p.role || '').toLowerCase() === 'business')
-        .map((p) => String(p.email || '').toLowerCase())
+        .filter((p) => normalizeRole(p.role) === 'business')
+        .map((p) => normalizeEmail(p.email))
         .filter(Boolean)
     )
   }, [profiles])
@@ -255,10 +259,10 @@ export default function AdminPage() {
   // Customer users: emails present in funnels/bookings, excluding business owner emails
   const customerUsers = useMemo(() => {
     const set = new Set<string>()
-    funnels.forEach((f) => { if (f.user_email) set.add(f.user_email) })
-    bookings.forEach((b) => { if (b.user_email) set.add(b.user_email) })
+    funnels.forEach((f) => { const e = normalizeEmail(f.user_email); if (e) set.add(e) })
+    bookings.forEach((b) => { const e = normalizeEmail(b.user_email); if (e) set.add(e) })
     return Array.from(set)
-      .filter((e) => !businessEmails.has(String(e).toLowerCase()))
+      .filter((e) => !businessEmails.has(normalizeEmail(e)))
       .sort()
   }, [funnels, bookings, businessEmails])
 
