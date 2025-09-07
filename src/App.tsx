@@ -1594,7 +1594,6 @@ function ContactPage() {
 
 function BusinessPage() {
   const auth = useAuth()
-  const [sent, setSent] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   // simple ROI calculator state is kept local via uncontrolled inputs and live compute
   useEffect(() => {
@@ -1712,7 +1711,7 @@ function BusinessPage() {
                   try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, challenge, ts: Date.now() })) } catch {}
                   const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
                   if (!error) {
-                    setSent(true); setMsg('Thanks! We received your application. We’ll follow up shortly.')
+                    setMsg('Thanks! We received your application. We’ll follow up shortly.')
                     form.reset()
                     try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
                     // Do not redirect; show success message instead

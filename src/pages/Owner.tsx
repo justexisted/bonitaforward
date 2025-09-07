@@ -80,12 +80,7 @@ export default function OwnerPage() {
     void load()
   }, [userId])
 
-  async function claimProvider(id: string) {
-    setMessage(null)
-    const { error } = await createProviderChangeRequest({ provider_id: id, owner_user_id: userId!, type: 'claim', changes: {}, reason: null })
-    if (error) setMessage('Claim request failed: ' + error)
-    else { setMessage('Claim requested. Awaiting admin approval.'); void load() }
-  }
+  // claimProvider disabled; we now guide users to Featured request
 
   async function saveProvider(p: ProviderRow) {
     setMessage(null)
