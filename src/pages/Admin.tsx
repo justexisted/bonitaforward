@@ -90,6 +90,8 @@ export default function AdminPage() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
+  const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
+  const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
 
   useEffect(() => {
     // Load content into editor when switching drafts
@@ -164,6 +166,7 @@ export default function AdminPage() {
   const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
   const isAdmin = useMemo(() => !!auth.email && adminList.includes(auth.email.toLowerCase()), [auth.email, adminList])
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
+  const [section, setSection] = useState<'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'providers' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
 
   useEffect(() => {
     let cancelled = false
@@ -548,6 +551,19 @@ export default function AdminPage() {
                     <option key={u} value={u}>{u}</option>
                   ))}
                 </select>
+                <select value={section} onChange={(e) => setSection(e.target.value as any)} className="rounded-xl border border-neutral-200 px-3 py-1.5 text-sm bg-white">
+                  <option value="business-applications">Business Applications</option>
+                  <option value="contact-leads">Contact / Get Featured</option>
+                  <option value="customer-users">Customer Users</option>
+                  <option value="business-accounts">Business Accounts</option>
+                  <option value="users">Users</option>
+                  <option value="providers">Providers</option>
+                  <option value="owner-change-requests">Owner Change Requests</option>
+                  <option value="job-posts">Job Posts</option>
+                  <option value="funnel-responses">Funnel Responses</option>
+                  <option value="bookings">Bookings</option>
+                  <option value="blog">Blog Manager</option>
+                </select>
               </>
             )}
             <button onClick={() => window.location.reload()} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200 text-sm">Refresh</button>
@@ -630,7 +646,7 @@ export default function AdminPage() {
               </div>
             </div>
           )}
-          {isAdmin && (
+          {isAdmin && section === 'customer-users' && (
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
               <div className="font-medium">Customer Users</div>
               <ul className="mt-2 text-sm">
@@ -652,7 +668,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {isAdmin && (
+          {isAdmin && section === 'business-accounts' && (
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
               <div className="font-medium">Business Accounts</div>
               <ul className="mt-2 text-sm">
@@ -664,7 +680,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {isAdmin && (
+          {isAdmin && section === 'business-owners' && (
             <>
               <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
                 <div className="font-medium">Business Owners</div>
@@ -716,6 +732,7 @@ export default function AdminPage() {
               </div>
             </>
           )}
+          {section === 'funnel-responses' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Funnel Responses</div>
             <div className="mt-2 space-y-2 text-sm">
@@ -725,19 +742,18 @@ export default function AdminPage() {
                   <div className="text-neutral-800 font-medium">{row.category}</div>
                   <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
                   <div className="mt-1 text-xs text-neutral-600">User: {row.user_email}</div>
-                  <ul className="mt-2 list-disc list-inside">
-                    {Object.entries(row.answers).map(([k, v]) => (
-                      <li key={k}>
-                        <span className="text-neutral-500">{k}: </span>
-                        <span>{String(v)}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <textarea className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs" defaultValue={JSON.stringify(row.answers, null, 2)} onChange={(e) => setEditFunnel((m) => ({ ...m, [row.id]: e.target.value }))} />
+                  <div className="mt-2 flex items-center gap-2">
+                    <button onClick={async () => { try { const next = (() => { try { return JSON.parse(editFunnel[row.id] || JSON.stringify(row.answers || {})) } catch { return row.answers } })(); const { error } = await supabase.from('funnel_responses').update({ answers: next as any }).eq('id', row.id); if (error) setError(error.message); else setMessage('Funnel updated') } catch {} }} className="btn btn-secondary text-xs">Save</button>
+                    <button onClick={async () => { const { error } = await supabase.from('funnel_responses').delete().eq('id', row.id); if (error) setError(error.message); else { setFunnels((arr) => arr.filter((f) => f.id !== row.id)); setMessage('Funnel deleted') } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+          )}
 
+          {section === 'bookings' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Bookings</div>
             <div className="mt-2 space-y-2 text-sm">
@@ -746,25 +762,25 @@ export default function AdminPage() {
                 <div key={row.id} className="rounded-xl border border-neutral-200 p-3 hover-gradient interactive-card">
                   <div className="text-neutral-800 font-medium">{row.category}</div>
                   <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
-                  <div className="mt-1">Name: {row.name || '-'}</div>
-                  <div className="mt-1">Notes: {row.notes || '-'}</div>
-                  {row.answers && (
-                    <ul className="mt-2 list-disc list-inside">
-                      {Object.entries(row.answers).map(([k, v]) => (
-                        <li key={k}>
-                          <span className="text-neutral-500">{k}: </span>
-                          <span>{String(v)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="mt-1 text-xs text-neutral-600">Status: {row.status || 'new'}</div>
+                  <input className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" defaultValue={row.name || ''} placeholder="Name" onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), name: e.target.value } }))} />
+                  <textarea className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" defaultValue={row.notes || ''} placeholder="Notes" onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), notes: e.target.value } }))} />
+                  {row.answers && <textarea className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs" defaultValue={JSON.stringify(row.answers, null, 2)} onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), answers: e.target.value } }))} />}
+                  <select className="mt-1 rounded-xl border border-neutral-200 px-3 py-2 text-xs bg-white" defaultValue={row.status || 'new'} onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), status: e.target.value } }))}>
+                    <option value="new">new</option>
+                    <option value="in_progress">in_progress</option>
+                    <option value="closed">closed</option>
+                  </select>
+                  <div className="mt-2 flex items-center gap-2">
+                    <button onClick={async () => { const edit = editBooking[row.id] || {}; const payload: any = { name: edit.name ?? row.name, notes: edit.notes ?? row.notes, status: edit.status ?? row.status }; if (typeof edit.answers === 'string') { try { payload.answers = JSON.parse(edit.answers) } catch {} } const { error } = await supabase.from('bookings').update(payload).eq('id', row.id); if (error) setError(error.message); else setMessage('Booking saved') }} className="btn btn-secondary text-xs">Save</button>
+                    <button onClick={async () => { const { error } = await supabase.from('bookings').delete().eq('id', row.id); if (error) setError(error.message); else { setBookings((arr) => arr.filter((b) => b.id !== row.id)); setMessage('Booking deleted') } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+          )}
         </div>
-        {isAdmin && (
+        {isAdmin && section === 'providers' && (
           <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Providers (Edit existing)</div>
             <div className="mt-2 text-sm">
@@ -859,7 +875,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {isAdmin && (
+        {isAdmin && section === 'owner-change-requests' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Owner Change Requests</div>
             <div className="mt-2 space-y-2 text-sm">
@@ -882,7 +898,7 @@ export default function AdminPage() {
             </div>
           </div>
         )}
-        {isAdmin && (
+        {isAdmin && section === 'job-posts' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Job Posts</div>
             <div className="mt-2 space-y-2 text-sm">
@@ -905,7 +921,7 @@ export default function AdminPage() {
             </div>
           </div>
         )}
-        {isAdmin && (
+        {isAdmin && section === 'blog' && (
           <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white">
             <div className="font-medium">Blog Post Manager</div>
             <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
