@@ -168,8 +168,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = params.get('access_token')
     await supabase.auth.signOut() // force logout first to avoid existing session
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })
-    // add console log for type and token
-    console.log('ResetPasswordPage URL params:', { type, token })
     return { error: error?.message }
   }
 
