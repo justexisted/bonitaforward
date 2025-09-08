@@ -12,6 +12,10 @@ export default function AccountPage() {
   const [ownedProviders, setOwnedProviders] = useState<{ id: string; name: string }[]>([])
   const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
   const [role, setRole] = useState<string>('')
+  const [bookings, setBookings] = useState<Array<{ id: string; provider_id?: string | null; provider_name?: string | null; time?: string | null; status?: string | null; created_at?: string | null }>>([])
+  const [savedBusinesses, setSavedBusinesses] = useState<Array<{ id?: string; provider_id: string; created_at?: string | null; provider_name?: string | null }>>([])
+  const [discounts, setDiscounts] = useState<Array<{ id: string; provider_id?: string | null; code?: string | null; created_at?: string | null; provider_name?: string | null }>>([])
+  const [communityLoading, setCommunityLoading] = useState(false)
 
   useEffect(() => {
     setEmail(auth.email || '')
@@ -51,6 +55,97 @@ export default function AccountPage() {
     }
     void loadOwned()
   }, [auth.email, auth.name])
+
+  useEffect(() => {
+    async function loadCommunityData() {
+      if (!auth.userId) { setBookings([]); setSavedBusinesses([]); setDiscounts([]); return }
+      setCommunityLoading(true)
+      console.log('[Account] Loading community data for user', auth.userId)
+      try {
+        // My Bookings
+        try {
+          const { data, error } = await supabase
+            .from('bookings')
+            .select('*')
+            .eq('user_id', auth.userId)
+            .order('created_at', { ascending: false })
+            .limit(50)
+          if (error) {
+            console.warn('[Account] bookings select error', error)
+            setBookings([])
+          } else {
+            const rows = (data as any[]) || []
+            setBookings(rows.map((r) => ({
+              id: r.id,
+              provider_id: r.provider_id ?? null,
+              provider_name: (r as any).provider_name ?? null,
+              time: r.time ?? r.start_time ?? r.created_at ?? null,
+              status: r.status ?? null,
+              created_at: r.created_at ?? null,
+            })))
+          }
+        } catch (e) {
+          console.warn('[Account] bookings load failed', e)
+          setBookings([])
+        }
+
+        // Saved Businesses
+        try {
+          const { data, error } = await supabase
+            .from('saved_providers')
+            .select('*')
+            .eq('user_id', auth.userId)
+            .order('created_at', { ascending: false })
+            .limit(100)
+          if (error) {
+            console.warn('[Account] saved_providers select error', error)
+            setSavedBusinesses([])
+          } else {
+            const rows = (data as any[]) || []
+            setSavedBusinesses(rows.map((r) => ({
+              id: r.id,
+              provider_id: r.provider_id,
+              provider_name: (r as any).provider_name ?? null,
+              created_at: r.created_at ?? null,
+            })))
+          }
+        } catch (e) {
+          console.warn('[Account] saved_providers load failed', e)
+          setSavedBusinesses([])
+        }
+
+        // Discounts Redeemed
+        try {
+          const { data, error } = await supabase
+            .from('coupon_redemptions')
+            .select('*')
+            .eq('user_id', auth.userId)
+            .order('created_at', { ascending: false })
+            .limit(100)
+          if (error) {
+            console.warn('[Account] coupon_redemptions select error', error)
+            setDiscounts([])
+          } else {
+            const rows = (data as any[]) || []
+            setDiscounts(rows.map((r) => ({
+              id: r.id,
+              provider_id: r.provider_id ?? null,
+              provider_name: (r as any).provider_name ?? null,
+              code: (r as any).code ?? null,
+              created_at: r.created_at ?? null,
+            })))
+          }
+        } catch (e) {
+          console.warn('[Account] coupon_redemptions load failed', e)
+          setDiscounts([])
+        }
+      } finally {
+        setCommunityLoading(false)
+      }
+    }
+    const isCommunity = String(auth.role || role || '').toLowerCase() === 'community'
+    if (isCommunity) void loadCommunityData()
+  }, [auth.userId, auth.role, role])
 
   async function saveProfile() {
     setBusy(true)
@@ -163,6 +258,57 @@ export default function AccountPage() {
                     <li key={p.id} className="flex items-center justify-between">
                       <span>{p.name}</span>
                       <Link to={`/owner`} className="text-xs underline">Manage</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          {String(auth.role || role || '').toLowerCase() === 'community' && (
+            <div className="mt-6 border-t border-neutral-100 pt-4">
+              <div className="text-sm font-medium">My Bookings</div>
+              <div className="mt-2 text-sm">
+                {communityLoading && <div className="text-neutral-500">Loading…</div>}
+                {!communityLoading && bookings.length === 0 && <div className="text-neutral-600">No bookings found.</div>}
+                <ul className="space-y-1">
+                  {bookings.map((b) => (
+                    <li key={b.id} className="flex items-center justify-between">
+                      <span>{b.provider_name || b.provider_id || 'Business'}{b.time ? ` • ${new Date(b.time).toLocaleString()}` : ''}</span>
+                      <span className="text-xs text-neutral-500">{b.status || '—'}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          {String(auth.role || role || '').toLowerCase() === 'community' && (
+            <div className="mt-6 border-t border-neutral-100 pt-4">
+              <div className="text-sm font-medium">Saved Businesses</div>
+              <div className="mt-2 text-sm">
+                {communityLoading && <div className="text-neutral-500">Loading…</div>}
+                {!communityLoading && savedBusinesses.length === 0 && <div className="text-neutral-600">No saved businesses yet.</div>}
+                <ul className="space-y-1">
+                  {savedBusinesses.map((s, idx) => (
+                    <li key={`${s.id || s.provider_id}-${idx}`} className="flex items-center justify-between">
+                      <span>{s.provider_name || s.provider_id}</span>
+                      <span className="text-xs text-neutral-500">{s.created_at ? new Date(s.created_at).toLocaleString() : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          {String(auth.role || role || '').toLowerCase() === 'community' && (
+            <div className="mt-6 border-t border-neutral-100 pt-4">
+              <div className="text-sm font-medium">Discounts Redeemed</div>
+              <div className="mt-2 text-sm">
+                {communityLoading && <div className="text-neutral-500">Loading…</div>}
+                {!communityLoading && discounts.length === 0 && <div className="text-neutral-600">No discounts redeemed yet.</div>}
+                <ul className="space-y-1">
+                  {discounts.map((d) => (
+                    <li key={d.id} className="flex items-center justify-between">
+                      <span>{d.provider_name || d.provider_id || 'Business'}{d.code ? ` • ${d.code}` : ''}</span>
+                      <span className="text-xs text-neutral-500">{d.created_at ? new Date(d.created_at).toLocaleString() : ''}</span>
                     </li>
                   ))}
                 </ul>

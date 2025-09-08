@@ -459,6 +459,12 @@ function ProviderPage() {
   const all: Provider[] = (['real-estate','home-services','health-wellness','restaurants-cafes','professional-services'] as CategoryKey[])
     .flatMap((k) => providersByCategory[k] || [])
   const provider = all.find((p) => p.id === providerId)
+  const auth = useAuth()
+  const [isSaved, setIsSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  const [couponBusy, setCouponBusy] = useState(false)
+  const [couponMsg, setCouponMsg] = useState<string | null>(null)
   const [jobs, setJobs] = useState<{ id: string; title: string; description?: string | null; apply_url?: string | null; salary_range?: string | null }[]>([])
 
   useEffect(() => {
@@ -474,6 +480,75 @@ function ProviderPage() {
     void loadJobs()
     return () => { cancelled = true }
   }, [provider?.id])
+
+  useEffect(() => {
+    async function checkSaved() {
+      try {
+        if (!auth.userId || !provider?.id) return
+        console.log('[Provider] check saved', { userId: auth.userId, providerId: provider.id })
+        const { data, error } = await supabase
+          .from('saved_providers')
+          .select('id')
+          .eq('user_id', auth.userId)
+          .eq('provider_id', provider.id)
+          .maybeSingle()
+        if (error) {
+          console.warn('[Provider] saved_providers lookup error', error)
+          setIsSaved(false)
+        } else {
+          setIsSaved(!!data)
+        }
+      } catch (e) {
+        console.warn('[Provider] checkSaved failed', e)
+        setIsSaved(false)
+      }
+    }
+    void checkSaved()
+  }, [auth.userId, provider?.id])
+
+  async function toggleSaveProvider() {
+    if (!auth.userId || !provider?.id) { setSaveMsg('Please sign in'); return }
+    setSaving(true)
+    setSaveMsg(null)
+    try {
+      if (isSaved) {
+        console.log('[Provider] unsave', { userId: auth.userId, providerId: provider.id })
+        const { error } = await supabase
+          .from('saved_providers')
+          .delete()
+          .eq('user_id', auth.userId)
+          .eq('provider_id', provider.id)
+        if (error) setSaveMsg(error.message)
+        else setIsSaved(false)
+      } else {
+        console.log('[Provider] save', { userId: auth.userId, providerId: provider.id })
+        const { error } = await supabase
+          .from('saved_providers')
+          .insert([{ user_id: auth.userId, provider_id: provider.id }])
+        if (error) setSaveMsg(error.message)
+        else setIsSaved(true)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveCoupon() {
+    if (!auth.userId || !provider?.id) { setCouponMsg('Please sign in'); return }
+    const code = prompt('Enter coupon code to save (default COMMUNITY):', 'COMMUNITY') || 'COMMUNITY'
+    setCouponBusy(true)
+    setCouponMsg(null)
+    try {
+      console.log('[Provider] save coupon', { userId: auth.userId, providerId: provider.id, code })
+      const { error } = await supabase
+        .from('coupon_redemptions')
+        .insert([{ user_id: auth.userId, provider_id: provider.id, code }])
+      if (error) setCouponMsg(error.message)
+      else setCouponMsg('Coupon saved to your account.')
+    } finally {
+      setCouponBusy(false)
+    }
+  }
   return (
     <section className="py-8">
       <Container>
@@ -484,6 +559,27 @@ function ProviderPage() {
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">{provider.name}</h1>
               <div className="mt-1 text-sm text-neutral-500">Category: {provider.category}</div>
+              {String(auth.role || '').toLowerCase() === 'community' && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={toggleSaveProvider}
+                    disabled={saving}
+                    className="rounded-full bg-neutral-900 text-white px-3 py-1.5 text-sm"
+                  >
+                    {saving ? 'Please wait…' : isSaved ? 'Saved ✓' : 'Save Business'}
+                  </button>
+                  <button
+                    onClick={saveCoupon}
+                    disabled={couponBusy}
+                    className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm border border-neutral-200"
+                  >
+                    {couponBusy ? 'Saving…' : 'Save Coupon'}
+                  </button>
+                  {(saveMsg || couponMsg) && (
+                    <span className="text-xs text-neutral-600">{saveMsg || couponMsg}</span>
+                  )}
+                </div>
+              )}
               <div className="mt-4 text-sm text-neutral-700">Dedicated provider page — details coming soon.</div>
               {jobs.length > 0 && (
                 <div className="mt-6">
@@ -1830,12 +1926,14 @@ function BookPage() {
                   return (
                     <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                       <div className="flex items-center justify-between">
-                        <div className="font-medium flex items-center gap-2">
-                          {r.name}
-                          {isFeaturedProvider(r) && (
-                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
-                          )}
-                        </div>
+                        <Link to={`/provider/${r.id}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
+                          <div className="font-medium flex items-center gap-2">
+                            {r.name}
+                            {isFeaturedProvider(r) && (
+                              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
+                            )}
+                          </div>
+                        </Link>
                         <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                       </div>
                       {isAdmin && (r.tags && r.tags.length > 0) && (
@@ -1928,12 +2026,14 @@ function BookPage() {
                       return (
                         <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                           <div className="flex items-center justify-between">
-                            <div className="font-medium flex items-center gap-2">
-                              {r.name}
-                              {isFeaturedProvider(r) && (
-                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
-                              )}
-                            </div>
+                            <Link to={`/provider/${r.id}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
+                              <div className="font-medium flex items-center gap-2">
+                                {r.name}
+                                {isFeaturedProvider(r) && (
+                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
+                                )}
+                              </div>
+                            </Link>
                             <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                           </div>
                           {isAdmin && (r.tags && r.tags.length > 0) && (
