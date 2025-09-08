@@ -22,6 +22,26 @@ export default function SignInPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  // add handleResetPassword to the component
+  const handleResetPassword = async () => {
+    if (!email) { setMessage('Enter your email'); return }
+
+    setBusy(true)
+    setMessage(null)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password'
+      })
+      if (error) setMessage(error.message)
+      else setMessage('Check your email for the reset link')
+    } catch (err) {
+      console.error('Reset password error:', err)
+      setMessage('Something went wrong')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // If already authenticated, redirect away from Sign In
   useEffect(() => {
@@ -236,7 +256,7 @@ export default function SignInPage() {
               <div className="text-sm text-red-600">{message}</div>
             )}
 
-            <button disabled={busy} className="w-full rounded-full bg-neutral-900 text-white py-2.5 elevate">
+            <button disabled={busy} onClick={handleResetPassword} className="w-full rounded-full bg-neutral-900 text-white py-2.5 elevate">
               {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'}
             </button>
           </form>
