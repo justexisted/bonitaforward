@@ -64,6 +64,7 @@ type AuthContextValue = {
   name?: string
   email?: string
   userId?: string
+  role?: 'business' | 'community'
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
   signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string; session?: unknown | null }>
@@ -74,7 +75,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInWithGoogle: async () => {}, signInWithEmail: async () => ({}), signUpWithEmail: async () => ({}), resetPassword: async () => ({}), signOut: async () => {} })
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string } | null>(null)
+  const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null>(null)
 
   useEffect(() => {
 
@@ -120,7 +121,16 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       const name = meta?.name
       const role = meta?.role
       const userId = session?.user?.id
-      if (email) setProfile({ name, email, userId })
+      // Fetch role from database if not in metadata
+      if (!role && userId) {
+        try {
+          const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+          const r = String((prof as any)?.role || '').toLowerCase()
+          if (r === 'business' || r === 'community') role = r as any
+        } catch {}
+      }
+
+      if (email) setProfile({ name, email, userId, role })
       else setProfile((curr) => curr && curr.email ? null : curr)
       if (email && userId) void ensureProfile(userId, email, name, role)
     })
@@ -161,6 +171,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     name: profile?.name,
     email: profile?.email,
     userId: profile?.userId,
+    role: profile?.role,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
@@ -173,6 +184,29 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   return useContext(AuthContext)
+}
+
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: ('business' | 'community')[] }) {
+  const auth = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!auth.isAuthed) {
+      navigate('/signin')
+      return
+    }
+
+    if (!allowedRoles.includes(auth.role || 'community')) {
+      navigate('/')
+      return
+    }
+  }, [auth.isAuthed, auth.role, allowedRoles, navigate])
+
+  if (!auth.isAuthed || !allowedRoles.includes(auth.role || 'community')) {
+    return null
+  }
+
+  return <>{children}</>
 }
 
 function Navbar() {
@@ -228,7 +262,7 @@ function Navbar() {
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/about">About</Link>
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/community">Community</Link>
-            {auth.isAuthed && (
+            {auth.isAuthed && auth.role === 'business' && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/owner">My Business</Link>
             )}
             {auth.isAuthed && (
@@ -258,7 +292,7 @@ function Navbar() {
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/about">About</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/community">Community</Link>
-              {auth.isAuthed && (
+              {auth.isAuthed && auth.role === 'business' && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/owner">My Business</Link>
               )}
               {auth.isAuthed && (
@@ -2067,7 +2101,11 @@ export default function App() {
             <Route path="community" element={<CommunityIndex />} />
             <Route path="community/:category" element={<CommunityPost />} />
             <Route path="admin" element={<AdminPage />} />
-            <Route path="owner" element={<OwnerPage />} />
+            <Route path="owner" element={
+              <ProtectedRoute allowedRoles={['business']}>
+                <OwnerPage />
+              </ProtectedRoute>
+            } />
             <Route path="account" element={<AccountPage />} />
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />

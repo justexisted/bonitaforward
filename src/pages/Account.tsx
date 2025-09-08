@@ -153,21 +153,23 @@ export default function AccountPage() {
             <button disabled={busy} onClick={saveProfile} className="rounded-full bg-neutral-900 text-white py-2.5 elevate">{busy ? 'Saving…' : 'Save Changes'}</button>
           </div>
 
-          <div className="mt-6 border-t border-neutral-100 pt-4">
-            <div className="text-sm font-medium">My Businesses</div>
-            <div className="mt-2 text-sm">
-              {ownedProviders.length === 0 && <div className="text-neutral-600">No businesses found.</div>}
-              <ul className="space-y-1">
-                {ownedProviders.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between">
-                    <span>{p.name}</span>
-                    <Link to={`/owner`} className="text-xs underline">Manage</Link>
-                  </li>
-                ))}
-              </ul>
+          {auth.role === 'business' && (
+            <div className="mt-6 border-t border-neutral-100 pt-4">
+              <div className="text-sm font-medium">My Businesses</div>
+              <div className="mt-2 text-sm">
+                {ownedProviders.length === 0 && <div className="text-neutral-600">No businesses found.</div>}
+                <ul className="space-y-1">
+                  {ownedProviders.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between">
+                      <span>{p.name}</span>
+                      <Link to={`/owner`} className="text-xs underline">Manage</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-          </div>
-          {pendingApps.length > 0 && (
+          )}
+          {auth.role === 'business' && pendingApps.length > 0 && (
             <div className="mt-6 border-t border-neutral-100 pt-4">
               <div className="text-sm font-medium">Pending Applications</div>
               <div className="mt-2 text-sm">
