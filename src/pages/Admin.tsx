@@ -157,14 +157,84 @@ export default function AdminPage() {
 
   const allEmojis = ['😀','😁','😂','🤣','😊','😇','🙂','😉','😍','😘','😋','😎','🤩','🥳','🤗','🤔','😴','🤤','🤓','🫶','👍','🔥','⭐','✨','💫','🎉','🏆','🥇','💡','📣','✅','🍔','🍟','🌮','🍣','🍕','🥗','🍜','🍩','☕','🍵','🍺','🍷','🥂','🏡','🏠','🏘️','🔑','📈','💼','⚖️','🧮','🤝','🧘','🏋️','💆','💅','🧴','🧑‍🍳','👨‍🍳','🧑‍🏫','📚','🛠️','🔧','🌿','🌞','🌧️','🌈']
   const filteredEmojis = allEmojis.filter((e) => e.includes(emojiQuery.trim()))
-  // Admins (comma-separated) can view all users' data. Example .env: VITE_ADMIN_EMAILS=you@example.com,other@example.com
-  // Default to the owner email if no env var is set.
+  // Secure server-side admin verification with client-side fallback
+  const [adminStatus, setAdminStatus] = useState<{
+    isAdmin: boolean
+    loading: boolean
+    verified: boolean
+    error?: string
+  }>({ isAdmin: false, loading: true, verified: false })
+  
+  // Legacy client-side check for fallback
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
     .split(',')
     .map((s: string) => s.trim().toLowerCase())
     .filter(Boolean)
   const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
-  const isAdmin = useMemo(() => !!auth.email && adminList.includes(auth.email.toLowerCase()), [auth.email, adminList])
+  const isClientAdmin = useMemo(() => !!auth.email && adminList.includes(auth.email.toLowerCase()), [auth.email, adminList])
+
+  // Server-side admin verification
+  useEffect(() => {
+    async function verifyAdmin() {
+      if (!auth.email) {
+        setAdminStatus({ isAdmin: false, loading: false, verified: false })
+        return
+      }
+
+      setAdminStatus(prev => ({ ...prev, loading: true }))
+
+      try {
+        const { data: session } = await supabase.auth.getSession()
+        const token = session.session?.access_token
+        
+        if (!token) {
+          setAdminStatus({ isAdmin: isClientAdmin, loading: false, verified: false })
+          return
+        }
+
+        const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
+          (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+        const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          setAdminStatus({
+            isAdmin: result.isAdmin,
+            loading: false,
+            verified: true
+          })
+        } else {
+          // Fallback to client-side check if server verification fails
+          setAdminStatus({
+            isAdmin: isClientAdmin,
+            loading: false,
+            verified: false,
+            error: 'Server verification unavailable'
+          })
+        }
+      } catch (err) {
+        // Fallback to client-side check on error
+        setAdminStatus({
+          isAdmin: isClientAdmin,
+          loading: false,
+          verified: false,
+          error: 'Server verification failed'
+        })
+      }
+    }
+
+    verifyAdmin()
+  }, [auth.email, isClientAdmin])
+
+  const isAdmin = adminStatus.isAdmin
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
   const [section, setSection] = useState<'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'providers' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
 
@@ -217,12 +287,23 @@ export default function AdminPage() {
         } catch {}
         try {
           if (isAdmin) {
-            const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
-            const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-profiles` : '/.netlify/functions/admin-list-profiles'
-            const res = await fetch(url, { method: 'POST' })
-            if (res.ok) {
-              const payload = await res.json() as { profiles?: ProfileRow[] }
-              if (payload?.profiles) setProfiles(payload.profiles)
+            const { data: session } = await supabase.auth.getSession()
+            const token = session.session?.access_token
+            
+            if (token) {
+              const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+              const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-profiles` : '/.netlify/functions/admin-list-profiles'
+              const res = await fetch(url, { 
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              })
+              if (res.ok) {
+                const payload = await res.json() as { profiles?: ProfileRow[] }
+                if (payload?.profiles) setProfiles(payload.profiles)
+              }
             }
           }
         } catch {}
@@ -558,7 +639,15 @@ export default function AdminPage() {
     <section className="py-8">
       <div className="container-px mx-auto max-w-5xl">
         <div className="flex flex-col lg:items-start md:flex-row md:items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">{isAdmin ? 'Admin' : 'Your Data'}</h1>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{isAdmin ? 'Admin' : 'Your Data'}</h1>
+            {isAdmin && (
+              <div className="text-xs text-neutral-500 mt-1">
+                {adminStatus.verified ? '🔒 Server-verified admin' : '⚠️ Client-side admin (less secure)'}
+                {adminStatus.error && ` • ${adminStatus.error}`}
+              </div>
+            )}
+          </div>
           <div className="flex flex-col lg:items-start md:flex-row md:items-center gap-2">
             {isAdmin && (
               <>

@@ -22,12 +22,80 @@ type ProviderRow = {
 
 export default function OwnerPage() {
   const { userId, email } = useAuth()
+  
+  // Server-side admin verification with client-side fallback
+  const [adminStatus, setAdminStatus] = useState<{
+    isAdmin: boolean
+    loading: boolean
+    verified: boolean
+  }>({ isAdmin: false, loading: true, verified: false })
+  
+  // Legacy client-side check for fallback
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
     .split(',')
     .map((s: string) => s.trim().toLowerCase())
     .filter(Boolean)
   const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
-  const isAdmin = !!email && adminList.includes(email.toLowerCase())
+  const isClientAdmin = !!email && adminList.includes(email.toLowerCase())
+
+  // Server-side admin verification
+  useEffect(() => {
+    async function verifyAdmin() {
+      if (!email) {
+        setAdminStatus({ isAdmin: false, loading: false, verified: false })
+        return
+      }
+
+      try {
+        const { data: session } = await supabase.auth.getSession()
+        const token = session.session?.access_token
+        
+        if (!token) {
+          setAdminStatus({ isAdmin: isClientAdmin, loading: false, verified: false })
+          return
+        }
+
+        const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
+          (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+        const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          setAdminStatus({
+            isAdmin: result.isAdmin,
+            loading: false,
+            verified: true
+          })
+        } else {
+          // Fallback to client-side check
+          setAdminStatus({
+            isAdmin: isClientAdmin,
+            loading: false,
+            verified: false
+          })
+        }
+      } catch {
+        // Fallback to client-side check on error
+        setAdminStatus({
+          isAdmin: isClientAdmin,
+          loading: false,
+          verified: false
+        })
+      }
+    }
+
+    verifyAdmin()
+  }, [email, isClientAdmin])
+
+  const isAdmin = adminStatus.isAdmin
   const [loading, setLoading] = useState(true)
   const [providers, setProviders] = useState<ProviderRow[]>([])
   const [message, setMessage] = useState<string | null>(null)
