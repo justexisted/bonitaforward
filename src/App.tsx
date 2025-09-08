@@ -115,11 +115,11 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       if (email) setProfile({ name, email, userId })
       void ensureProfile(userId || null, email || null, name || null, role)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const email = session?.user?.email
       const meta = (session?.user?.user_metadata as any) || {}
       const name = meta?.name
-      const role = meta?.role
+      let role = meta?.role as 'business' | 'community' | undefined
       const userId = session?.user?.id
       // Fetch role from database if not in metadata
       if (!role && userId) {
