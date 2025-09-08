@@ -10,10 +10,18 @@ export default function ResetPasswordPage() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const type = params.get('type')
+    const accessToken = params.get('access_token')
+
+    if (type === 'recovery' && accessToken) {
+      // Always allow the reset form, even if there’s an existing session
+      setValidRecovery(true)
+    }
     // If user arrived from email link, Supabase should have created a session
     // We don't auto-redirect; wait for user to set a new password
     // No-op here, but we could validate presence of a session if needed
-  }, [])
+  }, [location.search])
 
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault()
