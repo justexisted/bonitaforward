@@ -8,6 +8,7 @@ export default function ResetPasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [validRecovery, setValidRecovery] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -46,6 +47,7 @@ export default function ResetPasswordPage() {
         <div className="rounded-2xl border border-neutral-100 p-6 bg-white elevate">
           <h1 className="text-xl font-semibold tracking-tight text-center">Set a new password</h1>
           {message && <div className="mt-2 text-sm text-red-600 text-center">{message}</div>}
+          {validRecovery ? (
           <form onSubmit={handleUpdate} className="mt-4 space-y-3">
             <div>
               <label className="block text-sm text-neutral-600">New Password</label>
@@ -57,6 +59,11 @@ export default function ResetPasswordPage() {
             </div>
             <button disabled={busy} className="w-full rounded-full bg-neutral-900 text-white py-2.5 elevate">{busy ? 'Saving…' : 'Update Password'}</button>
           </form>
+          ) : (
+            <div className="mt-4 text-sm text-neutral-600 text-center">
+              This link is invalid or has expired. Please request a new password reset link.
+            </div>
+          )}
         </div>
       </div>
     </section>
