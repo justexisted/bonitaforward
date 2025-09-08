@@ -96,8 +96,14 @@ export default function AccountPage() {
         setMessage(`Delete failed: ${text || res.status}`)
         return
       }
-      await supabase.auth.signOut()
+      // Account deleted successfully - clear local state instead of trying to logout
+      // (logout would fail since the user no longer exists in Supabase)
+      try { localStorage.clear() } catch {}
       setMessage('Your account has been deleted. You can now create a new account with the same email.')
+      // Redirect to home page after a short delay
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 2000)
     } finally {
       setBusy(false)
     }
