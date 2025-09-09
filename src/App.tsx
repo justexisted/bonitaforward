@@ -162,11 +162,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    // add type and token to the redirect URL
-    const params = new URLSearchParams(location.search)
-    const type = params.get('type')
-    const token = params.get('access_token')
-    await supabase.auth.signOut() // force logout first to avoid existing session
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })
     return { error: error?.message }
   }
