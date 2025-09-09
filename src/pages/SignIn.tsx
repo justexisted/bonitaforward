@@ -22,7 +22,26 @@ export default function SignInPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
-  
+
+  const handleResetPassword = async () => {
+    if (!email) { setMessage('Enter your email'); return }
+
+    setBusy(true)
+    setMessage(null)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password'
+      })
+      if (error) setMessage(error.message)
+      else setMessage('Check your email for the reset link')
+    } catch (err) {
+      console.error('Reset password error:', err)
+      setMessage('Something went wrong')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // If already authenticated, redirect away from Sign In
   useEffect(() => {
@@ -40,6 +59,7 @@ export default function SignInPage() {
     e.preventDefault()
     setMessage(null)
     setBusy(true)
+
     try {
       if (mode === 'signin') {
         const { error } = await auth.signInWithEmail(email, password)
@@ -52,12 +72,15 @@ export default function SignInPage() {
             setMessage('Please select an account type')
             return
           }
+
           const { error, session } = await auth.signUpWithEmail(email, password, name, accountType || undefined)
+
           if (!error) {
             try {
               localStorage.removeItem('bf-signup-prefill')
               localStorage.setItem('bf-pending-profile', JSON.stringify({ name, email, role: accountType }))
             } catch {}
+
             if (!session) {
               // Fallback: try sign-in if no session returned (some configs)
               const { error: signInErr } = await auth.signInWithEmail(email, password)
@@ -66,6 +89,7 @@ export default function SignInPage() {
                 return
               }
             }
+
             const params = new URLSearchParams(location?.search || '')
             const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
             navigate(next, { replace: true })
@@ -87,11 +111,10 @@ export default function SignInPage() {
             }
           }
         }
-      } else if (mode === 'reset') {
-        const { error } = await auth.resetPassword(email)
-        if (!error) setMessage('Check your email for a password reset link')
-        else setMessage(error)
       }
+    } catch (err) {
+      console.error('Submit error:', err)
+      setMessage('Something went wrong')
     } finally {
       setBusy(false)
     }
@@ -237,9 +260,11 @@ export default function SignInPage() {
               <div className="text-sm text-red-600">{message}</div>
             )}
 
-            <button disabled={busy} type="submit" className="w-full rounded-full bg-neutral-900 text-white py-2.5 elevate">
-              {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'}
-            </button>
+            {mode !== 'reset' && (
+              <button disabled={busy} type="submit" className="w-full rounded-full bg-neutral-900 text-white py-2.5 elevate">
+                {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+              </button>
+            )}
           </form>
 
           {mode !== 'reset' && clientId && (
@@ -259,7 +284,7 @@ export default function SignInPage() {
           <div className="mt-4 text-center text-sm text-neutral-600">
             {mode === 'signin' && (
               <>
-                <button onClick={() => setMode('reset')} className="underline">Forgot password?</button>
+                <button onClick={handleResetPassword} className="underline">Forgot password?</button>
                 <span className="mx-2">·</span>
                 <button onClick={() => setMode('signup')} className="underline">Create account</button>
               </>
