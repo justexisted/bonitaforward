@@ -146,8 +146,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('bf-return-url', url)
     } catch {}
 
-    const redirectTo = window.location.origin + '/onboarding'
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
+    // Use Supabase OAuth with configured redirect URL from client initialization
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // redirectTo is already configured in the Supabase client
+        // but we can override it here if needed for specific cases
+        redirectTo: import.meta.env.VITE_SITE_URL
+          ? `${import.meta.env.VITE_SITE_URL}/onboarding`
+          : `${window.location.origin}/onboarding`
+      }
+    })
   }
 
   const signOut = async () => {
