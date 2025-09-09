@@ -9,8 +9,6 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [validRecovery, setValidRecovery] = useState(false)
-  const params = new URLSearchParams(location.search)
-  const token = params.get('token')
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)

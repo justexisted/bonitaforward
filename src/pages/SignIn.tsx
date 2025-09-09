@@ -57,7 +57,6 @@ export default function SignInPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    console.log('Form submitted, mode:', mode)
     setMessage(null)
     setBusy(true)
 
@@ -243,13 +242,6 @@ export default function SignInPage() {
               <button
                 disabled={busy}
                 type="submit"
-                onClick={() => {
-                  if (mode === 'signin') {
-                    console.log('Sign In button clicked')
-                  } else if (mode === 'signup') {
-                    console.log('Create Account button clicked')
-                  }
-                }}
                 className="w-full rounded-full bg-neutral-900 text-white py-2.5 elevate"
               >
                 {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
