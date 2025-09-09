@@ -35,7 +35,14 @@ export default function OnboardingPage() {
       if (userId && email) {
         await supabase.from('profiles').upsert([{ id: userId, email, role }], { onConflict: 'id' })
       }
-      navigate(role === 'business' ? '/business' : '/', { replace: true })
+      // Redirect to saved location or appropriate default
+      const savedUrl = (() => {
+        try { return localStorage.getItem('bf-return-url') } catch { return null }
+      })()
+      try { localStorage.removeItem('bf-return-url') } catch {}
+
+      const target = savedUrl || (role === 'business' ? '/business' : '/')
+      navigate(target, { replace: true })
     } finally {
       setBusy(false)
     }

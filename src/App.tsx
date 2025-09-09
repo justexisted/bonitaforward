@@ -140,6 +140,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   // Removed legacy local sign-in helper
 
   const signInWithGoogle = async () => {
+    // Save the current location for redirect after OAuth
+    try {
+      const url = window.location.pathname + window.location.search + window.location.hash
+      localStorage.setItem('bf-return-url', url)
+    } catch {}
+
     const redirectTo = window.location.origin + '/onboarding'
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
   }
