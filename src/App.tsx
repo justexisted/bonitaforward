@@ -216,9 +216,23 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    try { await supabase.auth.signOut() } finally {
+    try {
+      console.log('Signing out user...')
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Sign out error:', error)
+      } else {
+        console.log('Sign out successful')
+      }
+    } catch (err) {
+      console.error('Sign out exception:', err)
+    } finally {
       setProfile(null)
-      try { localStorage.removeItem('bf-auth') } catch {}
+      try { 
+        localStorage.removeItem('bf-auth')
+        localStorage.removeItem('sb-auth-token')
+        localStorage.clear() // Clear all auth-related data
+      } catch {}
     }
   }
 
