@@ -103,11 +103,27 @@ export default function MyBusinessPage() {
    * - Manage listings they own (after admin approval)
    * - Request free listings from existing applications
    */
+  /**
+   * CRITICAL DEBUG: Load business data with extensive logging
+   * 
+   * The issue is that approved business applications aren't showing as listings.
+   * This happens because:
+   * 1. Admin approves application but doesn't create provider with owner_user_id
+   * 2. My Business page only shows providers where owner_user_id = current user
+   * 3. The link between application approval and provider creation is broken
+   * 
+   * This function adds debug logging to see exactly what's in the database.
+   */
   const loadBusinessData = async () => {
-    if (!auth.userId) return
+    if (!auth.userId) {
+      console.log('[MyBusiness] No userId, cannot load data')
+      return
+    }
     
     setLoading(true)
     try {
+      console.log('[MyBusiness] Loading data for userId:', auth.userId, 'email:', auth.email)
+      
       // Load business listings owned by user from providers table
       const { data: listingsData, error: listingsError } = await supabase
         .from('providers')
@@ -115,7 +131,26 @@ export default function MyBusinessPage() {
         .eq('owner_user_id', auth.userId)
         .order('created_at', { ascending: false })
 
+      console.log('[MyBusiness] Providers query result:', {
+        error: listingsError,
+        count: listingsData?.length || 0,
+        data: listingsData
+      })
+
       if (listingsError) throw listingsError
+
+      // ALSO check for providers by email (in case admin didn't set owner_user_id)
+      const { data: emailListingsData, error: emailListingsError } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('email', auth.email)
+        .order('created_at', { ascending: false })
+
+      console.log('[MyBusiness] Providers by email query result:', {
+        error: emailListingsError,
+        count: emailListingsData?.length || 0,
+        data: emailListingsData
+      })
 
       // Load business applications by email from business_applications table
       const { data: appsData, error: appsError } = await supabase
@@ -124,12 +159,32 @@ export default function MyBusinessPage() {
         .eq('email', auth.email)
         .order('created_at', { ascending: false })
 
+      console.log('[MyBusiness] Applications query result:', {
+        error: appsError,
+        count: appsData?.length || 0,
+        data: appsData
+      })
+
       if (appsError) throw appsError
 
-      setListings((listingsData as BusinessListing[]) || [])
+      // Combine listings from both queries (owned and by email)
+      const allListings = [
+        ...(listingsData || []),
+        ...(emailListingsData || []).filter(item => 
+          !listingsData?.some(owned => owned.id === item.id)
+        )
+      ]
+
+      setListings((allListings as BusinessListing[]) || [])
       setApplications((appsData as BusinessApplication[]) || [])
+      
+      console.log('[MyBusiness] Final state:', {
+        listings: allListings.length,
+        applications: appsData?.length || 0
+      })
+      
     } catch (error: any) {
-      console.error('Error loading business data:', error)
+      console.error('[MyBusiness] Error loading business data:', error)
       setMessage(`Error loading data: ${error.message}`)
     } finally {
       setLoading(false)
@@ -269,6 +324,16 @@ export default function MyBusinessPage() {
             <p className="text-blue-800">{message}</p>
           </div>
         )}
+
+        {/* DEBUG INFO - Remove after fixing */}
+        <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs">
+          <div className="font-semibold mb-2">Debug Info:</div>
+          <div>Auth State: isAuthed={String(auth.isAuthed)}, loading={String(auth.loading)}</div>
+          <div>User: {auth.email} (Role: {auth.role || 'none'})</div>
+          <div>User ID: {auth.userId}</div>
+          <div>Listings Found: {listings.length}</div>
+          <div>Applications Found: {applications.length}</div>
+        </div>
 
         {/* Tab Navigation */}
         <div className="mb-6">

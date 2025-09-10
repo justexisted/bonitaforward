@@ -153,9 +153,16 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           let role = meta?.role as 'business' | 'community' | undefined
           const userId = session.user.id
 
-          console.log('[Auth] Processing existing session for:', email)
+          console.log('[Auth] Processing existing session for:', email, 'userId:', userId)
 
-          // CRITICAL FIX: Always fetch role from database to ensure accuracy
+          /**
+           * CRITICAL FIX: Proper role fetching and profile management
+           * 
+           * The issue is that role isn't being properly fetched and set,
+           * causing auth state to be incomplete and triggering sign-outs.
+           * 
+           * Fix: Always fetch role from database and ensure profile is complete.
+           */
           if (userId) {
             try {
               const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
@@ -163,19 +170,23 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
               if (dbRole === 'business' || dbRole === 'community') {
                 role = dbRole as 'business' | 'community'
                 console.log('[Auth] Role fetched from database:', role)
+              } else {
+                console.log('[Auth] No valid role found in database, role is:', prof)
               }
             } catch (error) {
               console.error('[Auth] Error fetching role from database:', error)
             }
           }
 
-          console.log('[Auth] Setting profile with role:', role)
+          console.log('[Auth] Setting complete profile:', { name, email, userId, role })
           setProfile({ name, email, userId, role })
 
-          // Ensure profile exists in database
+          // Ensure profile exists in database with proper role
           if (userId && email) {
             await ensureProfile(userId, email, name, role)
           }
+        } else {
+          console.log('[Auth] No session found during initialization')
         }
       } catch (error) {
         console.error('[Auth] Error initializing auth:', error)
