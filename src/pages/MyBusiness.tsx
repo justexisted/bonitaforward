@@ -1,8 +1,25 @@
+/**
+ * MY BUSINESS PAGE
+ * 
+ * This is the dedicated business management dashboard for business account holders.
+ * It provides three main sections:
+ * 1. Active Listings - View and manage approved business listings
+ * 2. Applications - Track submitted business applications
+ * 3. Analytics - View business performance metrics (coming soon)
+ * 
+ * Key Features:
+ * - Request free listings from submitted applications
+ * - Upgrade existing listings from free to featured tier
+ * - View application status and listing approval status
+ * - Protected route - only accessible to users with role 'business'
+ */
+
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { Link } from 'react-router-dom'
 
+// Type definition for business listings in the providers table
 type BusinessListing = {
   id: string
   name: string
@@ -27,6 +44,7 @@ type BusinessListing = {
   updated_at: string
 }
 
+// Type definition for business applications in the business_applications table
 type BusinessApplication = {
   id: string
   full_name: string | null
@@ -48,21 +66,49 @@ export default function MyBusinessPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'analytics'>('listings')
 
+  /**
+   * AUTHENTICATION & ROLE CHECK
+   * 
+   * This effect runs when the component mounts and when auth state changes.
+   * It ensures only authenticated business users can access this page.
+   * 
+   * Debug logging helps troubleshoot role assignment issues.
+   */
   useEffect(() => {
+    console.log('MyBusiness: Auth state:', { role: auth.role, email: auth.email, userId: auth.userId, isAuthed: auth.isAuthed })
+    
+    if (!auth.isAuthed) {
+      setMessage('Please sign in to access this page.')
+      setLoading(false)
+      return
+    }
+
     if (auth.role !== 'business') {
-      setMessage('This page is only available for business accounts.')
+      setMessage(`This page is only available for business accounts. Your current role: ${auth.role || 'none'}`)
       setLoading(false)
       return
     }
     loadBusinessData()
-  }, [auth.userId, auth.role])
+  }, [auth.userId, auth.role, auth.isAuthed])
 
+  /**
+   * LOAD BUSINESS DATA
+   * 
+   * Fetches two types of data for the business user:
+   * 1. Active Listings - From 'providers' table where owner_user_id matches current user
+   * 2. Applications - From 'business_applications' table where email matches current user
+   * 
+   * This separation allows businesses to:
+   * - Track applications they've submitted (even before account creation)
+   * - Manage listings they own (after admin approval)
+   * - Request free listings from existing applications
+   */
   const loadBusinessData = async () => {
     if (!auth.userId) return
     
     setLoading(true)
     try {
-      // Load business listings owned by user
+      // Load business listings owned by user from providers table
       const { data: listingsData, error: listingsError } = await supabase
         .from('providers')
         .select('*')
@@ -71,7 +117,7 @@ export default function MyBusinessPage() {
 
       if (listingsError) throw listingsError
 
-      // Load business applications by email
+      // Load business applications by email from business_applications table
       const { data: appsData, error: appsError } = await supabase
         .from('business_applications')
         .select('*')
@@ -90,6 +136,20 @@ export default function MyBusinessPage() {
     }
   }
 
+  /**
+   * REQUEST FREE LISTING FROM APPLICATION
+   * 
+   * This function allows business users to convert their submitted applications
+   * into free listing requests. It creates an entry in 'provider_change_requests'
+   * table with type 'create_free_listing' for admin review.
+   * 
+   * Flow:
+   * 1. User submits business application (via /business page)
+   * 2. User creates account and goes to My Business page
+   * 3. User sees their applications and clicks "Request Free Listing"
+   * 4. This creates a change request for admin to review
+   * 5. Admin can approve and create the actual provider listing
+   */
   const requestFreeListingFromApp = async (appId: string) => {
     try {
       setMessage('Creating free listing request...')
@@ -97,11 +157,12 @@ export default function MyBusinessPage() {
       const app = applications.find(a => a.id === appId)
       if (!app) throw new Error('Application not found')
 
-      // Create a provider change request for free listing
+      // Create a provider change request for admin to review
+      // This uses the existing admin workflow for approving new listings
       const { error } = await supabase
         .from('provider_change_requests')
         .insert([{
-          provider_id: null, // Will be created
+          provider_id: null, // Will be created by admin
           owner_user_id: auth.userId,
           type: 'create_free_listing',
           changes: {
@@ -118,16 +179,31 @@ export default function MyBusinessPage() {
       if (error) throw error
 
       setMessage('Free listing request submitted! We\'ll review and approve it shortly.')
-      loadBusinessData() // Refresh data
+      loadBusinessData() // Refresh data to show updated state
     } catch (error: any) {
       setMessage(`Error: ${error.message}`)
     }
   }
 
+  /**
+   * UPGRADE TO FEATURED TIER
+   * 
+   * This function allows business owners to request an upgrade from free to featured tier.
+   * It creates a change request for admin review and payment processing.
+   * 
+   * Featured tier includes:
+   * - Multiple images
+   * - Social media links  
+   * - Google Maps integration
+   * - Booking system
+   * - Priority placement
+   * - Enhanced description
+   */
   const upgradeToFeatured = async (listingId: string) => {
     try {
       setMessage('Requesting featured upgrade...')
       
+      // Create upgrade request for admin to review and process payment
       const { error } = await supabase
         .from('provider_change_requests')
         .insert([{

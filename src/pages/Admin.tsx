@@ -192,9 +192,12 @@ export default function AdminPage() {
           return
         }
 
-        const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
-          (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
-        const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
+        let url: string
+        if (window.location.hostname === 'localhost') {
+          url = 'http://localhost:8888/.netlify/functions/admin-verify'
+        } else {
+          url = `${window.location.origin}/.netlify/functions/admin-verify`
+        }
         
         const response = await fetch(url, {
           method: 'POST',
@@ -291,8 +294,12 @@ export default function AdminPage() {
             const token = session.session?.access_token
             
             if (token) {
-              const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
-              const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-profiles` : '/.netlify/functions/admin-list-profiles'
+              let url: string
+              if (window.location.hostname === 'localhost') {
+                url = 'http://localhost:8888/.netlify/functions/admin-list-profiles'
+              } else {
+                url = `${window.location.origin}/.netlify/functions/admin-list-profiles`
+              }
               const res = await fetch(url, { 
                 method: 'POST',
                 headers: {

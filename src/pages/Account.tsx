@@ -304,6 +304,14 @@ export default function AccountPage() {
             </div>
           </div>
 
+          {/* BUSINESS ACCOUNT REDIRECT SECTION
+              
+              For business users, we redirect them to the dedicated My Business page
+              instead of showing business management features directly on the account page.
+              
+              This keeps the account page clean and gives business users a dedicated
+              space to manage their listings, applications, and analytics.
+          */}
           {auth.role === 'business' && (
             <div className="mt-6 border-t border-neutral-100 pt-4">
               <div className="text-sm font-medium">Business Management</div>

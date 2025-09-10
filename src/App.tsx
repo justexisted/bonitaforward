@@ -1403,7 +1403,21 @@ async function createBookingRow(params: { email?: string | null; category: Categ
   }
 }
 
-// Track a business owner application
+/**
+ * BUSINESS APPLICATION SUBMISSION
+ * 
+ * This function handles business application submissions from the /business page.
+ * It stores applications in the 'business_applications' table for admin review.
+ * 
+ * NOTE: The tier parameter is captured but not stored in database yet.
+ * You need to add 'tier_requested' and 'status' columns to business_applications table.
+ * 
+ * Current flow:
+ * 1. User fills form on /business page (selects free or featured tier)
+ * 2. Application is submitted to business_applications table
+ * 3. User is redirected to create business account
+ * 4. User can then go to My Business page to request free listings
+ */
 async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string; tier?: string }) {
   console.log('[BusinessApp] submitting application', params)
   try {
@@ -1417,8 +1431,9 @@ async function createBusinessApplication(params: { full_name?: string; business_
           phone: params.phone || null,
           category: params.category || null,
           challenge: params.challenge || null,
-          tier_requested: params.tier || 'free',
-          status: 'pending'
+          // TODO: Add these columns to business_applications table:
+          // tier_requested: params.tier || 'free',
+          // status: 'pending'
         },
       ])
     if (error) {
@@ -1956,20 +1971,31 @@ function BusinessPage() {
                   const business_name = (form.elements.item(1) as HTMLInputElement)?.value
                   const email = (form.elements.item(2) as HTMLInputElement)?.value
                   const phone = (form.elements.item(3) as HTMLInputElement)?.value
+                  // EXTRACT FORM DATA including tier selection
                   const category = (form.elements.item(4) as HTMLSelectElement)?.value
                   const tier = (form.querySelector('input[name="tier"]:checked') as HTMLInputElement)?.value || 'free'
                   const challenge = (form.elements.item(6) as HTMLTextAreaElement)?.value
+                  
+                  // Save form data to localStorage for recovery if needed
                   try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, tier, challenge, ts: Date.now() })) } catch {}
+                  
+                  // SUBMIT APPLICATION to business_applications table
                   const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge, tier })
+                  
                   if (!error) {
+                    // SUCCESS - Show confirmation and redirect to account creation
                     setMsg(`Thanks! We received your ${tier} listing application. Create an account to track your application status and manage your business listing.`)
                     form.reset()
+                    
+                    // Pre-fill signup form with business info
                     try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
-                    // Encourage account creation
+                    
+                    // AUTO-REDIRECT to signup page with business account type pre-selected
                     setTimeout(() => {
                       window.location.href = `/signin?mode=signup&email=${encodeURIComponent(email)}&name=${encodeURIComponent(full_name)}&type=business`
                     }, 3000)
                   } else {
+                    // ERROR - Show failure message (likely database column missing)
                     setMsg('We could not submit your application. Please try again.')
                   }
                 }}
@@ -1988,9 +2014,11 @@ function BusinessPage() {
                   <option value="Restaurants">Restaurants</option>
                   <option value="Professional Services">Professional Services</option>
                 </select>
+                {/* TIER SELECTION - Free vs Featured Listing */}
                 <div>
                   <label className="block text-sm text-neutral-600 mb-2">Listing Type</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* FREE TIER - Basic listing with essential business information */}
                     <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
                       <input type="radio" name="tier" value="free" className="mt-1 mr-3" defaultChecked />
                       <div>
@@ -1998,6 +2026,7 @@ function BusinessPage() {
                         <div className="text-xs text-neutral-600">Basic business info, contact details, single image</div>
                       </div>
                     </label>
+                    {/* FEATURED TIER - Premium listing with enhanced features */}
                     <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
                       <input type="radio" name="tier" value="featured" className="mt-1 mr-3" />
                       <div>
