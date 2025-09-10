@@ -9,13 +9,54 @@ export default function OnboardingPage() {
   const [confirm, setConfirm] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // If no session, send to signin
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session?.user?.email) navigate('/signin', { replace: true })
-    })
+    const initializeOnboarding = async () => {
+      try {
+        // Handle OAuth callback if present
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        
+        if (accessToken) {
+          console.log('OAuth callback detected, processing...')
+          // Let Supabase handle the OAuth session
+          await new Promise(resolve => setTimeout(resolve, 1000)) // Give time for session to be established
+        }
+
+        // Check for session
+        const { data } = await supabase.auth.getSession()
+        
+        if (!data.session?.user?.email) {
+          console.log('No session found, redirecting to signin')
+          navigate('/signin', { replace: true })
+        } else {
+          console.log('Session found for:', data.session.user.email)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error initializing onboarding:', error)
+        navigate('/signin', { replace: true })
+      }
+    }
+
+    initializeOnboarding()
   }, [navigate])
+
+  if (loading) {
+    return (
+      <section className="py-10">
+        <div className="container-px mx-auto max-w-md">
+          <div className="rounded-2xl border border-neutral-100 p-6 bg-white elevate">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
+              <p className="mt-4 text-neutral-600">Setting up your account...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

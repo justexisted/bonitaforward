@@ -204,15 +204,13 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('bf-return-url', url)
     } catch {}
 
-    // Use Supabase OAuth with configured redirect URL from client initialization
+    // Use current origin for redirect to avoid SSL issues
+    const redirectTo = `${window.location.origin}/onboarding`
+    
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // redirectTo is already configured in the Supabase client
-        // but we can override it here if needed for specific cases
-        redirectTo: import.meta.env.VITE_SITE_URL
-          ? `${import.meta.env.VITE_SITE_URL}/onboarding`
-          : `${window.location.origin}/onboarding`
+        redirectTo: redirectTo
       }
     })
   }
@@ -235,10 +233,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    const redirectTo = import.meta.env.VITE_SITE_URL
-      ? `${import.meta.env.VITE_SITE_URL}/reset-password`
-      : `${window.location.origin}/reset-password`
-
+    const redirectTo = `${window.location.origin}/reset-password`
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
     return { error: error?.message }
   }

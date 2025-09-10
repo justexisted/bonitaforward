@@ -48,10 +48,7 @@ export default function SignInPage() {
     setMessage(null)
 
     try {
-      const redirectTo = import.meta.env.VITE_SITE_URL
-        ? `${import.meta.env.VITE_SITE_URL}/reset-password`
-        : `${window.location.origin}/reset-password`
-
+      const redirectTo = `${window.location.origin}/reset-password`
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
       if (error) setMessage(error.message)
       else setMessage('Check your email for the reset link')
