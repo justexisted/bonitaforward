@@ -9,7 +9,6 @@ export default function AccountPage() {
   const [name, setName] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [ownedProviders, setOwnedProviders] = useState<{ id: string; name: string }[]>([])
   const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
   const [role, setRole] = useState<string>('')
   const [bookings, setBookings] = useState<Array<{ id: string; provider_id?: string | null; provider_name?: string | null; time?: string | null; status?: string | null; created_at?: string | null }>>([])
@@ -21,18 +20,8 @@ export default function AccountPage() {
     setEmail(auth.email || '')
     setName(auth.name || '')
     async function loadOwned() {
-      if (!auth.userId) { setOwnedProviders([]); return }
+      if (!auth.userId) { setPendingApps([]); return }
       try {
-        // Load providers owned by user OR claimable by email
-        const { data: prov } = await supabase
-          .from('providers')
-          .select('id,name,email,owner_user_id')
-          .or(`owner_user_id.eq.${auth.userId},owner_user_id.is.null`)
-          .order('name', { ascending: true })
-        const normalize = (s?: string | null) => String(s || '').trim().toLowerCase()
-        const userEmail = normalize(auth.email)
-        const rows = ((prov as any[]) || []).filter((r) => r.owner_user_id === auth.userId || (!r.owner_user_id && normalize(r.email) && normalize(r.email) === userEmail))
-        setOwnedProviders(rows.map((r) => ({ id: r.id, name: r.name })))
         // Load pending business applications for this email
         if (auth.email) {
           const { data: apps } = await supabase
@@ -49,7 +38,6 @@ export default function AccountPage() {
         const { data: prof } = await supabase.from('profiles').select('role').eq('id', auth.userId).maybeSingle()
         setRole(String((prof as any)?.role || ''))
       } catch {
-        setOwnedProviders([])
         setPendingApps([])
       }
     }
@@ -318,17 +306,17 @@ export default function AccountPage() {
 
           {auth.role === 'business' && (
             <div className="mt-6 border-t border-neutral-100 pt-4">
-              <div className="text-sm font-medium">My Businesses</div>
-              <div className="mt-2 text-sm">
-                {ownedProviders.length === 0 && <div className="text-neutral-600">No businesses found.</div>}
-                <ul className="space-y-1">
-                  {ownedProviders.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between">
-                      <span>{p.name}</span>
-                      <Link to={`/owner`} className="text-xs underline">Manage</Link>
-                    </li>
-                  ))}
-                </ul>
+              <div className="text-sm font-medium">Business Management</div>
+              <div className="mt-2">
+                <p className="text-sm text-neutral-600 mb-3">
+                  Manage your business listings, applications, and analytics.
+                </p>
+                <Link 
+                  to="/my-business" 
+                  className="inline-block rounded-full bg-neutral-900 text-white px-4 py-2 text-sm hover:bg-neutral-800"
+                >
+                  Go to My Business →
+                </Link>
               </div>
             </div>
           )}

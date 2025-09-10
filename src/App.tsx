@@ -14,6 +14,7 @@ import AccountPage from './pages/Account'
 import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
+import MyBusinessPage from './pages/MyBusiness'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -393,7 +394,7 @@ function Navbar() {
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/community">Community</Link>
             {auth.isAuthed && auth.role === 'business' && (
-              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/owner">My Business</Link>
+              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/my-business">My Business</Link>
             )}
             {auth.isAuthed && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/account">Account</Link>
@@ -423,7 +424,7 @@ function Navbar() {
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/community">Community</Link>
               {auth.isAuthed && auth.role === 'business' && (
-                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/owner">My Business</Link>
+                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/my-business">My Business</Link>
               )}
               {auth.isAuthed && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/account">Account</Link>
@@ -1403,7 +1404,7 @@ async function createBookingRow(params: { email?: string | null; category: Categ
 }
 
 // Track a business owner application
-async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string }) {
+async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string; tier?: string }) {
   console.log('[BusinessApp] submitting application', params)
   try {
     const { error } = await supabase
@@ -1416,6 +1417,8 @@ async function createBusinessApplication(params: { full_name?: string; business_
           phone: params.phone || null,
           category: params.category || null,
           challenge: params.challenge || null,
+          tier_requested: params.tier || 'free',
+          status: 'pending'
         },
       ])
     if (error) {
@@ -1954,14 +1957,18 @@ function BusinessPage() {
                   const email = (form.elements.item(2) as HTMLInputElement)?.value
                   const phone = (form.elements.item(3) as HTMLInputElement)?.value
                   const category = (form.elements.item(4) as HTMLSelectElement)?.value
-                  const challenge = (form.elements.item(5) as HTMLTextAreaElement)?.value
-                  try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, challenge, ts: Date.now() })) } catch {}
-                  const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge })
+                  const tier = (form.querySelector('input[name="tier"]:checked') as HTMLInputElement)?.value || 'free'
+                  const challenge = (form.elements.item(6) as HTMLTextAreaElement)?.value
+                  try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, tier, challenge, ts: Date.now() })) } catch {}
+                  const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge, tier })
                   if (!error) {
-                    setMsg('Thanks! We received your application. We’ll follow up shortly.')
+                    setMsg(`Thanks! We received your ${tier} listing application. Create an account to track your application status and manage your business listing.`)
                     form.reset()
                     try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
-                    // Do not redirect; show success message instead
+                    // Encourage account creation
+                    setTimeout(() => {
+                      window.location.href = `/signin?mode=signup&email=${encodeURIComponent(email)}&name=${encodeURIComponent(full_name)}&type=business`
+                    }, 3000)
                   } else {
                     setMsg('We could not submit your application. Please try again.')
                   }
@@ -1981,8 +1988,27 @@ function BusinessPage() {
                   <option value="Restaurants">Restaurants</option>
                   <option value="Professional Services">Professional Services</option>
                 </select>
+                <div>
+                  <label className="block text-sm text-neutral-600 mb-2">Listing Type</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
+                      <input type="radio" name="tier" value="free" className="mt-1 mr-3" defaultChecked />
+                      <div>
+                        <div className="font-medium text-sm">Free Listing</div>
+                        <div className="text-xs text-neutral-600">Basic business info, contact details, single image</div>
+                      </div>
+                    </label>
+                    <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
+                      <input type="radio" name="tier" value="featured" className="mt-1 mr-3" />
+                      <div>
+                        <div className="font-medium text-sm">Featured Listing</div>
+                        <div className="text-xs text-neutral-600">Multiple images, social links, booking system, priority placement</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
                 <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={(new URLSearchParams(window.location.search)).get('challenge') || ''} />
-                <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Apply to Get Featured</button>
+                <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Submit Application</button>
               </form>
               {msg && <p className="mt-2 text-sm text-neutral-700">{msg}</p>}
               <p className="mt-2 text-xs text-neutral-500"></p>
@@ -2334,6 +2360,11 @@ export default function App() {
             <Route path="owner" element={
               <ProtectedRoute allowedRoles={['business']}>
                 <OwnerPage />
+              </ProtectedRoute>
+            } />
+            <Route path="my-business" element={
+              <ProtectedRoute allowedRoles={['business']}>
+                <MyBusinessPage />
               </ProtectedRoute>
             } />
             <Route path="account" element={<AccountPage />} />
