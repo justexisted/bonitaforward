@@ -176,33 +176,6 @@ export default function AccountPage() {
     }
   }
 
-  async function deleteAccount() {
-    if (!confirm('Delete your account? This will permanently remove your data.')) return
-    setBusy(true)
-    setMessage(null)
-    try {
-      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
-      const url = fnBase ? `${fnBase}/.netlify/functions/user-delete` : '/.netlify/functions/user-delete'
-      const { data: session } = await supabase.auth.getSession()
-      const token = session.session?.access_token
-      const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } })
-      if (!res.ok) {
-        const text = await res.text()
-        setMessage(`Delete failed: ${text || res.status}`)
-        return
-      }
-      // Account deleted successfully - clear local state instead of trying to logout
-      // (logout would fail since the user no longer exists in Supabase)
-      try { localStorage.clear() } catch {}
-      setMessage('Your account has been deleted. You can now create a new account with the same email.')
-      // Redirect to home page after a short delay
-      setTimeout(() => {
-        window.location.href = '/'
-      }, 2000)
-    } finally {
-      setBusy(false)
-    }
-  }
 
   async function updatePassword() {
     const pw = prompt('Enter a new password (min 8 characters):') || ''
@@ -231,24 +204,38 @@ export default function AccountPage() {
     setMessage('Deleting account...')
 
     try {
+      // Get current session token for authentication
+      const { data: session } = await supabase.auth.getSession()
+      const token = session.session?.access_token
+
+      if (!token) {
+        throw new Error('No authentication token found. Please sign in again.')
+      }
+
       // Call Netlify function to delete user account
       const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
-      const response = await fetch(`${fnBase}/.netlify/functions/user-delete`, {
+      const url = fnBase ? `${fnBase}/.netlify/functions/user-delete` : '/.netlify/functions/user-delete'
+      
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: auth.userId })
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
 
       if (!response.ok) {
         const errorData = await response.text()
-        throw new Error(errorData || 'Failed to delete account')
+        throw new Error(errorData || `Delete failed: ${response.status}`)
       }
 
-      setMessage('Account deleted successfully. You will be signed out.')
+      // Account deleted successfully - clear local state
+      try { localStorage.clear() } catch {}
+      setMessage('Your account has been deleted. You can now create a new account with the same email.')
       
-      // Sign out and redirect after a delay
+      // Redirect to home page after a short delay
       setTimeout(() => {
-        auth.signOut()
+        window.location.href = '/'
       }, 2000)
 
     } catch (error: any) {
