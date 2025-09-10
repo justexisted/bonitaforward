@@ -135,12 +135,26 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           const email = session.user.email
           const meta = session.user.user_metadata || {}
           const name = meta?.name
-          const role = meta?.role
+          let role = meta?.role as 'business' | 'community' | undefined
           const userId = session.user.id
 
-          console.log('Initial session found:', { email, userId })
+          console.log('Initial session found:', { email, userId, metaRole: role })
 
-          setProfile({ name, email, userId })
+          // CRITICAL FIX: Always fetch role from database to ensure accuracy
+          if (userId) {
+            try {
+              const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+              const dbRole = String((prof as any)?.role || '').toLowerCase()
+              if (dbRole === 'business' || dbRole === 'community') {
+                role = dbRole as 'business' | 'community'
+                console.log('Role fetched from database:', role)
+              }
+            } catch (error) {
+              console.error('Error fetching role from database:', error)
+            }
+          }
+
+          setProfile({ name, email, userId, role })
 
           // Ensure profile exists in database
           if (userId && email) {
@@ -167,12 +181,26 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         const email = session.user.email
         const meta = session.user.user_metadata || {}
         const name = meta?.name
-        const role = meta?.role
+        let role = meta?.role as 'business' | 'community' | undefined
         const userId = session.user.id
 
-        console.log('User signed in:', { email, userId })
+        console.log('User signed in:', { email, userId, metaRole: role })
 
-        setProfile({ name, email, userId })
+        // CRITICAL FIX: Always fetch role from database for signed in users
+        if (userId) {
+          try {
+            const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+            const dbRole = String((prof as any)?.role || '').toLowerCase()
+            if (dbRole === 'business' || dbRole === 'community') {
+              role = dbRole as 'business' | 'community'
+              console.log('Role fetched from database on sign in:', role)
+            }
+          } catch (error) {
+            console.error('Error fetching role on sign in:', error)
+          }
+        }
+
+        setProfile({ name, email, userId, role })
 
         // Ensure profile exists in database
         if (userId && email) {

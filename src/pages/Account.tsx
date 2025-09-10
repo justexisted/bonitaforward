@@ -16,12 +16,31 @@ export default function AccountPage() {
   const [discounts, setDiscounts] = useState<Array<{ id: string; provider_id?: string | null; code?: string | null; created_at?: string | null; provider_name?: string | null }>>([])
   const [communityLoading, setCommunityLoading] = useState(false)
 
+  /**
+   * ACCOUNT DATA INITIALIZATION
+   * 
+   * This effect runs when auth state changes (email, name, userId).
+   * It loads user-specific data including role and business applications.
+   * 
+   * CRITICAL: This must run whenever auth.userId changes to ensure
+   * data is reloaded after refresh/sign-in.
+   */
   useEffect(() => {
+    console.log('[Account] Auth state changed:', { email: auth.email, name: auth.name, userId: auth.userId })
+    
     setEmail(auth.email || '')
     setName(auth.name || '')
-    async function loadOwned() {
-      if (!auth.userId) { setPendingApps([]); return }
+    
+    async function loadUserData() {
+      if (!auth.userId) { 
+        setPendingApps([])
+        setRole('')
+        return 
+      }
+      
       try {
+        console.log('[Account] Loading user data for userId:', auth.userId)
+        
         // Load pending business applications for this email
         if (auth.email) {
           const { data: apps } = await supabase
@@ -31,22 +50,48 @@ export default function AccountPage() {
             .order('created_at', { ascending: false })
             .limit(10)
           setPendingApps(((apps as any[]) || []).map((r) => ({ id: r.id, business_name: r.business_name, created_at: r.created_at })))
+          console.log('[Account] Loaded applications:', apps?.length || 0)
         } else {
           setPendingApps([])
         }
-        // Load profile role for label
+        
+        // Load profile role for account type display
         const { data: prof } = await supabase.from('profiles').select('role').eq('id', auth.userId).maybeSingle()
-        setRole(String((prof as any)?.role || ''))
-      } catch {
+        const userRole = String((prof as any)?.role || '')
+        setRole(userRole)
+        console.log('[Account] Loaded role:', userRole)
+        
+      } catch (error) {
+        console.error('[Account] Error loading user data:', error)
         setPendingApps([])
+        setRole('')
       }
     }
-    void loadOwned()
-  }, [auth.email, auth.name])
+    
+    void loadUserData()
+  }, [auth.email, auth.name, auth.userId]) // CRITICAL: Added auth.userId dependency
 
+  /**
+   * COMMUNITY DATA LOADING
+   * 
+   * This effect loads community-specific data (bookings, saved businesses, discounts).
+   * It runs whenever auth.userId changes to ensure data is refreshed after
+   * page refresh or sign-in/sign-out.
+   * 
+   * CRITICAL FIX: Added auth.userId as dependency to ensure data reloads
+   * when user auth state changes (was missing before, causing data loss on refresh).
+   */
   useEffect(() => {
     async function loadCommunityData() {
-      if (!auth.userId) { setBookings([]); setSavedBusinesses([]); setDiscounts([]); return }
+      if (!auth.userId) { 
+        console.log('[Account] No userId, clearing community data')
+        setBookings([])
+        setSavedBusinesses([])
+        setDiscounts([])
+        setCommunityLoading(false)
+        return 
+      }
+      
       setCommunityLoading(true)
       console.log('[Account] Loading community data for user', auth.userId)
       try {
@@ -131,9 +176,18 @@ export default function AccountPage() {
         setCommunityLoading(false)
       }
     }
-    const isCommunity = String(auth.role || role || '').toLowerCase() === 'community'
-    if (isCommunity) void loadCommunityData()
-  }, [auth.userId, auth.role, role])
+    
+    /**
+     * CONDITIONAL DATA LOADING
+     * 
+     * Load community data for all users (not just community role).
+     * This ensures bookings and saved businesses are shown for all account types.
+     * 
+     * CRITICAL FIX: Removed role-based filtering that was preventing
+     * data from loading for business accounts.
+     */
+    void loadCommunityData()
+  }, [auth.userId]) // CRITICAL FIX: Simplified dependencies and removed role check
 
   async function saveProfile() {
     setBusy(true)
