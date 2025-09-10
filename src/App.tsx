@@ -61,6 +61,7 @@ function Container(props: { children: React.ReactNode; className?: string }) {
 
 type AuthContextValue = {
   isAuthed: boolean
+  loading: boolean
   name?: string
   email?: string
   userId?: string
@@ -72,12 +73,22 @@ type AuthContextValue = {
   signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextValue>({ isAuthed: false, signInWithGoogle: async () => {}, signInWithEmail: async () => ({}), signUpWithEmail: async () => ({}), resetPassword: async () => ({}), signOut: async () => {} })
+const AuthContext = createContext<AuthContextValue>({
+  isAuthed: false,
+  loading: true,
+  signInWithGoogle: async () => {},
+  signInWithEmail: async () => ({}),
+  signUpWithEmail: async () => ({}),
+  resetPassword: async () => ({}),
+  signOut: async () => {}
+})
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
 
     // Helper: ensure a profile row exists with role/name
     async function ensureProfile(userId?: string | null, email?: string | null, name?: string | null, metadataRole?: any) {
@@ -102,39 +113,86 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         if (role) payload.role = role
         await supabase.from('profiles').upsert([payload], { onConflict: 'id' })
         try { localStorage.removeItem('bf-pending-profile') } catch {}
-      } catch {}
+      } catch (error) {
+        console.error('Error ensuring profile:', error)
+      }
     }
 
-    // Sync with Supabase session
-    supabase.auth.getSession().then(({ data }) => {
-      const email = data.session?.user?.email
-      const meta = (data.session?.user?.user_metadata as any) || {}
-      const name = meta?.name
-      const role = meta?.role
-      const userId = data.session?.user?.id
-      if (email) setProfile({ name, email, userId })
-      void ensureProfile(userId || null, email || null, name || null, role)
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const email = session?.user?.email
-      const meta = (session?.user?.user_metadata as any) || {}
-      const name = meta?.name
-      let role = meta?.role as 'business' | 'community' | undefined
-      const userId = session?.user?.id
-      // Fetch role from database if not in metadata
-      if (!role && userId) {
-        try {
-          const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
-          const r = String((prof as any)?.role || '').toLowerCase()
-          if (r === 'business' || r === 'community') role = r as any
-        } catch {}
-      }
+    // Initialize auth state
+    const initializeAuth = async () => {
+      try {
+        // Get initial session
+        const { data: { session }, error } = await supabase.auth.getSession()
 
-      if (email) setProfile({ name, email, userId, role })
-      else setProfile((curr) => curr && curr.email ? null : curr)
-      if (email && userId) void ensureProfile(userId, email, name, role)
+        if (error) {
+          console.error('Error getting session:', error)
+          if (mounted) setLoading(false)
+          return
+        }
+
+        if (session?.user && mounted) {
+          const email = session.user.email
+          const meta = session.user.user_metadata || {}
+          const name = meta?.name
+          const role = meta?.role
+          const userId = session.user.id
+
+          console.log('Initial session found:', { email, userId })
+
+          setProfile({ name, email, userId })
+
+          // Ensure profile exists in database
+          if (userId && email) {
+            await ensureProfile(userId, email, name, role)
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    // Initialize auth
+    initializeAuth()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
+      console.log('Auth state change:', event, session?.user?.email)
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        const email = session.user.email
+        const meta = session.user.user_metadata || {}
+        const name = meta?.name
+        const role = meta?.role
+        const userId = session.user.id
+
+        console.log('User signed in:', { email, userId })
+
+        setProfile({ name, email, userId })
+
+        // Ensure profile exists in database
+        if (userId && email) {
+          await ensureProfile(userId, email, name, role)
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('User signed out')
+        setProfile(null)
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed')
+        // Profile should already be set, just ensure it's current
+        if (session?.user?.email) {
+          setProfile(prev => prev ? { ...prev } : null)
+        }
+      }
     })
-    return () => { sub.subscription.unsubscribe() }
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Removed legacy local sign-in helper
@@ -177,12 +235,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })
+    const redirectTo = import.meta.env.VITE_SITE_URL
+      ? `${import.meta.env.VITE_SITE_URL}/reset-password`
+      : `${window.location.origin}/reset-password`
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
     return { error: error?.message }
   }
 
   const value: AuthContextValue = {
     isAuthed: Boolean(profile?.email),
+    loading,
     name: profile?.name,
     email: profile?.email,
     userId: profile?.userId,
@@ -206,6 +269,9 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
   const navigate = useNavigate()
 
   useEffect(() => {
+    // Don't redirect while still loading
+    if (auth.loading) return
+
     if (!auth.isAuthed) {
       navigate('/signin')
       return
@@ -215,7 +281,19 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
       navigate('/')
       return
     }
-  }, [auth.isAuthed, auth.role, allowedRoles, navigate])
+  }, [auth.isAuthed, auth.loading, auth.role, allowedRoles, navigate])
+
+  // Show loading state while authentication is being determined
+  if (auth.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
+          <p className="mt-4 text-neutral-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!auth.isAuthed || !allowedRoles.includes(auth.role || 'community')) {
     return null

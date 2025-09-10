@@ -9,6 +9,24 @@ import { useAuth } from '../App'
  * - Google OAuth option
  * - Create account and Forgot password flows
  */
+// Debug component for testing authentication state
+function AuthDebugInfo() {
+  const auth = useAuth()
+
+  if (process.env.NODE_ENV === 'development') {
+    return (
+      <div className="fixed bottom-4 right-4 bg-black text-white p-4 rounded-lg text-xs font-mono max-w-xs">
+        <div>Auth: {auth.isAuthed ? '✅' : '❌'}</div>
+        <div>Loading: {auth.loading ? '⏳' : '✅'}</div>
+        <div>Email: {auth.email || 'none'}</div>
+        <div>Role: {auth.role || 'none'}</div>
+        <div>UserId: {auth.userId ? 'set' : 'none'}</div>
+      </div>
+    )
+  }
+  return null
+}
+
 export default function SignInPage() {
   const auth = useAuth()
   const navigate = useNavigate()
@@ -30,11 +48,11 @@ export default function SignInPage() {
     setMessage(null)
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: import.meta.env.VITE_SITE_URL
-          ? `${import.meta.env.VITE_SITE_URL}/reset-password`
-          : `${window.location.origin}/reset-password`
-      })
+      const redirectTo = import.meta.env.VITE_SITE_URL
+        ? `${import.meta.env.VITE_SITE_URL}/reset-password`
+        : `${window.location.origin}/reset-password`
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
       if (error) setMessage(error.message)
       else setMessage('Check your email for the reset link')
     } catch (err) {
@@ -295,6 +313,7 @@ export default function SignInPage() {
           </div>
         </div>
       </div>
+      <AuthDebugInfo />
     </section>
   )
 }
