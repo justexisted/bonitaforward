@@ -213,23 +213,37 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[Auth] Auth initialization complete, setting loading to false')
           console.log('[Auth] Final profile state before loading=false:', profile)
           setLoading(false)
+          
+          // CRITICAL: Mark initialization as complete AFTER setting loading to false
+          initializationComplete = true
+          console.log('[Auth] Initialization complete, auth events will now be processed')
         }
       }
     }
 
-    // Initialize auth
-    initializeAuth()
-
     /**
-     * CRITICAL INVESTIGATION: Auth state change handler
+     * CRITICAL FIX: Race condition between initialization and auth events
      * 
-     * This listener might be interfering with the initial session setup.
-     * Adding detailed logging to see if this is clearing the profile state.
+     * Issue: onAuthStateChange fires during initialization, causing conflicts.
+     * 
+     * Root cause: Both initializeAuth and onAuthStateChange try to set profile
+     * simultaneously, causing the profile to be set then immediately cleared.
+     * 
+     * Fix: Use a flag to prevent onAuthStateChange from interfering during initialization.
      */
+    let initializationComplete = false
+    
+    // Set up auth listener first, but make it wait for initialization
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'hasSession:', !!session)
+      console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'initComplete:', initializationComplete)
+      
+      // CRITICAL: Don't process auth events during initialization
+      if (!initializationComplete) {
+        console.log('[Auth] Ignoring auth event during initialization')
+        return
+      }
 
       if (event === 'SIGNED_IN' && session?.user) {
         const email = session.user.email
@@ -282,6 +296,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] Unhandled auth event:', event, 'session exists:', !!session)
       }
     })
+
+    // Start initialization process
+    initializeAuth()
 
     return () => {
       mounted = false
