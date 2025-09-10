@@ -213,8 +213,17 @@ export default function AccountPage() {
       }
 
       // Call Netlify function to delete user account
-      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
-      const url = fnBase ? `${fnBase}/.netlify/functions/user-delete` : '/.netlify/functions/user-delete'
+      // Use the correct URL for your deployed site
+      let url: string
+      if (window.location.hostname === 'localhost') {
+        url = 'http://localhost:8888/.netlify/functions/user-delete'
+      } else {
+        // Use your actual Netlify site URL
+        url = 'https://bonitaforward.netlify.app/.netlify/functions/user-delete'
+      }
+      
+      console.log('Calling delete function at:', url)
+      console.log('Using token:', token ? 'Token present' : 'No token')
       
       const response = await fetch(url, {
         method: 'POST',
@@ -224,10 +233,17 @@ export default function AccountPage() {
         }
       })
 
+      console.log('Delete response status:', response.status)
+      console.log('Delete response ok:', response.ok)
+
       if (!response.ok) {
         const errorData = await response.text()
+        console.log('Delete error response:', errorData)
         throw new Error(errorData || `Delete failed: ${response.status}`)
       }
+
+      const successData = await response.text()
+      console.log('Delete success response:', successData)
 
       // Account deleted successfully - clear local state
       try { localStorage.clear() } catch {}
@@ -240,7 +256,19 @@ export default function AccountPage() {
 
     } catch (error: any) {
       console.error('Account deletion error:', error)
-      setMessage(`Error deleting account: ${error.message}`)
+      
+      // Provide more specific error messages
+      let errorMessage = 'Unknown error occurred'
+      
+      if (error.message === 'Failed to fetch') {
+        errorMessage = 'Network error: Unable to reach the server. Please check your internet connection and try again.'
+      } else if (error.message.includes('CORS')) {
+        errorMessage = 'Server configuration error. Please contact support.'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      setMessage(`Error deleting account: ${errorMessage}`)
     } finally {
       setBusy(false)
     }

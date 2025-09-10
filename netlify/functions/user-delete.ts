@@ -20,6 +20,14 @@ function requireEnv(name: string): string {
   return v
 }
 
+function getEnv(names: string[]): string {
+  for (const name of names) {
+    const v = process.env[name]
+    if (v) return v
+  }
+  throw new Error(`Missing env variables: ${names.join(', ')}`)
+}
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
   try {
@@ -27,8 +35,8 @@ export const handler: Handler = async (event) => {
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
     if (!token) return { statusCode: 401, body: 'Unauthorized' }
 
-    const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE')
+    const SUPABASE_URL = getEnv(['SUPABASE_URL', 'VITE_SUPABASE_URL'])
+    const SUPABASE_SERVICE_ROLE = getEnv(['SUPABASE_SERVICE_ROLE', 'SUPABASE_SERVICE_ROLE_KEY'])
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
     // Verify the JWT to identify the caller
