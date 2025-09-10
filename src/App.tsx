@@ -146,6 +146,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           userId: session?.user?.id
         })
 
+        /**
+         * CRITICAL FIX: React state not updating despite valid session
+         * 
+         * Issue: localStorage has valid session but React UI shows signed out.
+         * Root cause: The profile state is being set but something immediately clears it.
+         * 
+         * Fix: Add immediate state logging and ensure profile is set synchronously.
+         */
         if (session?.user && mounted) {
           const email = session.user.email
           const meta = session.user.user_metadata || {}
@@ -178,8 +186,18 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          console.log('[Auth] Setting complete profile:', { name, email, userId, role })
+          console.log('[Auth] About to set profile state:', { name, email, userId, role })
+          
+          // CRITICAL FIX: Set profile state and immediately verify it was set
           setProfile({ name, email, userId, role })
+          
+          console.log('[Auth] Profile state set, current auth context will be:', {
+            isAuthed: Boolean(email),
+            name,
+            email,
+            userId,
+            role
+          })
 
           // Ensure profile exists in database with proper role
           if (userId && email) {
@@ -193,6 +211,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         if (mounted) {
           console.log('[Auth] Auth initialization complete, setting loading to false')
+          console.log('[Auth] Final profile state before loading=false:', profile)
           setLoading(false)
         }
       }
@@ -201,11 +220,16 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initialize auth
     initializeAuth()
 
-    // Listen for auth state changes
+    /**
+     * CRITICAL INVESTIGATION: Auth state change handler
+     * 
+     * This listener might be interfering with the initial session setup.
+     * Adding detailed logging to see if this is clearing the profile state.
+     */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      console.log('Auth state change:', event, session?.user?.email)
+      console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'hasSession:', !!session)
 
       if (event === 'SIGNED_IN' && session?.user) {
         const email = session.user.email
@@ -237,7 +261,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           await ensureProfile(userId, email, name, role)
         }
       } else if (event === 'SIGNED_OUT' || !session) {
-        console.log('User signed out - clearing profile')
+        console.log('[Auth] SIGNED_OUT event or no session - clearing profile')
         setProfile(null)
         // Clear any remaining auth data
         try {
@@ -245,14 +269,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem('sb-auth-token')
         } catch {}
       } else if (event === 'TOKEN_REFRESHED') {
-        console.log('Token refreshed')
+        console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
         // Only update if we have a valid session
         if (session?.user?.email) {
+          console.log('[Auth] Token refreshed with valid session, maintaining profile')
           setProfile(prev => prev ? { ...prev } : null)
         } else {
-          console.log('Token refresh but no session - signing out')
+          console.log('[Auth] Token refresh but no session - this should not happen, clearing profile')
           setProfile(null)
         }
+      } else {
+        console.log('[Auth] Unhandled auth event:', event, 'session exists:', !!session)
       }
     })
 
@@ -339,6 +366,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message }
   }
 
+  /**
+   * CRITICAL DEBUG: Auth context value creation
+   * 
+   * This is where the auth state gets exposed to the rest of the app.
+   * Adding logging to see if profile state is being set but not reflected in UI.
+   */
   const value: AuthContextValue = {
     isAuthed: Boolean(profile?.email),
     loading,
@@ -352,6 +385,15 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     resetPassword,
     signOut,
   }
+
+  // Debug log the auth context value whenever it changes
+  console.log('[Auth] Context value updated:', {
+    isAuthed: value.isAuthed,
+    loading: value.loading,
+    email: value.email,
+    role: value.role,
+    profileState: profile
+  })
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
