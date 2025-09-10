@@ -1985,7 +1985,7 @@ function BusinessPage() {
                 <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Apply to Get Featured</button>
               </form>
               {msg && <p className="mt-2 text-sm text-neutral-700">{msg}</p>}
-              <p className="mt-2 text-xs text-neutral-500">Submission can auto-trigger Zapier → Google Sheets + HighLevel (to be wired).</p>
+              <p className="mt-2 text-xs text-neutral-500"></p>
             </>
           ) : (
             <>
