@@ -11,18 +11,43 @@ export default function ResetPasswordPage() {
   const [validRecovery, setValidRecovery] = useState(false)
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const type = params.get('type')
-    const accessToken = params.get('access_token')
+    const checkRecoverySession = async () => {
+      try {
+        // Check URL parameters
+        const params = new URLSearchParams(location.search)
+        const type = params.get('type')
+        const accessToken = params.get('access_token')
+        
+        // Also check hash parameters (common for OAuth flows)
+        const hashParams = new URLSearchParams(location.hash.substring(1))
+        const hashType = hashParams.get('type')
+        const hashAccessToken = hashParams.get('access_token')
 
-    if (type === 'recovery' && accessToken) {
-      // Always allow the reset form, even if there’s an existing session
-      setValidRecovery(true)
+        console.log('Reset password page - URL params:', { type, accessToken: !!accessToken })
+        console.log('Reset password page - Hash params:', { hashType, hashAccessToken: !!hashAccessToken })
+
+        if ((type === 'recovery' && accessToken) || (hashType === 'recovery' && hashAccessToken)) {
+          console.log('Valid recovery session detected')
+          setValidRecovery(true)
+        } else {
+          // Check if user has an active session (might be from email link)
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            console.log('Active session found, allowing password reset')
+            setValidRecovery(true)
+          } else {
+            console.log('No valid recovery session or active session')
+            setValidRecovery(false)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking recovery session:', error)
+        setValidRecovery(false)
+      }
     }
-    // If user arrived from email link, Supabase should have created a session
-    // We don't auto-redirect; wait for user to set a new password
-    // No-op here, but we could validate presence of a session if needed
-  }, [location.search])
+
+    checkRecoverySession()
+  }, [location.search, location.hash])
 
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault()
@@ -31,11 +56,21 @@ export default function ResetPasswordPage() {
     if (password !== confirm) { setMessage('Passwords do not match'); return }
     setBusy(true)
     try {
+      console.log('Updating password...')
       const { error } = await supabase.auth.updateUser({ password })
-      if (error) { setMessage(error.message); return }
-      // Force logout and send user to sign-in afterwards
-      await supabase.auth.signOut()
-      navigate('/signin', { replace: true })
+      if (error) { 
+        console.error('Password update error:', error)
+        setMessage(error.message)
+        return 
+      }
+      console.log('Password updated successfully')
+      setMessage('Password updated successfully! You will be redirected to sign in.')
+      
+      // Wait a moment for user to see success message, then sign out and redirect
+      setTimeout(async () => {
+        await supabase.auth.signOut()
+        navigate('/signin', { replace: true })
+      }, 2000)
     } finally {
       setBusy(false)
     }

@@ -107,18 +107,17 @@ export default function SignInPage() {
               }
             }
 
-            const params = new URLSearchParams(location?.search || '')
-            const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
-            navigate(next, { replace: true })
+            // Redirect based on account type
+            const redirectPath = accountType === 'business' ? '/account' : '/account'
+            navigate(redirectPath, { replace: true })
           } else {
             const emsg = String(error || '').toLowerCase()
             if (emsg.includes('already') || emsg.includes('registered') || emsg.includes('exists')) {
               // Try immediate sign-in with provided password
               const { error: signInErr } = await auth.signInWithEmail(email, password)
               if (!signInErr) {
-                const params = new URLSearchParams(location?.search || '')
-                const next = params.get('next') || (() => { try { return localStorage.getItem('bf-return-url') } catch { return null } })() || '/thank-you'
-                navigate(next, { replace: true })
+                // Redirect to account page after successful signup fallback
+                navigate('/account', { replace: true })
               } else {
                 setMode('reset')
                 setMessage('This email may already exist. Reset your password to continue.')

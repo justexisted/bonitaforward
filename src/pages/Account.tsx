@@ -218,6 +218,47 @@ export default function AccountPage() {
     }
   }
 
+  async function deleteAccount() {
+    const confirmation = prompt('Type "DELETE" to confirm account deletion:')
+    if (confirmation !== 'DELETE') return
+
+    const doubleConfirmation = confirm(
+      'Are you absolutely sure? This will permanently delete your account and all associated data. This action cannot be undone.'
+    )
+    if (!doubleConfirmation) return
+
+    setBusy(true)
+    setMessage('Deleting account...')
+
+    try {
+      // Call Netlify function to delete user account
+      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+      const response = await fetch(`${fnBase}/.netlify/functions/user-delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: auth.userId })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        throw new Error(errorData || 'Failed to delete account')
+      }
+
+      setMessage('Account deleted successfully. You will be signed out.')
+      
+      // Sign out and redirect after a delay
+      setTimeout(() => {
+        auth.signOut()
+      }, 2000)
+
+    } catch (error: any) {
+      console.error('Account deletion error:', error)
+      setMessage(`Error deleting account: ${error.message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!auth.isAuthed) {
     return (
       <section className="py-8">
@@ -245,7 +286,10 @@ export default function AccountPage() {
               <label className="block text-sm text-neutral-600">Email</label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="you@example.com" />
             </div>
-            <button disabled={busy} onClick={saveProfile} className="rounded-full bg-neutral-900 text-white py-2.5 elevate">{busy ? 'Saving…' : 'Save Changes'}</button>
+            <div className="flex gap-3">
+              <button disabled={busy} onClick={saveProfile} className="flex-1 rounded-full bg-neutral-900 text-white py-2.5 elevate">{busy ? 'Saving…' : 'Save Changes'}</button>
+              <button disabled={busy} onClick={updatePassword} className="rounded-full bg-neutral-100 text-neutral-900 px-4 py-2.5 border border-neutral-200 hover:bg-neutral-50">Change Password</button>
+            </div>
           </div>
 
           {auth.role === 'business' && (
