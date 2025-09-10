@@ -213,24 +213,33 @@ export default function AccountPage() {
       }
 
       // Call Netlify function to delete user account
-      // Use the correct URL for your deployed site
+      // Use the current site's URL to ensure we're calling the right endpoint
       let url: string
       if (window.location.hostname === 'localhost') {
         url = 'http://localhost:8888/.netlify/functions/user-delete'
       } else {
-        // Use your actual Netlify site URL
-        url = 'https://bonitaforward.netlify.app/.netlify/functions/user-delete'
+        // Use the current site's origin to ensure we call the right deployment
+        url = `${window.location.origin}/.netlify/functions/user-delete`
       }
       
       console.log('Calling delete function at:', url)
       console.log('Using token:', token ? 'Token present' : 'No token')
+      
+      // First, test if the function endpoint exists
+      try {
+        const testResponse = await fetch(url.replace('user-delete', 'ping'), { method: 'GET' })
+        console.log('Test ping response:', testResponse.status)
+      } catch (e) {
+        console.log('Test ping failed:', e)
+      }
       
       const response = await fetch(url, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        mode: 'cors'
       })
 
       console.log('Delete response status:', response.status)

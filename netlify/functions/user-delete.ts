@@ -29,11 +29,25 @@ function getEnv(names: string[]): string {
 }
 
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
+  // Add CORS headers
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  }
+  
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers: corsHeaders, body: '' }
+  }
+  
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' }
+  }
   try {
     const authHeader = event.headers['authorization'] || event.headers['Authorization']
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
-    if (!token) return { statusCode: 401, body: 'Unauthorized' }
+    if (!token) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' }
 
     const SUPABASE_URL = getEnv(['SUPABASE_URL', 'VITE_SUPABASE_URL'])
     const SUPABASE_SERVICE_ROLE = getEnv(['SUPABASE_SERVICE_ROLE', 'SUPABASE_SERVICE_ROLE_KEY'])
@@ -41,7 +55,7 @@ export const handler: Handler = async (event) => {
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
     // Verify the JWT to identify the caller
     const { data: userData, error: getUserErr } = await (adminClient as any).auth.getUser(token)
-    if (getUserErr || !userData?.user?.id) return { statusCode: 401, body: 'Invalid token' }
+    if (getUserErr || !userData?.user?.id) return { statusCode: 401, headers: corsHeaders, body: 'Invalid token' }
     const userId: string = userData.user.id
     const userEmail: string | null = userData.user.email || null
 
@@ -72,11 +86,11 @@ export const handler: Handler = async (event) => {
 
     // Finally, delete the auth user
     const { error: delErr } = await (adminClient as any).auth.admin.deleteUser(userId)
-    if (delErr) return { statusCode: 400, body: delErr.message }
+    if (delErr) return { statusCode: 400, headers: corsHeaders, body: delErr.message }
 
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) }
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ ok: true }) }
   } catch (err: any) {
-    return { statusCode: 500, body: err?.message || 'Server error' }
+    return { statusCode: 500, headers: corsHeaders, body: err?.message || 'Server error' }
   }
 }
 
