@@ -618,12 +618,39 @@ export default function AdminPage() {
     }
   }
 
+  /**
+   * CRITICAL FIX: Admin page auth check
+   * 
+   * The issue was that auth.email was temporarily undefined during auth loading,
+   * causing the "Please sign in" message to show even when user was signed in.
+   * 
+   * Fix: Check auth.loading state to prevent premature "sign in" message.
+   */
   if (!auth.email) {
+    // Don't show "please sign in" message while auth is still loading
+    if (auth.loading) {
+      return (
+        <section className="py-8">
+          <div className="container-px mx-auto max-w-3xl">
+            <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
+              <div className="animate-pulse">
+                <div className="h-4 bg-neutral-200 rounded w-3/4"></div>
+                <div className="h-4 bg-neutral-200 rounded w-1/2 mt-2"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )
+    }
+    
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-3xl">
           <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
             Please sign in to view your data.
+            <div className="mt-2 text-sm text-neutral-600">
+              Debug: email={auth.email || 'none'}, loading={String(auth.loading)}, isAuthed={String(auth.isAuthed)}
+            </div>
           </div>
         </div>
       </section>
