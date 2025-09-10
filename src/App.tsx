@@ -177,14 +177,22 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userId && email) {
           await ensureProfile(userId, email, name, role)
         }
-      } else if (event === 'SIGNED_OUT') {
-        console.log('User signed out')
+      } else if (event === 'SIGNED_OUT' || !session) {
+        console.log('User signed out - clearing profile')
         setProfile(null)
+        // Clear any remaining auth data
+        try {
+          localStorage.removeItem('bf-auth')
+          localStorage.removeItem('sb-auth-token')
+        } catch {}
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('Token refreshed')
-        // Profile should already be set, just ensure it's current
+        // Only update if we have a valid session
         if (session?.user?.email) {
           setProfile(prev => prev ? { ...prev } : null)
+        } else {
+          console.log('Token refresh but no session - signing out')
+          setProfile(null)
         }
       }
     })
@@ -218,21 +226,41 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       console.log('Signing out user...')
-      const { error } = await supabase.auth.signOut()
+      
+      // Force clear profile state immediately
+      setProfile(null)
+      
+      // Clear localStorage first
+      try { 
+        localStorage.removeItem('bf-auth')
+        localStorage.removeItem('sb-auth-token')
+        // Clear all Supabase auth tokens
+        const keys = Object.keys(localStorage)
+        keys.forEach(key => {
+          if (key.startsWith('sb-') || key.includes('supabase')) {
+            localStorage.removeItem(key)
+          }
+        })
+      } catch (e) {
+        console.log('Error clearing localStorage:', e)
+      }
+
+      // Then call Supabase signOut
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
       if (error) {
         console.error('Sign out error:', error)
       } else {
         console.log('Sign out successful')
       }
+
+      // Force page reload to ensure clean state
+      window.location.href = '/signin'
+      
     } catch (err) {
       console.error('Sign out exception:', err)
-    } finally {
+      // Force clear state even if signOut fails
       setProfile(null)
-      try { 
-        localStorage.removeItem('bf-auth')
-        localStorage.removeItem('sb-auth-token')
-        localStorage.clear() // Clear all auth-related data
-      } catch {}
+      window.location.href = '/signin'
     }
   }
 
