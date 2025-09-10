@@ -60,9 +60,24 @@ export default function SignInPage() {
     }
   }
 
-  // If already authenticated, redirect away from Sign In
+  /**
+   * CRITICAL FIX: Auto-redirect authenticated users
+   * 
+   * Issue: User was already signed in from previous session but stuck on sign-in page.
+   * 
+   * Fix: Check both auth.isAuthed AND !auth.loading to ensure we have complete
+   * auth state before redirecting. This prevents redirect during auth initialization.
+   */
   useEffect(() => {
-    if (auth.isAuthed) {
+    console.log('[SignIn] Auth state check:', { isAuthed: auth.isAuthed, loading: auth.loading, email: auth.email })
+    
+    // Only redirect if fully authenticated and not loading
+    if (auth.isAuthed && !auth.loading) {
+      console.log('[SignIn] User is authenticated, redirecting...')
+      
+      // CRITICAL FIX: Reset busy state before redirect to prevent stuck button
+      setBusy(false)
+      
       const stored = (() => {
         try { return localStorage.getItem('bf-return-url') || null } catch { return null }
       })()
@@ -70,8 +85,18 @@ export default function SignInPage() {
       try { localStorage.removeItem('bf-return-url') } catch {}
       navigate(target, { replace: true })
     }
-  }, [auth.isAuthed, location?.state?.from, navigate])
+  }, [auth.isAuthed, auth.loading, location?.state?.from, navigate])
 
+  /**
+   * CRITICAL FIX: Sign-in form submission
+   * 
+   * Issue: Button got stuck on "Please wait" even when sign-in succeeded.
+   * 
+   * Root cause: The auth state change event fired, but the local busy state
+   * wasn't being reset because the component didn't know sign-in was complete.
+   * 
+   * Fix: Ensure setBusy(false) is always called, and add success handling.
+   */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setMessage(null)
@@ -79,8 +104,17 @@ export default function SignInPage() {
 
     try {
       if (mode === 'signin') {
+        console.log('[SignIn] Attempting sign in with email:', email)
         const { error } = await auth.signInWithEmail(email, password)
-        if (error) setMessage(error)
+        
+        if (error) {
+          console.log('[SignIn] Sign in error:', error)
+          setMessage(error)
+        } else {
+          console.log('[SignIn] Sign in successful, waiting for redirect...')
+          // Don't set busy to false here - let the redirect useEffect handle it
+          return
+        }
       } else if (mode === 'signup') {
         if (password !== confirm) {
           setMessage('Passwords do not match')

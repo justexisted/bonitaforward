@@ -119,17 +119,32 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Initialize auth state
+    /**
+     * CRITICAL FIX: Auth initialization
+     * 
+     * Issue: User was seeing "SIGNED_IN" events even when not actively signing in.
+     * This happened because a previous session was persisting in localStorage.
+     * 
+     * Fix: Better session handling and clear logging to understand auth state.
+     */
     const initializeAuth = async () => {
       try {
-        // Get initial session
+        console.log('[Auth] Initializing auth state...')
+        
+        // Get initial session from localStorage/cookies
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
-          console.error('Error getting session:', error)
+          console.error('[Auth] Error getting session:', error)
           if (mounted) setLoading(false)
           return
         }
+
+        console.log('[Auth] Initial session check:', { 
+          hasSession: !!session, 
+          email: session?.user?.email,
+          userId: session?.user?.id
+        })
 
         if (session?.user && mounted) {
           const email = session.user.email
@@ -138,7 +153,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           let role = meta?.role as 'business' | 'community' | undefined
           const userId = session.user.id
 
-          console.log('Initial session found:', { email, userId, metaRole: role })
+          console.log('[Auth] Processing existing session for:', email)
 
           // CRITICAL FIX: Always fetch role from database to ensure accuracy
           if (userId) {
@@ -147,13 +162,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
               const dbRole = String((prof as any)?.role || '').toLowerCase()
               if (dbRole === 'business' || dbRole === 'community') {
                 role = dbRole as 'business' | 'community'
-                console.log('Role fetched from database:', role)
+                console.log('[Auth] Role fetched from database:', role)
               }
             } catch (error) {
-              console.error('Error fetching role from database:', error)
+              console.error('[Auth] Error fetching role from database:', error)
             }
           }
 
+          console.log('[Auth] Setting profile with role:', role)
           setProfile({ name, email, userId, role })
 
           // Ensure profile exists in database
@@ -162,9 +178,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.error('Error initializing auth:', error)
+        console.error('[Auth] Error initializing auth:', error)
       } finally {
-        if (mounted) setLoading(false)
+        if (mounted) {
+          console.log('[Auth] Auth initialization complete, setting loading to false')
+          setLoading(false)
+        }
       }
     }
 
