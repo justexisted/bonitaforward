@@ -93,6 +93,43 @@ export default function AdminPage() {
   const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
 
+  /**
+   * LOAD CHANGE REQUESTS
+   * 
+   * This function loads all change requests from the database for admin review.
+   * It fetches all change requests ordered by creation date (newest first).
+   * 
+   * How it works:
+   * 1. Queries the provider_change_requests table
+   * 2. Orders by created_at descending to show newest requests first
+   * 3. Updates the changeRequests state with the fetched data
+   * 
+   * This provides the admin with a complete list of all pending change requests.
+   */
+  const loadChangeRequests = async () => {
+    try {
+      console.log('[Admin] Loading change requests...')
+      
+      const { data, error } = await supabase
+        .from('provider_change_requests')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('[Admin] Error loading change requests:', error)
+        setError(`Failed to load change requests: ${error.message}`)
+        return
+      }
+
+      console.log('[Admin] Loaded change requests:', data?.length || 0)
+      setChangeRequests((data as ProviderChangeRequest[]) || [])
+      
+    } catch (error: any) {
+      console.error('[Admin] Error loading change requests:', error)
+      setError(`Failed to load change requests: ${error.message}`)
+    }
+  }
+
   useEffect(() => {
     // Load content into editor when switching drafts
     if (editorRef.current) {
@@ -573,9 +610,10 @@ export default function AdminPage() {
       }
       await supabase.from('provider_change_requests').update({ status: 'approved', decided_at: new Date().toISOString() as any }).eq('id', req.id)
       await notifyUser(req.owner_user_id, 'Request approved', `Your ${req.type} request was approved.`, { reqId: req.id })
-      setChangeRequests((arr) => arr.map((r) => r.id === req.id ? { ...r, status: 'approved', decided_at: new Date().toISOString() as any } : r))
       setMessage('Change request approved')
       try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
+      // Refresh the change requests list to show updated status
+      await loadChangeRequests()
     } catch (err: any) {
       setError(err?.message || 'Failed to approve request')
     }
@@ -586,8 +624,9 @@ export default function AdminPage() {
     try {
       await supabase.from('provider_change_requests').update({ status: 'rejected', reason: reason || null, decided_at: new Date().toISOString() as any }).eq('id', req.id)
       await notifyUser(req.owner_user_id, 'Request rejected', reason || `Your ${req.type} request was rejected.`, { reqId: req.id })
-      setChangeRequests((arr) => arr.map((r) => r.id === req.id ? { ...r, status: 'rejected', reason: reason || r.reason, decided_at: new Date().toISOString() as any } : r))
       setMessage('Change request rejected')
+      // Refresh the change requests list to show updated status
+      await loadChangeRequests()
     } catch (err: any) {
       setError(err?.message || 'Failed to reject request')
     }
@@ -1213,15 +1252,51 @@ export default function AdminPage() {
               {changeRequests.filter((r) => r.status === 'pending').map((r) => (
                 <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium">{r.type}</div>
+                    <div className="font-medium">
+                      {r.type === 'update' ? 'Business Listing Update' : 
+                       r.type === 'delete' ? 'Business Listing Deletion' :
+                       r.type === 'feature_request' ? 'Featured Upgrade Request' :
+                       r.type === 'claim' ? 'Business Claim Request' : r.type}
+                    </div>
                     <div className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</div>
                   </div>
-                  {r.changes && (
-                    <pre className="mt-1 text-xs bg-neutral-50 border border-neutral-100 rounded p-2 overflow-auto max-h-40">{JSON.stringify(r.changes, null, 2)}</pre>
+                  
+                  {/* Show the actual changes being requested in a user-friendly format */}
+                  {r.changes && Object.keys(r.changes).length > 0 && (
+                    <div className="mt-2 p-2 bg-gray-50 rounded-lg">
+                      <div className="text-xs font-medium text-gray-700 mb-1">Proposed Changes:</div>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        {Object.entries(r.changes).map(([field, value]) => (
+                          <div key={field} className="flex justify-between">
+                            <span className="font-medium capitalize">{field.replace('_', ' ')}:</span>
+                            <span className="ml-2">
+                              {typeof value === 'object' ? JSON.stringify(value) : String(value || 'Not provided')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                  <div className="mt-2 flex items-center gap-2">
-                    <button onClick={() => approveChangeRequest(r)} className="btn btn-primary text-xs">Approve</button>
-                    <button onClick={() => rejectChangeRequest(r)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Reject</button>
+                  
+                  <div className="text-xs text-neutral-600 mt-1">Provider ID: {r.provider_id}</div>
+                  <div className="text-xs text-neutral-600 mt-1">Owner: {r.owner_user_id}</div>
+                  {r.reason && <div className="text-xs text-neutral-600 mt-1">Reason: {r.reason}</div>}
+                  
+                  <div className="mt-3 flex items-center gap-2">
+                    <button 
+                      onClick={() => approveChangeRequest(r)} 
+                      className="btn btn-primary text-xs"
+                      disabled={r.status !== 'pending'}
+                    >
+                      {r.status === 'pending' ? 'Approve' : r.status}
+                    </button>
+                    <button 
+                      onClick={() => rejectChangeRequest(r)} 
+                      className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs"
+                      disabled={r.status !== 'pending'}
+                    >
+                      {r.status === 'pending' ? 'Reject' : r.status}
+                    </button>
                   </div>
                 </div>
               ))}

@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { Link } from 'react-router-dom'
+import { createProviderChangeRequest } from '../lib/supabaseData'
 
 // Type definition for business listings in the providers table
 // Updated to include all enhanced business management fields that were added to the database
@@ -410,9 +411,15 @@ export default function MyBusinessPage() {
    * UPDATE BUSINESS LISTING
    * 
    * This function allows business owners to update their existing business listings.
-   * It updates the provider entry in the database with new information.
+   * Instead of directly updating the database, it creates a change request that requires admin approval.
    * 
-   * Note: Some changes may require admin approval depending on the field.
+   * How it works:
+   * 1. Creates a change request in the provider_change_requests table
+   * 2. Stores the proposed changes in the 'changes' JSONB field
+   * 3. Sets status to 'pending' for admin review
+   * 4. Admin can then approve/reject the changes in the admin panel
+   * 
+   * This ensures all business listing changes go through proper admin approval workflow.
    */
   const updateBusinessListing = async (listingId: string, updates: Partial<BusinessListing>) => {
     // Prevent multiple simultaneous updates
@@ -422,62 +429,55 @@ export default function MyBusinessPage() {
     }
 
     setIsUpdating(true)
-    setMessage('Updating business listing...')
+    setMessage('Submitting changes for admin approval...')
     
-    // No timeout needed - we have proper loading states and error handling
-
     try {
-      console.log('[MyBusiness] Starting update for listing:', listingId)
-      console.log('[MyBusiness] Update data:', updates)
+      console.log('[MyBusiness] Creating change request for listing:', listingId)
+      console.log('[MyBusiness] Proposed changes:', updates)
       
-      // Update all fields that exist in the providers table
-      // Now includes the enhanced business management fields that were just added to the database
-      const updateData: any = {}
+      // Prepare the changes data for the change request
+      // Only include fields that are actually being updated
+      const changesData: Record<string, any> = {}
       
       // Core business fields
-      if (updates.name !== undefined) updateData.name = updates.name
-      if (updates.category_key !== undefined) updateData.category_key = updates.category_key
-      if (updates.phone !== undefined) updateData.phone = updates.phone
-      if (updates.email !== undefined) updateData.email = updates.email
-      if (updates.website !== undefined) updateData.website = updates.website
-      if (updates.address !== undefined) updateData.address = updates.address
-      if (updates.tags !== undefined) updateData.tags = updates.tags
-      if (updates.images !== undefined) updateData.images = updates.images
-      if (updates.rating !== undefined) updateData.rating = updates.rating
-      if (updates.badges !== undefined) updateData.badges = updates.badges
-      if (updates.published !== undefined) updateData.published = updates.published
-      if (updates.is_member !== undefined) updateData.is_member = updates.is_member
+      if (updates.name !== undefined) changesData.name = updates.name
+      if (updates.category_key !== undefined) changesData.category_key = updates.category_key
+      if (updates.phone !== undefined) changesData.phone = updates.phone
+      if (updates.email !== undefined) changesData.email = updates.email
+      if (updates.website !== undefined) changesData.website = updates.website
+      if (updates.address !== undefined) changesData.address = updates.address
+      if (updates.tags !== undefined) changesData.tags = updates.tags
+      if (updates.images !== undefined) changesData.images = updates.images
+      if (updates.rating !== undefined) changesData.rating = updates.rating
+      if (updates.badges !== undefined) changesData.badges = updates.badges
+      if (updates.published !== undefined) changesData.published = updates.published
+      if (updates.is_member !== undefined) changesData.is_member = updates.is_member
       
-      // Enhanced business management fields (now available in database)
-      if (updates.description !== undefined) updateData.description = updates.description
-      if (updates.specialties !== undefined) updateData.specialties = updates.specialties
-      if (updates.social_links !== undefined) updateData.social_links = updates.social_links
-      if (updates.business_hours !== undefined) updateData.business_hours = updates.business_hours
-      if (updates.service_areas !== undefined) updateData.service_areas = updates.service_areas
-      if (updates.google_maps_url !== undefined) updateData.google_maps_url = updates.google_maps_url
+      // Enhanced business management fields
+      if (updates.description !== undefined) changesData.description = updates.description
+      if (updates.specialties !== undefined) changesData.specialties = updates.specialties
+      if (updates.social_links !== undefined) changesData.social_links = updates.social_links
+      if (updates.business_hours !== undefined) changesData.business_hours = updates.business_hours
+      if (updates.service_areas !== undefined) changesData.service_areas = updates.service_areas
+      if (updates.google_maps_url !== undefined) changesData.google_maps_url = updates.google_maps_url
       
-      // updated_at will be automatically set by the database trigger
+      console.log('[MyBusiness] Final changes data for request:', changesData)
       
-      console.log('[MyBusiness] Final update data:', updateData)
-      
-      const { error } = await supabase
-        .from('providers')
-        .update(updateData)
-        .eq('id', listingId)
-        .eq('owner_user_id', auth.userId) // Ensure user owns this listing
+      // Create a change request instead of directly updating the database
+      const { error, id } = await createProviderChangeRequest({
+        provider_id: listingId,
+        owner_user_id: auth.userId!,
+        type: 'update',
+        changes: changesData,
+        reason: `Business listing update request from ${auth.email}`
+      })
 
       if (error) {
-        console.error('[MyBusiness] Supabase update error:', error)
-        console.error('[MyBusiness] Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        })
-        throw error
+        console.error('[MyBusiness] Change request creation error:', error)
+        throw new Error(error)
       }
 
-      console.log('[MyBusiness] Update successful')
+      console.log('[MyBusiness] Change request created successfully with ID:', id)
       
       // Create specific message based on what was updated
       const updatedFields = []
@@ -488,22 +488,22 @@ export default function MyBusinessPage() {
       if (updates.address) updatedFields.push('address')
       
       const fieldText = updatedFields.length > 0 ? ` (${updatedFields.join(', ')})` : ''
-      setMessage(`✅ Business listing updated successfully! Your changes${fieldText} will be reviewed by our admin team before going live. You will receive an email notification once approved.`)
+      setMessage(`✅ Change request submitted successfully! Your changes${fieldText} will be reviewed by our admin team before going live. You will receive an email notification once approved.`)
       
-      // Refresh data and close form
+      // Refresh data to show the change request in the applications section
       await loadBusinessData()
       setEditingListing(null)
       
       // Show success message for 5 seconds then redirect
       setTimeout(() => {
         setMessage(null)
-        // Optionally redirect to listings tab
-        setActiveTab('listings')
+        // Redirect to applications tab to show the change request
+        setActiveTab('applications')
       }, 5000)
       
     } catch (error: any) {
-      console.error('[MyBusiness] Update failed:', error)
-      setMessage(`Error updating listing: ${error.message}. Please try again.`)
+      console.error('[MyBusiness] Change request failed:', error)
+      setMessage(`Error submitting changes: ${error.message}. Please try again.`)
     } finally {
       setIsUpdating(false)
     }
