@@ -41,7 +41,6 @@ type BusinessListing = {
   description: string | null
   social_links: Record<string, string> | null
   google_maps_url: string | null
-  booking_enabled: boolean | null
   business_hours: Record<string, string> | null
   service_areas: string[] | null
   specialties: string[] | null
@@ -401,7 +400,6 @@ export default function MyBusinessPage() {
           business_hours: listingData.business_hours || {},
           service_areas: listingData.service_areas || [],
           images: listingData.images || [],
-          booking_enabled: listingData.booking_enabled || false,
           google_maps_url: listingData.google_maps_url,
           owner_user_id: auth.userId,
           published: false, // Requires admin approval
@@ -451,23 +449,30 @@ export default function MyBusinessPage() {
       console.log('[MyBusiness] Update data:', updates)
       
       // Only update fields that are actually provided and not null/undefined
+      // Based on the actual providers table schema, these are the core valid columns:
       const updateData: any = {}
       
+      // Core fields that definitely exist in the providers table
       if (updates.name !== undefined) updateData.name = updates.name
       if (updates.category_key !== undefined) updateData.category_key = updates.category_key
       if (updates.phone !== undefined) updateData.phone = updates.phone
       if (updates.email !== undefined) updateData.email = updates.email
       if (updates.website !== undefined) updateData.website = updates.website
       if (updates.address !== undefined) updateData.address = updates.address
-      if (updates.description !== undefined) updateData.description = updates.description
       if (updates.tags !== undefined) updateData.tags = updates.tags
+      if (updates.images !== undefined) updateData.images = updates.images
+      
+      // Extended fields that may or may not exist - only include if they're defined
+      // These will be ignored by Supabase if the columns don't exist
+      if (updates.description !== undefined) updateData.description = updates.description
       if (updates.specialties !== undefined) updateData.specialties = updates.specialties
       if (updates.social_links !== undefined) updateData.social_links = updates.social_links
       if (updates.business_hours !== undefined) updateData.business_hours = updates.business_hours
       if (updates.service_areas !== undefined) updateData.service_areas = updates.service_areas
-      if (updates.images !== undefined) updateData.images = updates.images
-      if (updates.booking_enabled !== undefined) updateData.booking_enabled = updates.booking_enabled
       if (updates.google_maps_url !== undefined) updateData.google_maps_url = updates.google_maps_url
+      
+      // Note: Some fields like booking_enabled, description, specialties, etc. may not exist
+      // in the current providers table schema. Supabase will ignore unknown columns.
       
       updateData.updated_at = new Date().toISOString()
       
@@ -481,7 +486,46 @@ export default function MyBusinessPage() {
 
       if (error) {
         console.error('[MyBusiness] Supabase update error:', error)
-        throw error
+        console.error('[MyBusiness] Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        
+        // If the error is about unknown columns, try updating only core fields
+        if (error.code === 'PGRST204' && error.message.includes('Could not find')) {
+          console.log('[MyBusiness] Retrying with core fields only...')
+          
+          const coreUpdateData = {
+            name: updates.name,
+            category_key: updates.category_key,
+            phone: updates.phone,
+            email: updates.email,
+            website: updates.website,
+            address: updates.address,
+            tags: updates.tags,
+            images: updates.images,
+            updated_at: new Date().toISOString()
+          }
+          
+          console.log('[MyBusiness] Core update data:', coreUpdateData)
+          
+          const { error: coreError } = await supabase
+            .from('providers')
+            .update(coreUpdateData)
+            .eq('id', listingId)
+            .eq('owner_user_id', auth.userId)
+          
+          if (coreError) {
+            console.error('[MyBusiness] Core fields update also failed:', coreError)
+            throw coreError
+          }
+          
+          console.log('[MyBusiness] Core fields updated successfully')
+        } else {
+          throw error
+        }
       }
 
       // Clear timeout on success
@@ -1072,7 +1116,6 @@ function BusinessListingForm({
     business_hours: listing?.business_hours || {},
     service_areas: listing?.service_areas || [],
     images: listing?.images || [],
-    booking_enabled: listing?.booking_enabled || false,
     google_maps_url: listing?.google_maps_url || ''
   })
 
