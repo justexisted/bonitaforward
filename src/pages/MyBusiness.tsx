@@ -86,6 +86,33 @@ export default function MyBusinessPage() {
   const [editingListing, setEditingListing] = useState<BusinessListing | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showJobForm, setShowJobForm] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateTimeout, setUpdateTimeout] = useState<NodeJS.Timeout | null>(null)
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeout) {
+        clearTimeout(updateTimeout)
+      }
+    }
+  }, [updateTimeout])
+
+  /**
+   * CANCEL UPDATE
+   * 
+   * This function allows users to cancel a long-running update operation.
+   * It clears the timeout and resets the updating state.
+   */
+  const cancelUpdate = () => {
+    if (updateTimeout) {
+      clearTimeout(updateTimeout)
+      setUpdateTimeout(null)
+    }
+    setIsUpdating(false)
+    setMessage('Update cancelled.')
+    setEditingListing(null)
+  }
 
   /**
    * AUTHENTICATION & ROLE CHECK
@@ -400,39 +427,95 @@ export default function MyBusinessPage() {
    * Note: Some changes may require admin approval depending on the field.
    */
   const updateBusinessListing = async (listingId: string, updates: Partial<BusinessListing>) => {
+    // Prevent multiple simultaneous updates
+    if (isUpdating) {
+      console.log('[MyBusiness] Update already in progress, ignoring duplicate request')
+      return
+    }
+
+    setIsUpdating(true)
+    setMessage('Updating business listing...')
+    
+    // Set timeout to prevent infinite loops
+    const timeout = setTimeout(() => {
+      console.log('[MyBusiness] Update timeout reached, cancelling operation')
+      setIsUpdating(false)
+      setMessage('Update timed out. Please try again.')
+      setEditingListing(null)
+    }, 10000) // 10 second timeout
+    
+    setUpdateTimeout(timeout)
+
     try {
-      setMessage('Updating business listing...')
+      console.log('[MyBusiness] Starting update for listing:', listingId)
+      console.log('[MyBusiness] Update data:', updates)
+      
+      // Only update fields that are actually provided and not null/undefined
+      const updateData: any = {}
+      
+      if (updates.name !== undefined) updateData.name = updates.name
+      if (updates.category_key !== undefined) updateData.category_key = updates.category_key
+      if (updates.phone !== undefined) updateData.phone = updates.phone
+      if (updates.email !== undefined) updateData.email = updates.email
+      if (updates.website !== undefined) updateData.website = updates.website
+      if (updates.address !== undefined) updateData.address = updates.address
+      if (updates.description !== undefined) updateData.description = updates.description
+      if (updates.tags !== undefined) updateData.tags = updates.tags
+      if (updates.specialties !== undefined) updateData.specialties = updates.specialties
+      if (updates.social_links !== undefined) updateData.social_links = updates.social_links
+      if (updates.business_hours !== undefined) updateData.business_hours = updates.business_hours
+      if (updates.service_areas !== undefined) updateData.service_areas = updates.service_areas
+      if (updates.images !== undefined) updateData.images = updates.images
+      if (updates.booking_enabled !== undefined) updateData.booking_enabled = updates.booking_enabled
+      if (updates.google_maps_url !== undefined) updateData.google_maps_url = updates.google_maps_url
+      
+      updateData.updated_at = new Date().toISOString()
+      
+      console.log('[MyBusiness] Final update data:', updateData)
       
       const { error } = await supabase
         .from('providers')
-        .update({
-          name: updates.name,
-          category_key: updates.category_key,
-          phone: updates.phone,
-          email: updates.email,
-          website: updates.website,
-          address: updates.address,
-          description: updates.description,
-          tags: updates.tags,
-          specialties: updates.specialties,
-          social_links: updates.social_links,
-          business_hours: updates.business_hours,
-          service_areas: updates.service_areas,
-          images: updates.images,
-          booking_enabled: updates.booking_enabled,
-          google_maps_url: updates.google_maps_url,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', listingId)
         .eq('owner_user_id', auth.userId) // Ensure user owns this listing
 
-      if (error) throw error
+      if (error) {
+        console.error('[MyBusiness] Supabase update error:', error)
+        throw error
+      }
 
-      setMessage('Business listing updated successfully!')
-      loadBusinessData() // Refresh data to show updates
+      // Clear timeout on success
+      if (updateTimeout) {
+        clearTimeout(updateTimeout)
+        setUpdateTimeout(null)
+      }
+
+      console.log('[MyBusiness] Update successful')
+      setMessage('✅ Business listing updated successfully! Your changes will be reviewed by our admin team before going live. You will receive an email notification once approved.')
+      
+      // Refresh data and close form
+      await loadBusinessData()
       setEditingListing(null)
+      
+      // Show success message for 5 seconds then redirect
+      setTimeout(() => {
+        setMessage(null)
+        // Optionally redirect to listings tab
+        setActiveTab('listings')
+      }, 5000)
+      
     } catch (error: any) {
-      setMessage(`Error updating listing: ${error.message}`)
+      console.error('[MyBusiness] Update failed:', error)
+      
+      // Clear timeout on error
+      if (updateTimeout) {
+        clearTimeout(updateTimeout)
+        setUpdateTimeout(null)
+      }
+      
+      setMessage(`Error updating listing: ${error.message}. Please try again.`)
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -542,7 +625,17 @@ export default function MyBusinessPage() {
 
         {message && (
           <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-blue-800">{message}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-blue-800">{message}</p>
+              {isUpdating && (
+                <button
+                  onClick={cancelUpdate}
+                  className="ml-4 px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                >
+                  Cancel Update
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -911,6 +1004,7 @@ export default function MyBusinessPage() {
                 createBusinessListing(data)
               }
             }
+            isUpdating={isUpdating}
             onCancel={() => {
               console.log('[MyBusiness] Form cancelled')
               setShowCreateForm(false)
@@ -954,11 +1048,13 @@ export default function MyBusinessPage() {
 function BusinessListingForm({ 
   listing, 
   onSave, 
-  onCancel 
+  onCancel,
+  isUpdating = false
 }: { 
   listing: BusinessListing | null
   onSave: (data: Partial<BusinessListing>) => void
-  onCancel: () => void 
+  onCancel: () => void
+  isUpdating?: boolean
 }) {
   console.log('[BusinessListingForm] Rendering with listing:', listing?.id, listing?.name)
   
@@ -996,6 +1092,13 @@ function BusinessListingForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Prevent multiple submissions
+    if (isUpdating) {
+      console.log('[BusinessListingForm] Form submission blocked - update in progress')
+      return
+    }
+    
     console.log('[BusinessListingForm] Form submitted with data:', formData)
     onSave(formData)
   }
@@ -1388,16 +1491,33 @@ function BusinessListingForm({
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
-                className="flex-1 bg-neutral-900 text-white px-6 py-2 rounded-lg hover:bg-neutral-800"
+                disabled={isUpdating}
+                className={`flex-1 px-6 py-2 rounded-lg flex items-center justify-center ${
+                  isUpdating 
+                    ? 'bg-neutral-400 text-white cursor-not-allowed' 
+                    : 'bg-neutral-900 text-white hover:bg-neutral-800'
+                }`}
               >
-                {listing ? 'Update Listing' : 'Create Listing'}
+                {isUpdating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {listing ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  listing ? 'Update Listing' : 'Create Listing'
+                )}
               </button>
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50"
+                disabled={isUpdating}
+                className={`px-6 py-2 border rounded-lg ${
+                  isUpdating 
+                    ? 'border-neutral-300 text-neutral-400 cursor-not-allowed' 
+                    : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50'
+                }`}
               >
-                Cancel
+                {isUpdating ? 'Please Wait...' : 'Cancel'}
               </button>
             </div>
           </form>
