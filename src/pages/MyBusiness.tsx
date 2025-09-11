@@ -20,6 +20,7 @@ import { useAuth } from '../App'
 import { Link } from 'react-router-dom'
 
 // Type definition for business listings in the providers table
+// Updated to include all enhanced business management fields that were added to the database
 type BusinessListing = {
   id: string
   name: string
@@ -35,15 +36,16 @@ type BusinessListing = {
   owner_user_id: string | null
   is_member: boolean | null  // This indicates if the provider is featured (admin-approved)
   published: boolean | null
-  created_at: string
-  updated_at: string
-  // Additional fields for enhanced business management
+  created_at: string | null  // Now available in database
+  updated_at: string | null  // Now available in database
+  
+  // Enhanced business management fields (now stored in providers table)
   description: string | null
+  specialties: string[] | null
   social_links: Record<string, string> | null
-  google_maps_url: string | null
   business_hours: Record<string, string> | null
   service_areas: string[] | null
-  specialties: string[] | null
+  google_maps_url: string | null
 }
 
 // Type definition for business applications in the business_applications table
@@ -387,23 +389,29 @@ export default function MyBusinessPage() {
       const { error } = await supabase
         .from('providers')
         .insert([{
+          // Core business fields
           name: listingData.name,
           category_key: listingData.category_key,
           phone: listingData.phone,
           email: listingData.email || auth.email,
           website: listingData.website,
           address: listingData.address,
-          description: listingData.description,
           tags: listingData.tags || [],
+          images: listingData.images || [],
+          rating: listingData.rating || null,
+          badges: listingData.badges || [],
+          owner_user_id: auth.userId,
+          published: false, // Requires admin approval
+          is_member: false, // Free tier by default
+          
+          // Enhanced business management fields (now stored in providers table)
+          description: listingData.description || null,
           specialties: listingData.specialties || [],
           social_links: listingData.social_links || {},
           business_hours: listingData.business_hours || {},
           service_areas: listingData.service_areas || [],
-          images: listingData.images || [],
-          google_maps_url: listingData.google_maps_url,
-          owner_user_id: auth.userId,
-          published: false, // Requires admin approval
-          is_member: false  // Free tier by default
+          google_maps_url: listingData.google_maps_url || null
+          // created_at and updated_at are automatically handled by the database
         }])
 
       if (error) throw error
@@ -448,11 +456,11 @@ export default function MyBusinessPage() {
       console.log('[MyBusiness] Starting update for listing:', listingId)
       console.log('[MyBusiness] Update data:', updates)
       
-      // Only update fields that are actually provided and not null/undefined
-      // Based on the actual providers table schema, these are the core valid columns:
+      // Update all fields that exist in the providers table
+      // Now includes the enhanced business management fields that were just added to the database
       const updateData: any = {}
       
-      // Core fields that definitely exist in the providers table
+      // Core business fields
       if (updates.name !== undefined) updateData.name = updates.name
       if (updates.category_key !== undefined) updateData.category_key = updates.category_key
       if (updates.phone !== undefined) updateData.phone = updates.phone
@@ -461,9 +469,12 @@ export default function MyBusinessPage() {
       if (updates.address !== undefined) updateData.address = updates.address
       if (updates.tags !== undefined) updateData.tags = updates.tags
       if (updates.images !== undefined) updateData.images = updates.images
+      if (updates.rating !== undefined) updateData.rating = updates.rating
+      if (updates.badges !== undefined) updateData.badges = updates.badges
+      if (updates.published !== undefined) updateData.published = updates.published
+      if (updates.is_member !== undefined) updateData.is_member = updates.is_member
       
-      // Extended fields that may or may not exist - only include if they're defined
-      // These will be ignored by Supabase if the columns don't exist
+      // Enhanced business management fields (now available in database)
       if (updates.description !== undefined) updateData.description = updates.description
       if (updates.specialties !== undefined) updateData.specialties = updates.specialties
       if (updates.social_links !== undefined) updateData.social_links = updates.social_links
@@ -471,10 +482,7 @@ export default function MyBusinessPage() {
       if (updates.service_areas !== undefined) updateData.service_areas = updates.service_areas
       if (updates.google_maps_url !== undefined) updateData.google_maps_url = updates.google_maps_url
       
-      // Note: Some fields like booking_enabled, description, specialties, etc. may not exist
-      // in the current providers table schema. Supabase will ignore unknown columns.
-      
-      updateData.updated_at = new Date().toISOString()
+      // updated_at will be automatically set by the database trigger
       
       console.log('[MyBusiness] Final update data:', updateData)
       
@@ -492,40 +500,7 @@ export default function MyBusinessPage() {
           details: error.details,
           hint: error.hint
         })
-        
-        // If the error is about unknown columns, try updating only core fields
-        if (error.code === 'PGRST204' && error.message.includes('Could not find')) {
-          console.log('[MyBusiness] Retrying with core fields only...')
-          
-          const coreUpdateData = {
-            name: updates.name,
-            category_key: updates.category_key,
-            phone: updates.phone,
-            email: updates.email,
-            website: updates.website,
-            address: updates.address,
-            tags: updates.tags,
-            images: updates.images,
-            updated_at: new Date().toISOString()
-          }
-          
-          console.log('[MyBusiness] Core update data:', coreUpdateData)
-          
-          const { error: coreError } = await supabase
-            .from('providers')
-            .update(coreUpdateData)
-            .eq('id', listingId)
-            .eq('owner_user_id', auth.userId)
-          
-          if (coreError) {
-            console.error('[MyBusiness] Core fields update also failed:', coreError)
-            throw coreError
-          }
-          
-          console.log('[MyBusiness] Core fields updated successfully')
-        } else {
-          throw error
-        }
+        throw error
       }
 
       // Clear timeout on success
@@ -1103,19 +1078,26 @@ function BusinessListingForm({
   console.log('[BusinessListingForm] Rendering with listing:', listing?.id, listing?.name)
   
   const [formData, setFormData] = useState<Partial<BusinessListing>>({
+    // Core business fields
     name: listing?.name || '',
     category_key: listing?.category_key || '',
     phone: listing?.phone || '',
     email: listing?.email || '',
     website: listing?.website || '',
     address: listing?.address || '',
-    description: listing?.description || '',
     tags: listing?.tags || [],
+    images: listing?.images || [],
+    rating: listing?.rating || null,
+    badges: listing?.badges || [],
+    published: listing?.published || false,
+    is_member: listing?.is_member || false,
+    
+    // Enhanced business management fields (now properly stored in database)
+    description: listing?.description || '',
     specialties: listing?.specialties || [],
     social_links: listing?.social_links || {},
     business_hours: listing?.business_hours || {},
     service_areas: listing?.service_areas || [],
-    images: listing?.images || [],
     google_maps_url: listing?.google_maps_url || ''
   })
 
