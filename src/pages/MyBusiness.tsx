@@ -287,13 +287,19 @@ export default function MyBusinessPage() {
    * This function allows business owners to request an upgrade from free to featured tier.
    * It creates a change request for admin review and payment processing.
    * 
-   * Featured tier includes:
-   * - Multiple images
-   * - Social media links  
+   * Featured tier pricing:
+   * - $1/day billed annually ($365/year)
+   * - $1.50/day billed monthly ($45/month)
+   * 
+   * Featured tier benefits:
+   * - Priority placement in search results (appears at top)
+   * - Enhanced business description
+   * - Multiple images support
+   * - Social media links integration
    * - Google Maps integration
-   * - Booking system
-   * - Priority placement
-   * - Enhanced description
+   * - Booking system integration
+   * - Analytics and insights
+   * - Premium customer support
    */
   const upgradeToFeatured = async (listingId: string) => {
     try {
@@ -308,14 +314,28 @@ export default function MyBusinessPage() {
           type: 'feature_request',
           changes: {
             tier: 'featured',
-            upgrade_reason: 'User requested featured upgrade'
+            upgrade_reason: 'User requested featured upgrade',
+            pricing_options: {
+              annual: '$1/day ($365/year)',
+              monthly: '$1.50/day ($45/month)'
+            },
+            benefits: [
+              'Priority placement in search results',
+              'Enhanced business description',
+              'Multiple images support',
+              'Social media links integration',
+              'Google Maps integration',
+              'Booking system integration',
+              'Analytics and insights',
+              'Premium customer support'
+            ]
           },
           status: 'pending'
         }])
 
       if (error) throw error
 
-      setMessage('Featured upgrade request submitted! We\'ll contact you about payment and setup.')
+      setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $1/day annually or $1.50/day monthly.')
     } catch (error: any) {
       setMessage(`Error: ${error.message}`)
     }
@@ -661,19 +681,50 @@ export default function MyBusinessPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Community Visibility Info */}
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <h4 className="text-sm font-medium text-blue-900 mb-2">What Community Users See:</h4>
+                        <div className="text-xs text-blue-800 space-y-1">
+                          <p>• <strong>Basic Info:</strong> {listing.name}, {listing.category_key}, {listing.phone}</p>
+                          <p>• <strong>Contact:</strong> {listing.email} {listing.website && `• ${listing.website}`}</p>
+                          {listing.address && <p>• <strong>Location:</strong> {listing.address}</p>}
+                          {listing.description && <p>• <strong>Description:</strong> {listing.description.substring(0, 100)}{listing.description.length > 100 ? '...' : ''}</p>}
+                          {listing.tags && listing.tags.length > 0 && <p>• <strong>Tags:</strong> {listing.tags.join(', ')}</p>}
+                          {listing.is_member && <p>• <strong>Featured:</strong> Appears at top of search results</p>}
+                        </div>
+                      </div>
                     </div>
                     
                     <div className="flex flex-col gap-2 ml-4">
-                      {!listing.is_member && (
-                        <button
-                          onClick={() => upgradeToFeatured(listing.id)}
-                          className="rounded-full bg-yellow-50 text-yellow-700 px-3 py-1.5 text-xs border border-yellow-200 hover:bg-yellow-100"
-                        >
-                          Upgrade to Featured
-                        </button>
+                      {/* Featured Status and Pricing Info */}
+                      {listing.is_member ? (
+                        <div className="text-center">
+                          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 mb-2">
+                            ⭐ Featured Listing
+                          </span>
+                          <p className="text-xs text-neutral-500">Priority placement in search results</p>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <button
+                            onClick={() => upgradeToFeatured(listing.id)}
+                            className="rounded-full bg-yellow-50 text-yellow-700 px-3 py-1.5 text-xs border border-yellow-200 hover:bg-yellow-100 mb-2"
+                          >
+                            Upgrade to Featured
+                          </button>
+                          <p className="text-xs text-neutral-500">
+                            $1/day annually or $1.50/day monthly
+                          </p>
+                        </div>
                       )}
+                      
+                      {/* Action Buttons */}
                       <button
-                        onClick={() => setEditingListing(listing)}
+                        onClick={() => {
+                          console.log('[MyBusiness] Edit button clicked for listing:', listing.id, listing.name)
+                          setEditingListing(listing)
+                        }}
                         className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200"
                       >
                         Edit Details
@@ -851,10 +902,17 @@ export default function MyBusinessPage() {
           <BusinessListingForm
             listing={editingListing}
             onSave={editingListing ? 
-              (updates) => updateBusinessListing(editingListing.id, updates) :
-              createBusinessListing
+              (updates) => {
+                console.log('[MyBusiness] Updating listing:', editingListing.id, updates)
+                updateBusinessListing(editingListing.id, updates)
+              } :
+              (data) => {
+                console.log('[MyBusiness] Creating listing:', data)
+                createBusinessListing(data)
+              }
             }
             onCancel={() => {
+              console.log('[MyBusiness] Form cancelled')
               setShowCreateForm(false)
               setEditingListing(null)
             }}
@@ -902,6 +960,8 @@ function BusinessListingForm({
   onSave: (data: Partial<BusinessListing>) => void
   onCancel: () => void 
 }) {
+  console.log('[BusinessListingForm] Rendering with listing:', listing?.id, listing?.name)
+  
   const [formData, setFormData] = useState<Partial<BusinessListing>>({
     name: listing?.name || '',
     category_key: listing?.category_key || '',
@@ -936,6 +996,7 @@ function BusinessListingForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[BusinessListingForm] Form submitted with data:', formData)
     onSave(formData)
   }
 
@@ -1295,6 +1356,31 @@ function BusinessListingForm({
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Community Visibility Information */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-blue-900 mb-2">Community User Visibility</h3>
+              <div className="text-xs text-blue-800 space-y-1">
+                <p><strong>Free Listing (Always Visible):</strong></p>
+                <ul className="ml-4 space-y-1">
+                  <li>• Business name, category, phone, email</li>
+                  <li>• Website and address</li>
+                  <li>• Basic business description (up to 200 characters)</li>
+                  <li>• Basic tags and specialties</li>
+                </ul>
+                <p className="mt-2"><strong>Featured Listing (Additional Benefits):</strong></p>
+                <ul className="ml-4 space-y-1">
+                  <li>• <strong>Priority placement</strong> - appears at top of search results</li>
+                  <li>• <strong>Enhanced description</strong> - up to 500 characters</li>
+                  <li>• <strong>Social media links</strong> - Facebook, Instagram, etc.</li>
+                  <li>• <strong>Google Maps integration</strong> - interactive location</li>
+                  <li>• <strong>Multiple images</strong> - showcase your business</li>
+                  <li>• <strong>Booking system</strong> - direct appointment scheduling</li>
+                  <li>• <strong>Analytics</strong> - view customer interactions</li>
+                </ul>
+                <p className="mt-2 text-blue-600"><strong>Featured Pricing:</strong> $1/day annually ($365/year) or $1.50/day monthly ($45/month)</p>
               </div>
             </div>
 
