@@ -122,23 +122,12 @@ export default function AdminPage() {
    */
   const loadChangeRequests = async () => {
     try {
-      console.log('[Admin] Loading change requests...')
+      console.log('[Admin] Loading change requests via loadChangeRequests function...')
       
+      // First, load change requests without joins to avoid foreign key issues
       const { data, error } = await supabase
         .from('provider_change_requests')
-        .select(`
-          *,
-          providers:provider_id (
-            id,
-            name,
-            email
-          ),
-          profiles:owner_user_id (
-            id,
-            email,
-            name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -147,8 +136,43 @@ export default function AdminPage() {
         return
       }
 
-      console.log('[Admin] Loaded change requests:', data?.length || 0)
-      setChangeRequests((data as any[]) || [])
+      console.log('[Admin] Change requests loaded successfully:', data?.length || 0, 'requests')
+      
+      // Now enrich the data with provider and profile information
+      const enrichedChangeRequests = await Promise.all(
+        (data || []).map(async (request) => {
+          // Load provider information
+          let providerInfo = null
+          if (request.provider_id) {
+            const { data: providerData } = await supabase
+              .from('providers')
+              .select('id, name, email')
+              .eq('id', request.provider_id)
+              .single()
+            providerInfo = providerData
+          }
+          
+          // Load profile information
+          let profileInfo = null
+          if (request.owner_user_id) {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('id, email, name')
+              .eq('id', request.owner_user_id)
+              .single()
+            profileInfo = profileData
+          }
+          
+          return {
+            ...request,
+            providers: providerInfo,
+            profiles: profileInfo
+          }
+        })
+      )
+      
+      console.log('[Admin] Enriched change requests via loadChangeRequests:', enrichedChangeRequests.length)
+      setChangeRequests(enrichedChangeRequests)
       
     } catch (error: any) {
       console.error('[Admin] Error loading change requests:', error)
@@ -422,24 +446,61 @@ export default function AdminPage() {
         } catch {}
         try {
           // Load change requests with provider and owner information
-          const { data: crData } = await supabase
+          // This should load for all users, not just admins, so they can see their own requests
+          console.log('[Admin] Loading change requests...')
+          
+          // First, load change requests without joins to avoid foreign key issues
+          const { data: crData, error: crError } = await supabase
             .from('provider_change_requests')
-            .select(`
-              *,
-              providers:provider_id (
-                id,
-                name,
-                email
-              ),
-              profiles:owner_user_id (
-                id,
-                email,
-                name
-              )
-            `)
+            .select('*')
             .order('created_at', { ascending: false })
-          setChangeRequests((crData as any[]) || [])
-        } catch {}
+          
+          if (crError) {
+            console.error('[Admin] Change requests loading error:', crError)
+            setError((prev) => prev ?? `Failed to load change requests: ${crError.message}`)
+          } else {
+            console.log('[Admin] Change requests loaded successfully:', crData?.length || 0, 'requests')
+            
+            // Now enrich the data with provider and profile information
+            const enrichedChangeRequests = await Promise.all(
+              (crData || []).map(async (request) => {
+                // Load provider information
+                let providerInfo = null
+                if (request.provider_id) {
+                  const { data: providerData } = await supabase
+                    .from('providers')
+                    .select('id, name, email')
+                    .eq('id', request.provider_id)
+                    .single()
+                  providerInfo = providerData
+                }
+                
+                // Load profile information
+                let profileInfo = null
+                if (request.owner_user_id) {
+                  const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('id, email, name')
+                    .eq('id', request.owner_user_id)
+                    .single()
+                  profileInfo = profileData
+                }
+                
+                return {
+                  ...request,
+                  providers: providerInfo,
+                  profiles: profileInfo
+                }
+              })
+            )
+            
+            console.log('[Admin] Enriched change requests:', enrichedChangeRequests.length)
+            setChangeRequests(enrichedChangeRequests)
+          }
+        } catch (err) {
+          console.error('[Admin] Change requests loading exception:', err)
+          setError((prev) => prev ?? `Failed to load change requests: ${err}`)
+        }
         try {
           const { data: jpData } = await supabase.from('provider_job_posts').select('*').order('created_at', { ascending: false })
           setJobPosts((jpData as ProviderJobPost[]) || [])
@@ -850,6 +911,16 @@ export default function AdminPage() {
         {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
         {message && <div className="mt-3 text-sm text-green-700">{message}</div>}
 
+        {/* Debug Section - Show all change requests for troubleshooting */}
+        {isAdmin && (
+          <div className="mt-4 mb-2 p-2 bg-gray-100 rounded text-xs">
+            <strong>Debug Info:</strong> Total change requests: {changeRequests.length}, 
+            Pending: {changeRequests.filter(req => req.status === 'pending').length}, 
+            Approved: {changeRequests.filter(req => req.status === 'approved').length}, 
+            Rejected: {changeRequests.filter(req => req.status === 'rejected').length}
+          </div>
+        )}
+
         {/* Pending Approvals Notification Section */}
         {isAdmin && (
           <div className="mt-6 mb-4">
@@ -890,6 +961,8 @@ export default function AdminPage() {
                           <div className="text-xs text-amber-700 mt-2">
                             {changeRequests.filter(req => req.status === 'pending').slice(0, 2).map(req => (
                               <div key={req.id} className="truncate">
+                                {/* Show business name if available, otherwise show request type */}
+                                {req.providers?.name ? `${req.providers.name} - ` : ''}
                                 {req.type === 'feature_request' ? 'Featured Upgrade' : 
                                  req.type === 'update' ? 'Listing Update' : 
                                  req.type === 'delete' ? 'Listing Deletion' :
