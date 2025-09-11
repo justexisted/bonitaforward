@@ -252,6 +252,13 @@ export default function MyBusinessPage() {
         jobPosts: jobPostsData.length
       })
       
+      // Debug: Log the actual listing data to see what's being displayed
+      if (allListings && allListings.length > 0) {
+        console.log('[MyBusiness] First listing data:', allListings[0])
+        console.log('[MyBusiness] Website field:', allListings[0].website)
+        console.log('[MyBusiness] Description field:', allListings[0].description)
+      }
+      
     } catch (error: any) {
       console.error('[MyBusiness] Error loading business data:', error)
       setMessage(`Error loading data: ${error.message}`)
@@ -510,6 +517,13 @@ export default function MyBusinessPage() {
       }
 
       console.log('[MyBusiness] Update successful')
+      
+      // Clear timeout immediately on success to prevent contradictory messages
+      if (updateTimeout) {
+        clearTimeout(updateTimeout)
+        setUpdateTimeout(null)
+      }
+      
       setMessage('✅ Business listing updated successfully! Your changes will be reviewed by our admin team before going live. You will receive an email notification once approved.')
       
       // Refresh data and close form
@@ -658,6 +672,32 @@ export default function MyBusinessPage() {
           </div>
         )}
 
+        {/* Admin Approval Status Section */}
+        {listings.some(listing => !listing.published) && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-amber-800">Pending Admin Approval</h3>
+                <div className="mt-2 text-sm text-amber-700">
+                  <p>You have business listings that are pending admin approval. These changes will not be visible to the public until approved.</p>
+                  <ul className="mt-2 list-disc list-inside">
+                    {listings.filter(listing => !listing.published).map(listing => (
+                      <li key={listing.id}>
+                        <strong>{listing.name}</strong> - {listing.website ? `Website: ${listing.website}` : 'Basic listing information'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* DEBUG INFO - Remove after fixing */}
         <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs">
           <div className="font-semibold mb-2">Debug Info:</div>
@@ -751,14 +791,15 @@ export default function MyBusinessPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                         <div>
                           <p className="text-sm text-neutral-600"><strong>Category:</strong> {listing.category_key}</p>
-                          <p className="text-sm text-neutral-600"><strong>Email:</strong> {listing.email}</p>
-                          <p className="text-sm text-neutral-600"><strong>Phone:</strong> {listing.phone}</p>
-                          {listing.website && (
-                            <p className="text-sm text-neutral-600"><strong>Website:</strong> 
-                              <a href={listing.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">
-                                {listing.website}
-                              </a>
-                            </p>
+                          <p className="text-sm text-neutral-600"><strong>Email:</strong> {listing.email || 'Not provided'}</p>
+                          <p className="text-sm text-neutral-600"><strong>Phone:</strong> {listing.phone || 'Not provided'}</p>
+                          <p className="text-sm text-neutral-600"><strong>Website:</strong> {listing.website ? (
+                            <a href={listing.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">
+                              {listing.website}
+                            </a>
+                          ) : 'Not provided'}</p>
+                          {listing.description && (
+                            <p className="text-sm text-neutral-600"><strong>Description:</strong> {listing.description}</p>
                           )}
                         </div>
                         <div>
