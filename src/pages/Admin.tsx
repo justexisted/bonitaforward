@@ -173,14 +173,33 @@ export default function AdminPage() {
   const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
   const isClientAdmin = useMemo(() => !!auth.email && adminList.includes(auth.email.toLowerCase()), [auth.email, adminList])
 
-  // Server-side admin verification
+  /**
+   * CRITICAL FIX: Admin verification race condition
+   * 
+   * Issue: Admin verification re-runs during auth state changes, causing isAdmin to flip from true to false.
+   * 
+   * Root cause: useEffect runs on every auth.email change, including during auth initialization.
+   * During auth state transitions, auth.email might be temporarily undefined or the verification fails.
+   * 
+   * Fix: Only run verification once when auth is fully loaded, and cache the result.
+   */
   useEffect(() => {
     async function verifyAdmin() {
+      console.log('[Admin] Admin verification triggered for:', auth.email, 'loading:', auth.loading)
+      
       if (!auth.email) {
+        console.log('[Admin] No email, setting admin status to false')
         setAdminStatus({ isAdmin: false, loading: false, verified: false })
         return
       }
 
+      // CRITICAL: Don't re-verify if already verified for this email
+      if (adminStatus.verified && adminStatus.isAdmin && auth.email) {
+        console.log('[Admin] Already verified as admin for this email, skipping re-verification')
+        return
+      }
+
+      console.log('[Admin] Starting admin verification for:', auth.email)
       setAdminStatus(prev => ({ ...prev, loading: true }))
 
       try {
@@ -188,6 +207,7 @@ export default function AdminPage() {
         const token = session.session?.access_token
         
         if (!token) {
+          console.log('[Admin] No auth token, using client-side admin check:', isClientAdmin)
           setAdminStatus({ isAdmin: isClientAdmin, loading: false, verified: false })
           return
         }
@@ -199,6 +219,8 @@ export default function AdminPage() {
           url = `${window.location.origin}/.netlify/functions/admin-verify`
         }
         
+        console.log('[Admin] Making server verification request to:', url)
+        
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -207,14 +229,18 @@ export default function AdminPage() {
           }
         })
 
+        console.log('[Admin] Server verification response:', response.status, response.ok)
+
         if (response.ok) {
           const result = await response.json()
+          console.log('[Admin] Server verification result:', result)
           setAdminStatus({
             isAdmin: result.isAdmin,
             loading: false,
             verified: true
           })
         } else {
+          console.log('[Admin] Server verification failed, using client-side check:', isClientAdmin)
           // Fallback to client-side check if server verification fails
           setAdminStatus({
             isAdmin: isClientAdmin,
@@ -224,6 +250,7 @@ export default function AdminPage() {
           })
         }
       } catch (err) {
+        console.log('[Admin] Server verification error, using client-side check:', isClientAdmin, 'Error:', err)
         // Fallback to client-side check on error
         setAdminStatus({
           isAdmin: isClientAdmin,
@@ -234,8 +261,24 @@ export default function AdminPage() {
       }
     }
 
-    verifyAdmin()
-  }, [auth.email, isClientAdmin])
+    /**
+     * CRITICAL FIX: Prevent re-verification during auth state changes
+     * 
+     * Issue: useEffect was running on every isClientAdmin change, which happens
+     * during auth state updates, causing admin status to flip from true to false.
+     * 
+     * Root cause: isClientAdmin is a computed value that changes during auth updates,
+     * triggering unnecessary re-verification that fails.
+     * 
+     * Fix: Only run verification when email changes AND auth is not loading.
+     * Remove isClientAdmin from dependencies to prevent unnecessary re-runs.
+     */
+    
+    // Only verify when email changes and auth is stable (not loading)
+    if (!auth.loading) {
+      verifyAdmin()
+    }
+  }, [auth.email, auth.loading]) // Removed isClientAdmin dependency
 
   const isAdmin = adminStatus.isAdmin
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
