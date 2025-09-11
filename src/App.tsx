@@ -372,8 +372,36 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message }
   }
 
+  /**
+   * CRITICAL DEBUG: Sign-up function with extensive logging
+   * 
+   * This function calls Supabase auth.signUp and returns the result.
+   * Adding logging to see exactly what Supabase returns in different scenarios.
+   * 
+   * Supabase behavior depends on email confirmation settings:
+   * - Confirmation disabled: Returns session immediately
+   * - Confirmation enabled: Returns no session, user must confirm email
+   * - User exists: Returns error without creating duplicate
+   */
   const signUpWithEmail = async (email: string, password: string, name?: string, role?: 'business' | 'community') => {
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name, role } } })
+    console.log('[Auth] signUpWithEmail called:', { email, hasPassword: !!password, name, role })
+    
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password, 
+      options: { 
+        data: { name, role } 
+      } 
+    })
+    
+    console.log('[Auth] signUpWithEmail response:', {
+      error: error?.message,
+      errorCode: (error as any)?.code,
+      hasSession: !!data?.session,
+      hasUser: !!data?.user,
+      userConfirmed: data?.user?.email_confirmed_at ? 'confirmed' : 'unconfirmed'
+    })
+    
     return { error: error?.message, session: data?.session ?? null }
   }
 

@@ -124,24 +124,68 @@ export default function SignInPage() {
             return
           }
 
+          /**
+           * CRITICAL DEBUG: Sign-up process investigation
+           * 
+           * Issue: Supabase claims user already exists before user is actually created.
+           * This can happen due to email confirmation settings in Supabase.
+           * 
+           * Possible causes:
+           * 1. Email confirmation is enabled - user gets created but unconfirmed
+           * 2. Previous failed sign-up left unconfirmed user in database
+           * 3. Supabase auth settings are misconfigured
+           * 
+           * Adding extensive logging to understand the exact flow.
+           */
+          console.log('[SignIn] Starting sign-up process for:', email)
+          console.log('[SignIn] Account type selected:', accountType)
+          console.log('[SignIn] Password length:', password.length)
+
           const { error, session } = await auth.signUpWithEmail(email, password, name, accountType || undefined)
+          
+          console.log('[SignIn] Sign-up result:', {
+            error: error,
+            hasSession: !!session,
+            sessionUser: session ? 'present' : 'none'
+          })
 
           if (!error) {
+            /**
+             * SUCCESS CASE: Sign-up worked
+             * 
+             * User account was created successfully. Handle session and redirect.
+             */
+            console.log('[SignIn] Sign-up successful!')
+            
             try {
               localStorage.removeItem('bf-signup-prefill')
               localStorage.setItem('bf-pending-profile', JSON.stringify({ name, email, role: accountType }))
             } catch {}
 
             if (!session) {
-              // Fallback: try sign-in if no session returned (some configs)
+              /**
+               * NO SESSION CASE: Email confirmation might be enabled
+               * 
+               * If Supabase email confirmation is enabled, sign-up succeeds but
+               * no session is returned until user confirms email.
+               */
+              console.log('[SignIn] No session returned - email confirmation might be required')
+              
+              // Try sign-in to see if account is usable
               const { error: signInErr } = await auth.signInWithEmail(email, password)
               if (signInErr) {
-                setMessage('Account created. Please sign in to continue.')
+                console.log('[SignIn] Sign-in failed after successful sign-up:', signInErr)
+                setMessage('Account created. Please check your email to confirm your account, then sign in.')
                 return
+              } else {
+                console.log('[SignIn] Sign-in successful after sign-up')
               }
+            } else {
+              console.log('[SignIn] Session returned with sign-up, user is immediately authenticated')
             }
 
             // Redirect based on account type
+            console.log('[SignIn] Redirecting to account page')
             const redirectPath = accountType === 'business' ? '/account' : '/account'
             navigate(redirectPath, { replace: true })
           } else {
@@ -173,16 +217,46 @@ export default function SignInPage() {
             console.log('[SignIn] Sign-up error:', error)
             const emsg = String(error || '').toLowerCase()
             
-            // Check for specific "user already exists" error from Supabase
-            if (emsg.includes('user_already_exists') || emsg.includes('user already exists') || emsg.includes('already registered')) {
-              console.log('[SignIn] User already exists, this is a password/sign-in issue')
-              setMessage('An account with this email already exists. Please sign in instead or reset your password if you forgot it.')
-              // Switch to sign-in mode so user can try signing in
+            /**
+             * COMPREHENSIVE ERROR HANDLING: Handle all Supabase sign-up scenarios
+             * 
+             * Supabase can return different errors:
+             * 1. "user_already_exists" - Email is taken (confirmed user)
+             * 2. "signup_disabled" - Sign-ups are disabled
+             * 3. "email_not_confirmed" - User exists but unconfirmed
+             * 4. Validation errors - Weak password, invalid email, etc.
+             * 
+             * The "bullshit" behavior you're seeing is likely due to email confirmation
+             * being enabled in Supabase, causing users to exist in unconfirmed state.
+             */
+            
+            // Check for specific user already exists scenarios
+            if (emsg.includes('user_already_exists') || emsg.includes('user already exists')) {
+              console.log('[SignIn] Definitive user already exists error')
+              setMessage('An account with this email already exists. Please sign in instead.')
               setMode('signin')
-            } else {
-              // For all other errors (weak password, invalid email, etc.), show the actual error
-              console.log('[SignIn] Sign-up failed with error:', error)
-              setMessage(error)
+            } 
+            else if (emsg.includes('email_not_confirmed') || emsg.includes('not confirmed')) {
+              console.log('[SignIn] User exists but email not confirmed')
+              setMessage('Please check your email and click the confirmation link, then try signing in.')
+              setMode('signin')
+            }
+            else if (emsg.includes('signup_disabled')) {
+              console.log('[SignIn] Sign-ups are disabled')
+              setMessage('Account creation is currently disabled. Please contact support.')
+            }
+            else if (emsg.includes('password')) {
+              console.log('[SignIn] Password-related error')
+              setMessage(error) // Show specific password error
+            }
+            else if (emsg.includes('email')) {
+              console.log('[SignIn] Email-related error')
+              setMessage(error) // Show specific email error
+            }
+            else {
+              // For unknown errors, show the actual error
+              console.log('[SignIn] Unknown sign-up error:', error)
+              setMessage(`Sign-up failed: ${error}`)
             }
           }
         }
