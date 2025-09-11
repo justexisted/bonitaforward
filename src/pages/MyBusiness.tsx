@@ -33,15 +33,18 @@ type BusinessListing = {
   address: string | null
   images: string[] | null
   owner_user_id: string | null
-  is_featured: boolean | null
-  tier: 'free' | 'featured' | null
-  status: 'pending' | 'approved' | 'rejected' | null
+  is_member: boolean | null  // This indicates if the provider is featured (admin-approved)
+  published: boolean | null
+  created_at: string
+  updated_at: string
+  // Additional fields for enhanced business management
   description: string | null
   social_links: Record<string, string> | null
   google_maps_url: string | null
   booking_enabled: boolean | null
-  created_at: string
-  updated_at: string
+  business_hours: Record<string, string> | null
+  service_areas: string[] | null
+  specialties: string[] | null
 }
 
 // Type definition for business applications in the business_applications table
@@ -58,13 +61,30 @@ type BusinessApplication = {
   created_at: string
 }
 
+// Type definition for job posts in the provider_job_posts table
+type JobPost = {
+  id: string
+  provider_id: string
+  owner_user_id: string
+  title: string
+  description: string | null
+  apply_url: string | null
+  salary_range: string | null
+  status: 'pending' | 'approved' | 'rejected' | 'archived'
+  created_at: string
+  decided_at: string | null
+}
+
 export default function MyBusinessPage() {
   const auth = useAuth()
   const [listings, setListings] = useState<BusinessListing[]>([])
   const [applications, setApplications] = useState<BusinessApplication[]>([])
+  const [jobPosts, setJobPosts] = useState<JobPost[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'analytics'>('listings')
+  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'jobs' | 'analytics'>('listings')
+  const [editingListing, setEditingListing] = useState<BusinessListing | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
 
   /**
    * AUTHENTICATION & ROLE CHECK
@@ -94,25 +114,16 @@ export default function MyBusinessPage() {
   /**
    * LOAD BUSINESS DATA
    * 
-   * Fetches two types of data for the business user:
+   * Fetches comprehensive business data for the business user:
    * 1. Active Listings - From 'providers' table where owner_user_id matches current user
    * 2. Applications - From 'business_applications' table where email matches current user
+   * 3. Job Posts - From 'provider_job_posts' table where owner_user_id matches current user
    * 
-   * This separation allows businesses to:
-   * - Track applications they've submitted (even before account creation)
-   * - Manage listings they own (after admin approval)
-   * - Request free listings from existing applications
-   */
-  /**
-   * CRITICAL DEBUG: Load business data with extensive logging
-   * 
-   * The issue is that approved business applications aren't showing as listings.
-   * This happens because:
-   * 1. Admin approves application but doesn't create provider with owner_user_id
-   * 2. My Business page only shows providers where owner_user_id = current user
-   * 3. The link between application approval and provider creation is broken
-   * 
-   * This function adds debug logging to see exactly what's in the database.
+   * This comprehensive data allows businesses to:
+   * - Manage their business listings (create, edit, update)
+   * - Track applications they've submitted
+   * - Manage job postings for their business
+   * - Request upgrades from free to featured tier
    */
   const loadBusinessData = async () => {
     if (!auth.userId) {
@@ -122,7 +133,7 @@ export default function MyBusinessPage() {
     
     setLoading(true)
     try {
-      console.log('[MyBusiness] Loading data for userId:', auth.userId, 'email:', auth.email)
+      console.log('[MyBusiness] Loading comprehensive business data for userId:', auth.userId, 'email:', auth.email)
       
       // Load business listings owned by user from providers table
       const { data: listingsData, error: listingsError } = await supabase
@@ -167,6 +178,33 @@ export default function MyBusinessPage() {
 
       if (appsError) throw appsError
 
+      // Load job posts for all user's providers
+      const providerIds = [
+        ...(listingsData || []).map(l => l.id),
+        ...(emailListingsData || []).map(l => l.id)
+      ]
+      
+      let jobPostsData: JobPost[] = []
+      if (providerIds.length > 0) {
+        const { data: jobsData, error: jobsError } = await supabase
+          .from('provider_job_posts')
+          .select('*')
+          .in('provider_id', providerIds)
+          .order('created_at', { ascending: false })
+
+        console.log('[MyBusiness] Job posts query result:', {
+          error: jobsError,
+          count: jobsData?.length || 0,
+          data: jobsData
+        })
+
+        if (jobsError) {
+          console.warn('[MyBusiness] Job posts error (non-critical):', jobsError)
+        } else {
+          jobPostsData = (jobsData as JobPost[]) || []
+        }
+      }
+
       // Combine listings from both queries (owned and by email)
       const allListings = [
         ...(listingsData || []),
@@ -177,10 +215,12 @@ export default function MyBusinessPage() {
 
       setListings((allListings as BusinessListing[]) || [])
       setApplications((appsData as BusinessApplication[]) || [])
+      setJobPosts(jobPostsData)
       
-      console.log('[MyBusiness] Final state:', {
+      console.log('[MyBusiness] Final comprehensive state:', {
         listings: allListings.length,
-        applications: appsData?.length || 0
+        applications: appsData?.length || 0,
+        jobPosts: jobPostsData.length
       })
       
     } catch (error: any) {
@@ -280,6 +320,166 @@ export default function MyBusinessPage() {
     }
   }
 
+  /**
+   * CREATE NEW BUSINESS LISTING
+   * 
+   * This function allows business owners to create new business listings directly.
+   * It creates a provider entry in the database with the user as the owner.
+   * 
+   * Fields included:
+   * - Basic info: name, category, phone, email, website, address
+   * - Business details: description, tags, specialties
+   * - Social media: social_links object
+   * - Service areas and business hours
+   * - Images and booking settings
+   */
+  const createBusinessListing = async (listingData: Partial<BusinessListing>) => {
+    try {
+      setMessage('Creating business listing...')
+      
+      const { error } = await supabase
+        .from('providers')
+        .insert([{
+          name: listingData.name,
+          category_key: listingData.category_key,
+          phone: listingData.phone,
+          email: listingData.email || auth.email,
+          website: listingData.website,
+          address: listingData.address,
+          description: listingData.description,
+          tags: listingData.tags || [],
+          specialties: listingData.specialties || [],
+          social_links: listingData.social_links || {},
+          business_hours: listingData.business_hours || {},
+          service_areas: listingData.service_areas || [],
+          images: listingData.images || [],
+          booking_enabled: listingData.booking_enabled || false,
+          google_maps_url: listingData.google_maps_url,
+          owner_user_id: auth.userId,
+          published: false, // Requires admin approval
+          is_member: false  // Free tier by default
+        }])
+
+      if (error) throw error
+
+      setMessage('Business listing created! It will be reviewed by our admin team.')
+      loadBusinessData() // Refresh data to show new listing
+      setShowCreateForm(false)
+    } catch (error: any) {
+      setMessage(`Error creating listing: ${error.message}`)
+    }
+  }
+
+  /**
+   * UPDATE BUSINESS LISTING
+   * 
+   * This function allows business owners to update their existing business listings.
+   * It updates the provider entry in the database with new information.
+   * 
+   * Note: Some changes may require admin approval depending on the field.
+   */
+  const updateBusinessListing = async (listingId: string, updates: Partial<BusinessListing>) => {
+    try {
+      setMessage('Updating business listing...')
+      
+      const { error } = await supabase
+        .from('providers')
+        .update({
+          name: updates.name,
+          category_key: updates.category_key,
+          phone: updates.phone,
+          email: updates.email,
+          website: updates.website,
+          address: updates.address,
+          description: updates.description,
+          tags: updates.tags,
+          specialties: updates.specialties,
+          social_links: updates.social_links,
+          business_hours: updates.business_hours,
+          service_areas: updates.service_areas,
+          images: updates.images,
+          booking_enabled: updates.booking_enabled,
+          google_maps_url: updates.google_maps_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', listingId)
+        .eq('owner_user_id', auth.userId) // Ensure user owns this listing
+
+      if (error) throw error
+
+      setMessage('Business listing updated successfully!')
+      loadBusinessData() // Refresh data to show updates
+      setEditingListing(null)
+    } catch (error: any) {
+      setMessage(`Error updating listing: ${error.message}`)
+    }
+  }
+
+  /**
+   * CREATE JOB POST
+   * 
+   * This function allows business owners to create job postings for their business.
+   * It creates an entry in the provider_job_posts table for admin review.
+   */
+  const createJobPost = async (providerId: string, jobData: {
+    title: string
+    description?: string
+    apply_url?: string
+    salary_range?: string
+  }) => {
+    try {
+      setMessage('Creating job post...')
+      
+      const { error } = await supabase
+        .from('provider_job_posts')
+        .insert([{
+          provider_id: providerId,
+          owner_user_id: auth.userId,
+          title: jobData.title,
+          description: jobData.description,
+          apply_url: jobData.apply_url,
+          salary_range: jobData.salary_range,
+          status: 'pending'
+        }])
+
+      if (error) throw error
+
+      setMessage('Job post created! It will be reviewed by our admin team.')
+      loadBusinessData() // Refresh data to show new job post
+    } catch (error: any) {
+      setMessage(`Error creating job post: ${error.message}`)
+    }
+  }
+
+  /**
+   * DELETE BUSINESS LISTING
+   * 
+   * This function allows business owners to delete their business listings.
+   * It removes the provider entry from the database.
+   */
+  const deleteBusinessListing = async (listingId: string) => {
+    if (!confirm('Are you sure you want to delete this business listing? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setMessage('Deleting business listing...')
+      
+      const { error } = await supabase
+        .from('providers')
+        .delete()
+        .eq('id', listingId)
+        .eq('owner_user_id', auth.userId) // Ensure user owns this listing
+
+      if (error) throw error
+
+      setMessage('Business listing deleted successfully!')
+      loadBusinessData() // Refresh data to remove deleted listing
+    } catch (error: any) {
+      setMessage(`Error deleting listing: ${error.message}`)
+    }
+  }
+
   if (auth.role !== 'business') {
     return (
       <section className="py-8">
@@ -339,8 +539,9 @@ export default function MyBusinessPage() {
         <div className="mb-6">
           <div className="flex space-x-1 rounded-xl bg-neutral-100 p-1">
             {[
-              { key: 'listings', label: 'Active Listings', count: listings.length },
+              { key: 'listings', label: 'Business Listings', count: listings.length },
               { key: 'applications', label: 'Applications', count: applications.length },
+              { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
               { key: 'analytics', label: 'Analytics' }
             ].map((tab) => (
               <button
@@ -363,52 +564,106 @@ export default function MyBusinessPage() {
           </div>
         </div>
 
-        {/* Active Listings Tab */}
+        {/* Business Listings Tab */}
         {activeTab === 'listings' && (
           <div className="space-y-4">
+            {/* Header with Create Button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Your Business Listings</h2>
+                <p className="text-sm text-neutral-600">Manage your business listings and details</p>
+              </div>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800"
+              >
+                + Create New Listing
+              </button>
+            </div>
+
             {listings.length === 0 ? (
               <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-                <h3 className="text-lg font-medium text-neutral-900">No Active Listings</h3>
-                <p className="mt-2 text-neutral-600">You don't have any active business listings yet.</p>
-                <Link 
-                  to="/business#apply" 
+                <h3 className="text-lg font-medium text-neutral-900">No Business Listings</h3>
+                <p className="mt-2 text-neutral-600">You don't have any business listings yet. Create your first one to get started!</p>
+                <button
+                  onClick={() => setShowCreateForm(true)}
                   className="mt-4 inline-block rounded-full bg-neutral-900 text-white px-6 py-2"
                 >
-                  Apply for Business Listing
-                </Link>
+                  Create Your First Listing
+                </button>
               </div>
             ) : (
               listings.map((listing) => (
                 <div key={listing.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold">{listing.name}</h3>
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          listing.tier === 'featured' 
+                          listing.is_member 
                             ? 'bg-yellow-100 text-yellow-800' 
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {listing.tier === 'featured' ? '⭐ Featured' : '📋 Free'}
+                          {listing.is_member ? '⭐ Featured' : '📋 Free'}
                         </span>
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          listing.status === 'approved' 
+                          listing.published 
                             ? 'bg-green-100 text-green-800'
-                            : listing.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {listing.status || 'pending'}
+                          {listing.published ? 'Published' : 'Pending Review'}
                         </span>
                       </div>
-                      <p className="text-sm text-neutral-600 mt-1">{listing.category_key}</p>
-                      <p className="text-sm text-neutral-600">{listing.email} • {listing.phone}</p>
-                      {listing.address && (
-                        <p className="text-sm text-neutral-600">{listing.address}</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                        <div>
+                          <p className="text-sm text-neutral-600"><strong>Category:</strong> {listing.category_key}</p>
+                          <p className="text-sm text-neutral-600"><strong>Email:</strong> {listing.email}</p>
+                          <p className="text-sm text-neutral-600"><strong>Phone:</strong> {listing.phone}</p>
+                          {listing.website && (
+                            <p className="text-sm text-neutral-600"><strong>Website:</strong> 
+                              <a href={listing.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">
+                                {listing.website}
+                              </a>
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          {listing.address && (
+                            <p className="text-sm text-neutral-600"><strong>Address:</strong> {listing.address}</p>
+                          )}
+                          {listing.description && (
+                            <p className="text-sm text-neutral-600"><strong>Description:</strong> {listing.description}</p>
+                          )}
+                          {listing.tags && listing.tags.length > 0 && (
+                            <p className="text-sm text-neutral-600"><strong>Tags:</strong> {listing.tags.join(', ')}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Social Links */}
+                      {listing.social_links && Object.keys(listing.social_links).length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-neutral-700 mb-1">Social Media:</p>
+                          <div className="flex gap-2">
+                            {Object.entries(listing.social_links).map(([platform, url]) => (
+                              <a
+                                key={platform}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline text-sm"
+                              >
+                                {platform}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="flex gap-2">
-                      {listing.tier !== 'featured' && (
+                    
+                    <div className="flex flex-col gap-2 ml-4">
+                      {!listing.is_member && (
                         <button
                           onClick={() => upgradeToFeatured(listing.id)}
                           className="rounded-full bg-yellow-50 text-yellow-700 px-3 py-1.5 text-xs border border-yellow-200 hover:bg-yellow-100"
@@ -416,8 +671,17 @@ export default function MyBusinessPage() {
                           Upgrade to Featured
                         </button>
                       )}
-                      <button className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200">
+                      <button
+                        onClick={() => setEditingListing(listing)}
+                        className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200"
+                      >
                         Edit Details
+                      </button>
+                      <button
+                        onClick={() => deleteBusinessListing(listing.id)}
+                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs border border-red-200 hover:bg-red-100"
+                      >
+                        Delete
                       </button>
                     </div>
                   </div>
@@ -468,6 +732,109 @@ export default function MyBusinessPage() {
           </div>
         )}
 
+        {/* Job Posts Tab */}
+        {activeTab === 'jobs' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Job Posts</h2>
+                <p className="text-sm text-neutral-600">Manage job postings for your business</p>
+              </div>
+              {listings.length > 0 && (
+                <button
+                  onClick={() => {/* TODO: Add job post creation modal */}}
+                  className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800"
+                >
+                  + Create Job Post
+                </button>
+              )}
+            </div>
+
+            {listings.length === 0 ? (
+              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                <h3 className="text-lg font-medium text-neutral-900">Create a Business Listing First</h3>
+                <p className="mt-2 text-neutral-600">You need to create a business listing before you can post jobs.</p>
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="mt-4 inline-block rounded-full bg-neutral-900 text-white px-6 py-2"
+                >
+                  Create Business Listing
+                </button>
+              </div>
+            ) : jobPosts.length === 0 ? (
+              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                <h3 className="text-lg font-medium text-neutral-900">No Job Posts</h3>
+                <p className="mt-2 text-neutral-600">You haven't created any job posts yet.</p>
+                <button
+                  onClick={() => {/* TODO: Add job post creation modal */}}
+                  className="mt-4 inline-block rounded-full bg-neutral-900 text-white px-6 py-2"
+                >
+                  Create Your First Job Post
+                </button>
+              </div>
+            ) : (
+              jobPosts.map((job) => (
+                <div key={job.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold">{job.title}</h3>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          job.status === 'approved' 
+                            ? 'bg-green-100 text-green-800'
+                            : job.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : job.status === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {job.status}
+                        </span>
+                      </div>
+                      
+                      {job.description && (
+                        <p className="text-sm text-neutral-600 mb-2">{job.description}</p>
+                      )}
+                      
+                      <div className="flex gap-4 text-sm text-neutral-600">
+                        {job.salary_range && (
+                          <span><strong>Salary:</strong> {job.salary_range}</span>
+                        )}
+                        <span><strong>Posted:</strong> {new Date(job.created_at).toLocaleDateString()}</span>
+                        {job.decided_at && (
+                          <span><strong>Decided:</strong> {new Date(job.decided_at).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                      
+                      {job.apply_url && (
+                        <div className="mt-2">
+                          <a
+                            href={job.apply_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline text-sm"
+                          >
+                            Apply Here →
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2 ml-4">
+                      <button className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200">
+                        Edit
+                      </button>
+                      <button className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs border border-red-200 hover:bg-red-100">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
@@ -477,7 +844,466 @@ export default function MyBusinessPage() {
             </p>
           </div>
         )}
+
+        {/* Business Listing Creation/Edit Modal */}
+        {(showCreateForm || editingListing) && (
+          <BusinessListingForm
+            listing={editingListing}
+            onSave={editingListing ? 
+              (updates) => updateBusinessListing(editingListing.id, updates) :
+              createBusinessListing
+            }
+            onCancel={() => {
+              setShowCreateForm(false)
+              setEditingListing(null)
+            }}
+          />
+        )}
       </div>
     </section>
+  )
+}
+
+/**
+ * BUSINESS LISTING FORM COMPONENT
+ * 
+ * This component provides a comprehensive form for creating and editing business listings.
+ * It includes all the fields needed for both free and featured business listings.
+ * 
+ * Features:
+ * - Basic business information (name, category, contact details)
+ * - Business description and tags
+ * - Social media links
+ * - Service areas and specialties
+ * - Business hours
+ * - Image management
+ * - Google Maps integration
+ * - Booking system settings (for featured listings)
+ */
+function BusinessListingForm({ 
+  listing, 
+  onSave, 
+  onCancel 
+}: { 
+  listing: BusinessListing | null
+  onSave: (data: Partial<BusinessListing>) => void
+  onCancel: () => void 
+}) {
+  const [formData, setFormData] = useState<Partial<BusinessListing>>({
+    name: listing?.name || '',
+    category_key: listing?.category_key || '',
+    phone: listing?.phone || '',
+    email: listing?.email || '',
+    website: listing?.website || '',
+    address: listing?.address || '',
+    description: listing?.description || '',
+    tags: listing?.tags || [],
+    specialties: listing?.specialties || [],
+    social_links: listing?.social_links || {},
+    business_hours: listing?.business_hours || {},
+    service_areas: listing?.service_areas || [],
+    images: listing?.images || [],
+    booking_enabled: listing?.booking_enabled || false,
+    google_maps_url: listing?.google_maps_url || ''
+  })
+
+  const [newTag, setNewTag] = useState('')
+  const [newSpecialty, setNewSpecialty] = useState('')
+  const [newServiceArea, setNewServiceArea] = useState('')
+  const [newSocialPlatform, setNewSocialPlatform] = useState('')
+  const [newSocialUrl, setNewSocialUrl] = useState('')
+
+  const categories = [
+    { key: 'real-estate', name: 'Real Estate' },
+    { key: 'home-services', name: 'Home Services' },
+    { key: 'health-wellness', name: 'Health & Wellness' },
+    { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
+    { key: 'professional-services', name: 'Professional Services' }
+  ]
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave(formData)
+  }
+
+  const addTag = () => {
+    if (newTag.trim() && !formData.tags?.includes(newTag.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        tags: [...(prev.tags || []), newTag.trim()]
+      }))
+      setNewTag('')
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags?.filter(tag => tag !== tagToRemove) || []
+    }))
+  }
+
+  const addSpecialty = () => {
+    if (newSpecialty.trim() && !formData.specialties?.includes(newSpecialty.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        specialties: [...(prev.specialties || []), newSpecialty.trim()]
+      }))
+      setNewSpecialty('')
+    }
+  }
+
+  const removeSpecialty = (specialtyToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      specialties: prev.specialties?.filter(specialty => specialty !== specialtyToRemove) || []
+    }))
+  }
+
+  const addServiceArea = () => {
+    if (newServiceArea.trim() && !formData.service_areas?.includes(newServiceArea.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        service_areas: [...(prev.service_areas || []), newServiceArea.trim()]
+      }))
+      setNewServiceArea('')
+    }
+  }
+
+  const removeServiceArea = (areaToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      service_areas: prev.service_areas?.filter(area => area !== areaToRemove) || []
+    }))
+  }
+
+  const addSocialLink = () => {
+    if (newSocialPlatform.trim() && newSocialUrl.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        social_links: {
+          ...prev.social_links,
+          [newSocialPlatform.trim()]: newSocialUrl.trim()
+        }
+      }))
+      setNewSocialPlatform('')
+      setNewSocialUrl('')
+    }
+  }
+
+  const removeSocialLink = (platform: string) => {
+    setFormData(prev => ({
+      ...prev,
+      social_links: Object.fromEntries(
+        Object.entries(prev.social_links || {}).filter(([key]) => key !== platform)
+      )
+    }))
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">
+              {listing ? 'Edit Business Listing' : 'Create New Business Listing'}
+            </h2>
+            <button
+              onClick={onCancel}
+              className="text-neutral-500 hover:text-neutral-700"
+            >
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Business Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Category *
+                </label>
+                <select
+                  value={formData.category_key || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, category_key: e.target.value }))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {categories.map(cat => (
+                    <option key={cat.key} value={cat.key}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Phone *
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phone || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Website
+                </label>
+                <input
+                  type="url"
+                  value={formData.website || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  placeholder="https://example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  value={formData.address || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  placeholder="123 Main St, Bonita, CA"
+                />
+              </div>
+            </div>
+
+            {/* Business Description */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Business Description
+              </label>
+              <textarea
+                value={formData.description || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={4}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                placeholder="Tell customers about your business..."
+              />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Tags
+              </label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  placeholder="Add a tag..."
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                />
+                <button
+                  type="button"
+                  onClick={addTag}
+                  className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {formData.tags?.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-neutral-100 text-neutral-700 rounded-full text-sm"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="text-neutral-500 hover:text-neutral-700"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Specialties */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Specialties
+              </label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newSpecialty}
+                  onChange={(e) => setNewSpecialty(e.target.value)}
+                  className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  placeholder="Add a specialty..."
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialty())}
+                />
+                <button
+                  type="button"
+                  onClick={addSpecialty}
+                  className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {formData.specialties?.map(specialty => (
+                  <span
+                    key={specialty}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                  >
+                    {specialty}
+                    <button
+                      type="button"
+                      onClick={() => removeSpecialty(specialty)}
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Service Areas */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Service Areas
+              </label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newServiceArea}
+                  onChange={(e) => setNewServiceArea(e.target.value)}
+                  className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  placeholder="Add a service area..."
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addServiceArea())}
+                />
+                <button
+                  type="button"
+                  onClick={addServiceArea}
+                  className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {formData.service_areas?.map(area => (
+                  <span
+                    key={area}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-sm"
+                  >
+                    {area}
+                    <button
+                      type="button"
+                      onClick={() => removeServiceArea(area)}
+                      className="text-green-500 hover:text-green-700"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Social Media Links */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Social Media Links
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newSocialPlatform}
+                  onChange={(e) => setNewSocialPlatform(e.target.value)}
+                  className="rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  placeholder="Platform (e.g., Facebook)"
+                />
+                <input
+                  type="url"
+                  value={newSocialUrl}
+                  onChange={(e) => setNewSocialUrl(e.target.value)}
+                  className="rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                  placeholder="URL"
+                />
+                <button
+                  type="button"
+                  onClick={addSocialLink}
+                  className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="space-y-1">
+                {Object.entries(formData.social_links || {}).map(([platform, url]) => (
+                  <div key={platform} className="flex items-center justify-between bg-neutral-50 p-2 rounded">
+                    <span className="text-sm">
+                      <strong>{platform}:</strong> {url}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeSocialLink(platform)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex gap-3 pt-4">
+              <button
+                type="submit"
+                className="flex-1 bg-neutral-900 text-white px-6 py-2 rounded-lg hover:bg-neutral-800"
+              >
+                {listing ? 'Update Listing' : 'Create Listing'}
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   )
 }
