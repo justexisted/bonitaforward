@@ -809,9 +809,10 @@ export default function AdminPage() {
                           <div className="text-xs text-amber-700 mt-2">
                             {changeRequests.filter(req => req.status === 'pending').slice(0, 2).map(req => (
                               <div key={req.id} className="truncate">
-                                {req.type === 'create_free_listing' ? 'New Free Listing' : 
-                                 req.type === 'feature_request' ? 'Featured Upgrade' : 
-                                 req.type === 'update' ? 'Listing Update' : req.type}
+                                {req.type === 'feature_request' ? 'Featured Upgrade' : 
+                                 req.type === 'update' ? 'Listing Update' : 
+                                 req.type === 'delete' ? 'Listing Deletion' :
+                                 req.type === 'claim' ? 'Business Claim' : req.type}
                               </div>
                             ))}
                             {changeRequests.filter(req => req.status === 'pending').length > 2 && (
