@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { Link } from 'react-router-dom'
-import { createProviderChangeRequest } from '../lib/supabaseData'
+import { createProviderChangeRequest, type ProviderChangeRequest } from '../lib/supabaseData'
 
 // Type definition for business listings in the providers table
 // Updated to include all enhanced business management fields that were added to the database
@@ -82,9 +82,10 @@ export default function MyBusinessPage() {
   const [listings, setListings] = useState<BusinessListing[]>([])
   const [applications, setApplications] = useState<BusinessApplication[]>([])
   const [jobPosts, setJobPosts] = useState<JobPost[]>([])
+  const [changeRequests, setChangeRequests] = useState<ProviderChangeRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'jobs' | 'analytics'>('listings')
+  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'jobs' | 'change-requests' | 'analytics'>('listings')
   const [editingListing, setEditingListing] = useState<BusinessListing | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showJobForm, setShowJobForm] = useState(false)
@@ -210,6 +211,24 @@ export default function MyBusinessPage() {
         }
       }
 
+      // Load change requests for this business owner
+      console.log('[MyBusiness] Loading change requests for user:', auth.userId)
+      const { data: changeRequestsData, error: changeRequestsError } = await supabase
+        .from('provider_change_requests')
+        .select('*')
+        .eq('owner_user_id', auth.userId)
+        .order('created_at', { ascending: false })
+
+      console.log('[MyBusiness] Change requests query result:', {
+        error: changeRequestsError,
+        count: changeRequestsData?.length || 0,
+        data: changeRequestsData
+      })
+
+      if (changeRequestsError) {
+        console.warn('[MyBusiness] Change requests error (non-critical):', changeRequestsError)
+      }
+
       // Combine listings from both queries (owned and by email)
       const allListings = [
         ...(listingsData || []),
@@ -221,6 +240,7 @@ export default function MyBusinessPage() {
       setListings((allListings as BusinessListing[]) || [])
       setApplications((appsData as BusinessApplication[]) || [])
       setJobPosts(jobPostsData)
+      setChangeRequests((changeRequestsData as ProviderChangeRequest[]) || [])
       
       console.log('[MyBusiness] Final comprehensive state:', {
         listings: allListings.length,
@@ -671,6 +691,7 @@ export default function MyBusinessPage() {
               { key: 'listings', label: 'Business Listings', count: listings.length },
               { key: 'applications', label: 'Applications', count: applications.length },
               { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
+              { key: 'change-requests', label: 'Change Requests', count: changeRequests.filter(req => req.status === 'pending').length },
               { key: 'analytics', label: 'Analytics' }
             ].map((tab) => (
               <button
@@ -992,6 +1013,82 @@ export default function MyBusinessPage() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* Change Requests Tab */}
+        {activeTab === 'change-requests' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Change Requests</h2>
+                <p className="text-sm text-neutral-600">Track your pending business listing changes</p>
+              </div>
+            </div>
+
+            {changeRequests.length === 0 ? (
+              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                <h3 className="text-lg font-medium text-neutral-900">No Change Requests</h3>
+                <p className="mt-2 text-neutral-600">
+                  You haven't submitted any change requests yet. Edit your business listings to create change requests.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {changeRequests.map((request) => (
+                  <div key={request.id} className="rounded-xl border border-neutral-200 p-4 bg-white">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-neutral-900">
+                          {request.type === 'update' ? 'Business Listing Update' : 
+                           request.type === 'delete' ? 'Business Listing Deletion' :
+                           request.type === 'feature_request' ? 'Featured Upgrade Request' :
+                           request.type === 'claim' ? 'Business Claim Request' : request.type}
+                        </h3>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          request.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {request.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        {new Date(request.created_at).toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Show the changes being requested */}
+                    {request.changes && Object.keys(request.changes).length > 0 && (
+                      <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm font-medium text-gray-700 mb-2">Proposed Changes:</div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          {Object.entries(request.changes).map(([field, value]) => (
+                            <div key={field} className="flex justify-between">
+                              <span className="font-medium capitalize">{field.replace('_', ' ')}:</span>
+                              <span className="ml-2">
+                                {typeof value === 'object' ? JSON.stringify(value) : String(value || 'Not provided')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-xs text-neutral-600">
+                      <div>Provider ID: {request.provider_id}</div>
+                      {request.reason && <div>Reason: {request.reason}</div>}
+                      {request.decided_at && (
+                        <div>
+                          {request.status === 'approved' ? 'Approved' : 'Rejected'} on: {new Date(request.decided_at).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

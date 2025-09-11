@@ -4,6 +4,20 @@ import { useAuth } from '../App'
 import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, type BlogPost } from '../lib/supabaseData'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
+// Extended type for change requests with joined provider and profile data
+type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
+  providers?: {
+    id: string
+    name: string
+    email: string | null
+  }
+  profiles?: {
+    id: string
+    email: string
+    name: string | null
+  }
+}
+
 type ProviderRow = {
   id: string
   name: string
@@ -85,7 +99,7 @@ export default function AdminPage() {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiQuery, setEmojiQuery] = useState('')
-  const [changeRequests, setChangeRequests] = useState<ProviderChangeRequest[]>([])
+  const [changeRequests, setChangeRequests] = useState<ProviderChangeRequestWithDetails[]>([])
   const [jobPosts, setJobPosts] = useState<ProviderJobPost[]>([])
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
@@ -112,7 +126,19 @@ export default function AdminPage() {
       
       const { data, error } = await supabase
         .from('provider_change_requests')
-        .select('*')
+        .select(`
+          *,
+          providers:provider_id (
+            id,
+            name,
+            email
+          ),
+          profiles:owner_user_id (
+            id,
+            email,
+            name
+          )
+        `)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -122,7 +148,7 @@ export default function AdminPage() {
       }
 
       console.log('[Admin] Loaded change requests:', data?.length || 0)
-      setChangeRequests((data as ProviderChangeRequest[]) || [])
+      setChangeRequests((data as any[]) || [])
       
     } catch (error: any) {
       console.error('[Admin] Error loading change requests:', error)
@@ -395,8 +421,24 @@ export default function AdminPage() {
           }
         } catch {}
         try {
-          const { data: crData } = await supabase.from('provider_change_requests').select('*').order('created_at', { ascending: false })
-          setChangeRequests((crData as ProviderChangeRequest[]) || [])
+          // Load change requests with provider and owner information
+          const { data: crData } = await supabase
+            .from('provider_change_requests')
+            .select(`
+              *,
+              providers:provider_id (
+                id,
+                name,
+                email
+              ),
+              profiles:owner_user_id (
+                id,
+                email,
+                name
+              )
+            `)
+            .order('created_at', { ascending: false })
+          setChangeRequests((crData as any[]) || [])
         } catch {}
         try {
           const { data: jpData } = await supabase.from('provider_job_posts').select('*').order('created_at', { ascending: false })
@@ -586,7 +628,7 @@ export default function AdminPage() {
     try { await supabase.from('user_notifications').insert([{ user_id, subject, body: body || null, data: data || null }]) } catch {}
   }
 
-  async function approveChangeRequest(req: ProviderChangeRequest) {
+  async function approveChangeRequest(req: ProviderChangeRequestWithDetails) {
     setMessage(null)
     try {
       if (req.type === 'update') {
@@ -619,7 +661,7 @@ export default function AdminPage() {
     }
   }
 
-  async function rejectChangeRequest(req: ProviderChangeRequest, reason?: string) {
+  async function rejectChangeRequest(req: ProviderChangeRequestWithDetails, reason?: string) {
     setMessage(null)
     try {
       await supabase.from('provider_change_requests').update({ status: 'rejected', reason: reason || null, decided_at: new Date().toISOString() as any }).eq('id', req.id)
@@ -1278,8 +1320,12 @@ export default function AdminPage() {
                     </div>
                   )}
                   
-                  <div className="text-xs text-neutral-600 mt-1">Provider ID: {r.provider_id}</div>
-                  <div className="text-xs text-neutral-600 mt-1">Owner: {r.owner_user_id}</div>
+                  <div className="text-xs text-neutral-600 mt-1">
+                    <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
+                    <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Unknown Owner'}</div>
+                    <div><strong>Owner Email:</strong> {r.profiles?.email || 'Unknown Email'}</div>
+                    <div><strong>Provider ID:</strong> {r.provider_id}</div>
+                  </div>
                   {r.reason && <div className="text-xs text-neutral-600 mt-1">Reason: {r.reason}</div>}
                   
                   <div className="mt-3 flex items-center gap-2">
