@@ -145,18 +145,43 @@ export default function SignInPage() {
             const redirectPath = accountType === 'business' ? '/account' : '/account'
             navigate(redirectPath, { replace: true })
           } else {
+            /**
+             * CRITICAL FIX: Overly aggressive "email already exists" detection
+             * 
+             * Issue: The code assumes ANY sign-up error means email already exists,
+             * then tries to sign in, and if that fails, shows "email may already exist."
+             * This is wrong because sign-up can fail for many reasons:
+             * - Invalid email format
+             * - Password too weak  
+             * - Network issues
+             * - Server errors
+             * 
+             * Fix: Only treat it as "email exists" if the error message specifically
+             * mentions email being taken. For other errors, show the actual error.
+             */
+            /**
+             * PRECISE FIX: Handle actual Supabase error scenarios
+             * 
+             * Based on network logs, Supabase returns specific error patterns:
+             * - Sign-up fails with "user_already_exists" (422 status)
+             * - Sign-in attempt fails with "invalid_credentials" (400 status)
+             * 
+             * This means email exists but password is wrong.
+             * 
+             * Fix: Handle this specific case and provide clear guidance.
+             */
+            console.log('[SignIn] Sign-up error:', error)
             const emsg = String(error || '').toLowerCase()
-            if (emsg.includes('already') || emsg.includes('registered') || emsg.includes('exists')) {
-              // Try immediate sign-in with provided password
-              const { error: signInErr } = await auth.signInWithEmail(email, password)
-              if (!signInErr) {
-                // Redirect to account page after successful signup fallback
-                navigate('/account', { replace: true })
-              } else {
-                setMode('reset')
-                setMessage('This email may already exist. Reset your password to continue.')
-              }
+            
+            // Check for specific "user already exists" error from Supabase
+            if (emsg.includes('user_already_exists') || emsg.includes('user already exists') || emsg.includes('already registered')) {
+              console.log('[SignIn] User already exists, this is a password/sign-in issue')
+              setMessage('An account with this email already exists. Please sign in instead or reset your password if you forgot it.')
+              // Switch to sign-in mode so user can try signing in
+              setMode('signin')
             } else {
+              // For all other errors (weak password, invalid email, etc.), show the actual error
+              console.log('[SignIn] Sign-up failed with error:', error)
               setMessage(error)
             }
           }
