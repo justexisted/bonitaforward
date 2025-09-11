@@ -88,32 +88,7 @@ export default function MyBusinessPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showJobForm, setShowJobForm] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [updateTimeout, setUpdateTimeout] = useState<NodeJS.Timeout | null>(null)
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (updateTimeout) {
-        clearTimeout(updateTimeout)
-      }
-    }
-  }, [updateTimeout])
-
-  /**
-   * CANCEL UPDATE
-   * 
-   * This function allows users to cancel a long-running update operation.
-   * It clears the timeout and resets the updating state.
-   */
-  const cancelUpdate = () => {
-    if (updateTimeout) {
-      clearTimeout(updateTimeout)
-      setUpdateTimeout(null)
-    }
-    setIsUpdating(false)
-    setMessage('Update cancelled.')
-    setEditingListing(null)
-  }
 
   /**
    * AUTHENTICATION & ROLE CHECK
@@ -449,15 +424,7 @@ export default function MyBusinessPage() {
     setIsUpdating(true)
     setMessage('Updating business listing...')
     
-    // Set timeout to prevent infinite loops
-    const timeout = setTimeout(() => {
-      console.log('[MyBusiness] Update timeout reached, cancelling operation')
-      setIsUpdating(false)
-      setMessage('Update timed out. Please try again.')
-      setEditingListing(null)
-    }, 10000) // 10 second timeout
-    
-    setUpdateTimeout(timeout)
+    // No timeout needed - we have proper loading states and error handling
 
     try {
       console.log('[MyBusiness] Starting update for listing:', listingId)
@@ -510,21 +477,18 @@ export default function MyBusinessPage() {
         throw error
       }
 
-      // Clear timeout on success
-      if (updateTimeout) {
-        clearTimeout(updateTimeout)
-        setUpdateTimeout(null)
-      }
-
       console.log('[MyBusiness] Update successful')
       
-      // Clear timeout immediately on success to prevent contradictory messages
-      if (updateTimeout) {
-        clearTimeout(updateTimeout)
-        setUpdateTimeout(null)
-      }
+      // Create specific message based on what was updated
+      const updatedFields = []
+      if (updates.website) updatedFields.push('website')
+      if (updates.description) updatedFields.push('description')
+      if (updates.phone) updatedFields.push('phone')
+      if (updates.email) updatedFields.push('email')
+      if (updates.address) updatedFields.push('address')
       
-      setMessage('✅ Business listing updated successfully! Your changes will be reviewed by our admin team before going live. You will receive an email notification once approved.')
+      const fieldText = updatedFields.length > 0 ? ` (${updatedFields.join(', ')})` : ''
+      setMessage(`✅ Business listing updated successfully! Your changes${fieldText} will be reviewed by our admin team before going live. You will receive an email notification once approved.`)
       
       // Refresh data and close form
       await loadBusinessData()
@@ -539,13 +503,6 @@ export default function MyBusinessPage() {
       
     } catch (error: any) {
       console.error('[MyBusiness] Update failed:', error)
-      
-      // Clear timeout on error
-      if (updateTimeout) {
-        clearTimeout(updateTimeout)
-        setUpdateTimeout(null)
-      }
-      
       setMessage(`Error updating listing: ${error.message}. Please try again.`)
     } finally {
       setIsUpdating(false)
@@ -658,17 +615,7 @@ export default function MyBusinessPage() {
 
         {message && (
           <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-blue-800">{message}</p>
-              {isUpdating && (
-                <button
-                  onClick={cancelUpdate}
-                  className="ml-4 px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
-                >
-                  Cancel Update
-                </button>
-              )}
-            </div>
+            <p className="text-blue-800">{message}</p>
           </div>
         )}
 
@@ -686,11 +633,20 @@ export default function MyBusinessPage() {
                 <div className="mt-2 text-sm text-amber-700">
                   <p>You have business listings that are pending admin approval. These changes will not be visible to the public until approved.</p>
                   <ul className="mt-2 list-disc list-inside">
-                    {listings.filter(listing => !listing.published).map(listing => (
-                      <li key={listing.id}>
-                        <strong>{listing.name}</strong> - {listing.website ? `Website: ${listing.website}` : 'Basic listing information'}
-                      </li>
-                    ))}
+                    {listings.filter(listing => !listing.published).map(listing => {
+                      const pendingChanges = []
+                      if (listing.website) pendingChanges.push(`Website: ${listing.website}`)
+                      if (listing.description) pendingChanges.push(`Description: ${listing.description.substring(0, 50)}...`)
+                      if (listing.phone) pendingChanges.push(`Phone: ${listing.phone}`)
+                      if (listing.email) pendingChanges.push(`Email: ${listing.email}`)
+                      if (listing.address) pendingChanges.push(`Address: ${listing.address}`)
+                      
+                      return (
+                        <li key={listing.id}>
+                          <strong>{listing.name}</strong> - {pendingChanges.length > 0 ? pendingChanges.join(', ') : 'Basic listing information'}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               </div>
