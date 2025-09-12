@@ -813,24 +813,23 @@ export default function AdminPage() {
    * 
    * How it works:
    * 1. Sets loading state for the specific user
-   * 2. Queries providers table for businesses owned by the user
-   * 3. Returns business name, phone, and other relevant details
-   * 4. Updates expandedBusinessDetails state with the fetched data
+   * 2. Uses existing profile data to get user email (avoids RLS issues)
+   * 3. Queries providers table for businesses owned by the user
+   * 4. Returns business name, phone, and other relevant details
+   * 5. Updates expandedBusinessDetails state with the fetched data
    */
   async function fetchBusinessDetails(userId: string) {
     console.log('[Admin] Fetching business details for user ID:', userId)
     setLoadingBusinessDetails(prev => ({ ...prev, [userId]: true }))
     
     try {
-      // First, let's also try to find businesses by email as a fallback
-      // Get the user's email from profiles table
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', userId)
-        .single()
+      // Get the user's email and name from the existing profiles data (avoids RLS issues)
+      const userProfile = profiles.find(p => p.id === userId)
+      const userEmail = userProfile?.email
+      const userName = userProfile?.name
 
-      console.log('[Admin] User profile email:', profileData?.email)
+      console.log('[Admin] User profile data from existing data:', { email: userEmail, name: userName })
+      console.log('[Admin] Available profiles data:', profiles.map(p => ({ id: p.id, email: p.email, name: p.name, role: p.role })))
 
       // Fetch providers owned by this user (by owner_user_id)
       const { data: businessDataByOwner, error: ownerError } = await supabase
@@ -843,11 +842,11 @@ export default function AdminPage() {
 
       // Also try to find businesses by email (in case owner_user_id doesn't match)
       let businessDataByEmail: any[] = []
-      if (profileData?.email) {
+      if (userEmail) {
         const { data: emailData, error: emailError } = await supabase
           .from('providers')
           .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
-          .eq('email', profileData.email)
+          .eq('email', userEmail)
           .order('created_at', { ascending: false })
         
         console.log('[Admin] Business data by email:', emailData)
@@ -857,8 +856,24 @@ export default function AdminPage() {
         businessDataByEmail = emailData || []
       }
 
-      // Combine both results and remove duplicates
-      const allBusinessData = [...(businessDataByOwner || []), ...businessDataByEmail]
+      // Also try to find businesses by name (in case business name matches user name)
+      let businessDataByName: any[] = []
+      if (userName) {
+        const { data: nameData, error: nameError } = await supabase
+          .from('providers')
+          .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
+          .ilike('name', `%${userName}%`)
+          .order('created_at', { ascending: false })
+        
+        console.log('[Admin] Business data by name search:', nameData)
+        if (nameError) {
+          console.warn('[Admin] Error fetching business details by name:', nameError)
+        }
+        businessDataByName = nameData || []
+      }
+
+      // Combine all results and remove duplicates
+      const allBusinessData = [...(businessDataByOwner || []), ...businessDataByEmail, ...businessDataByName]
       const uniqueBusinessData = allBusinessData.filter((business, index, self) => 
         index === self.findIndex(b => b.id === business.id)
       )
