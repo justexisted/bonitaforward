@@ -755,16 +755,6 @@ export default function MyBusinessPage() {
           </div>
         )}
 
-        {/* DEBUG INFO - Remove after fixing */}
-        <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs">
-          <div className="font-semibold mb-2">Debug Info:</div>
-          <div>Auth State: isAuthed={String(auth.isAuthed)}, loading={String(auth.loading)}</div>
-          <div>User: {auth.email} (Role: {auth.role || 'none'})</div>
-          <div>User ID: {auth.userId}</div>
-          <div>Listings Found: {listings.length}</div>
-          <div>Applications Found: {applications.length}</div>
-        </div>
-
         {/* Mobile-Friendly Dropdown Navigation */}
         <div className="mb-6">
           <div className="relative inline-block text-left w-full" data-dropdown-container>
@@ -848,7 +838,7 @@ export default function MyBusinessPage() {
         {activeTab === 'listings' && (
           <div className="space-y-4">
             {/* Header with Create Button */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrapitems-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Your Business Listings</h2>
                 <p className="text-sm text-neutral-600">Manage your business listings and details</p>

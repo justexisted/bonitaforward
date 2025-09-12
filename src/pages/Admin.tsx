@@ -1039,16 +1039,6 @@ export default function AdminPage() {
         {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
         {message && <div className="mt-3 text-sm text-green-700">{message}</div>}
 
-        {/* Debug Section - Show all change requests for troubleshooting */}
-        {isAdmin && (
-          <div className="mt-4 mb-2 p-2 bg-gray-100 rounded text-xs">
-            <strong>Debug Info:</strong> Total change requests: {changeRequests.length}, 
-            Pending: {changeRequests.filter(req => req.status === 'pending').length}, 
-            Approved: {changeRequests.filter(req => req.status === 'approved').length}, 
-            Rejected: {changeRequests.filter(req => req.status === 'rejected').length}
-          </div>
-        )}
-
         {/* Pending Approvals Notification Section */}
         {isAdmin && (
           <div className="mt-6 mb-4">
