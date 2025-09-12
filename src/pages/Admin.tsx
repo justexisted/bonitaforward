@@ -148,7 +148,7 @@ export default function AdminPage() {
               .from('providers')
               .select('id, name, email')
               .eq('id', request.provider_id)
-              .single()
+              .maybeSingle()
             providerInfo = providerData
           }
           
@@ -159,7 +159,7 @@ export default function AdminPage() {
               .from('profiles')
               .select('id, email, name')
               .eq('id', request.owner_user_id)
-              .single()
+              .maybeSingle()
             profileInfo = profileData
           }
           
@@ -471,7 +471,7 @@ export default function AdminPage() {
                     .from('providers')
                     .select('id, name, email')
                     .eq('id', request.provider_id)
-                    .single()
+                    .maybeSingle()
                   providerInfo = providerData
                 }
                 
@@ -482,7 +482,7 @@ export default function AdminPage() {
                     .from('profiles')
                     .select('id, email, name')
                     .eq('id', request.owner_user_id)
-                    .single()
+                    .maybeSingle()
                   profileInfo = profileData
                 }
                 
