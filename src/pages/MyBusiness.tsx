@@ -15,6 +15,11 @@
  * - Protected route - only accessible to users with role 'business'
  * 
  * SUPABASE STORAGE SETUP REQUIRED:
+ * 
+ * CURRENT STATUS: Image uploads are implemented but require Supabase Storage setup.
+ * The system gracefully handles the missing bucket with user-friendly error messages.
+ * 
+ * TO ENABLE IMAGE UPLOADS:
  * 1. Create a 'business-images' bucket in Supabase Storage
  * 2. Set bucket to public for image display
  * 3. Configure RLS policies for authenticated users to upload/manage images
@@ -1373,6 +1378,12 @@ function BusinessListingForm({
 
       if (error) {
         console.error('[BusinessListingForm] Image upload error:', error)
+        
+        // Handle specific bucket not found error
+        if (error.message.includes('Bucket not found')) {
+          throw new Error('Image storage not yet configured. Please contact support to set up image uploads.')
+        }
+        
         throw new Error(`Failed to upload image: ${error.message}`)
       }
 
@@ -1406,8 +1417,16 @@ function BusinessListingForm({
         try {
           const imageUrl = await uploadImage(file, businessId)
           return imageUrl
-        } catch (error) {
+        } catch (error: any) {
           console.error(`[BusinessListingForm] Failed to upload ${file.name}:`, error)
+          
+          // Show user-friendly error message for storage setup issues
+          if (error.message.includes('Image storage not yet configured')) {
+            alert('Image uploads are not yet available. Please contact support to enable this feature.')
+          } else {
+            alert(`Failed to upload ${file.name}: ${error.message}`)
+          }
+          
           return null
         } finally {
           // Remove progress tracking
@@ -1584,6 +1603,21 @@ function BusinessListingForm({
               <p className="text-xs text-neutral-500 mb-3">
                 Upload images to showcase your business. Images will appear in search results and on your business page.
               </p>
+              
+              {/* Storage Setup Notice */}
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Image Storage Setup Required</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Image uploads require Supabase Storage to be configured. Contact support to enable this feature.
+                    </p>
+                  </div>
+                </div>
+              </div>
               
               {/* Image Upload Area */}
               <div className="border-2 border-dashed border-neutral-300 rounded-lg p-6 text-center hover:border-neutral-400 transition-colors">
