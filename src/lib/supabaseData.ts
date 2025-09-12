@@ -12,6 +12,17 @@ export type DbProvider = {
   address?: string | null
   images?: string[] | null
   badges?: string[] | null
+  // Enhanced business management fields
+  description?: string | null
+  specialties?: string[] | null
+  social_links?: Record<string, string> | null
+  business_hours?: Record<string, string> | null
+  service_areas?: string[] | null
+  google_maps_url?: string | null
+  published?: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
+  owner_user_id?: string | null
   // Membership/featured columns (optional in DB)
   is_member?: boolean | number | string | null
   member?: boolean | number | string | null

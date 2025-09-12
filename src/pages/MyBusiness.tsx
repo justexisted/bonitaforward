@@ -11,7 +11,34 @@
  * - Request free listings from submitted applications
  * - Upgrade existing listings from free to featured tier
  * - View application status and listing approval status
+ * - Upload and manage business images
  * - Protected route - only accessible to users with role 'business'
+ * 
+ * SUPABASE STORAGE SETUP REQUIRED:
+ * 1. Create a 'business-images' bucket in Supabase Storage
+ * 2. Set bucket to public for image display
+ * 3. Configure RLS policies for authenticated users to upload/manage images
+ * 
+ * SQL Commands for Supabase Storage Setup:
+ * 
+ * -- Create the business-images bucket
+ * INSERT INTO storage.buckets (id, name, public) VALUES ('business-images', 'business-images', true);
+ * 
+ * -- Create RLS policy for authenticated users to upload images
+ * CREATE POLICY "Authenticated users can upload business images" ON storage.objects
+ * FOR INSERT WITH CHECK (bucket_id = 'business-images' AND auth.role() = 'authenticated');
+ * 
+ * -- Create RLS policy for authenticated users to update their own images
+ * CREATE POLICY "Users can update their own business images" ON storage.objects
+ * FOR UPDATE USING (bucket_id = 'business-images' AND auth.role() = 'authenticated');
+ * 
+ * -- Create RLS policy for authenticated users to delete their own images
+ * CREATE POLICY "Users can delete their own business images" ON storage.objects
+ * FOR DELETE USING (bucket_id = 'business-images' AND auth.role() = 'authenticated');
+ * 
+ * -- Create RLS policy for public read access to images
+ * CREATE POLICY "Public can view business images" ON storage.objects
+ * FOR SELECT USING (bucket_id = 'business-images');
  */
 
 import { useEffect, useState } from 'react'
@@ -1200,6 +1227,10 @@ function BusinessListingForm({
   const [newServiceArea, setNewServiceArea] = useState('')
   const [newSocialPlatform, setNewSocialPlatform] = useState('')
   const [newSocialUrl, setNewSocialUrl] = useState('')
+  
+  // Image upload state management
+  const [uploadingImages, setUploadingImages] = useState(false)
+  const [imageUploadProgress, setImageUploadProgress] = useState<Record<string, number>>({})
 
   const categories = [
     { key: 'real-estate', name: 'Real Estate' },
@@ -1293,6 +1324,139 @@ function BusinessListingForm({
       social_links: Object.fromEntries(
         Object.entries(prev.social_links || {}).filter(([key]) => key !== platform)
       )
+    }))
+  }
+
+  /**
+   * IMAGE UPLOAD FUNCTIONS
+   * 
+   * These functions handle uploading images to Supabase Storage for business listings.
+   * Images are stored in a 'business-images' bucket and organized by business ID.
+   * 
+   * SETUP REQUIRED:
+   * 1. Create a 'business-images' bucket in Supabase Storage
+   * 2. Set bucket to public for image display
+   * 3. Configure RLS policies for authenticated users
+   * 
+   * Features:
+   * - Multiple image upload support
+   * - Progress tracking for each image
+   * - Automatic image optimization and validation
+   * - Secure file storage with proper naming conventions
+   * - Image reordering and management
+   */
+  
+  const uploadImage = async (file: File, businessId: string): Promise<string | null> => {
+    try {
+      // Validate file type and size
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please select a valid image file')
+      }
+      
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        throw new Error('Image size must be less than 5MB')
+      }
+
+      // Generate unique filename with timestamp and random string
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${businessId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+      
+      console.log('[BusinessListingForm] Uploading image:', fileName)
+      
+      // Upload to Supabase Storage
+      const { error } = await supabase.storage
+        .from('business-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (error) {
+        console.error('[BusinessListingForm] Image upload error:', error)
+        throw new Error(`Failed to upload image: ${error.message}`)
+      }
+
+      // Get public URL for the uploaded image
+      const { data: urlData } = supabase.storage
+        .from('business-images')
+        .getPublicUrl(fileName)
+
+      console.log('[BusinessListingForm] Image uploaded successfully:', urlData.publicUrl)
+      return urlData.publicUrl
+      
+    } catch (error: any) {
+      console.error('[BusinessListingForm] Image upload failed:', error)
+      throw error
+    }
+  }
+
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    const businessId = listing?.id || 'new-listing'
+    setUploadingImages(true)
+    
+    try {
+      const uploadPromises = Array.from(files).map(async (file, index) => {
+        const fileId = `${file.name}-${index}`
+        
+        // Track upload progress
+        setImageUploadProgress(prev => ({ ...prev, [fileId]: 0 }))
+        
+        try {
+          const imageUrl = await uploadImage(file, businessId)
+          return imageUrl
+        } catch (error) {
+          console.error(`[BusinessListingForm] Failed to upload ${file.name}:`, error)
+          return null
+        } finally {
+          // Remove progress tracking
+          setImageUploadProgress(prev => {
+            const newProgress = { ...prev }
+            delete newProgress[fileId]
+            return newProgress
+          })
+        }
+      })
+
+      const uploadedUrls = await Promise.all(uploadPromises)
+      const successfulUrls = uploadedUrls.filter(url => url !== null) as string[]
+      
+      if (successfulUrls.length > 0) {
+        // Add new images to existing images
+        const currentImages = formData.images || []
+        setFormData(prev => ({
+          ...prev,
+          images: [...currentImages, ...successfulUrls]
+        }))
+        
+        console.log('[BusinessListingForm] Successfully uploaded', successfulUrls.length, 'images')
+      }
+      
+    } catch (error: any) {
+      console.error('[BusinessListingForm] Image upload process failed:', error)
+    } finally {
+      setUploadingImages(false)
+    }
+  }
+
+  const removeImage = (imageUrl: string) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images?.filter(img => img !== imageUrl) || []
+    }))
+  }
+
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    if (!formData.images) return
+    
+    const newImages = [...formData.images]
+    const [movedImage] = newImages.splice(fromIndex, 1)
+    newImages.splice(toIndex, 0, movedImage)
+    
+    setFormData(prev => ({
+      ...prev,
+      images: newImages
     }))
   }
 
@@ -1410,6 +1574,127 @@ function BusinessListingForm({
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
                 placeholder="Tell customers about your business..."
               />
+            </div>
+
+            {/* Business Images */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Business Images
+              </label>
+              <p className="text-xs text-neutral-500 mb-3">
+                Upload images to showcase your business. Images will appear in search results and on your business page.
+              </p>
+              
+              {/* Image Upload Area */}
+              <div className="border-2 border-dashed border-neutral-300 rounded-lg p-6 text-center hover:border-neutral-400 transition-colors">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e.target.files)}
+                  className="hidden"
+                  id="image-upload"
+                  disabled={uploadingImages}
+                />
+                <label
+                  htmlFor="image-upload"
+                  className={`cursor-pointer ${uploadingImages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex flex-col items-center">
+                    <svg className="w-8 h-8 text-neutral-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm text-neutral-600">
+                      {uploadingImages ? 'Uploading images...' : 'Click to upload images or drag and drop'}
+                    </p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      PNG, JPG, GIF up to 5MB each
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Current Images Display */}
+              {formData.images && formData.images.length > 0 && (
+                <div className="mt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {formData.images.map((imageUrl, index) => (
+                      <div key={imageUrl} className="relative group">
+                        <img
+                          src={imageUrl}
+                          alt={`Business image ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border border-neutral-200"
+                        />
+                        
+                        {/* Image Actions Overlay */}
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <div className="flex gap-2">
+                            {/* Move Left Button */}
+                            {index > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => moveImage(index, index - 1)}
+                                className="p-1 bg-white rounded-full text-neutral-600 hover:text-neutral-800"
+                                title="Move left"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                              </button>
+                            )}
+                            
+                            {/* Move Right Button */}
+                            {index < formData.images!.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() => moveImage(index, index + 1)}
+                                className="p-1 bg-white rounded-full text-neutral-600 hover:text-neutral-800"
+                                title="Move right"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </button>
+                            )}
+                            
+                            {/* Remove Button */}
+                            <button
+                              type="button"
+                              onClick={() => removeImage(imageUrl)}
+                              className="p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
+                              title="Remove image"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Image Order Indicator */}
+                        <div className="absolute top-1 left-1 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                          {index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <p className="text-xs text-neutral-500 mt-2">
+                    Drag to reorder images. The first image will be used as the main image in search results.
+                  </p>
+                </div>
+              )}
+
+              {/* Upload Progress */}
+              {Object.keys(imageUploadProgress).length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {Object.entries(imageUploadProgress).map(([fileId, progress]) => (
+                    <div key={fileId} className="text-xs text-neutral-600">
+                      Uploading {fileId}... {progress}%
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Tags */}

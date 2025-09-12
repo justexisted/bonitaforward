@@ -157,7 +157,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user && mounted) {
           const email = session.user.email
           const meta = session.user.user_metadata || {}
-          const name = meta?.name
+      const name = meta?.name
           let role = meta?.role as 'business' | 'community' | undefined
           const userId = session.user.id
 
@@ -248,16 +248,16 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' && session?.user) {
         const email = session.user.email
         const meta = session.user.user_metadata || {}
-        const name = meta?.name
-        let role = meta?.role as 'business' | 'community' | undefined
+      const name = meta?.name
+      let role = meta?.role as 'business' | 'community' | undefined
         const userId = session.user.id
 
         console.log('User signed in:', { email, userId, metaRole: role })
 
         // CRITICAL FIX: Always fetch role from database for signed in users
         if (userId) {
-          try {
-            const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+        try {
+          const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
             const dbRole = String((prof as any)?.role || '').toLowerCase()
             if (dbRole === 'business' || dbRole === 'community') {
               role = dbRole as 'business' | 'community'
@@ -729,6 +729,22 @@ function Hero() {
   )
 }
 
+/**
+ * PROVIDER PAGE
+ * 
+ * This page displays comprehensive business information for community users.
+ * It shows all the enhanced business details that business owners can manage
+ * through their "My Business" dashboard.
+ * 
+ * Features:
+ * - Business description and images
+ * - Contact information (phone, email, website, address)
+ * - Specialties and service areas
+ * - Business hours and social media links
+ * - Featured business badge and rating display
+ * - Job postings (if any)
+ * - Save business and coupon functionality for community users
+ */
 function ProviderPage() {
   const params = useParams()
   const providerId = params.id as string
@@ -833,8 +849,23 @@ function ProviderPage() {
             <div className="text-sm text-neutral-600">Provider not found.</div>
           ) : (
             <div>
+              <div className="flex items-center gap-3 mb-2">
               <h1 className="text-2xl font-semibold tracking-tight">{provider.name}</h1>
-              <div className="mt-1 text-sm text-neutral-500">Category: {provider.category}</div>
+                {provider.isMember && (
+                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-sm font-medium">
+                    ⭐ Featured
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-4 text-sm text-neutral-500">
+                <span>Category: {provider.category.replace('-', ' ')}</span>
+                {provider.rating && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-amber-500">★</span>
+                    <span>{provider.rating.toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
               {String(auth.role || '').toLowerCase() === 'community' && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
@@ -856,7 +887,189 @@ function ProviderPage() {
                   )}
                 </div>
               )}
-              <div className="mt-4 text-sm text-neutral-700">Dedicated provider page — details coming soon.</div>
+              {/* Business Details Section */}
+              <div className="mt-6 space-y-6">
+                {/* Business Description */}
+                {provider.description && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-2">About {provider.name}</h3>
+                    <p className="text-neutral-700 leading-relaxed">{provider.description}</p>
+                  </div>
+                )}
+
+                {/* Business Images */}
+                {provider.images && provider.images.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Photos</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {provider.images.map((imageUrl, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={imageUrl}
+                            alt={`${provider.name} - Image ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border border-neutral-200 hover:shadow-md transition-shadow"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Contact Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-3">Contact Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {provider.phone && (
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.964 5.964l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <a href={`tel:${provider.phone}`} className="text-neutral-700 hover:text-neutral-900">
+                          {provider.phone}
+                        </a>
+                      </div>
+                    )}
+                    
+                    {provider.email && (
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <a href={`mailto:${provider.email}`} className="text-neutral-700 hover:text-neutral-900">
+                          {provider.email}
+                        </a>
+                      </div>
+                    )}
+                    
+                    {provider.website && (
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <a 
+                          href={provider.website.startsWith('http') ? provider.website : `https://${provider.website}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-neutral-700 hover:text-neutral-900"
+                        >
+                          {provider.website}
+                        </a>
+                      </div>
+                    )}
+                    
+                    {provider.address && (
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-neutral-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <div>
+                          <p className="text-neutral-700">{provider.address}</p>
+                          {provider.google_maps_url && (
+                            <a 
+                              href={provider.google_maps_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:text-blue-800"
+                            >
+                              View on Google Maps
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Specialties */}
+                {provider.specialties && provider.specialties.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Specialties</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {provider.specialties.map((specialty, index) => (
+                        <span 
+                          key={index}
+                          className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-50 text-blue-700 border border-blue-200"
+                        >
+                          {specialty}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Service Areas */}
+                {provider.service_areas && provider.service_areas.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Service Areas</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {provider.service_areas.map((area, index) => (
+                        <span 
+                          key={index}
+                          className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-50 text-green-700 border border-green-200"
+                        >
+                          {area}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Business Hours */}
+                {provider.business_hours && Object.keys(provider.business_hours).length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Business Hours</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {Object.entries(provider.business_hours).map(([day, hours]) => (
+                        <div key={day} className="flex justify-between items-center py-1">
+                          <span className="font-medium text-neutral-700 capitalize">{day}</span>
+                          <span className="text-neutral-600">{hours}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Social Media Links */}
+                {provider.social_links && Object.keys(provider.social_links).length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Follow Us</h3>
+                    <div className="flex flex-wrap gap-3">
+                      {Object.entries(provider.social_links).map(([platform, url]) => (
+                        <a
+                          key={platform}
+                          href={url.startsWith('http') ? url : `https://${url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+                        >
+                          <span className="capitalize">{platform}</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tags */}
+                {provider.tags && provider.tags.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Tags</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {provider.tags.map((tag, index) => (
+                        <span 
+                          key={index}
+                          className="inline-flex items-center px-2 py-1 rounded text-sm bg-neutral-100 text-neutral-700"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               {jobs.length > 0 && (
                 <div className="mt-6">
                   <div className="text-sm font-medium">Open Roles</div>
@@ -1213,6 +1426,18 @@ type Provider = {
   website?: string | null
   address?: string | null
   isMember?: boolean
+  // Enhanced business fields from database
+  description?: string | null
+  specialties?: string[] | null
+  social_links?: Record<string, string> | null
+  business_hours?: Record<string, string> | null
+  service_areas?: string[] | null
+  google_maps_url?: string | null
+  images?: string[] | null
+  badges?: string[] | null
+  published?: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 function ensureDemoMembers(input: Record<CategoryKey, Provider[]>): Record<CategoryKey, Provider[]> {
   const out: Record<CategoryKey, Provider[]> = {
@@ -1394,6 +1619,18 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       website: r.website ?? null,
       address: r.address ?? null,
       isMember: coerceIsMember(r),
+      // Enhanced business fields
+      description: r.description ?? null,
+      specialties: r.specialties ?? null,
+      social_links: r.social_links ?? null,
+      business_hours: r.business_hours ?? null,
+      service_areas: r.service_areas ?? null,
+      google_maps_url: r.google_maps_url ?? null,
+      images: r.images ?? null,
+      badges: r.badges ?? null,
+      published: r.published ?? null,
+      created_at: r.created_at ?? null,
+      updated_at: r.updated_at ?? null,
     })
   })
   // Fallback: if a category has zero members flagged from Supabase, promote the first three
