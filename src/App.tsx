@@ -1475,25 +1475,20 @@ function isFeaturedProvider(p: Provider): boolean {
 }
 
 function getProviderDetails(p: Provider): ProviderDetails {
-  // Placeholder details; in production, fetch from DB/API
-  const seed = encodeURIComponent(p.id)
+  // Use actual business data from database instead of placeholder data
   return {
     phone: p.phone || undefined,
     email: p.email || undefined,
     website: p.website || undefined,
     address: p.address || undefined,
-    images: [
-      `https://picsum.photos/seed/${seed}-1/400/240`,
-      `https://picsum.photos/seed/${seed}-2/400/240`,
-    ],
-    reviews: [
-      { author: 'Local Resident', rating: (p.rating ?? 4.6), text: 'Great experience, highly recommend.' },
-      { author: 'Bonita Neighbor', rating: (p.rating ?? 4.5) - 0.2, text: 'Friendly and professional.' },
-    ],
-    posts: [
-      { id: p.id + '-post1', title: `Spotlight: ${p.name}` },
-      { id: p.id + '-post2', title: `${p.name} in the Community` },
-    ],
+    // Use actual business images from database if available, otherwise show no images
+    images: p.images && p.images.length > 0 ? p.images : undefined,
+    // Only show reviews if they exist in the database (currently no reviews table exists)
+    // TODO: Add reviews table to database and fetch actual reviews
+    reviews: undefined, // Remove placeholder reviews until reviews system is implemented
+    // Only show related posts if they exist in the database (currently no posts table exists)
+    // TODO: Add posts table to database and fetch actual related posts
+    posts: undefined, // Remove placeholder posts until posts system is implemented
   }
 }
 
@@ -2510,14 +2505,14 @@ function BookPage() {
                           ))}
                         </div>
                       )}
-                      {canShowRich && d.images && (
+                      {canShowRich && d.images && d.images.length > 0 && (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           {d.images.map((src, idx) => (
                             <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
                           ))}
                         </div>
                       )}
-                      {canShowRich && d.reviews && (
+                      {canShowRich && d.reviews && d.reviews.length > 0 && (
                         <div className="mt-3">
                           <div className="font-medium text-sm">Reviews</div>
                           <ul className="mt-1 space-y-1 text-sm">
@@ -2529,7 +2524,7 @@ function BookPage() {
                           </ul>
                         </div>
                       )}
-                      {canShowRich && d.posts && (
+                      {canShowRich && d.posts && d.posts.length > 0 && (
                         <div className="mt-3">
                           <div className="font-medium text-sm">Related Posts</div>
                           <ul className="mt-1 list-disc list-inside text-sm">
@@ -2612,14 +2607,14 @@ function BookPage() {
                           )}
                           <button onClick={() => setExpanded((e: Record<string, boolean>) => ({ ...e, [r.id]: !open }))} className="mt-2 text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5">{open ? 'Hide' : 'View'}</button>
                           <div className="collapsible mt-3 text-sm" data-open={open ? 'true' : 'false'}>
-                              {r.isMember && d.images && (
+                              {r.isMember && d.images && d.images.length > 0 && (
                                 <div className="grid grid-cols-2 gap-2 mb-2">
                                   {d.images.map((src, idx) => (
                                     <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
                                   ))}
                                 </div>
                               )}
-                              {r.isMember && d.reviews && (
+                              {r.isMember && d.reviews && d.reviews.length > 0 && (
                                 <div className="mt-2">
                                   <div className="font-medium">Reviews</div>
                                   <ul className="mt-1 space-y-1">
@@ -2631,7 +2626,7 @@ function BookPage() {
                                   </ul>
                                 </div>
                               )}
-                              {r.isMember && d.posts && (
+                              {r.isMember && d.posts && d.posts.length > 0 && (
                                 <div className="mt-2">
                                   <div className="font-medium">Related Posts</div>
                                   <ul className="mt-1 list-disc list-inside">
