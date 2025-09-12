@@ -108,6 +108,8 @@ export default function AdminPage() {
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
   const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
   const [loadingBusinessDetails, setLoadingBusinessDetails] = useState<Record<string, boolean>>({})
+  // Filter state for funnel responses - allows filtering by specific user email
+  const [funnelUserFilter, setFunnelUserFilter] = useState<string>('')
 
   /**
    * LOAD CHANGE REQUESTS
@@ -543,6 +545,20 @@ export default function AdminPage() {
       .filter((e) => !businessEmails.has(normalizeEmail(e)))
       .sort()
   }, [funnels, bookings, businessEmails])
+
+  // Filtered funnel responses based on user email filter
+  // This allows admins to view responses from specific users to avoid overwhelming display
+  const filteredFunnels = useMemo(() => {
+    if (!funnelUserFilter.trim()) {
+      // If no filter is set, show all funnel responses
+      return funnels
+    }
+    // Filter funnels by user email (case-insensitive partial match)
+    const filterLower = funnelUserFilter.toLowerCase().trim()
+    return funnels.filter(funnel => 
+      funnel.user_email.toLowerCase().includes(filterLower)
+    )
+  }, [funnels, funnelUserFilter])
 
   // Removed legacy businessAccounts (email-derived). Business accounts now come from profiles.role === 'business'.
 
@@ -1393,9 +1409,56 @@ export default function AdminPage() {
           {section === 'funnel-responses' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Funnel Responses</div>
+            
+            {/* User Filter Section - allows filtering by specific user email to avoid overwhelming display */}
+            <div className="mt-3 mb-4">
+              <div className="flex items-center gap-3">
+                <label htmlFor="funnel-user-filter" className="text-sm font-medium text-neutral-700">
+                  Filter by user email:
+                </label>
+                <div className="flex-1 relative">
+                  <input
+                    id="funnel-user-filter"
+                    type="text"
+                    value={funnelUserFilter}
+                    onChange={(e) => setFunnelUserFilter(e.target.value)}
+                    placeholder="Enter user email to filter..."
+                    className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm placeholder:text-neutral-400"
+                    list="funnel-user-emails"
+                  />
+                  {/* Dropdown with existing user emails for quick selection */}
+                  <datalist id="funnel-user-emails">
+                    {Array.from(new Set(funnels.map(f => f.user_email).filter(Boolean))).sort().map(email => (
+                      <option key={email} value={email} />
+                    ))}
+                  </datalist>
+                </div>
+                {funnelUserFilter && (
+                  <button
+                    onClick={() => setFunnelUserFilter('')}
+                    className="rounded-full bg-neutral-100 text-neutral-600 px-3 py-1.5 text-xs hover:bg-neutral-200"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {/* Show filter status and count */}
+              <div className="mt-2 text-xs text-neutral-500">
+                {funnelUserFilter ? (
+                  <>Showing {filteredFunnels.length} of {funnels.length} responses</>
+                ) : (
+                  <>Showing all {funnels.length} responses</>
+                )}
+              </div>
+            </div>
+            
             <div className="mt-2 space-y-2 text-sm">
-              {funnels.length === 0 && <div className="text-neutral-500">No entries yet.</div>}
-              {funnels.map((row) => (
+              {filteredFunnels.length === 0 && (
+                <div className="text-neutral-500">
+                  {funnelUserFilter ? 'No responses found for this user.' : 'No entries yet.'}
+                </div>
+              )}
+              {filteredFunnels.map((row) => (
                 <div key={row.id} className="rounded-xl border border-neutral-200 p-3 hover-gradient interactive-card">
                   <div className="text-neutral-800 font-medium">{row.category}</div>
                   <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
