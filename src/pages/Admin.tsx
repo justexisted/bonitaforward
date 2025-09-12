@@ -818,26 +818,63 @@ export default function AdminPage() {
    * 4. Updates expandedBusinessDetails state with the fetched data
    */
   async function fetchBusinessDetails(userId: string) {
+    console.log('[Admin] Fetching business details for user ID:', userId)
     setLoadingBusinessDetails(prev => ({ ...prev, [userId]: true }))
     
     try {
-      // Fetch providers owned by this user
-      const { data: businessData, error } = await supabase
+      // First, let's also try to find businesses by email as a fallback
+      // Get the user's email from profiles table
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', userId)
+        .single()
+
+      console.log('[Admin] User profile email:', profileData?.email)
+
+      // Fetch providers owned by this user (by owner_user_id)
+      const { data: businessDataByOwner, error: ownerError } = await supabase
         .from('providers')
         .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
         .eq('owner_user_id', userId)
         .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('[Admin] Error fetching business details:', error)
-        setError(`Failed to fetch business details: ${error.message}`)
+      console.log('[Admin] Business data by owner_user_id:', businessDataByOwner)
+
+      // Also try to find businesses by email (in case owner_user_id doesn't match)
+      let businessDataByEmail: any[] = []
+      if (profileData?.email) {
+        const { data: emailData, error: emailError } = await supabase
+          .from('providers')
+          .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
+          .eq('email', profileData.email)
+          .order('created_at', { ascending: false })
+        
+        console.log('[Admin] Business data by email:', emailData)
+        if (emailError) {
+          console.warn('[Admin] Error fetching business details by email:', emailError)
+        }
+        businessDataByEmail = emailData || []
+      }
+
+      // Combine both results and remove duplicates
+      const allBusinessData = [...(businessDataByOwner || []), ...businessDataByEmail]
+      const uniqueBusinessData = allBusinessData.filter((business, index, self) => 
+        index === self.findIndex(b => b.id === business.id)
+      )
+
+      console.log('[Admin] Combined unique business data:', uniqueBusinessData)
+
+      if (ownerError) {
+        console.error('[Admin] Error fetching business details by owner:', ownerError)
+        setError(`Failed to fetch business details: ${ownerError.message}`)
         return
       }
 
       // Update expanded details with the fetched business data
       setExpandedBusinessDetails(prev => ({
         ...prev,
-        [userId]: businessData || []
+        [userId]: uniqueBusinessData
       }))
 
     } catch (err: any) {
@@ -846,6 +883,21 @@ export default function AdminPage() {
     } finally {
       setLoadingBusinessDetails(prev => ({ ...prev, [userId]: false }))
     }
+  }
+
+  /**
+   * COLLAPSE BUSINESS DETAILS
+   * 
+   * This function collapses the expanded business details for a specific user.
+   * It removes the user's data from the expandedBusinessDetails state.
+   */
+  function collapseBusinessDetails(userId: string) {
+    console.log('[Admin] Collapsing business details for user ID:', userId)
+    setExpandedBusinessDetails(prev => {
+      const newState = { ...prev }
+      delete newState[userId]
+      return newState
+    })
   }
 
   /**
@@ -1195,14 +1247,23 @@ export default function AdminPage() {
                         <div className="text-xs text-neutral-500">{p.name || '—'} • business</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* See More Button - Shows business details */}
-                        <button 
-                          onClick={() => fetchBusinessDetails(p.id)} 
-                          className="rounded-full bg-blue-50 text-blue-700 px-3 py-1.5 border border-blue-200 text-xs hover:bg-blue-100"
-                          disabled={loadingBusinessDetails[p.id]}
-                        >
-                          {loadingBusinessDetails[p.id] ? 'Loading...' : 'See More'}
-                        </button>
+                        {/* Dynamic Button - Shows "See More" or "Back" based on expansion state */}
+                        {expandedBusinessDetails[p.id] ? (
+                          <button 
+                            onClick={() => collapseBusinessDetails(p.id)} 
+                            className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs hover:bg-red-100"
+                          >
+                            Back
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => fetchBusinessDetails(p.id)} 
+                            className="rounded-full bg-blue-50 text-blue-700 px-3 py-1.5 border border-blue-200 text-xs hover:bg-blue-100"
+                            disabled={loadingBusinessDetails[p.id]}
+                          >
+                            {loadingBusinessDetails[p.id] ? 'Loading...' : 'See More'}
+                          </button>
+                        )}
                         {deletingUserId === p.id ? (
                           <>
                             <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
