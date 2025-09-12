@@ -876,7 +876,7 @@ export default function MyBusinessPage() {
               listings.map((listing) => (
                 <div key={listing.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
                   <div className="flex flex-wrap items-start justify-between">
-                  <div className="flex flex-col gap-2 ml-4">
+                  <div className="flex flex-col gap-2 mx-auto pb-[1vh]">
                       {/* Featured Status and Pricing Info */}
                       {listing.is_member ? (
                         <div className="text-center">
