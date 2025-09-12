@@ -122,7 +122,56 @@ export default function MyBusinessPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showJobForm, setShowJobForm] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  // Dropdown state for mobile-friendly tab navigation
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
+  /**
+   * TAB CONFIGURATION
+   * 
+   * This defines all available tabs with their labels and counts.
+   * Used for both the dropdown menu and tab display logic.
+   */
+  const tabs = [
+    { key: 'listings', label: 'Business Listings', count: listings.length },
+    { key: 'applications', label: 'Applications', count: applications.length },
+    { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
+    { key: 'change-requests', label: 'Change Requests', count: changeRequests.filter(req => req.status === 'pending').length },
+    { key: 'analytics', label: 'Analytics' }
+  ] as const
+
+  // Get current tab information for dropdown display
+  const currentTab = tabs.find(tab => tab.key === activeTab) || tabs[0]
+
+  /**
+   * HANDLE TAB SELECTION
+   * 
+   * This function handles tab selection from the dropdown menu.
+   * It closes the dropdown and updates the active tab.
+   */
+  const handleTabSelect = (tabKey: typeof activeTab) => {
+    setActiveTab(tabKey)
+    setIsDropdownOpen(false) // Close dropdown after selection
+  }
+
+  /**
+   * CLICK OUTSIDE HANDLER
+   * 
+   * This effect adds a click-outside listener to close the dropdown
+   * when clicking anywhere outside of it. This improves UX on mobile.
+   */
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (isDropdownOpen && !target.closest('[data-dropdown-container]')) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isDropdownOpen])
 
   /**
    * AUTHENTICATION & ROLE CHECK
@@ -716,33 +765,82 @@ export default function MyBusinessPage() {
           <div>Applications Found: {applications.length}</div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Mobile-Friendly Dropdown Navigation */}
         <div className="mb-6">
-          <div className="flex space-x-1 rounded-xl bg-neutral-100 p-1">
-            {[
-              { key: 'listings', label: 'Business Listings', count: listings.length },
-              { key: 'applications', label: 'Applications', count: applications.length },
-              { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
-              { key: 'change-requests', label: 'Change Requests', count: changeRequests.filter(req => req.status === 'pending').length },
-              { key: 'analytics', label: 'Analytics' }
-            ].map((tab) => (
+          <div className="relative inline-block text-left w-full" data-dropdown-container>
+            <div>
               <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key as any)}
-                className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  activeTab === tab.key
-                    ? 'bg-white text-neutral-900 shadow-sm'
-                    : 'text-neutral-600 hover:text-neutral-900'
-                }`}
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                onKeyDown={(e) => {
+                  // Close dropdown on Escape key
+                  if (e.key === 'Escape') {
+                    setIsDropdownOpen(false)
+                  }
+                }}
+                className="inline-flex justify-between w-full rounded-xl border border-neutral-300 shadow-sm px-4 py-3 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-100 focus:ring-blue-500"
+                aria-expanded={isDropdownOpen}
+                aria-haspopup="true"
               >
-                {tab.label}
-                {('count' in tab) && tab.count! > 0 && (
-                  <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-xs">
-                    {tab.count}
-                  </span>
-                )}
+                <span className="flex items-center">
+                  {currentTab.label}
+                  {('count' in currentTab) && currentTab.count! > 0 && (
+                    <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-xs">
+                      {currentTab.count}
+                    </span>
+                  )}
+                </span>
+                <svg
+                  className={`-mr-1 ml-2 h-5 w-5 transition-transform duration-200 ${
+                    isDropdownOpen ? 'rotate-180' : ''
+                  }`}
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </button>
-            ))}
+            </div>
+
+            {/* Dropdown Menu */}
+            {isDropdownOpen && (
+              <div
+                className="origin-top-right absolute right-0 mt-2 w-full rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
+                role="menu"
+                aria-orientation="vertical"
+                aria-labelledby="menu-button"
+              >
+                <div className="py-1" role="none">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => handleTabSelect(tab.key as any)}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                        activeTab === tab.key
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-neutral-700 hover:bg-neutral-50'
+                      }`}
+                      role="menuitem"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{tab.label}</span>
+                        {('count' in tab) && tab.count! > 0 && (
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-xs">
+                            {tab.count}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
