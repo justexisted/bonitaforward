@@ -121,6 +121,7 @@ export default function MyBusinessPage() {
   const [editingListing, setEditingListing] = useState<BusinessListing | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showJobForm, setShowJobForm] = useState(false)
+  const [editingJob, setEditingJob] = useState<JobPost | null>(null) // State for editing existing job posts
   const [isUpdating, setIsUpdating] = useState(false)
   // Dropdown state for mobile-friendly tab navigation
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -675,6 +676,76 @@ export default function MyBusinessPage() {
     }
   }
 
+  /**
+   * DELETE JOB POST
+   * 
+   * This function deletes a job post from the database.
+   * It removes the job post entry and refreshes the data.
+   */
+  const deleteJobPost = async (jobId: string) => {
+    if (!confirm('Are you sure you want to delete this job post? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setMessage('Deleting job post...')
+      
+      const { error } = await supabase
+        .from('provider_job_posts')
+        .delete()
+        .eq('id', jobId)
+        .eq('owner_user_id', auth.userId) // Ensure user owns this job post
+
+      if (error) throw error
+
+      setMessage('Job post deleted successfully!')
+      loadBusinessData() // Refresh data to remove deleted job post
+    } catch (error: any) {
+      setMessage(`Error deleting job post: ${error.message}`)
+    }
+  }
+
+  /**
+   * UPDATE JOB POST
+   * 
+   * This function updates an existing job post in the database.
+   * It creates a change request for admin approval instead of direct update.
+   */
+  const updateJobPost = async (jobId: string, jobData: {
+    title: string
+    description?: string
+    apply_url?: string
+    salary_range?: string
+  }) => {
+    try {
+      setMessage('Updating job post...')
+      
+      // Create a change request for job post updates (admin approval required)
+      const { error } = await supabase
+        .from('provider_change_requests')
+        .insert([{
+          type: 'job_update',
+          provider_id: jobPosts.find(job => job.id === jobId)?.provider_id,
+          owner_user_id: auth.userId,
+          changes: {
+            job_id: jobId,
+            title: jobData.title,
+            description: jobData.description,
+            apply_url: jobData.apply_url,
+            salary_range: jobData.salary_range
+          },
+          status: 'pending'
+        }])
+
+      if (error) throw error
+
+      setMessage('Job post update submitted for admin approval!')
+      loadBusinessData() // Refresh data to show the change request
+    } catch (error: any) {
+      setMessage(`Error updating job post: ${error.message}`)
+    }
+  }
+
   if (auth.role !== 'business') {
     return (
       <section className="py-8">
@@ -1124,10 +1195,20 @@ export default function MyBusinessPage() {
                     </div>
                     
                     <div className="flex gap-2 ml-4">
-                      <button className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200">
+                      <button 
+                        onClick={() => {
+                          console.log('[MyBusiness] Edit job button clicked for job:', job.id, job.title)
+                          setEditingJob(job) // Set the job to edit
+                          setShowJobForm(true) // Open the job form
+                        }}
+                        className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200"
+                      >
                         Edit
                       </button>
-                      <button className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs border border-red-200 hover:bg-red-100">
+                      <button 
+                        onClick={() => deleteJobPost(job.id)}
+                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs border border-red-200 hover:bg-red-100"
+                      >
                         Delete
                       </button>
                     </div>
@@ -1247,15 +1328,26 @@ export default function MyBusinessPage() {
           />
         )}
 
-        {/* Job Post Creation Modal */}
+        {/* Job Post Creation/Edit Modal */}
         {showJobForm && (
           <JobPostForm
             listings={listings}
+            editingJob={editingJob} // Pass the job being edited (null for new jobs)
             onSave={(providerId, jobData) => {
-              createJobPost(providerId, jobData)
+              if (editingJob) {
+                // Update existing job post
+                updateJobPost(editingJob.id, jobData)
+              } else {
+                // Create new job post
+                createJobPost(providerId, jobData)
+              }
               setShowJobForm(false)
+              setEditingJob(null) // Clear editing state
             }}
-            onCancel={() => setShowJobForm(false)}
+            onCancel={() => {
+              setShowJobForm(false)
+              setEditingJob(null) // Clear editing state
+            }}
           />
         )}
       </div>
@@ -2068,10 +2160,12 @@ function BusinessListingForm({
  */
 function JobPostForm({ 
   listings, 
+  editingJob, // Optional job being edited
   onSave, 
   onCancel 
 }: { 
   listings: BusinessListing[]
+  editingJob?: JobPost | null // Optional job being edited
   onSave: (providerId: string, jobData: {
     title: string
     description?: string
@@ -2081,12 +2175,34 @@ function JobPostForm({
   onCancel: () => void 
 }) {
   const [formData, setFormData] = useState({
-    provider_id: '',
-    title: '',
-    description: '',
-    apply_url: '',
-    salary_range: ''
+    provider_id: editingJob?.provider_id || '',
+    title: editingJob?.title || '',
+    description: editingJob?.description || '',
+    apply_url: editingJob?.apply_url || '',
+    salary_range: editingJob?.salary_range || ''
   })
+
+  // Update form data when editingJob changes
+  useEffect(() => {
+    if (editingJob) {
+      setFormData({
+        provider_id: editingJob.provider_id || '',
+        title: editingJob.title || '',
+        description: editingJob.description || '',
+        apply_url: editingJob.apply_url || '',
+        salary_range: editingJob.salary_range || ''
+      })
+    } else {
+      // Reset form for new job creation
+      setFormData({
+        provider_id: '',
+        title: '',
+        description: '',
+        apply_url: '',
+        salary_range: ''
+      })
+    }
+  }, [editingJob])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -2105,7 +2221,9 @@ function JobPostForm({
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold">Create Job Post</h2>
+            <h2 className="text-xl font-semibold">
+              {editingJob ? 'Edit Job Post' : 'Create Job Post'}
+            </h2>
             <button
               onClick={onCancel}
               className="text-neutral-500 hover:text-neutral-700"
@@ -2198,7 +2316,7 @@ function JobPostForm({
                 type="submit"
                 className="flex-1 bg-neutral-900 text-white px-6 py-2 rounded-lg hover:bg-neutral-800"
               >
-                Create Job Post
+                {editingJob ? 'Update Job Post' : 'Create Job Post'}
               </button>
               <button
                 type="button"
