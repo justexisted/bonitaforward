@@ -106,6 +106,8 @@ export default function AdminPage() {
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
   const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
+  const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
+  const [loadingBusinessDetails, setLoadingBusinessDetails] = useState<Record<string, boolean>>({})
 
   /**
    * LOAD CHANGE REQUESTS
@@ -804,6 +806,49 @@ export default function AdminPage() {
   }
 
   /**
+   * FETCH BUSINESS DETAILS
+   * 
+   * This function fetches business details for a specific business account user.
+   * It looks up providers owned by the user and returns business information.
+   * 
+   * How it works:
+   * 1. Sets loading state for the specific user
+   * 2. Queries providers table for businesses owned by the user
+   * 3. Returns business name, phone, and other relevant details
+   * 4. Updates expandedBusinessDetails state with the fetched data
+   */
+  async function fetchBusinessDetails(userId: string) {
+    setLoadingBusinessDetails(prev => ({ ...prev, [userId]: true }))
+    
+    try {
+      // Fetch providers owned by this user
+      const { data: businessData, error } = await supabase
+        .from('providers')
+        .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
+        .eq('owner_user_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('[Admin] Error fetching business details:', error)
+        setError(`Failed to fetch business details: ${error.message}`)
+        return
+      }
+
+      // Update expanded details with the fetched business data
+      setExpandedBusinessDetails(prev => ({
+        ...prev,
+        [userId]: businessData || []
+      }))
+
+    } catch (err: any) {
+      console.error('[Admin] Error fetching business details:', err)
+      setError(`Failed to fetch business details: ${err.message}`)
+    } finally {
+      setLoadingBusinessDetails(prev => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  /**
    * CRITICAL FIX: Admin page auth check
    * 
    * The issue was that auth.email was temporarily undefined during auth loading,
@@ -1143,21 +1188,74 @@ export default function AdminPage() {
               <div className="mt-2 text-sm">
                 {profiles.filter((p) => String(p.role || '').toLowerCase() === 'business').length === 0 && <div className="text-neutral-500">No business accounts yet.</div>}
                 {profiles.filter((p) => String(p.role || '').toLowerCase() === 'business').map((p) => (
-                  <div key={p.id} className="flex items-center justify-between py-1 border-b border-neutral-100 last:border-0">
-                    <div>
-                      <div className="font-medium text-sm">{p.email || '(no email)'}</div>
-                      <div className="text-xs text-neutral-500">{p.name || '—'} • business</div>
+                  <div key={p.id} className="py-3 border-b border-neutral-100 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{p.email || '(no email)'}</div>
+                        <div className="text-xs text-neutral-500">{p.name || '—'} • business</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* See More Button - Shows business details */}
+                        <button 
+                          onClick={() => fetchBusinessDetails(p.id)} 
+                          className="rounded-full bg-blue-50 text-blue-700 px-3 py-1.5 border border-blue-200 text-xs hover:bg-blue-100"
+                          disabled={loadingBusinessDetails[p.id]}
+                        >
+                          {loadingBusinessDetails[p.id] ? 'Loading...' : 'See More'}
+                        </button>
+                        {deletingUserId === p.id ? (
+                          <>
+                            <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
+                            <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
+                          </>
+                        ) : (
+                          <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {deletingUserId === p.id ? (
-                        <>
-                          <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
-                          <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
-                      )}
-                    </div>
+                    
+                    {/* Expanded Business Details */}
+                    {expandedBusinessDetails[p.id] && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs font-medium text-gray-700 mb-2">Business Details:</div>
+                        {expandedBusinessDetails[p.id].length === 0 ? (
+                          <div className="text-xs text-gray-500">No businesses found for this account.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {expandedBusinessDetails[p.id].map((business: any) => (
+                              <div key={business.id} className="text-xs bg-white p-2 rounded border">
+                                <div className="font-medium text-gray-800">{business.name || 'Unnamed Business'}</div>
+                                <div className="text-gray-600 mt-1">
+                                  {business.phone && <div>📞 {business.phone}</div>}
+                                  {business.email && <div>✉️ {business.email}</div>}
+                                  {business.website && <div>🌐 {business.website}</div>}
+                                  {business.address && <div>📍 {business.address}</div>}
+                                  <div className="mt-1">
+                                    <span className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs mr-1">
+                                      {business.category_key || 'No category'}
+                                    </span>
+                                    {business.is_member && (
+                                      <span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs mr-1">
+                                        Featured
+                                      </span>
+                                    )}
+                                    {business.published ? (
+                                      <span className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                        Published
+                                      </span>
+                                    ) : (
+                                      <span className="inline-block bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                                        Draft
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
