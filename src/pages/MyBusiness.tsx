@@ -876,7 +876,7 @@ export default function MyBusinessPage() {
               listings.map((listing) => (
                 <div key={listing.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
                   <div className="flex flex-wrap items-start justify-between">
-                  <div className="flex flex-col gap-2 mx-auto pb-[1vh]">
+                    <div className="flex flex-col gap-2 mx-auto pb-[1vh]">
                       {/* Featured Status and Pricing Info */}
                       {listing.is_member ? (
                         <div className="text-center">
@@ -908,12 +908,6 @@ export default function MyBusinessPage() {
                         className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200"
                       >
                         Edit Details
-                      </button>
-                      <button
-                        onClick={() => deleteBusinessListing(listing.id)}
-                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs border border-red-200 hover:bg-red-100"
-                      >
-                        Delete
                       </button>
                     </div>
                     <div className="flex-1 flex-wrap">
@@ -981,6 +975,14 @@ export default function MyBusinessPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => deleteBusinessListing(listing.id)}
+                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs border border-red-200 hover:bg-red-100"
+                      >
+                        Delete
+                      </button>
 
                       {/* Community Visibility Info */}
                       <div className="mt-4 p-3 bg-blue-50 rounded-lg">
