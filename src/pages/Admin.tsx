@@ -138,14 +138,18 @@ export default function AdminPage() {
    * TOGGLE FEATURED STATUS
    * 
    * This function allows admins to toggle a provider's featured status.
-   * It updates the is_featured field and sets featured_since timestamp when making featured.
+   * It handles both is_featured and is_member fields to ensure proper toggling.
+   * When making featured, it sets both is_featured=true and featured_since timestamp.
+   * When removing featured, it sets both is_featured=false and is_member=false.
    */
   const toggleFeaturedStatus = async (providerId: string, currentStatus: boolean) => {
     try {
       setMessage('Updating featured status...')
       
+      // Always update both is_featured and is_member to ensure consistent state
       const updateData: Partial<ProviderRow> = {
         is_featured: !currentStatus,
+        is_member: !currentStatus, // Keep both fields in sync
         updated_at: new Date().toISOString()
       }
       
@@ -157,13 +161,19 @@ export default function AdminPage() {
         updateData.featured_since = null
       }
       
+      console.log('[Admin] Toggling featured status:', { providerId, currentStatus, updateData })
+      
       const { error } = await supabase
         .from('providers')
         .update(updateData)
         .eq('id', providerId)
 
-      if (error) throw error
+      if (error) {
+        console.error('[Admin] Error updating featured status:', error)
+        throw error
+      }
 
+      console.log('[Admin] Featured status updated successfully')
       setMessage(`Provider ${!currentStatus ? 'featured' : 'unfeatured'} successfully!`)
       
       // Refresh providers data
@@ -173,6 +183,7 @@ export default function AdminPage() {
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
+      console.error('[Admin] Error in toggleFeaturedStatus:', error)
       setMessage(`Error updating featured status: ${error.message}`)
     }
   }
