@@ -1594,11 +1594,27 @@ function BusinessListingForm({
   const handleImageUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
+    // Check image limit for free accounts
+    if (!formData.is_member) {
+      const currentImageCount = formData.images?.length || 0
+      if (currentImageCount >= 1) {
+        alert('Free accounts are limited to 1 image. Upgrade to Featured to add multiple images.')
+        return
+      }
+      
+      // If trying to upload multiple files, only take the first one
+      if (files.length > 1) {
+        alert('Free accounts can only upload 1 image. Only the first image will be uploaded.')
+      }
+    }
+
     const businessId = listing?.id || 'new-listing'
     setUploadingImages(true)
     
     try {
-      const uploadPromises = Array.from(files).map(async (file, index) => {
+      // For free accounts, only process the first file
+      const filesToProcess = !formData.is_member ? [files[0]] : Array.from(files)
+      const uploadPromises = filesToProcess.map(async (file, index) => {
         const fileId = `${file.name}-${index}`
         
         // Track upload progress
@@ -1867,10 +1883,35 @@ function BusinessListingForm({
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Business Images
+                {!formData.is_member && (
+                  <span className="text-xs text-amber-600 ml-2">
+                    (1 image for free accounts)
+                  </span>
+                )}
               </label>
               <p className="text-xs text-neutral-500 mb-3">
                 Upload images to showcase your business. Images will appear in search results and on your business page.
+                {!formData.is_member && (
+                  <span className="text-amber-600 font-medium"> Free accounts are limited to 1 image. Upgrade to Featured for multiple images.</span>
+                )}
               </p>
+              
+              {/* Free account image limit notice */}
+              {!formData.is_member && formData.images && formData.images.length >= 1 && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm text-amber-800 font-medium">Image Limit Reached</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Free accounts can upload 1 image. Upgrade to Featured to add multiple images and showcase your business better.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Storage Setup Notice */}
               <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -1896,11 +1937,15 @@ function BusinessListingForm({
                   onChange={(e) => handleImageUpload(e.target.files)}
                   className="hidden"
                   id="image-upload"
-                  disabled={uploadingImages}
+                  disabled={uploadingImages || (!formData.is_member && (formData.images?.length || 0) >= 1)}
                 />
                 <label
                   htmlFor="image-upload"
-                  className={`cursor-pointer ${uploadingImages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`cursor-pointer ${
+                    uploadingImages || (!formData.is_member && (formData.images?.length || 0) >= 1) 
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : ''
+                  }`}
                 >
                   <div className="flex flex-col items-center">
                     <svg className="w-8 h-8 text-neutral-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2123,10 +2168,33 @@ function BusinessListingForm({
             </div>
 
             {/* Social Media Links */}
-            <div>
+            <div className={!formData.is_member ? 'opacity-50 pointer-events-none' : ''}>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Social Media Links
+                {!formData.is_member && (
+                  <span className="text-xs text-amber-600 ml-2">
+                    (Featured accounts only)
+                  </span>
+                )}
               </label>
+              
+              {/* Free account restriction notice */}
+              {!formData.is_member && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm text-amber-800 font-medium">Social Media Links - Featured Accounts Only</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Upgrade to Featured to add your social media profiles and increase your online presence.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
                 <input
                   type="text"
@@ -2134,6 +2202,7 @@ function BusinessListingForm({
                   onChange={(e) => setNewSocialPlatform(e.target.value)}
                   className="rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
                   placeholder="Platform (e.g., Facebook)"
+                  disabled={!formData.is_member}
                 />
                 <input
                   type="url"
@@ -2141,11 +2210,13 @@ function BusinessListingForm({
                   onChange={(e) => setNewSocialUrl(e.target.value)}
                   className="rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
                   placeholder="URL"
+                  disabled={!formData.is_member}
                 />
                 <button
                   type="button"
                   onClick={addSocialLink}
-                  className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                  className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!formData.is_member}
                 >
                   Add
                 </button>
@@ -2159,12 +2230,80 @@ function BusinessListingForm({
                     <button
                       type="button"
                       onClick={() => removeSocialLink(platform)}
-                      className="text-red-500 hover:text-red-700"
+                      className="text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!formData.is_member}
                     >
                       ×
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Booking System */}
+            <div className={!formData.is_member ? 'opacity-50 pointer-events-none' : ''}>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Booking System
+                {!formData.is_member && (
+                  <span className="text-xs text-amber-600 ml-2">
+                    (Featured accounts only)
+                  </span>
+                )}
+              </label>
+              
+              {/* Free account restriction notice */}
+              {!formData.is_member && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm text-amber-800 font-medium">Booking System - Featured Accounts Only</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Upgrade to Featured to enable direct appointment booking and scheduling for your customers.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">
+                    Booking URL
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://your-booking-system.com"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                    disabled={!formData.is_member}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">
+                    Booking Instructions
+                  </label>
+                  <textarea
+                    placeholder="Instructions for customers on how to book appointments..."
+                    rows={3}
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                    disabled={!formData.is_member}
+                  />
+                </div>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="booking-enabled"
+                    className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
+                    disabled={!formData.is_member}
+                  />
+                  <label htmlFor="booking-enabled" className="ml-2 text-sm text-neutral-700">
+                    Enable booking system for this business
+                  </label>
+                </div>
               </div>
             </div>
 
