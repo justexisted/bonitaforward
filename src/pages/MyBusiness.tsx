@@ -910,7 +910,7 @@ export default function MyBusinessPage() {
           <div className="space-y-4">
             {/* Header with Create Button */}
             <div className="flex flex-wrap items-center justify-between">
-              <div>
+              <div className="p-[1vh] m-[1vh]">
                 <h2 className="text-lg font-semibold">Your Business Listings</h2>
                 <p className="text-sm text-neutral-600">Manage your business listings and details</p>
               </div>
@@ -937,7 +937,7 @@ export default function MyBusinessPage() {
               listings.map((listing) => (
                 <div key={listing.id} className="rounded-2xl border border-neutral-100 p-1 bg-white">
                   <div className="flex flex-wrap items-start justify-between">
-                    <div className="flex flex-col gap-2 mx-auto p-[1vh] min-w-[230px]">
+                    <div className="flex flex-col gap-2 mx-auto p-[1vh] min-w-[330px]">
                       {/* Featured Status and Pricing Info */}
                       {listing.is_member ? (
                         <div className="text-center">
