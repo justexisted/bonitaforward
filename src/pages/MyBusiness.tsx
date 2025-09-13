@@ -750,7 +750,7 @@ export default function MyBusinessPage() {
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-4xl">
-          <div className="rounded-2xl border border-neutral-100 p-6 bg-white">
+          <div className="rounded-2xl border border-neutral-100 p-1 bg-white">
             <h1 className="text-xl font-semibold">Access Restricted</h1>
             <p className="mt-2 text-neutral-600">This page is only available for business accounts.</p>
             <Link to="/account" className="mt-4 inline-block rounded-full bg-neutral-900 text-white px-4 py-2">
@@ -766,7 +766,7 @@ export default function MyBusinessPage() {
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-4xl">
-          <div className="rounded-2xl border border-neutral-100 p-6 bg-white">
+          <div className="rounded-2xl border border-neutral-100 p-1 bg-white">
             <div className="animate-pulse">
               <div className="h-6 bg-neutral-200 rounded w-1/4 mb-4"></div>
               <div className="h-4 bg-neutral-200 rounded w-1/2"></div>
@@ -909,7 +909,7 @@ export default function MyBusinessPage() {
         {activeTab === 'listings' && (
           <div className="space-y-4">
             {/* Header with Create Button */}
-            <div className="flex flex-wrapitems-center justify-between">
+            <div className="flex flex-wrap items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Your Business Listings</h2>
                 <p className="text-sm text-neutral-600">Manage your business listings and details</p>
@@ -935,9 +935,9 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               listings.map((listing) => (
-                <div key={listing.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
+                <div key={listing.id} className="rounded-2xl border border-neutral-100 p-1 bg-white">
                   <div className="flex flex-wrap items-start justify-between">
-                    <div className="flex flex-col gap-2 mx-auto pb-[1vh] min-w-[230px]">
+                    <div className="flex flex-col gap-2 mx-auto p-[1vh] min-w-[230px]">
                       {/* Featured Status and Pricing Info */}
                       {listing.is_member ? (
                         <div className="text-center">
@@ -1081,7 +1081,7 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               applications.map((app) => (
-                <div key={app.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
+                <div key={app.id} className="rounded-2xl border border-neutral-100 p-1 bg-white">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold">{app.business_name}</h3>
@@ -1148,7 +1148,7 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               jobPosts.map((job) => (
-                <div key={job.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
+                <div key={job.id} className="rounded-2xl border border-neutral-100 p-1 bg-white">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
