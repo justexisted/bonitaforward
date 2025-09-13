@@ -79,6 +79,7 @@ type BusinessListing = {
   business_hours: Record<string, string> | null
   service_areas: string[] | null
   google_maps_url: string | null
+  bonita_resident_discount: string | null  // Discount offer for Bonita residents
 }
 
 // Type definition for business applications in the business_applications table
@@ -495,7 +496,8 @@ export default function MyBusinessPage() {
           social_links: listingData.social_links || {},
           business_hours: listingData.business_hours || {},
           service_areas: listingData.service_areas || [],
-          google_maps_url: listingData.google_maps_url || null
+          google_maps_url: listingData.google_maps_url || null,
+          bonita_resident_discount: listingData.bonita_resident_discount || null
           // created_at and updated_at are automatically handled by the database
         }])
 
@@ -562,6 +564,7 @@ export default function MyBusinessPage() {
       if (updates.business_hours !== undefined) changesData.business_hours = updates.business_hours
       if (updates.service_areas !== undefined) changesData.service_areas = updates.service_areas
       if (updates.google_maps_url !== undefined) changesData.google_maps_url = updates.google_maps_url
+      if (updates.bonita_resident_discount !== undefined) changesData.bonita_resident_discount = updates.bonita_resident_discount
       
       console.log('[MyBusiness] Final changes data for request:', changesData)
       
@@ -588,6 +591,7 @@ export default function MyBusinessPage() {
       if (updates.phone) updatedFields.push('phone')
       if (updates.email) updatedFields.push('email')
       if (updates.address) updatedFields.push('address')
+      if (updates.bonita_resident_discount) updatedFields.push('Bonita residents discount')
       
       const fieldText = updatedFields.length > 0 ? ` (${updatedFields.join(', ')})` : ''
       setMessage(`✅ Change request submitted successfully! Your changes${fieldText} will be reviewed by our admin team before going live. You will receive an email notification once approved.`)
@@ -812,6 +816,7 @@ export default function MyBusinessPage() {
                       if (listing.phone) pendingChanges.push(`Phone: ${listing.phone}`)
                       if (listing.email) pendingChanges.push(`Email: ${listing.email}`)
                       if (listing.address) pendingChanges.push(`Address: ${listing.address}`)
+                      if (listing.bonita_resident_discount) pendingChanges.push(`Bonita Discount: ${listing.bonita_resident_discount.substring(0, 30)}...`)
                       
                       return (
                         <li key={listing.id}>
@@ -1002,6 +1007,9 @@ export default function MyBusinessPage() {
                           ) : 'Not provided'}</p>
                           {listing.description && (
                             <p className="text-sm text-neutral-600"><strong>Description:</strong> {listing.description}</p>
+                          )}
+                          {listing.bonita_resident_discount && (
+                            <p className="text-sm text-green-600"><strong>Bonita Residents Discount:</strong> {listing.bonita_resident_discount}</p>
                           )}
                         </div>
                         <div>
@@ -1405,7 +1413,8 @@ function BusinessListingForm({
     social_links: listing?.social_links || {},
     business_hours: listing?.business_hours || {},
     service_areas: listing?.service_areas || [],
-    google_maps_url: listing?.google_maps_url || ''
+    google_maps_url: listing?.google_maps_url || '',
+    bonita_resident_discount: listing?.bonita_resident_discount || ''
   })
 
   const [newTag, setNewTag] = useState('')
@@ -1766,14 +1775,92 @@ function BusinessListingForm({
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Business Description
+                {/* Show character limit info based on plan tier */}
+                <span className="text-xs text-neutral-500 ml-2">
+                  ({formData.description?.length || 0}/{formData.is_member ? '500' : '200'} characters)
+                </span>
               </label>
               <textarea
                 value={formData.description || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) => {
+                  const newDescription = e.target.value
+                  
+                  // For free plans, enforce 200 character limit
+                  if (!formData.is_member && newDescription.length > 200) {
+                    // Don't update the form data if it exceeds the limit for free plans
+                    return
+                  }
+                  
+                  setFormData(prev => ({ ...prev, description: newDescription }))
+                }}
                 rows={4}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
+                  // Show red border if free plan exceeds 200 characters
+                  !formData.is_member && (formData.description?.length || 0) > 200
+                    ? 'border-red-300 focus:ring-red-500'
+                    : 'border-neutral-300 focus:ring-neutral-500'
+                }`}
                 placeholder="Tell customers about your business..."
+                maxLength={formData.is_member ? 500 : 200} // Set maxLength based on plan
               />
+              
+              {/* Character limit warning for free plans */}
+              {!formData.is_member && (formData.description?.length || 0) > 200 && (
+                <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">
+                        Character Limit Exceeded
+                      </h3>
+                      <div className="mt-1 text-sm text-red-700">
+                        <p>
+                          Free listings are limited to 200 characters for business descriptions. 
+                          You have {(formData.description?.length || 0) - 200} characters over the limit.
+                        </p>
+                        <p className="mt-1">
+                          <strong>Upgrade to Featured</strong> to get up to 500 characters for your description.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Character limit info for featured plans */}
+              {formData.is_member && (formData.description?.length || 0) > 400 && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    You're approaching the 500 character limit for featured listings. 
+                    {(formData.description?.length || 0)}/500 characters used.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Bonita Residents Discount */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Bonita Residents Discount
+                <span className="text-xs text-neutral-500 ml-2">
+                  (Optional - Special offer for local residents)
+                </span>
+              </label>
+              <input
+                type="text"
+                value={formData.bonita_resident_discount || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, bonita_resident_discount: e.target.value }))}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                placeholder="e.g., 10% off for Bonita residents, Free consultation for locals, etc."
+                maxLength={100}
+              />
+              <p className="text-xs text-neutral-500 mt-1">
+                Let Bonita residents know about any special offers or discounts you provide to the local community.
+              </p>
             </div>
 
             {/* Business Images */}
