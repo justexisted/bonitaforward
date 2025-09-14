@@ -23,6 +23,7 @@ export type DbProvider = {
   created_at?: string | null
   updated_at?: string | null
   owner_user_id?: string | null
+  bonita_resident_discount?: string | null
   // Membership/featured columns (optional in DB)
   is_member?: boolean | number | string | null
   member?: boolean | number | string | null
@@ -31,6 +32,11 @@ export type DbProvider = {
   paid?: boolean | number | string | null
   plan?: string | null
   tier?: string | null
+  // Booking system fields
+  booking_enabled?: boolean | null
+  booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
+  booking_instructions?: string | null
+  booking_url?: string | null
 }
 
 export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
