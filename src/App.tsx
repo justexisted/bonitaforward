@@ -162,6 +162,15 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           const userId = session.user.id
 
           console.log('[Auth] Processing existing session for:', email, 'userId:', userId)
+          
+          // CRITICAL FIX: Don't override profile if user is already signed in
+          // This prevents initialization from clearing a successful sign-in
+          if (profile?.email === email) {
+            console.log('[Auth] User already signed in, skipping initialization profile setting')
+            setLoading(false)
+            initializationComplete = true
+            return
+          }
 
           /**
            * CRITICAL FIX: Proper role fetching and profile management
@@ -239,10 +248,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'initComplete:', initializationComplete)
       
-      // CRITICAL: Don't process auth events during initialization
-      if (!initializationComplete) {
-        console.log('[Auth] Ignoring auth event during initialization')
+      // CRITICAL FIX: Allow SIGNED_IN events during initialization to prevent sign-in loop
+      // Only ignore other events (SIGNED_OUT, TOKEN_REFRESHED) during initialization
+      if (!initializationComplete && event !== 'SIGNED_IN') {
+        console.log('[Auth] Ignoring non-sign-in auth event during initialization:', event)
         return
+      }
+      
+      // For SIGNED_IN events during initialization, mark initialization as complete first
+      if (event === 'SIGNED_IN' && !initializationComplete) {
+        console.log('[Auth] Processing SIGNED_IN during initialization, marking init complete')
+        initializationComplete = true
       }
 
       if (event === 'SIGNED_IN' && session?.user) {

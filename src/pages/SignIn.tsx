@@ -87,6 +87,13 @@ export default function SignInPage() {
     }
   }, [auth.isAuthed, auth.loading, location?.state?.from, navigate])
 
+  // CRITICAL FIX: Cleanup effect to reset busy state on unmount
+  useEffect(() => {
+    return () => {
+      setBusy(false)
+    }
+  }, [])
+
   /**
    * CRITICAL FIX: Sign-in form submission
    * 
@@ -110,8 +117,20 @@ export default function SignInPage() {
         if (error) {
           console.log('[SignIn] Sign in error:', error)
           setMessage(error)
+          setBusy(false) // CRITICAL FIX: Reset busy state on error
         } else {
           console.log('[SignIn] Sign in successful, waiting for redirect...')
+          
+          // CRITICAL FIX: Add timeout to prevent infinite "Please wait" state
+          // If redirect doesn't happen within 5 seconds, reset busy state
+          setTimeout(() => {
+            if (busy) {
+              console.log('[SignIn] Timeout reached, resetting busy state')
+              setBusy(false)
+              setMessage('Sign-in completed but redirect is taking longer than expected. Please refresh the page.')
+            }
+          }, 5000)
+          
           // Don't set busy to false here - let the redirect useEffect handle it
           return
         }
