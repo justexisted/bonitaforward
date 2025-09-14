@@ -270,9 +270,47 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         initializationComplete = true
         // CRITICAL FIX: Also set loading to false to prevent initialization from overriding
         setLoading(false)
+        
+        // CRITICAL FIX: Set profile state during initialization SIGNED_IN event
+        // This prevents the user from appearing as not authenticated and triggering duplicate sign-ins
+        if (session?.user) {
+          const email = session.user.email
+          const meta = session.user.user_metadata || {}
+          const name = meta?.name
+          let role = meta?.role as 'business' | 'community' | undefined
+          const userId = session.user.id
+
+          console.log('[Auth] Setting profile during initialization SIGNED_IN:', { email, userId, metaRole: role })
+
+          // Fetch role from database for signed in users
+          if (userId) {
+            try {
+              const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+              const dbRole = String((prof as any)?.role || '').toLowerCase()
+              if (dbRole === 'business' || dbRole === 'community') {
+                role = dbRole as 'business' | 'community'
+                console.log('[Auth] Role fetched from database during init:', role)
+              }
+            } catch (error) {
+              console.error('[Auth] Error fetching role during init:', error)
+            }
+          }
+
+          console.log('[Auth] Setting profile state during initialization:', { name, email, userId, role })
+          setProfile({ name, email, userId, role })
+          
+          // Ensure profile exists in database
+          if (userId && email) {
+            await ensureProfile(userId, email, name, role)
+          }
+          
+          console.log('[Auth] Initialization SIGNED_IN process complete, user should be authenticated')
+        }
       }
 
-      if (event === 'SIGNED_IN' && session?.user) {
+      // CRITICAL FIX: Only process SIGNED_IN if we haven't already processed it during initialization
+      // This prevents duplicate profile setting and ensures clean authentication flow
+      if (event === 'SIGNED_IN' && session?.user && initializationComplete) {
         const email = session.user.email
         const meta = session.user.user_metadata || {}
       const name = meta?.name

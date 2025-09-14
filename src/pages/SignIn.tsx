@@ -107,6 +107,16 @@ export default function SignInPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setMessage(null)
+    
+    // CRITICAL FIX: Prevent duplicate sign-in attempts if user is already authenticated
+    // This prevents the stuck "Please wait" button when user is already signed in
+    if (auth.isAuthed && !auth.loading) {
+      console.log('[SignIn] User is already authenticated, redirecting instead of signing in again')
+      const target = location?.state?.from || '/'
+      navigate(target, { replace: true })
+      return
+    }
+    
     setBusy(true)
 
     try {
