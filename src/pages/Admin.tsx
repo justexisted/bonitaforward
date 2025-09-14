@@ -135,6 +135,10 @@ export default function AdminPage() {
   const [funnelUserFilter, setFunnelUserFilter] = useState<string>('')
   // Filter state for featured providers - allows toggling between all, featured, and non-featured
   const [featuredProviderFilter, setFeaturedProviderFilter] = useState<'all' | 'featured' | 'non-featured'>('all')
+  // Loading state for provider save operations
+  const [savingProvider, setSavingProvider] = useState(false)
+  // Image upload state
+  const [uploadingImages, setUploadingImages] = useState(false)
 
   // Filtered providers based on featured status filter
   // This allows admins to easily view all providers, only featured ones, or only non-featured ones
@@ -776,6 +780,7 @@ export default function AdminPage() {
   async function saveProvider(p: ProviderRow) {
     setMessage(null)
     setError(null)
+    setSavingProvider(true)
     
     try {
       console.log('[Admin] Saving provider:', p.id, 'with data:', p)
@@ -821,6 +826,7 @@ export default function AdminPage() {
       if (error) {
         console.error('[Admin] Provider save error:', error)
         setError(`Failed to save provider: ${error.message}`)
+        setSavingProvider(false)
         return
       }
       
@@ -837,6 +843,124 @@ export default function AdminPage() {
     } catch (err: any) {
       console.error('[Admin] Unexpected error saving provider:', err)
       setError(`Unexpected error: ${err.message}`)
+    } finally {
+      setSavingProvider(false)
+    }
+  }
+
+  // Image upload functionality for admin provider editing
+  // Handles both free (1 image) and featured (multiple images) accounts
+  async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, providerId: string) {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    setUploadingImages(true)
+    setError(null)
+
+    try {
+      const currentProvider = providers.find(p => p.id === providerId)
+      if (!currentProvider) {
+        setError('Provider not found')
+        return
+      }
+
+      const isFeatured = currentProvider.is_member === true
+      const currentImages = currentProvider.images || []
+      const maxImages = isFeatured ? 10 : 1 // Free accounts: 1 image, Featured: up to 10
+
+      // Check if adding these files would exceed the limit
+      if (currentImages.length + files.length > maxImages) {
+        setError(`Maximum ${maxImages} image${maxImages === 1 ? '' : 's'} allowed for ${isFeatured ? 'featured' : 'free'} accounts`)
+        return
+      }
+
+      const uploadPromises = Array.from(files).map(async (file) => {
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`${file.name} is not a valid image file`)
+        }
+
+        // Validate file size (5MB max)
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`${file.name} is too large. Maximum size is 5MB`)
+        }
+
+        // Create unique filename
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${providerId}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+        
+        // Upload to Supabase Storage
+        const { error } = await supabase.storage
+          .from('business-images')
+          .upload(fileName, file)
+
+        if (error) {
+          throw new Error(`Failed to upload ${file.name}: ${error.message}`)
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('business-images')
+          .getPublicUrl(fileName)
+
+        return urlData.publicUrl
+      })
+
+      const uploadedUrls = await Promise.all(uploadPromises)
+      const newImages = [...currentImages, ...uploadedUrls]
+
+      // Update the provider with new images
+      setProviders(prev => prev.map(p => 
+        p.id === providerId 
+          ? { ...p, images: newImages }
+          : p
+      ))
+
+      setMessage(`Successfully uploaded ${uploadedUrls.length} image${uploadedUrls.length === 1 ? '' : 's'}`)
+
+    } catch (err: any) {
+      console.error('[Admin] Image upload error:', err)
+      setError(err.message || 'Failed to upload images')
+    } finally {
+      setUploadingImages(false)
+      // Clear the file input
+      event.target.value = ''
+    }
+  }
+
+  // Remove image from provider
+  async function removeImage(providerId: string, imageUrl: string) {
+    try {
+      const currentProvider = providers.find(p => p.id === providerId)
+      if (!currentProvider) return
+
+      // Extract filename from URL for storage deletion
+      const urlParts = imageUrl.split('/')
+      const fileName = urlParts[urlParts.length - 1]
+      
+      // Delete from storage
+      const { error } = await supabase.storage
+        .from('business-images')
+        .remove([fileName])
+
+      if (error) {
+        console.warn('[Admin] Failed to delete image from storage:', error)
+        // Continue anyway - we'll still remove it from the provider
+      }
+
+      // Update provider images
+      const newImages = (currentProvider.images || []).filter(img => img !== imageUrl)
+      setProviders(prev => prev.map(p => 
+        p.id === providerId 
+          ? { ...p, images: newImages }
+          : p
+      ))
+
+      setMessage('Image removed successfully')
+
+    } catch (err: any) {
+      console.error('[Admin] Image removal error:', err)
+      setError('Failed to remove image')
     }
   }
 
@@ -2054,6 +2178,87 @@ export default function AdminPage() {
                           </div>
                         </div>
 
+                        {/* Image Upload Section */}
+                        <div>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">
+                            Business Images
+                            {!providers[0].is_member && (
+                              <span className="text-sm text-amber-600 ml-2">(1 image for free accounts)</span>
+                            )}
+                            {providers[0].is_member && (
+                              <span className="text-sm text-green-600 ml-2">(Up to 10 images for featured accounts)</span>
+                            )}
+                          </h4>
+                          
+                          {/* Current Images Display */}
+                          {providers[0].images && providers[0].images.length > 0 && (
+                            <div className="mb-4">
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {providers[0].images.map((imageUrl, index) => (
+                                  <div key={index} className="relative group">
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Business image ${index + 1}`}
+                                      className="w-full h-24 object-cover rounded-lg border border-neutral-200"
+                                    />
+                                    <button
+                                      onClick={() => removeImage(providers[0].id, imageUrl)}
+                                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                                      title="Remove image"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Upload Section */}
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                Upload Images
+                              </label>
+                              <input
+                                type="file"
+                                multiple={providers[0].is_member === true}
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, providers[0].id)}
+                                disabled={uploadingImages}
+                                className="w-full text-sm text-neutral-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              <p className="text-xs text-neutral-500 mt-1">
+                                {providers[0].is_member 
+                                  ? 'Select multiple images (JPG, PNG, GIF). Max 5MB per image, up to 10 total.'
+                                  : 'Select one image (JPG, PNG, GIF). Max 5MB.'
+                                }
+                              </p>
+                            </div>
+
+                            {/* Upload Progress */}
+                            {uploadingImages && (
+                              <div className="flex items-center gap-2 text-sm text-blue-600">
+                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Uploading images...
+                              </div>
+                            )}
+
+                            {/* Image Limit Warning */}
+                            {providers[0].images && providers[0].images.length >= (providers[0].is_member ? 10 : 1) && (
+                              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p className="text-sm text-amber-800">
+                                  <strong>Image limit reached:</strong> {providers[0].is_member ? 'Featured accounts can have up to 10 images.' : 'Free accounts can have 1 image.'} 
+                                  {!providers[0].is_member && ' Upgrade to featured to upload more images.'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Booking System - Featured Only */}
                         <div className={!providers[0].is_member ? 'opacity-50 pointer-events-none' : ''}>
                           <h4 className="text-md font-medium text-neutral-800 mb-4">
@@ -2187,9 +2392,16 @@ export default function AdminPage() {
                         <div className="flex items-center gap-4">
                           <button 
                             onClick={() => saveProvider(providers[0])} 
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                            disabled={savingProvider}
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                           >
-                            Save Changes
+                            {savingProvider && (
+                              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            )}
+                            {savingProvider ? 'Saving...' : 'Save Changes'}
                           </button>
                           <button
                             onClick={() => {
@@ -2215,6 +2427,29 @@ export default function AdminPage() {
                           Last updated: {providers[0].updated_at ? new Date(providers[0].updated_at).toLocaleString() : 'Never'}
                         </div>
                       </div>
+                      
+                      {/* Save Status Messages */}
+                      {message && (
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-green-800 font-medium">{message}</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {error && (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            <span className="text-red-800 font-medium">{error}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
