@@ -50,6 +50,11 @@ type ProviderRow = {
   published?: boolean | null
   created_at?: string | null
   updated_at?: string | null
+  // Booking system fields
+  booking_enabled?: boolean | null
+  booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
+  booking_instructions?: string | null
+  booking_url?: string | null
 }
 
 type FunnelRow = {
@@ -798,6 +803,11 @@ export default function AdminPage() {
         google_maps_url: p.google_maps_url || null,
         bonita_resident_discount: p.bonita_resident_discount || null,
         published: p.published ?? true,
+        // Booking system fields
+        booking_enabled: p.booking_enabled ?? false,
+        booking_type: p.booking_type || null,
+        booking_instructions: p.booking_instructions || null,
+        booking_url: p.booking_url || null,
         updated_at: new Date().toISOString()
       }
       
@@ -2041,6 +2051,121 @@ export default function AdminPage() {
                                 disabled={!providers[0].is_member}
                               />
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Booking System - Featured Only */}
+                        <div className={!providers[0].is_member ? 'opacity-50 pointer-events-none' : ''}>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">
+                            Booking System Configuration
+                            {!providers[0].is_member && (
+                              <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
+                            )}
+                          </h4>
+                          
+                          {!providers[0].is_member && (
+                            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                              <p className="text-sm text-amber-800">
+                                <strong>Upgrade to Featured</strong> to enable online booking and appointment scheduling.
+                              </p>
+                            </div>
+                          )}
+                          
+                          <div className="space-y-4">
+                            {/* Enable Booking Toggle */}
+                            <div>
+                              <label className="flex items-center gap-3">
+                                <input 
+                                  type="checkbox" 
+                                  checked={providers[0].booking_enabled === true} 
+                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_enabled: e.target.checked }, ...arr.slice(1)])} 
+                                  className="rounded border-neutral-300"
+                                  disabled={!providers[0].is_member}
+                                />
+                                <span className="text-sm font-medium text-neutral-700">
+                                  Enable Online Booking
+                                </span>
+                              </label>
+                              <p className="text-xs text-neutral-500 mt-1 ml-6">
+                                Allow customers to book appointments or reservations online
+                              </p>
+                            </div>
+
+                            {/* Booking Type */}
+                            {providers[0].booking_enabled && (
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                  Booking Type
+                                </label>
+                                <select 
+                                  value={providers[0].booking_type || ''} 
+                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_type: e.target.value as any || null }, ...arr.slice(1)])} 
+                                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                                  disabled={!providers[0].is_member}
+                                >
+                                  <option value="">Select booking type...</option>
+                                  <option value="appointment">Appointment</option>
+                                  <option value="reservation">Reservation</option>
+                                  <option value="consultation">Consultation</option>
+                                  <option value="walk-in">Walk-in Only</option>
+                                </select>
+                              </div>
+                            )}
+
+                            {/* Booking Instructions */}
+                            {providers[0].booking_enabled && (
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                  Booking Instructions
+                                </label>
+                                <textarea
+                                  value={providers[0].booking_instructions || ''}
+                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_instructions: e.target.value }, ...arr.slice(1)])}
+                                  rows={3}
+                                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                                  placeholder="e.g., Please call ahead for same-day appointments, Book at least 24 hours in advance, Walk-ins welcome during business hours"
+                                  disabled={!providers[0].is_member}
+                                />
+                                <p className="text-xs text-neutral-500 mt-1">
+                                  Instructions that will be shown to customers when they try to book
+                                </p>
+                              </div>
+                            )}
+
+                            {/* External Booking URL */}
+                            {providers[0].booking_enabled && (
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                  External Booking URL (Optional)
+                                </label>
+                                <input 
+                                  value={providers[0].booking_url || ''} 
+                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_url: e.target.value }, ...arr.slice(1)])} 
+                                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                  placeholder="https://calendly.com/yourbusiness or https://yourbookingplatform.com"
+                                  disabled={!providers[0].is_member}
+                                />
+                                <p className="text-xs text-neutral-500 mt-1">
+                                  If you use an external booking platform, enter the URL here. Otherwise, customers will see booking instructions.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Booking Preview */}
+                            {providers[0].booking_enabled && providers[0].is_member && (
+                              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <h5 className="text-sm font-medium text-blue-900 mb-2">Booking Preview</h5>
+                                <div className="text-sm text-blue-800">
+                                  <p><strong>Type:</strong> {providers[0].booking_type || 'Not specified'}</p>
+                                  {providers[0].booking_url && (
+                                    <p><strong>External URL:</strong> <a href={providers[0].booking_url} target="_blank" rel="noopener noreferrer" className="underline">{providers[0].booking_url}</a></p>
+                                  )}
+                                  {providers[0].booking_instructions && (
+                                    <p><strong>Instructions:</strong> {providers[0].booking_instructions}</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 

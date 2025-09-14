@@ -1070,6 +1070,88 @@ function ProviderPage() {
                   </div>
                 )}
               </div>
+
+              {/* Booking System - Featured Providers Only */}
+              {provider.isMember && provider.booking_enabled && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Book with {provider.name}</h3>
+                  <div className="rounded-xl border border-neutral-200 p-6 bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-lg font-semibold text-neutral-900 mb-2">
+                          {provider.booking_type === 'appointment' && 'Book an Appointment'}
+                          {provider.booking_type === 'reservation' && 'Make a Reservation'}
+                          {provider.booking_type === 'consultation' && 'Schedule a Consultation'}
+                          {provider.booking_type === 'walk-in' && 'Walk-in Information'}
+                          {!provider.booking_type && 'Book Online'}
+                        </h4>
+                        
+                        {provider.booking_url ? (
+                          <div className="space-y-3">
+                            <p className="text-neutral-700">
+                              Click the button below to book online through our booking platform.
+                            </p>
+                            <a
+                              href={provider.booking_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              Book Now
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {provider.booking_instructions && (
+                              <div className="p-4 bg-white rounded-lg border border-neutral-200">
+                                <h5 className="font-medium text-neutral-900 mb-2">Booking Instructions</h5>
+                                <p className="text-neutral-700 whitespace-pre-wrap">{provider.booking_instructions}</p>
+                              </div>
+                            )}
+                            
+                            <div className="flex flex-wrap gap-3">
+                              {provider.phone && (
+                                <a
+                                  href={`tel:${provider.phone}`}
+                                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.964 5.964l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                  </svg>
+                                  Call {provider.phone}
+                                </a>
+                              )}
+                              
+                              {provider.email && (
+                                <a
+                                  href={`mailto:${provider.email}`}
+                                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  Email {provider.email}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {jobs.length > 0 && (
                 <div className="mt-6">
                   <div className="text-sm font-medium">Open Roles</div>
@@ -1438,6 +1520,11 @@ type Provider = {
   published?: boolean | null
   created_at?: string | null
   updated_at?: string | null
+  // Booking system fields
+  booking_enabled?: boolean | null
+  booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
+  booking_instructions?: string | null
+  booking_url?: string | null
 }
 function ensureDemoMembers(input: Record<CategoryKey, Provider[]>): Record<CategoryKey, Provider[]> {
   const out: Record<CategoryKey, Provider[]> = {
@@ -1626,6 +1713,11 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       published: r.published ?? null,
       created_at: r.created_at ?? null,
       updated_at: r.updated_at ?? null,
+      // Booking system fields
+      booking_enabled: r.booking_enabled ?? null,
+      booking_type: r.booking_type ?? null,
+      booking_instructions: r.booking_instructions ?? null,
+      booking_url: r.booking_url ?? null,
     })
   })
   // Fallback: if a category has zero members flagged from Supabase, promote the first three
