@@ -1947,7 +1947,6 @@ export default function AdminPage() {
 
                         {/* Business Description */}
                         <div>
-                          <h4 className="text-md font-medium text-neutral-800 mb-4">Business Description</h4>
                           <div>
                             <label className="block text-sm font-medium text-neutral-700 mb-1">
                               Description
@@ -1978,7 +1977,6 @@ export default function AdminPage() {
 
                         {/* Bonita Residents Discount */}
                         <div>
-                          <h4 className="text-md font-medium text-neutral-800 mb-4">Bonita Residents Discount</h4>
                           <div>
                             <label className="block text-sm font-medium text-neutral-700 mb-1">
                               Special Discount for Bonita Residents
@@ -1994,7 +1992,6 @@ export default function AdminPage() {
 
                         {/* Service Areas */}
                         <div>
-                          <h4 className="text-md font-medium text-neutral-800 mb-4">Service Areas</h4>
                           <div>
                             <label className="block text-sm font-medium text-neutral-700 mb-1">
                               Areas You Serve
@@ -2049,7 +2046,6 @@ export default function AdminPage() {
 
                         {/* Tags */}
                         <div>
-                          <h4 className="text-md font-medium text-neutral-800 mb-4">Business Tags</h4>
                           <div>
                             <label className="block text-sm font-medium text-neutral-700 mb-1">Tags</label>
                             <input 
