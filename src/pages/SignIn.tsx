@@ -71,8 +71,23 @@ export default function SignInPage() {
   useEffect(() => {
     console.log('[SignIn] Auth state check:', { isAuthed: auth.isAuthed, loading: auth.loading, email: auth.email })
     
-    // Only redirect if fully authenticated and not loading
-    if (auth.isAuthed && !auth.loading) {
+    // CRITICAL FIX: Redirect if we have an email and not loading (even if isAuthed is false)
+    // This handles the case where profile is being set but isAuthed hasn't updated yet
+    if (auth.email && !auth.loading) {
+      console.log('[SignIn] User has email and not loading, redirecting...')
+      
+      // CRITICAL FIX: Reset busy state before redirect to prevent stuck button
+      setBusy(false)
+      
+      const stored = (() => {
+        try { return localStorage.getItem('bf-return-url') || null } catch { return null }
+      })()
+      const target = location?.state?.from || stored || '/'
+      try { localStorage.removeItem('bf-return-url') } catch {}
+      navigate(target, { replace: true })
+    }
+    // Fallback: Only redirect if fully authenticated and not loading
+    else if (auth.isAuthed && !auth.loading) {
       console.log('[SignIn] User is authenticated, redirecting...')
       
       // CRITICAL FIX: Reset busy state before redirect to prevent stuck button
@@ -85,7 +100,7 @@ export default function SignInPage() {
       try { localStorage.removeItem('bf-return-url') } catch {}
       navigate(target, { replace: true })
     }
-  }, [auth.isAuthed, auth.loading, location?.state?.from, navigate])
+  }, [auth.isAuthed, auth.loading, auth.email, location?.state?.from, navigate])
 
   // CRITICAL FIX: Cleanup effect to reset busy state on unmount
   useEffect(() => {
@@ -114,6 +129,13 @@ export default function SignInPage() {
       console.log('[SignIn] User is already authenticated, redirecting instead of signing in again')
       const target = location?.state?.from || '/'
       navigate(target, { replace: true })
+      return
+    }
+    
+    // CRITICAL FIX: Also prevent sign-in if we have a profile but loading is false
+    // This handles the case where profile is being set but not yet reflected in isAuthed
+    if (auth.email && !auth.loading) {
+      console.log('[SignIn] User profile exists but not fully authenticated yet, waiting for auth state to update')
       return
     }
     

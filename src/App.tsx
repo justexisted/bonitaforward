@@ -273,6 +273,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // CRITICAL FIX: Set profile state during initialization SIGNED_IN event
         // This prevents the user from appearing as not authenticated and triggering duplicate sign-ins
+        console.log('[Auth] Session available during init SIGNED_IN:', !!session, 'User available:', !!session?.user)
+        
         if (session?.user) {
           const email = session.user.email
           const meta = session.user.user_metadata || {}
@@ -296,8 +298,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          console.log('[Auth] Setting profile state during initialization:', { name, email, userId, role })
-          setProfile({ name, email, userId, role })
+          console.log('[Auth] About to set profile state during initialization:', { name, email, userId, role })
+          
+          // CRITICAL FIX: Use a callback to ensure setProfile is called and logged
+          setProfile((prevProfile) => {
+            const newProfile = { name, email, userId, role }
+            console.log('[Auth] setProfile callback called with:', newProfile, 'previous:', prevProfile)
+            return newProfile
+          })
           
           // Ensure profile exists in database
           if (userId && email) {
@@ -305,6 +313,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           
           console.log('[Auth] Initialization SIGNED_IN process complete, user should be authenticated')
+        } else {
+          console.log('[Auth] No session or user available during initialization SIGNED_IN')
         }
       }
 
