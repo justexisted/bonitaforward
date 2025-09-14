@@ -1556,9 +1556,10 @@ type ProviderDetails = {
 // Removed unused providerDescriptions/getProviderDescription to satisfy TypeScript build
 
 function isFeaturedProvider(p: Provider): boolean {
-  if (p.isMember) return true
-  const tags = (p.tags || []).map((t) => String(t).trim().toLowerCase())
-  return tags.includes('featured') || tags.includes('member') || tags.includes('paid')
+  // Only check the isMember field to ensure consistency with admin page
+  // This prevents discrepancies where providers show as featured on provider page
+  // but not on admin page due to different logic
+  return Boolean(p.isMember)
 }
 
 function getProviderDetails(p: Provider): ProviderDetails {
@@ -1659,24 +1660,15 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
     'professional-services': [],
   }
   function coerceIsMember(r: any): boolean {
-    const raw = (
-      r.is_member ?? r.member ?? r.isMember ?? r.is_featured ?? r.featured ??
-      r.paid ?? r.plan ?? r.tier
-    )
+    // Only check the primary featured/member fields from the database
+    // This ensures consistency between admin page and provider page featured status
+    // Removed secondary fields (paid, plan, tier) and tag-based checks to prevent discrepancies
+    const raw = r.is_member ?? r.is_featured
     if (typeof raw === 'boolean') return raw
     if (typeof raw === 'number') return raw > 0
     if (typeof raw === 'string') {
       const v = raw.trim().toLowerCase()
-      if (['true','t','yes','y','1','paid','pro','premium','featured','member'].includes(v)) return true
-    }
-    // Also allow tag/badge-based hints — combine arrays to avoid empty-tags truthiness issues
-    const combined: string[] = [
-      ...(((r.tags as string[] | null) || []) as string[]),
-      ...(((r.badges as string[] | null) || []) as string[]),
-    ]
-    if (combined.length) {
-      const set = new Set(combined.map((s) => String(s).trim().toLowerCase()))
-      if (set.has('featured') || set.has('member') || set.has('paid')) return true
+      if (['true','t','yes','y','1'].includes(v)) return true
     }
     return false
   }
