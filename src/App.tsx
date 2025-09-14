@@ -131,6 +131,15 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         console.log('[Auth] Initializing auth state...')
         
+        // CRITICAL FIX: Don't initialize if user is already signed in
+        // This prevents initialization from overriding a successful sign-in
+        if (profile?.email) {
+          console.log('[Auth] User already signed in, skipping initialization')
+          setLoading(false)
+          initializationComplete = true
+          return
+        }
+        
         // Get initial session from localStorage/cookies
         const { data: { session }, error } = await supabase.auth.getSession()
 
@@ -259,6 +268,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' && !initializationComplete) {
         console.log('[Auth] Processing SIGNED_IN during initialization, marking init complete')
         initializationComplete = true
+        // CRITICAL FIX: Also set loading to false to prevent initialization from overriding
+        setLoading(false)
       }
 
       if (event === 'SIGNED_IN' && session?.user) {
@@ -284,12 +295,20 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        console.log('[Auth] Setting profile state:', { name, email, userId, role })
         setProfile({ name, email, userId, role })
+        
+        // CRITICAL FIX: Set loading to false after setting profile
+        // This ensures isAuthed becomes true and user gets redirected
+        console.log('[Auth] Setting loading to false after successful sign-in')
+        setLoading(false)
 
         // Ensure profile exists in database
         if (userId && email) {
           await ensureProfile(userId, email, name, role)
         }
+        
+        console.log('[Auth] Sign-in process complete, user should now be authenticated')
       } else if (event === 'SIGNED_OUT' || !session) {
         console.log('[Auth] SIGNED_OUT event or no session - clearing profile')
         setProfile(null)
