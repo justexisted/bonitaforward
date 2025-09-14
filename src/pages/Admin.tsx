@@ -39,6 +39,15 @@ type ProviderRow = {
   plan?: string | null
   tier?: string | null
   paid?: boolean | null
+  // Enhanced business management fields (matching My Business page)
+  description?: string | null
+  specialties?: string[] | null
+  social_links?: Record<string, string> | null
+  business_hours?: Record<string, string> | null
+  service_areas?: string[] | null
+  google_maps_url?: string | null
+  bonita_resident_discount?: string | null
+  published?: boolean | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -746,11 +755,29 @@ export default function AdminPage() {
     }
   }
 
+  /**
+   * SAVE PROVIDER - Enhanced Admin Provider Update
+   * 
+   * This function saves all provider fields including the enhanced business management fields.
+   * It includes all the same fields that are available in the My Business page editing form.
+   * 
+   * Features:
+   * - Updates all core business fields (name, category, contact info)
+   * - Updates enhanced fields (description, specialties, social links, etc.)
+   * - Handles free vs featured plan restrictions
+   * - Provides clear success/error feedback
+   * - Refreshes provider data after successful update
+   */
   async function saveProvider(p: ProviderRow) {
     setMessage(null)
-    const { error } = await supabase
-      .from('providers')
-      .update({
+    setError(null)
+    
+    try {
+      console.log('[Admin] Saving provider:', p.id, 'with data:', p)
+      
+      // Prepare update data with all enhanced business fields
+      const updateData = {
+        // Core business fields
         name: p.name,
         category_key: p.category_key,
         tags: p.tags || [],
@@ -761,12 +788,45 @@ export default function AdminPage() {
         address: p.address,
         images: p.images || [],
         is_member: p.is_member === true,
-      })
-      .eq('id', p.id)
-    if (error) setError(error.message)
-    else {
-      setMessage('Provider saved')
-      try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
+        
+        // Enhanced business management fields (matching My Business page)
+        description: p.description || null,
+        specialties: p.specialties || null,
+        social_links: p.social_links || null,
+        business_hours: p.business_hours || null,
+        service_areas: p.service_areas || null,
+        google_maps_url: p.google_maps_url || null,
+        bonita_resident_discount: p.bonita_resident_discount || null,
+        published: p.published ?? true,
+        updated_at: new Date().toISOString()
+      }
+      
+      console.log('[Admin] Update data prepared:', updateData)
+      
+      const { error } = await supabase
+        .from('providers')
+        .update(updateData)
+        .eq('id', p.id)
+        
+      if (error) {
+        console.error('[Admin] Provider save error:', error)
+        setError(`Failed to save provider: ${error.message}`)
+        return
+      }
+      
+      console.log('[Admin] Provider saved successfully')
+      setMessage('Provider updated successfully')
+      
+      // Refresh provider data to reflect changes
+      try { 
+        window.dispatchEvent(new CustomEvent('bf-refresh-providers')) 
+      } catch (refreshError) {
+        console.warn('[Admin] Failed to dispatch refresh event:', refreshError)
+      }
+      
+    } catch (err: any) {
+      console.error('[Admin] Unexpected error saving provider:', err)
+      setError(`Unexpected error: ${err.message}`)
     }
   }
 
@@ -1781,43 +1841,258 @@ export default function AdminPage() {
                       ))}
                     </datalist>
                   </div>
-                  {/* Single edit card bound to the first provider in array */}
+                  {/* Enhanced Provider Edit Form - Matching My Business Page Functionality */}
                   {providers[0] && (
-                    <div className="rounded-xl border border-neutral-200 p-3">
-                      <div className="text-neutral-700 font-medium mb-2">Editing: {providers[0].name}</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <input value={providers[0].name} onChange={(e) => setProviders((arr) => [{ ...arr[0], name: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Name" />
-                        <select value={providers[0].category_key} onChange={(e) => setProviders((arr) => [{ ...arr[0], category_key: e.target.value } as any, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
-                          {catOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.name}</option>
-                          ))}
-                        </select>
-                        <input value={(providers[0].tags || []).join(', ')} onChange={(e) => setProviders((arr) => [{ ...arr[0], tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Tags" />
-                        <label className="inline-flex items-center gap-2 text-sm">
-                          <input type="checkbox" checked={providers[0].is_member === true} onChange={(e) => setProviders((arr) => [{ ...arr[0], is_member: e.target.checked }, ...arr.slice(1)])} />
-                          <span>Featured (Paid)</span>
-                        </label>
-                        <input value={providers[0].phone || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], phone: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" />
-                        <input value={providers[0].email || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], email: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" />
-                        <input value={providers[0].website || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], website: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Website" />
-                        <input value={providers[0].address || ''} onChange={(e) => setProviders((arr) => [{ ...arr[0], address: e.target.value }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2" placeholder="Address" />
-                        <input value={(providers[0].images || []).join(', ')} onChange={(e) => setProviders((arr) => [{ ...arr[0], images: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-3" placeholder="Image URLs" />
+                    <div className="rounded-xl border border-neutral-200 p-6 bg-white">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-lg font-semibold text-neutral-900">Editing: {providers[0].name}</h3>
+                          <p className="text-sm text-neutral-600 mt-1">
+                            {providers[0].is_member ? 'Featured Account' : 'Free Account'} • 
+                            Category: {providers[0].category_key}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="inline-flex items-center gap-2 text-sm">
+                            <input 
+                              type="checkbox" 
+                              checked={providers[0].is_member === true} 
+                              onChange={(e) => setProviders((arr) => [{ ...arr[0], is_member: e.target.checked }, ...arr.slice(1)])} 
+                              className="rounded border-neutral-300"
+                            />
+                            <span className="font-medium">Featured Account</span>
+                          </label>
+                        </div>
                       </div>
-                      <div className="mt-2">
-                        <button onClick={() => saveProvider(providers[0])} className="btn btn-secondary text-xs">Save</button>
-                        <button
-                          onClick={() => {
-                            const id = providers[0].id
-                            if (confirmDeleteProviderId === id) deleteProvider(id)
-                            else setConfirmDeleteProviderId(id)
-                          }}
-                          className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs ml-2"
-                        >
-                          {confirmDeleteProviderId === providers[0].id ? 'Confirm' : 'Delete'}
-                        </button>
-                        {confirmDeleteProviderId === providers[0].id && (
-                          <button onClick={() => setConfirmDeleteProviderId(null)} className="text-xs underline text-neutral-500 ml-2">Cancel</button>
-                        )}
+
+                      {/* Core Business Information */}
+                      <div className="space-y-6">
+                        <div>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">Core Business Information</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Business Name *
+                              </label>
+                              <input 
+                                value={providers[0].name || ''} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], name: e.target.value }, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                placeholder="Enter business name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Category *
+                              </label>
+                              <select 
+                                value={providers[0].category_key} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], category_key: e.target.value } as any, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                              >
+                                {catOptions.map((opt) => (
+                                  <option key={opt.key} value={opt.key}>{opt.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Phone Number
+                              </label>
+                              <input 
+                                value={providers[0].phone || ''} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], phone: e.target.value }, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                placeholder="(619) 123-4567"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Email Address
+                              </label>
+                              <input 
+                                value={providers[0].email || ''} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], email: e.target.value }, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                placeholder="business@example.com"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Website
+                              </label>
+                              <input 
+                                value={providers[0].website || ''} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], website: e.target.value }, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                placeholder="https://www.example.com"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Address
+                              </label>
+                              <input 
+                                value={providers[0].address || ''} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], address: e.target.value }, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                placeholder="123 Main St, Bonita, CA 91902"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Business Description */}
+                        <div>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">Business Description</h4>
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-1">
+                              Description
+                              <span className="text-xs text-neutral-500 ml-2">
+                                ({(providers[0].description?.length || 0)}/{providers[0].is_member ? '500' : '200'} characters)
+                              </span>
+                            </label>
+                            <textarea
+                              value={providers[0].description || ''}
+                              onChange={(e) => {
+                                const newDescription = e.target.value
+                                if (!providers[0].is_member && newDescription.length > 200) {
+                                  return
+                                }
+                                setProviders((arr) => [{ ...arr[0], description: newDescription }, ...arr.slice(1)])
+                              }}
+                              rows={4}
+                              className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
+                                !providers[0].is_member && (providers[0].description?.length || 0) > 200
+                                  ? 'border-red-300 focus:ring-red-500'
+                                  : 'border-neutral-300 focus:ring-neutral-500'
+                              }`}
+                              placeholder="Tell customers about your business..."
+                              maxLength={providers[0].is_member ? 500 : 200}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Bonita Residents Discount */}
+                        <div>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">Bonita Residents Discount</h4>
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-1">
+                              Special Discount for Bonita Residents
+                            </label>
+                            <input 
+                              value={providers[0].bonita_resident_discount || ''} 
+                              onChange={(e) => setProviders((arr) => [{ ...arr[0], bonita_resident_discount: e.target.value }, ...arr.slice(1)])} 
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                              placeholder="e.g., 10% off for Bonita residents, Free consultation for locals"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Service Areas */}
+                        <div>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">Service Areas</h4>
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-1">
+                              Areas You Serve
+                            </label>
+                            <input 
+                              value={(providers[0].service_areas || []).join(', ')} 
+                              onChange={(e) => setProviders((arr) => [{ ...arr[0], service_areas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} 
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                              placeholder="Bonita, Chula Vista, San Diego, National City"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Social Media Links - Featured Only */}
+                        <div className={!providers[0].is_member ? 'opacity-50 pointer-events-none' : ''}>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">
+                            Social Media Links
+                            {!providers[0].is_member && (
+                              <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
+                            )}
+                          </h4>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">Facebook</label>
+                              <input 
+                                value={providers[0].social_links?.facebook || ''} 
+                                onChange={(e) => setProviders((arr) => [{ 
+                                  ...arr[0], 
+                                  social_links: { ...arr[0].social_links, facebook: e.target.value } 
+                                }, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                placeholder="https://facebook.com/yourbusiness"
+                                disabled={!providers[0].is_member}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">Instagram</label>
+                              <input 
+                                value={providers[0].social_links?.instagram || ''} 
+                                onChange={(e) => setProviders((arr) => [{ 
+                                  ...arr[0], 
+                                  social_links: { ...arr[0].social_links, instagram: e.target.value } 
+                                }, ...arr.slice(1)])} 
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                                placeholder="https://instagram.com/yourbusiness"
+                                disabled={!providers[0].is_member}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        <div>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">Business Tags</h4>
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-1">Tags</label>
+                            <input 
+                              value={(providers[0].tags || []).join(', ')} 
+                              onChange={(e) => setProviders((arr) => [{ ...arr[0], tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} 
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                              placeholder="professional, reliable, local, certified"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-between mt-8 pt-6 border-t border-neutral-200">
+                        <div className="flex items-center gap-4">
+                          <button 
+                            onClick={() => saveProvider(providers[0])} 
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => {
+                              const id = providers[0].id
+                              if (confirmDeleteProviderId === id) deleteProvider(id)
+                              else setConfirmDeleteProviderId(id)
+                            }}
+                            className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 font-medium"
+                          >
+                            {confirmDeleteProviderId === providers[0].id ? 'Confirm Delete' : 'Delete Provider'}
+                          </button>
+                          {confirmDeleteProviderId === providers[0].id && (
+                            <button 
+                              onClick={() => setConfirmDeleteProviderId(null)} 
+                              className="px-4 py-2 text-neutral-500 hover:text-neutral-700 underline"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="text-sm text-neutral-500">
+                          Last updated: {providers[0].updated_at ? new Date(providers[0].updated_at).toLocaleString() : 'Never'}
+                        </div>
                       </div>
                     </div>
                   )}
