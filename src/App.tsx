@@ -1772,13 +1772,14 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
     'professional-services': [],
   }
   function coerceIsMember(r: any): boolean {
-    // CRITICAL FIX: Match Admin page logic exactly - check BOTH is_featured AND is_member
-    // Admin page uses: provider.is_featured || provider.is_member
+    // CRITICAL FIX: Match Admin page logic EXACTLY - only check for boolean true values
+    // Admin page uses: provider.is_featured === true || provider.is_member === true
     // This ensures perfect consistency between admin page and provider page featured status
-    const isFeatured = r.is_featured === true || r.is_featured === 'true' || r.is_featured === 1
-    const isMember = r.is_member === true || r.is_member === 'true' || r.is_member === 1
+    // We only check for boolean true, not string 'true' or numeric 1, to match admin page exactly
+    const isFeatured = r.is_featured === true
+    const isMember = r.is_member === true
     
-    // Return true if EITHER field indicates featured status (matching Admin page logic)
+    // Return true if EITHER field indicates featured status (matching Admin page logic exactly)
     return isFeatured || isMember
   }
 
