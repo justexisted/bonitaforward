@@ -139,6 +139,8 @@ export default function AdminPage() {
   const [savingProvider, setSavingProvider] = useState(false)
   // Image upload state
   const [uploadingImages, setUploadingImages] = useState(false)
+  // Retry state for failed saves
+  const [retryProvider, setRetryProvider] = useState<ProviderRow | null>(null)
 
   // Filtered providers based on featured status filter
   // This allows admins to easily view all providers, only featured ones, or only non-featured ones
@@ -841,24 +843,42 @@ export default function AdminPage() {
         .update(updateData)
         .eq('id', p.id)
       
-      // Race the update against a timeout to prevent hanging
+      // IMPROVED TIMEOUT: Increase timeout to 15 seconds for better reliability
+      // This gives more time for the database operation to complete
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database update timeout')), 8000)
+        setTimeout(() => reject(new Error('Database update timeout - please check your connection and try again')), 15000)
       )
       
+      console.log('[Admin] Starting database update with 15 second timeout...')
+      const startTime = Date.now()
       const { error } = await Promise.race([updatePromise, timeoutPromise]) as any
+      const duration = Date.now() - startTime
+      console.log(`[Admin] Database update completed in ${duration}ms`)
       
       // Clear the timeout since we got a response
       clearTimeout(timeoutId)
         
       if (error) {
         console.error('[Admin] Provider save error:', error)
-        setError(`Failed to save provider: ${error.message}`)
+        
+        // IMPROVED ERROR HANDLING: Provide specific error messages based on error type
+        if (error.message.includes('timeout')) {
+          setError(`Database operation timed out. This might be due to network issues or server load. Please try again in a moment.`)
+          setRetryProvider(p) // Store provider for retry
+        } else if (error.message.includes('permission')) {
+          setError(`Permission denied. Please check your admin access and try again.`)
+        } else if (error.message.includes('network')) {
+          setError(`Network error. Please check your internet connection and try again.`)
+          setRetryProvider(p) // Store provider for retry
+        } else {
+          setError(`Failed to save provider: ${error.message}`)
+        }
         return
       }
       
       console.log('[Admin] Provider saved successfully')
-      setMessage('Provider updated successfully')
+      setMessage('Provider updated successfully! Changes have been saved to the database.')
+      setRetryProvider(null) // Clear retry state on success
       
       // Refresh provider data to reflect changes
       try { 
@@ -876,6 +896,15 @@ export default function AdminPage() {
       clearTimeout(timeoutId)
       clearTimeout(backupTimeoutId)
       setSavingProvider(false)
+    }
+  }
+
+  // RETRY FUNCTION: Allows users to retry failed save operations
+  // This is particularly useful for timeout errors that might be temporary
+  const retrySaveProvider = () => {
+    if (retryProvider) {
+      console.log('[Admin] Retrying save for provider:', retryProvider.id)
+      saveProvider(retryProvider)
     }
   }
 
@@ -2473,11 +2502,38 @@ export default function AdminPage() {
                       
                       {error && (
                         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            <span className="text-red-800 font-medium">{error}</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              <span className="text-red-800 font-medium">{error}</span>
+                            </div>
+                            {/* RETRY BUTTON: Show retry button for timeout and network errors */}
+                            {retryProvider && (
+                              <button
+                                onClick={retrySaveProvider}
+                                disabled={savingProvider}
+                                className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              >
+                                {savingProvider ? (
+                                  <>
+                                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Retrying...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Retry
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
