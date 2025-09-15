@@ -798,7 +798,7 @@ export default function AdminPage() {
       console.error('[Admin] Backup timeout triggered - forcing loading state reset')
       setSavingProvider(false)
       setError('Save operation failed. Please refresh the page and try again.')
-    }, 15000) // 15 second backup timeout
+    }, 20000) // 20 second backup timeout (increased to allow for connection test + update)
     
     try {
       console.log('[Admin] Saving provider:', p.id, 'with data:', p)
@@ -836,55 +836,94 @@ export default function AdminPage() {
       
       console.log('[Admin] Update data prepared:', updateData)
       
-      // CRITICAL FIX: Add explicit timeout to Supabase query to prevent hanging
-      // This ensures the query doesn't hang indefinitely and always resolves
-      const updatePromise = supabase
-        .from('providers')
-        .update(updateData)
-        .eq('id', p.id)
-      
-      // IMPROVED TIMEOUT: Increase timeout to 15 seconds for better reliability
-      // This gives more time for the database operation to complete
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database update timeout - please check your connection and try again')), 15000)
-      )
-      
-      console.log('[Admin] Starting database update with 15 second timeout...')
-      const startTime = Date.now()
-      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any
-      const duration = Date.now() - startTime
-      console.log(`[Admin] Database update completed in ${duration}ms`)
-      
-      // Clear the timeout since we got a response
-      clearTimeout(timeoutId)
+      // CONNECTION CHECK: Test Supabase connection before attempting update
+      // This helps identify if the issue is with connectivity or the specific query
+      try {
+        console.log('[Admin] Testing Supabase connection...')
+        const { error: testError } = await supabase
+          .from('providers')
+          .select('id')
+          .eq('id', p.id)
+          .limit(1)
         
-      if (error) {
-        console.error('[Admin] Provider save error:', error)
-        
-        // IMPROVED ERROR HANDLING: Provide specific error messages based on error type
-        if (error.message.includes('timeout')) {
-          setError(`Database operation timed out. This might be due to network issues or server load. Please try again in a moment.`)
-          setRetryProvider(p) // Store provider for retry
-        } else if (error.message.includes('permission')) {
-          setError(`Permission denied. Please check your admin access and try again.`)
-        } else if (error.message.includes('network')) {
-          setError(`Network error. Please check your internet connection and try again.`)
-          setRetryProvider(p) // Store provider for retry
-        } else {
-          setError(`Failed to save provider: ${error.message}`)
+        if (testError) {
+          console.error('[Admin] Connection test failed:', testError)
+          setError(`Connection test failed: ${testError.message}. Please check your internet connection.`)
+          return
         }
+        console.log('[Admin] Connection test successful, proceeding with update...')
+      } catch (connectionError: any) {
+        console.error('[Admin] Connection test exception:', connectionError)
+        setError(`Connection test failed: ${connectionError.message}. Please check your internet connection.`)
         return
       }
       
-      console.log('[Admin] Provider saved successfully')
-      setMessage('Provider updated successfully! Changes have been saved to the database.')
-      setRetryProvider(null) // Clear retry state on success
+      // CRITICAL FIX: Use AbortController for proper request cancellation
+      // This ensures the Supabase request can be properly cancelled if it hangs
+      const abortController = new AbortController()
+      const timeoutId = setTimeout(() => {
+        console.log('[Admin] Aborting database request due to timeout')
+        abortController.abort()
+      }, 12000) // 12 second timeout for the actual request
       
-      // Refresh provider data to reflect changes
-      try { 
-        window.dispatchEvent(new CustomEvent('bf-refresh-providers')) 
-      } catch (refreshError) {
-        console.warn('[Admin] Failed to dispatch refresh event:', refreshError)
+      console.log('[Admin] Starting database update with AbortController...')
+      const startTime = Date.now()
+      
+      try {
+        // IMPROVED APPROACH: Use AbortController to properly cancel hanging requests
+        // This prevents the Supabase client from hanging indefinitely
+        const { error } = await supabase
+          .from('providers')
+          .update(updateData)
+          .eq('id', p.id)
+          .abortSignal(abortController.signal)
+        
+        clearTimeout(timeoutId)
+        const duration = Date.now() - startTime
+        console.log(`[Admin] Database update completed in ${duration}ms`)
+        
+        if (error) {
+          console.error('[Admin] Provider save error:', error)
+          
+          // IMPROVED ERROR HANDLING: Provide specific error messages based on error type
+          if (error.message.includes('timeout') || error.message.includes('aborted')) {
+            setError(`Database operation timed out. This might be due to network issues or server load. Please try again in a moment.`)
+            setRetryProvider(p) // Store provider for retry
+          } else if (error.message.includes('permission')) {
+            setError(`Permission denied. Please check your admin access and try again.`)
+          } else if (error.message.includes('network')) {
+            setError(`Network error. Please check your internet connection and try again.`)
+            setRetryProvider(p) // Store provider for retry
+          } else {
+            setError(`Failed to save provider: ${error.message}`)
+          }
+          return
+        }
+        
+        console.log('[Admin] Provider saved successfully')
+        setMessage('Provider updated successfully! Changes have been saved to the database.')
+        setRetryProvider(null) // Clear retry state on success
+        
+        // Refresh provider data to reflect changes
+        try { 
+          window.dispatchEvent(new CustomEvent('bf-refresh-providers')) 
+        } catch (refreshError) {
+          console.warn('[Admin] Failed to dispatch refresh event:', refreshError)
+        }
+        
+      } catch (requestError: any) {
+        clearTimeout(timeoutId)
+        const duration = Date.now() - startTime
+        console.error(`[Admin] Database request failed after ${duration}ms:`, requestError)
+        
+        // Handle AbortError specifically
+        if (requestError.name === 'AbortError' || requestError.message.includes('aborted')) {
+          setError(`Database operation timed out after 12 seconds. Please check your connection and try again.`)
+          setRetryProvider(p) // Store provider for retry
+        } else {
+          setError(`Database request failed: ${requestError.message}`)
+        }
+        return
       }
       
     } catch (err: any) {
