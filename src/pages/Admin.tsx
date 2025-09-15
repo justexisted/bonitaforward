@@ -782,6 +782,22 @@ export default function AdminPage() {
     setError(null)
     setSavingProvider(true)
     
+    // CRITICAL FIX: Add timeout to prevent infinite loading state
+    // This ensures the loading state is always reset even if the request hangs
+    const timeoutId = setTimeout(() => {
+      console.error('[Admin] Save provider timeout - resetting loading state')
+      setSavingProvider(false)
+      setError('Save operation timed out. Please try again.')
+    }, 10000) // 10 second timeout
+    
+    // ADDITIONAL SAFETY: Add a backup timeout that runs regardless of the main timeout
+    // This provides a failsafe in case the main timeout doesn't work as expected
+    const backupTimeoutId = setTimeout(() => {
+      console.error('[Admin] Backup timeout triggered - forcing loading state reset')
+      setSavingProvider(false)
+      setError('Save operation failed. Please refresh the page and try again.')
+    }, 15000) // 15 second backup timeout
+    
     try {
       console.log('[Admin] Saving provider:', p.id, 'with data:', p)
       
@@ -818,15 +834,26 @@ export default function AdminPage() {
       
       console.log('[Admin] Update data prepared:', updateData)
       
-      const { error } = await supabase
+      // CRITICAL FIX: Add explicit timeout to Supabase query to prevent hanging
+      // This ensures the query doesn't hang indefinitely and always resolves
+      const updatePromise = supabase
         .from('providers')
         .update(updateData)
         .eq('id', p.id)
+      
+      // Race the update against a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database update timeout')), 8000)
+      )
+      
+      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any
+      
+      // Clear the timeout since we got a response
+      clearTimeout(timeoutId)
         
       if (error) {
         console.error('[Admin] Provider save error:', error)
         setError(`Failed to save provider: ${error.message}`)
-        setSavingProvider(false)
         return
       }
       
@@ -844,6 +871,10 @@ export default function AdminPage() {
       console.error('[Admin] Unexpected error saving provider:', err)
       setError(`Unexpected error: ${err.message}`)
     } finally {
+      // CRITICAL FIX: Always clear both timeouts and reset loading state
+      // This ensures the UI never gets stuck in loading state
+      clearTimeout(timeoutId)
+      clearTimeout(backupTimeoutId)
       setSavingProvider(false)
     }
   }
