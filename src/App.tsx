@@ -416,19 +416,16 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       // Force clear profile state immediately
       setProfile(null)
       
-      // Clear localStorage first
+      // CRITICAL FIX: Don't manually clear Supabase tokens - let Supabase handle its own session management
+      // Manual clearing interferes with Supabase's built-in session persistence and causes auth issues
+      // Only clear our custom app data, not Supabase's internal session management
       try { 
         localStorage.removeItem('bf-auth')
-        localStorage.removeItem('sb-auth-token')
-        // Clear all Supabase auth tokens
-        const keys = Object.keys(localStorage)
-        keys.forEach(key => {
-          if (key.startsWith('sb-') || key.includes('supabase')) {
-            localStorage.removeItem(key)
-          }
-        })
+        // Remove only our custom return URL, not Supabase session tokens
+        localStorage.removeItem('bf-return-url')
+        console.log('[Auth] Cleared custom app data, leaving Supabase session management intact')
       } catch (e) {
-        console.log('Error clearing localStorage:', e)
+        console.log('Error clearing custom localStorage:', e)
       }
 
       // Then call Supabase signOut
