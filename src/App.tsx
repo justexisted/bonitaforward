@@ -788,7 +788,7 @@ function Hero() {
                         <li key={r.id}>
                           <button
                             onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => { setOpen(false); setQuery(''); navigate(`/provider/${encodeURIComponent(r.id)}`) }}
+                            onClick={() => { setOpen(false); setQuery(''); navigate(`/provider/${encodeURIComponent(r.slug)}`) }}
                             className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 flex items-center justify-between"
                           >
                             <span className="truncate mr-2">{r.name}</span>
@@ -827,10 +827,14 @@ function Hero() {
  */
 function ProviderPage() {
   const params = useParams()
-  const providerId = params.id as string
+  const providerIdentifier = params.id as string // Can be either ID or slug
   const all: Provider[] = (['real-estate','home-services','health-wellness','restaurants-cafes','professional-services'] as CategoryKey[])
     .flatMap((k) => providersByCategory[k] || [])
-  const provider = all.find((p) => p.id === providerId)
+  
+  // CRITICAL FIX: Support both ID and slug lookups for backward compatibility
+  // This allows URLs like /provider/flora-cafe (slug) or /provider/uuid (ID)
+  // Priority: Try slug first (for new URLs), then fall back to ID (for existing bookmarks)
+  const provider = all.find((p) => p.slug === providerIdentifier) || all.find((p) => p.id === providerIdentifier)
   const auth = useAuth()
   const [isSaved, setIsSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -1580,6 +1584,7 @@ const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
 type Provider = {
   id: string
   name: string
+  slug: string // URL-friendly version of the business name (e.g., "flora-cafe")
   category: CategoryKey
   tags: string[]
   rating?: number
@@ -1635,6 +1640,24 @@ type ProviderDetails = {
 
 // Removed unused providerDescriptions/getProviderDescription to satisfy TypeScript build
 
+/**
+ * SLUG GENERATION FUNCTION
+ * 
+ * Creates URL-friendly slugs from business names for cleaner URLs.
+ * Example: "Flora Cafe" -> "flora-cafe"
+ * 
+ * This enables professional URLs like /provider/flora-cafe instead of /provider/uuid
+ */
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+}
+
 function isFeaturedProvider(p: Provider): boolean {
   // Only check the isMember field to ensure consistency with admin page
   // This prevents discrepancies where providers show as featured on provider page
@@ -1662,44 +1685,44 @@ function getProviderDetails(p: Provider): ProviderDetails {
 
 let providersByCategory: Record<CategoryKey, Provider[]> = {
   'real-estate': [
-    { id: 're-1', name: 'Bonita Realty Group', category: 'real-estate', tags: ['buy', '0-3', 'entry', '2', '3'], rating: 4.9, isMember: true },
-    { id: 're-2', name: 'South Bay Homes', category: 'real-estate', tags: ['buy', '3-6', 'mid', '3', '4+'], rating: 4.8, isMember: true },
-    { id: 're-3', name: 'Vista Property Pros', category: 'real-estate', tags: ['sell', 'now', '750-1200', '3', '4+'], rating: 4.7, isMember: true },
-    { id: 're-4', name: 'Bonita Rentals Co', category: 'real-estate', tags: ['rent', 'this-month', 'low', '1', '2'], rating: 4.6 },
-    { id: 're-5', name: 'Canyon Estates', category: 'real-estate', tags: ['sell', '60+', '1200+', '4+'], rating: 4.6 },
-    { id: 're-6', name: 'Coastal Keys', category: 'real-estate', tags: ['buy', '6+', 'high', '4+'], rating: 4.5 },
+    { id: 're-1', name: 'Bonita Realty Group', slug: 'bonita-realty-group', category: 'real-estate', tags: ['buy', '0-3', 'entry', '2', '3'], rating: 4.9, isMember: true },
+    { id: 're-2', name: 'South Bay Homes', slug: 'south-bay-homes', category: 'real-estate', tags: ['buy', '3-6', 'mid', '3', '4+'], rating: 4.8, isMember: true },
+    { id: 're-3', name: 'Vista Property Pros', slug: 'vista-property-pros', category: 'real-estate', tags: ['sell', 'now', '750-1200', '3', '4+'], rating: 4.7, isMember: true },
+    { id: 're-4', name: 'Bonita Rentals Co', slug: 'bonita-rentals-co', category: 'real-estate', tags: ['rent', 'this-month', 'low', '1', '2'], rating: 4.6 },
+    { id: 're-5', name: 'Canyon Estates', slug: 'canyon-estates', category: 'real-estate', tags: ['sell', '60+', '1200+', '4+'], rating: 4.6 },
+    { id: 're-6', name: 'Coastal Keys', slug: 'coastal-keys', category: 'real-estate', tags: ['buy', '6+', 'high', '4+'], rating: 4.5 },
   ],
   'home-services': [
-    { id: 'hs-1', name: 'GreenLeaf Landscaping', category: 'home-services', tags: ['landscaping', 'asap', 'house', 'low'], rating: 4.9, isMember: true },
-    { id: 'hs-2', name: 'SunBright Solar', category: 'home-services', tags: ['solar', 'this-month', 'house', 'high'], rating: 4.8, isMember: true },
-    { id: 'hs-3', name: 'Sparkle Clean', category: 'home-services', tags: ['cleaning', 'asap', 'condo', 'low'], rating: 4.7, isMember: true },
-    { id: 'hs-4', name: 'Bonita Remodel Co', category: 'home-services', tags: ['remodeling', 'flexible', 'house', 'med'], rating: 4.7 },
-    { id: 'hs-5', name: 'CondoCare Pros', category: 'home-services', tags: ['cleaning', 'this-month', 'condo', 'med'], rating: 4.6 },
-    { id: 'hs-6', name: 'YardWorks', category: 'home-services', tags: ['landscaping', 'flexible', 'house', 'med'], rating: 4.5 },
+    { id: 'hs-1', name: 'GreenLeaf Landscaping', slug: 'greenleaf-landscaping', category: 'home-services', tags: ['landscaping', 'asap', 'house', 'low'], rating: 4.9, isMember: true },
+    { id: 'hs-2', name: 'SunBright Solar', slug: 'sunbright-solar', category: 'home-services', tags: ['solar', 'this-month', 'house', 'high'], rating: 4.8, isMember: true },
+    { id: 'hs-3', name: 'Sparkle Clean', slug: 'sparkle-clean', category: 'home-services', tags: ['cleaning', 'asap', 'condo', 'low'], rating: 4.7, isMember: true },
+    { id: 'hs-4', name: 'Bonita Remodel Co', slug: 'bonita-remodel-co', category: 'home-services', tags: ['remodeling', 'flexible', 'house', 'med'], rating: 4.7 },
+    { id: 'hs-5', name: 'CondoCare Pros', slug: 'condocare-pros', category: 'home-services', tags: ['cleaning', 'this-month', 'condo', 'med'], rating: 4.6 },
+    { id: 'hs-6', name: 'YardWorks', slug: 'yardworks', category: 'home-services', tags: ['landscaping', 'flexible', 'house', 'med'], rating: 4.5 },
   ],
   'health-wellness': [
-    { id: 'hw-1', name: 'Bonita Chiro Clinic', category: 'health-wellness', tags: ['chiro', 'relief', 'this-week', 'one-off'], rating: 4.9, isMember: true },
-    { id: 'hw-2', name: 'Peak Fitness Gym', category: 'health-wellness', tags: ['gym', 'fitness', 'this-month', 'membership'], rating: 4.8, isMember: true },
-    { id: 'hw-3', name: 'Glow Salon', category: 'health-wellness', tags: ['salon', 'beauty', 'this-week', 'one-off'], rating: 4.7, isMember: true },
-    { id: 'hw-4', name: 'Serene Med Spa', category: 'health-wellness', tags: ['medspa', 'beauty', 'later', 'one-off'], rating: 4.7 },
-    { id: 'hw-5', name: 'Core Strength Club', category: 'health-wellness', tags: ['gym', 'fitness', 'later', 'membership'], rating: 4.6 },
-    { id: 'hw-6', name: 'Align & Thrive', category: 'health-wellness', tags: ['chiro', 'relief', 'this-month', 'one-off'], rating: 4.6 },
+    { id: 'hw-1', name: 'Bonita Chiro Clinic', slug: 'bonita-chiro-clinic', category: 'health-wellness', tags: ['chiro', 'relief', 'this-week', 'one-off'], rating: 4.9, isMember: true },
+    { id: 'hw-2', name: 'Peak Fitness Gym', slug: 'peak-fitness-gym', category: 'health-wellness', tags: ['gym', 'fitness', 'this-month', 'membership'], rating: 4.8, isMember: true },
+    { id: 'hw-3', name: 'Glow Salon', slug: 'glow-salon', category: 'health-wellness', tags: ['salon', 'beauty', 'this-week', 'one-off'], rating: 4.7, isMember: true },
+    { id: 'hw-4', name: 'Serene Med Spa', slug: 'serene-med-spa', category: 'health-wellness', tags: ['medspa', 'beauty', 'later', 'one-off'], rating: 4.7 },
+    { id: 'hw-5', name: 'Core Strength Club', slug: 'core-strength-club', category: 'health-wellness', tags: ['gym', 'fitness', 'later', 'membership'], rating: 4.6 },
+    { id: 'hw-6', name: 'Align & Thrive', slug: 'align-thrive', category: 'health-wellness', tags: ['chiro', 'relief', 'this-month', 'one-off'], rating: 4.6 },
   ],
   'restaurants-cafes': [
-    { id: 'rc-1', name: 'Casa Bonita', category: 'restaurants-cafes', tags: ['mexican', 'casual', 'low', 'dine'], rating: 4.8, isMember: true },
-    { id: 'rc-2', name: 'Bamboo Grove', category: 'restaurants-cafes', tags: ['asian', 'date', 'med', 'dine'], rating: 4.7, isMember: true },
-    { id: 'rc-3', name: 'Bluebird Café', category: 'restaurants-cafes', tags: ['cafes', 'casual', 'low', 'takeout'], rating: 4.7, isMember: true },
-    { id: 'rc-4', name: 'Bonita Grill', category: 'restaurants-cafes', tags: ['american', 'family', 'med', 'dine'], rating: 4.6 },
-    { id: 'rc-5', name: 'Salsa Verde', category: 'restaurants-cafes', tags: ['mexican', 'family', 'med', 'dine'], rating: 4.6 },
-    { id: 'rc-6', name: 'Noodle Haus', category: 'restaurants-cafes', tags: ['asian', 'casual', 'low', 'takeout'], rating: 4.5 },
+    { id: 'rc-1', name: 'Casa Bonita', slug: 'casa-bonita', category: 'restaurants-cafes', tags: ['mexican', 'casual', 'low', 'dine'], rating: 4.8, isMember: true },
+    { id: 'rc-2', name: 'Bamboo Grove', slug: 'bamboo-grove', category: 'restaurants-cafes', tags: ['asian', 'date', 'med', 'dine'], rating: 4.7, isMember: true },
+    { id: 'rc-3', name: 'Bluebird Café', slug: 'bluebird-cafe', category: 'restaurants-cafes', tags: ['cafes', 'casual', 'low', 'takeout'], rating: 4.7, isMember: true },
+    { id: 'rc-4', name: 'Bonita Grill', slug: 'bonita-grill', category: 'restaurants-cafes', tags: ['american', 'family', 'med', 'dine'], rating: 4.6 },
+    { id: 'rc-5', name: 'Salsa Verde', slug: 'salsa-verde', category: 'restaurants-cafes', tags: ['mexican', 'family', 'med', 'dine'], rating: 4.6 },
+    { id: 'rc-6', name: 'Noodle Haus', slug: 'noodle-haus', category: 'restaurants-cafes', tags: ['asian', 'casual', 'low', 'takeout'], rating: 4.5 },
   ],
   'professional-services': [
-    { id: 'ps-1', name: 'Bonita Legal', category: 'professional-services', tags: ['attorney', 'advice', 'now', 'med'], rating: 4.9, isMember: true },
-    { id: 'ps-2', name: 'Summit Accounting', category: 'professional-services', tags: ['accountant', 'ongoing', 'soon', 'low'], rating: 4.8, isMember: true },
-    { id: 'ps-3', name: 'Citrus Consulting', category: 'professional-services', tags: ['consultant', 'project', 'flex', 'high'], rating: 4.7, isMember: true },
-    { id: 'ps-4', name: 'South Bay Counsel', category: 'professional-services', tags: ['attorney', 'project', 'now', 'high'], rating: 4.7 },
-    { id: 'ps-5', name: 'Ledger Pros', category: 'professional-services', tags: ['accountant', 'advice', 'soon', 'med'], rating: 4.6 },
-    { id: 'ps-6', name: 'Coastline Strategy', category: 'professional-services', tags: ['consultant', 'ongoing', 'flex', 'high'], rating: 4.5 },
+    { id: 'ps-1', name: 'Bonita Legal', slug: 'bonita-legal', category: 'professional-services', tags: ['attorney', 'advice', 'now', 'med'], rating: 4.9, isMember: true },
+    { id: 'ps-2', name: 'Summit Accounting', slug: 'summit-accounting', category: 'professional-services', tags: ['accountant', 'ongoing', 'soon', 'low'], rating: 4.8, isMember: true },
+    { id: 'ps-3', name: 'Citrus Consulting', slug: 'citrus-consulting', category: 'professional-services', tags: ['consultant', 'project', 'flex', 'high'], rating: 4.7, isMember: true },
+    { id: 'ps-4', name: 'South Bay Counsel', slug: 'south-bay-counsel', category: 'professional-services', tags: ['attorney', 'project', 'now', 'high'], rating: 4.7 },
+    { id: 'ps-5', name: 'Ledger Pros', slug: 'ledger-pros', category: 'professional-services', tags: ['accountant', 'advice', 'soon', 'med'], rating: 4.6 },
+    { id: 'ps-6', name: 'Coastline Strategy', slug: 'coastline-strategy', category: 'professional-services', tags: ['consultant', 'ongoing', 'flex', 'high'], rating: 4.5 },
   ],
 }
 
@@ -1717,7 +1740,7 @@ async function loadProvidersFromSheet(): Promise<void> {
     mapped.forEach((sp: SheetProvider) => {
       const cat = (sp.category as CategoryKey)
       if (grouped[cat]) {
-        grouped[cat].push({ id: sp.id, name: sp.name, category: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
+        grouped[cat].push({ id: sp.id, name: sp.name, slug: generateSlug(sp.name), category: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
       }
     })
     providersByCategory = ensureDemoMembers(grouped)
@@ -1740,17 +1763,14 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
     'professional-services': [],
   }
   function coerceIsMember(r: any): boolean {
-    // Only check the primary featured/member fields from the database
-    // This ensures consistency between admin page and provider page featured status
-    // Removed secondary fields (paid, plan, tier) and tag-based checks to prevent discrepancies
-    const raw = r.is_member ?? r.is_featured
-    if (typeof raw === 'boolean') return raw
-    if (typeof raw === 'number') return raw > 0
-    if (typeof raw === 'string') {
-      const v = raw.trim().toLowerCase()
-      if (['true','t','yes','y','1'].includes(v)) return true
-    }
-    return false
+    // CRITICAL FIX: Match Admin page logic exactly - check BOTH is_featured AND is_member
+    // Admin page uses: provider.is_featured || provider.is_member
+    // This ensures perfect consistency between admin page and provider page featured status
+    const isFeatured = r.is_featured === true || r.is_featured === 'true' || r.is_featured === 1
+    const isMember = r.is_member === true || r.is_member === 'true' || r.is_member === 1
+    
+    // Return true if EITHER field indicates featured status (matching Admin page logic)
+    return isFeatured || isMember
   }
 
   rows.forEach((r) => {
@@ -1765,6 +1785,7 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
     grouped[key].push({
       id: r.id,
       name: r.name,
+      slug: generateSlug(r.name), // Generate URL-friendly slug from business name
       category: key,
       tags: combinedTags,
       rating: r.rating ?? undefined,
@@ -2652,7 +2673,7 @@ function BookPage() {
                   return (
                     <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                       <div className="flex items-center justify-between">
-                        <Link to={`/provider/${r.id}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
+                        <Link to={`/provider/${r.slug}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
                           <div className="font-medium flex items-center gap-2">
                             {r.name}
                             {isFeaturedProvider(r) && (
@@ -2752,7 +2773,7 @@ function BookPage() {
                       return (
                         <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                           <div className="flex items-center justify-between">
-                            <Link to={`/provider/${r.id}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
+                            <Link to={`/provider/${r.slug}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
                               <div className="font-medium flex items-center gap-2">
                                 {r.name}
                                 {isFeaturedProvider(r) && (
