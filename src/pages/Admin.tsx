@@ -199,7 +199,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -232,7 +232,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -496,7 +496,7 @@ export default function AdminPage() {
     
     // Only verify when email changes and auth is stable (not loading)
     if (!auth.loading) {
-      verifyAdmin()
+    verifyAdmin()
     }
   }, [auth.email, auth.loading]) // Removed isClientAdmin dependency
 
@@ -524,7 +524,7 @@ export default function AdminPage() {
         // Enhanced providers query with all featured tracking fields
         const provQuery = isAdmin ? supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true }) : null
         const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
           fExec,
@@ -749,7 +749,7 @@ export default function AdminPage() {
       try {
         const { data: pData } = await supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true })
         setProviders((pData as ProviderRow[]) || [])
       } catch {}
@@ -843,7 +843,7 @@ export default function AdminPage() {
         const { error: testError } = await supabase
           .from('providers')
           .select('id')
-          .eq('id', p.id)
+      .eq('id', p.id)
           .limit(1)
         
         if (testError) {
@@ -1101,7 +1101,7 @@ export default function AdminPage() {
     try {
       const { data: pData, error: pErr } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, plan, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       if (pErr) {
         setProviders((arr) => arr.filter((p) => p.id !== providerId))
@@ -1674,17 +1674,17 @@ export default function AdminPage() {
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-neutral-700 mb-3">Contact Leads ({contactLeads.length})</h3>
                 <div className="space-y-2 text-sm">
-                  {contactLeads.length === 0 && <div className="text-neutral-500">No leads yet.</div>}
-                  {contactLeads.map((row) => (
-                    <div key={row.id} className="rounded-xl border border-neutral-200 p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">{row.business_name || '-'}</div>
-                        <div className="text-xs text-neutral-500">{new Date(row.created_at).toLocaleString()}</div>
-                      </div>
-                      <div className="text-xs text-neutral-600 mt-1">Email: {row.contact_email || '-'}</div>
-                      <div className="text-xs text-neutral-600 mt-1">Details: {row.details || '-'}</div>
+                {contactLeads.length === 0 && <div className="text-neutral-500">No leads yet.</div>}
+                {contactLeads.map((row) => (
+                  <div key={row.id} className="rounded-xl border border-neutral-200 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{row.business_name || '-'}</div>
+                      <div className="text-xs text-neutral-500">{new Date(row.created_at).toLocaleString()}</div>
                     </div>
-                  ))}
+                    <div className="text-xs text-neutral-600 mt-1">Email: {row.contact_email || '-'}</div>
+                    <div className="text-xs text-neutral-600 mt-1">Details: {row.details || '-'}</div>
+                  </div>
+                ))}
                 </div>
               </div>
 
@@ -1798,10 +1798,10 @@ export default function AdminPage() {
                   <div key={p.id} className="py-3 border-b border-neutral-100 last:border-0">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <div className="font-medium text-sm">{p.email || '(no email)'}</div>
-                        <div className="text-xs text-neutral-500">{p.name || '—'} • business</div>
-                      </div>
-                      <div className="flex items-center gap-2">
+                      <div className="font-medium text-sm">{p.email || '(no email)'}</div>
+                      <div className="text-xs text-neutral-500">{p.name || '—'} • business</div>
+                    </div>
+                    <div className="flex items-center gap-2">
                         {/* Dynamic Button - Shows "See More" or "Back" based on expansion state */}
                         {expandedBusinessDetails[p.id] ? (
                           <button 
@@ -1819,14 +1819,14 @@ export default function AdminPage() {
                             {loadingBusinessDetails[p.id] ? 'Loading...' : 'See More'}
                           </button>
                         )}
-                        {deletingUserId === p.id ? (
-                          <>
-                            <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
-                            <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
-                          </>
-                        ) : (
-                          <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
-                        )}
+                      {deletingUserId === p.id ? (
+                        <>
+                          <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
+                          <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
+                      )}
                       </div>
                     </div>
                     
@@ -1865,7 +1865,7 @@ export default function AdminPage() {
                                       </span>
                                     )}
                                   </div>
-                                </div>
+                    </div>
                               </div>
                             ))}
                           </div>
@@ -2123,22 +2123,22 @@ export default function AdminPage() {
                                 onChange={(e) => setProviders((arr) => [{ ...arr[0], category_key: e.target.value } as any, ...arr.slice(1)])} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
                               >
-                                {catOptions.map((opt) => (
-                                  <option key={opt.key} value={opt.key}>{opt.name}</option>
-                                ))}
-                              </select>
+                          {catOptions.map((opt) => (
+                            <option key={opt.key} value={opt.key}>{opt.name}</option>
+                          ))}
+                        </select>
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-neutral-700 mb-1">
                                 Phone Number
-                              </label>
+                        </label>
                               <input 
                                 value={providers[0].phone || ''} 
                                 onChange={(e) => setProviders((arr) => [{ ...arr[0], phone: e.target.value }, ...arr.slice(1)])} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="(619) 123-4567"
                               />
-                            </div>
+                      </div>
                             
                             <div>
                               <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -2502,17 +2502,17 @@ export default function AdminPage() {
                             )}
                             {savingProvider ? 'Saving...' : 'Save Changes'}
                           </button>
-                          <button
-                            onClick={() => {
-                              const id = providers[0].id
-                              if (confirmDeleteProviderId === id) deleteProvider(id)
-                              else setConfirmDeleteProviderId(id)
-                            }}
+                        <button
+                          onClick={() => {
+                            const id = providers[0].id
+                            if (confirmDeleteProviderId === id) deleteProvider(id)
+                            else setConfirmDeleteProviderId(id)
+                          }}
                             className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 font-medium"
-                          >
+                        >
                             {confirmDeleteProviderId === providers[0].id ? 'Confirm Delete' : 'Delete Provider'}
-                          </button>
-                          {confirmDeleteProviderId === providers[0].id && (
+                        </button>
+                        {confirmDeleteProviderId === providers[0].id && (
                             <button 
                               onClick={() => setConfirmDeleteProviderId(null)} 
                               className="px-4 py-2 text-neutral-500 hover:text-neutral-700 underline"
@@ -2535,9 +2535,9 @@ export default function AdminPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                             <span className="text-green-800 font-medium">{message}</span>
-                          </div>
-                        </div>
-                      )}
+                      </div>
+                    </div>
+                  )}
                       
                       {error && (
                         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">

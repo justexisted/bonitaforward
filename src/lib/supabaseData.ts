@@ -32,6 +32,9 @@ export type DbProvider = {
   paid?: boolean | number | string | null
   plan?: string | null
   tier?: string | null
+  // MISSING FIELDS - ADD THESE:
+  featured_since?: string | null
+  subscription_type?: 'monthly' | 'yearly' | null
   // Booking system fields
   booking_enabled?: boolean | null
   booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
@@ -248,7 +251,9 @@ export type UserNotification = {
   subject: string
   body: string | null
   data: Record<string, any> | null
-  read_at: string | null
+  // SCHEMA MISMATCH:
+  // Option A: Use boolean read field (matches schema)
+  read?: boolean | null
   created_at: string
 }
 

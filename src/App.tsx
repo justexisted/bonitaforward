@@ -504,7 +504,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   // CRITICAL FIX: Use ref for immediate access to profile data
   // This prevents the race condition where profile state isn't immediately available
   const currentProfile = profileRef.current || profile
-  
+
   const value: AuthContextValue = {
     isAuthed: Boolean(currentProfile?.email),
     loading,
@@ -1614,6 +1614,9 @@ type Provider = {
   published?: boolean | null
   created_at?: string | null
   updated_at?: string | null
+  // Missing fields:
+  featured_since?: string | null
+  subscription_type?: 'monthly' | 'yearly' | null
   // Booking system fields
   booking_enabled?: boolean | null
   booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
