@@ -798,7 +798,7 @@ export default function AdminPage() {
       console.error('[Admin] Backup timeout triggered - forcing loading state reset')
       setSavingProvider(false)
       setError('Save operation failed. Please refresh the page and try again.')
-    }, 20000) // 20 second backup timeout (increased to allow for connection test + update)
+    }, 15000) // 15 second backup timeout (reduced since we removed connection test)
     
     try {
       console.log('[Admin] Saving provider:', p.id, 'with data:', p)
@@ -836,49 +836,20 @@ export default function AdminPage() {
       
       console.log('[Admin] Update data prepared:', updateData)
       
-      // CONNECTION CHECK: Test Supabase connection before attempting update
-      // This helps identify if the issue is with connectivity or the specific query
-      try {
-        console.log('[Admin] Testing Supabase connection...')
-        const { error: testError } = await supabase
-          .from('providers')
-          .select('id')
-      .eq('id', p.id)
-          .limit(1)
-        
-        if (testError) {
-          console.error('[Admin] Connection test failed:', testError)
-          setError(`Connection test failed: ${testError.message}. Please check your internet connection.`)
-          return
-        }
-        console.log('[Admin] Connection test successful, proceeding with update...')
-      } catch (connectionError: any) {
-        console.error('[Admin] Connection test exception:', connectionError)
-        setError(`Connection test failed: ${connectionError.message}. Please check your internet connection.`)
-        return
-      }
-      
-      // CRITICAL FIX: Use AbortController for proper request cancellation
-      // This ensures the Supabase request can be properly cancelled if it hangs
-      const abortController = new AbortController()
-      const timeoutId = setTimeout(() => {
-        console.log('[Admin] Aborting database request due to timeout')
-        abortController.abort()
-      }, 12000) // 12 second timeout for the actual request
-      
-      console.log('[Admin] Starting database update with AbortController...')
+      // SIMPLIFIED APPROACH: Direct database update without connection test
+      // The connection test was causing timeouts and preventing saves
+      // We'll handle errors directly from the update operation
+      console.log('[Admin] Starting database update...')
       const startTime = Date.now()
       
       try {
-        // IMPROVED APPROACH: Use AbortController to properly cancel hanging requests
-        // This prevents the Supabase client from hanging indefinitely
+        // DIRECT UPDATE: Simple, direct update without AbortController complexity
+        // This approach is more reliable and less prone to timeout issues
         const { error } = await supabase
           .from('providers')
           .update(updateData)
           .eq('id', p.id)
-          .abortSignal(abortController.signal)
         
-        clearTimeout(timeoutId)
         const duration = Date.now() - startTime
         console.log(`[Admin] Database update completed in ${duration}ms`)
         
@@ -889,11 +860,13 @@ export default function AdminPage() {
           if (error.message.includes('timeout') || error.message.includes('aborted')) {
             setError(`Database operation timed out. This might be due to network issues or server load. Please try again in a moment.`)
             setRetryProvider(p) // Store provider for retry
-          } else if (error.message.includes('permission')) {
+          } else if (error.message.includes('permission') || error.message.includes('denied')) {
             setError(`Permission denied. Please check your admin access and try again.`)
-          } else if (error.message.includes('network')) {
+          } else if (error.message.includes('network') || error.message.includes('connection')) {
             setError(`Network error. Please check your internet connection and try again.`)
             setRetryProvider(p) // Store provider for retry
+          } else if (error.message.includes('foreign key') || error.message.includes('constraint')) {
+            setError(`Database constraint error: ${error.message}. Please contact support.`)
           } else {
             setError(`Failed to save provider: ${error.message}`)
           }
@@ -912,13 +885,15 @@ export default function AdminPage() {
         }
         
       } catch (requestError: any) {
-        clearTimeout(timeoutId)
         const duration = Date.now() - startTime
         console.error(`[Admin] Database request failed after ${duration}ms:`, requestError)
         
-        // Handle AbortError specifically
-        if (requestError.name === 'AbortError' || requestError.message.includes('aborted')) {
-          setError(`Database operation timed out after 12 seconds. Please check your connection and try again.`)
+        // Handle different types of errors
+        if (requestError.message.includes('timeout') || requestError.message.includes('aborted')) {
+          setError(`Database operation timed out after ${duration}ms. Please check your connection and try again.`)
+          setRetryProvider(p) // Store provider for retry
+        } else if (requestError.message.includes('network') || requestError.message.includes('fetch')) {
+          setError(`Network error: ${requestError.message}. Please check your internet connection.`)
           setRetryProvider(p) // Store provider for retry
         } else {
           setError(`Database request failed: ${requestError.message}`)

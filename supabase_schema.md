@@ -111,7 +111,9 @@ CREATE TABLE public.provider_change_requests (
   reason text,
   created_at timestamp with time zone DEFAULT now(),
   decided_at timestamp with time zone,
-  CONSTRAINT provider_change_requests_pkey PRIMARY KEY (id)
+  CONSTRAINT provider_change_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT provider_change_requests_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(id),
+  CONSTRAINT provider_change_requests_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.provider_job_posts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -162,7 +164,8 @@ CREATE TABLE public.providers (
   booking_instructions text,
   booking_url text,
   CONSTRAINT providers_pkey PRIMARY KEY (id),
-  CONSTRAINT providers_category_key_fkey FOREIGN KEY (category_key) REFERENCES public.categories(key)
+  CONSTRAINT providers_category_key_fkey FOREIGN KEY (category_key) REFERENCES public.categories(key),
+  CONSTRAINT providers_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.providers_backup (
   id uuid,
