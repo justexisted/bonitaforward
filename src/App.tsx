@@ -143,6 +143,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // CRITICAL FIX: Don't initialize if user is already signed in
         // This prevents initialization from overriding a successful sign-in
+        // NOTE: On refresh, profile state resets to null, so this check won't work
+        // We need to rely on the session check below instead
         if (profile?.email) {
           console.log('[Auth] User already signed in, skipping initialization')
           setLoading(false)
@@ -155,7 +157,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error('[Auth] Error getting session:', error)
-          if (mounted) setLoading(false)
+          if (mounted) {
+            setLoading(false)
+            initializationComplete = true
+          }
           return
         }
 
@@ -164,6 +169,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           email: session?.user?.email,
           userId: session?.user?.id
         })
+        
+        // CRITICAL FIX: If no session exists, mark initialization as complete immediately
+        // This prevents the auth state change handler from interfering
+        if (!session?.user) {
+          console.log('[Auth] No session found during initialization')
+          if (mounted) {
+            setLoading(false)
+            initializationComplete = true
+          }
+          return
+        }
 
         /**
          * CRITICAL FIX: React state not updating despite valid session
@@ -269,10 +285,11 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'initComplete:', initializationComplete)
       
-      // CRITICAL FIX: Allow SIGNED_IN events during initialization to prevent sign-in loop
-      // Only ignore other events (SIGNED_OUT, TOKEN_REFRESHED) during initialization
+      // CRITICAL FIX: During initialization, only process SIGNED_IN events
+      // Ignore SIGNED_OUT and TOKEN_REFRESHED during initialization to prevent
+      // race conditions where refresh triggers a false SIGNED_OUT event
       if (!initializationComplete && event !== 'SIGNED_IN') {
-        console.log('[Auth] Ignoring non-sign-in auth event during initialization:', event)
+        console.log('[Auth] Ignoring auth event during initialization:', event, 'session exists:', !!session)
         return
       }
       
@@ -380,14 +397,29 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         
         console.log('[Auth] Sign-in process complete, user should now be authenticated')
       } else if (event === 'SIGNED_OUT' || !session) {
-        console.log('[Auth] SIGNED_OUT event or no session - clearing profile')
+        console.log('[Auth] SIGNED_OUT event or no session - checking if this is a false positive')
+        
+        // CRITICAL FIX: Double-check session before clearing profile
+        // Sometimes Supabase fires SIGNED_OUT during refresh even with valid session
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        
+        if (currentSession?.user?.email) {
+          console.log('[Auth] False SIGNED_OUT detected - session still exists, maintaining profile')
+          // Don't clear profile if session actually exists
+          return
+        }
+        
+        console.log('[Auth] Confirmed SIGNED_OUT - clearing profile')
         setProfile(null)
         profileRef.current = null
         // Clear any remaining auth data
         try {
           localStorage.removeItem('bf-auth')
-          localStorage.removeItem('sb-auth-token')
-        } catch {}
+          localStorage.removeItem('bf-return-url')
+          console.log('[Auth] Cleared custom app data, Supabase will handle its own session cleanup')
+        } catch (e) {
+          console.log('Error clearing custom localStorage:', e)
+        }
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
         // Only update if we have a valid session
@@ -407,7 +439,13 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     // Start initialization process
-    initializeAuth()
+    // CRITICAL FIX: Await initialization to ensure it completes before auth events are processed
+    // This prevents race conditions where auth events interfere with initialization
+    initializeAuth().then(() => {
+      console.log('[Auth] Initialization completed, auth events can now be processed')
+    }).catch((error) => {
+      console.error('[Auth] Initialization failed:', error)
+    })
 
     return () => {
       mounted = false
