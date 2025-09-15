@@ -285,74 +285,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'initComplete:', initializationComplete)
       
-      // CRITICAL FIX: During initialization, only process SIGNED_IN events
-      // Ignore SIGNED_OUT and TOKEN_REFRESHED during initialization to prevent
-      // race conditions where refresh triggers a false SIGNED_OUT event
-      if (!initializationComplete && event !== 'SIGNED_IN') {
+      // CRITICAL FIX: During initialization, ignore ALL auth events to prevent race conditions
+      // The initializeAuth function handles the initial session, and onAuthStateChange
+      // should only process events AFTER initialization is complete
+      if (!initializationComplete) {
         console.log('[Auth] Ignoring auth event during initialization:', event, 'session exists:', !!session)
         return
-      }
-      
-      // For SIGNED_IN events during initialization, mark initialization as complete first
-      if (event === 'SIGNED_IN' && !initializationComplete) {
-        console.log('[Auth] Processing SIGNED_IN during initialization, marking init complete')
-        initializationComplete = true
-        // CRITICAL FIX: Don't set loading to false here - wait until profile is set
-        // This prevents the race condition where loading becomes false before profile is set
-        
-        // CRITICAL FIX: Set profile state during initialization SIGNED_IN event
-        // This prevents the user from appearing as not authenticated and triggering duplicate sign-ins
-        console.log('[Auth] Session available during init SIGNED_IN:', !!session, 'User available:', !!session?.user)
-        
-        if (session?.user) {
-          const email = session.user.email
-          const meta = session.user.user_metadata || {}
-          const name = meta?.name
-          let role = meta?.role as 'business' | 'community' | undefined
-          const userId = session.user.id
-
-          console.log('[Auth] Setting profile during initialization SIGNED_IN:', { email, userId, metaRole: role })
-
-          // Fetch role from database for signed in users
-          if (userId) {
-            try {
-              const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
-              const dbRole = String((prof as any)?.role || '').toLowerCase()
-              if (dbRole === 'business' || dbRole === 'community') {
-                role = dbRole as 'business' | 'community'
-                console.log('[Auth] Role fetched from database during init:', role)
-              }
-            } catch (error) {
-              console.error('[Auth] Error fetching role during init:', error)
-            }
-          }
-
-          console.log('[Auth] About to set profile state during initialization:', { name, email, userId, role })
-          
-          // CRITICAL FIX: Set profile state directly (not via callback) to ensure immediate update
-          // The callback approach was causing React state batching issues where the profile
-          // state wouldn't update immediately, causing isAuthed to remain false
-          const newProfile = { name, email, userId, role }
-          console.log('[Auth] Setting profile state directly:', newProfile)
-          
-          // CRITICAL FIX: Update both state and ref simultaneously
-          // The ref provides immediate access to the profile data for context calculation
-          setProfile(newProfile)
-          profileRef.current = newProfile
-          
-          // CRITICAL FIX: Force immediate context recalculation by updating loading state
-          // This ensures the context value is recalculated with the new profile state
-          setLoading(false)
-          
-          // Ensure profile exists in database
-          if (userId && email) {
-            await ensureProfile(userId, email, name, role)
-          }
-          
-          console.log('[Auth] Initialization SIGNED_IN process complete, user should be authenticated')
-        } else {
-          console.log('[Auth] No session or user available during initialization SIGNED_IN')
-        }
       }
 
       // CRITICAL FIX: Only process SIGNED_IN if we haven't already processed it during initialization
