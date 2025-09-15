@@ -817,6 +817,15 @@ export default function AdminPage() {
         images: p.images || [],
         is_member: p.is_member === true,
         
+        // PLAN TRACKING FIELDS: Handle the new plan system properly
+        // This ensures the database reflects the correct plan status and tracking
+        is_featured: p.is_featured === true,
+        featured_since: p.featured_since || null,
+        subscription_type: p.subscription_type || null,
+        plan: p.plan || null,
+        tier: p.tier || null,
+        paid: p.paid === true,
+        
         // Enhanced business management fields (matching My Business page)
         description: p.description || null,
         specialties: p.specialties || null,
@@ -2060,16 +2069,68 @@ export default function AdminPage() {
                             Category: {providers[0].category_key}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <label className="inline-flex items-center gap-2 text-sm">
-                            <input 
-                              type="checkbox" 
-                              checked={providers[0].is_member === true} 
-                              onChange={(e) => setProviders((arr) => [{ ...arr[0], is_member: e.target.checked }, ...arr.slice(1)])} 
-                              className="rounded border-neutral-300"
-                            />
-                            <span className="font-medium">Featured Account</span>
-                          </label>
+                        <div className="flex items-center gap-4">
+                          {/* PLAN DROPDOWN: Replace checkbox with plan selection dropdown */}
+                          {/* This allows admins to set providers as free, monthly, or yearly plans */}
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-neutral-700">Plan Type:</label>
+                            <select 
+                              value={providers[0].subscription_type || 'free'} 
+                              onChange={(e) => {
+                                const newPlan = e.target.value
+                                const now = new Date().toISOString()
+                                setProviders((arr) => [{
+                                  ...arr[0], 
+                                  subscription_type: newPlan === 'free' ? null : newPlan,
+                                  is_member: newPlan !== 'free',
+                                  is_featured: newPlan !== 'free',
+                                  featured_since: newPlan !== 'free' ? (arr[0].featured_since || now) : null
+                                }, ...arr.slice(1)])
+                              }}
+                              className="rounded-lg border border-neutral-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                            >
+                              <option value="free">Free</option>
+                              <option value="monthly">Monthly ($100/mo)</option>
+                              <option value="yearly">Yearly ($1000/yr)</option>
+                            </select>
+                          </div>
+                          
+                          {/* PLAN DURATION DISPLAY: Show how long the provider has been on their current plan */}
+                          {/* This helps admins track plan duration and billing cycles */}
+                          {providers[0].featured_since && (
+                            <div className="text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded">
+                              Featured since: {new Date(providers[0].featured_since).toLocaleDateString()}
+                              {providers[0].subscription_type && (
+                                <span className="ml-1">
+                                  ({providers[0].subscription_type === 'monthly' ? 'Monthly' : 'Yearly'} plan)
+                                </span>
+                              )}
+                              {/* DURATION CALCULATOR: Show how long they've been featured */}
+                              {(() => {
+                                const startDate = new Date(providers[0].featured_since!)
+                                const now = new Date()
+                                const diffTime = Math.abs(now.getTime() - startDate.getTime())
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                                const diffMonths = Math.floor(diffDays / 30)
+                                const diffYears = Math.floor(diffDays / 365)
+                                
+                                let durationText = ''
+                                if (diffYears > 0) {
+                                  durationText = `${diffYears} year${diffYears > 1 ? 's' : ''}`
+                                } else if (diffMonths > 0) {
+                                  durationText = `${diffMonths} month${diffMonths > 1 ? 's' : ''}`
+                                } else {
+                                  durationText = `${diffDays} day${diffDays > 1 ? 's' : ''}`
+                                }
+                                
+                                return (
+                                  <span className="ml-1 text-green-600 font-medium">
+                                    ({durationText} ago)
+                                  </span>
+                                )
+                              })()}
+                            </div>
+                          )}
                         </div>
                       </div>
 
