@@ -815,16 +815,17 @@ export default function AdminPage() {
         website: p.website,
         address: p.address,
         images: p.images || [],
-        is_member: p.is_member === true,
+        is_member: p.subscription_type ? p.is_member === true : false,
         
         // PLAN TRACKING FIELDS: Handle the new plan system properly
         // This ensures the database reflects the correct plan status and tracking
-        is_featured: p.is_featured === true,
-        featured_since: p.featured_since || null,
+        // CRITICAL FIX: When subscription_type is null (free plan), explicitly clear featured status
+        is_featured: p.subscription_type ? p.is_featured === true : false,
+        featured_since: p.subscription_type ? (p.featured_since || null) : null,
         subscription_type: p.subscription_type || null,
         plan: p.plan || null,
         tier: p.tier || null,
-        paid: p.paid === true,
+        paid: p.subscription_type ? p.paid === true : false,
         
         // Enhanced business management fields (matching My Business page)
         description: p.description || null,
@@ -2065,7 +2066,14 @@ export default function AdminPage() {
                         <div>
                           <h3 className="text-lg font-semibold text-neutral-900">Editing: {providers[0].name}</h3>
                           <p className="text-sm text-neutral-600 mt-1">
-                            {providers[0].is_member ? 'Featured Account' : 'Free Account'} • 
+                            {(() => {
+                              // ACCOUNT STATUS DISPLAY: Use subscription_type to determine account status
+                              // This ensures the display matches the actual plan system
+                              if (providers[0].subscription_type) {
+                                return 'Featured Account'
+                              }
+                              return 'Free Account'
+                            })()} • 
                             Category: {providers[0].category_key}
                           </p>
                         </div>
@@ -2097,7 +2105,7 @@ export default function AdminPage() {
                           
                           {/* PLAN DURATION DISPLAY: Show how long the provider has been on their current plan */}
                           {/* This helps admins track plan duration and billing cycles */}
-                          {providers[0].featured_since && (
+                          {providers[0].subscription_type && providers[0].featured_since && (
                             <div className="text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded">
                               Featured since: {new Date(providers[0].featured_since).toLocaleDateString()}
                               {providers[0].subscription_type && (
