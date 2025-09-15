@@ -67,6 +67,7 @@ type AuthContextValue = {
   email?: string
   userId?: string
   role?: 'business' | 'community'
+  profileState: { name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
   signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string; session?: unknown | null }>
@@ -77,6 +78,11 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue>({
   isAuthed: false,
   loading: true,
+  name: undefined,
+  email: undefined,
+  userId: undefined,
+  role: undefined,
+  profileState: null,
   signInWithGoogle: async () => {},
   signInWithEmail: async () => ({}),
   signUpWithEmail: async () => ({}),
@@ -87,6 +93,10 @@ const AuthContext = createContext<AuthContextValue>({
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // CRITICAL FIX: Use a ref to track profile state for immediate access
+  // This prevents the race condition where profile state isn't immediately available in context
+  const profileRef = useRef<{ name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -207,7 +217,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[Auth] About to set profile state:', { name, email, userId, role })
           
           // CRITICAL FIX: Set profile state and immediately verify it was set
-          setProfile({ name, email, userId, role })
+          const newProfile = { name, email, userId, role }
+          setProfile(newProfile)
+          profileRef.current = newProfile
           
           console.log('[Auth] Profile state set, current auth context will be:', {
             isAuthed: Boolean(email),
@@ -268,8 +280,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' && !initializationComplete) {
         console.log('[Auth] Processing SIGNED_IN during initialization, marking init complete')
         initializationComplete = true
-        // CRITICAL FIX: Also set loading to false to prevent initialization from overriding
-        setLoading(false)
+        // CRITICAL FIX: Don't set loading to false here - wait until profile is set
+        // This prevents the race condition where loading becomes false before profile is set
         
         // CRITICAL FIX: Set profile state during initialization SIGNED_IN event
         // This prevents the user from appearing as not authenticated and triggering duplicate sign-ins
@@ -300,12 +312,20 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
           console.log('[Auth] About to set profile state during initialization:', { name, email, userId, role })
           
-          // CRITICAL FIX: Use a callback to ensure setProfile is called and logged
-          setProfile((prevProfile) => {
-            const newProfile = { name, email, userId, role }
-            console.log('[Auth] setProfile callback called with:', newProfile, 'previous:', prevProfile)
-            return newProfile
-          })
+          // CRITICAL FIX: Set profile state directly (not via callback) to ensure immediate update
+          // The callback approach was causing React state batching issues where the profile
+          // state wouldn't update immediately, causing isAuthed to remain false
+          const newProfile = { name, email, userId, role }
+          console.log('[Auth] Setting profile state directly:', newProfile)
+          
+          // CRITICAL FIX: Update both state and ref simultaneously
+          // The ref provides immediate access to the profile data for context calculation
+          setProfile(newProfile)
+          profileRef.current = newProfile
+          
+          // CRITICAL FIX: Force immediate context recalculation by updating loading state
+          // This ensures the context value is recalculated with the new profile state
+          setLoading(false)
           
           // Ensure profile exists in database
           if (userId && email) {
@@ -344,7 +364,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         console.log('[Auth] Setting profile state:', { name, email, userId, role })
-        setProfile({ name, email, userId, role })
+        const newProfile = { name, email, userId, role }
+        setProfile(newProfile)
+        profileRef.current = newProfile
         
         // CRITICAL FIX: Set loading to false after setting profile
         // This ensures isAuthed becomes true and user gets redirected
@@ -360,6 +382,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (event === 'SIGNED_OUT' || !session) {
         console.log('[Auth] SIGNED_OUT event or no session - clearing profile')
         setProfile(null)
+        profileRef.current = null
         // Clear any remaining auth data
         try {
           localStorage.removeItem('bf-auth')
@@ -370,10 +393,13 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         // Only update if we have a valid session
         if (session?.user?.email) {
           console.log('[Auth] Token refreshed with valid session, maintaining profile')
-          setProfile(prev => prev ? { ...prev } : null)
+          const newProfile = profile ? { ...profile } : null
+          setProfile(newProfile)
+          profileRef.current = newProfile
         } else {
           console.log('[Auth] Token refresh but no session - this should not happen, clearing profile')
           setProfile(null)
+          profileRef.current = null
         }
       } else {
         console.log('[Auth] Unhandled auth event:', event, 'session exists:', !!session)
@@ -415,6 +441,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Force clear profile state immediately
       setProfile(null)
+      profileRef.current = null
       
       // CRITICAL FIX: Don't manually clear Supabase tokens - let Supabase handle its own session management
       // Manual clearing interferes with Supabase's built-in session persistence and causes auth issues
@@ -443,6 +470,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Sign out exception:', err)
       // Force clear state even if signOut fails
       setProfile(null)
+      profileRef.current = null
       window.location.href = '/signin'
     }
   }
@@ -497,13 +525,18 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
    * This is where the auth state gets exposed to the rest of the app.
    * Adding logging to see if profile state is being set but not reflected in UI.
    */
+  // CRITICAL FIX: Use ref for immediate access to profile data
+  // This prevents the race condition where profile state isn't immediately available
+  const currentProfile = profileRef.current || profile
+  
   const value: AuthContextValue = {
-    isAuthed: Boolean(profile?.email),
+    isAuthed: Boolean(currentProfile?.email),
     loading,
-    name: profile?.name,
-    email: profile?.email,
-    userId: profile?.userId,
-    role: profile?.role,
+    name: currentProfile?.name,
+    email: currentProfile?.email,
+    userId: currentProfile?.userId,
+    role: currentProfile?.role,
+    profileState: currentProfile,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
