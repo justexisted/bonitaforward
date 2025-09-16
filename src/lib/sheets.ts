@@ -1,7 +1,7 @@
 export type SheetProvider = {
   id: string
   name: string
-  category: string
+  category_key: string // FIXED: Use category_key to match database schema
   tags: string[]
   rating?: number
   details: {

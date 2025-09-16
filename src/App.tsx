@@ -1594,7 +1594,7 @@ type Provider = {
   id: string
   name: string
   slug: string // URL-friendly version of the business name (e.g., "flora-cafe")
-  category: CategoryKey
+  category_key: CategoryKey // FIXED: Use category_key to match database schema
   tags: string[]
   rating?: number
   phone?: string | null
@@ -1752,7 +1752,7 @@ async function loadProvidersFromSheet(): Promise<void> {
     mapped.forEach((sp: SheetProvider) => {
       const cat = (sp.category_key as CategoryKey)
       if (grouped[cat]) {
-        grouped[cat].push({ id: sp.id, name: sp.name, slug: generateSlug(sp.name), category: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
+        grouped[cat].push({ id: sp.id, name: sp.name, slug: generateSlug(sp.name), category_key: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
       }
     })
     providersByCategory = ensureDemoMembers(grouped)

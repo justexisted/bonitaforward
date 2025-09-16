@@ -726,7 +726,7 @@ export default function AdminPage() {
     } catch {}
     const payload: Partial<ProviderRow> = {
       name: (app.business_name || 'Unnamed Business') as any,
-      category_key: draft.category_key as any,
+      category_key: draft.category as any,
       tags: tags as any,
       phone: (app.phone || null) as any,
       email: (app.email || null) as any,
@@ -1587,8 +1587,8 @@ export default function AdminPage() {
                     <div className="text-xs text-neutral-600 mt-1">Challenge: {row.challenge || '-'}</div>
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <select
-                        value={(appEdits[row.id]?.category_key) || 'professional-services'}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
+                        value={(appEdits[row.id]?.category) || 'professional-services'}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
                         className="rounded-xl border border-neutral-200 px-3 py-2 bg-white text-xs"
                       >
                         {catOptions.map((opt) => (
@@ -1598,7 +1598,7 @@ export default function AdminPage() {
                       <input
                         placeholder="tags (comma separated)"
                         value={appEdits[row.id]?.tagsInput || ''}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: m[row.id]?.category_key || 'professional-services', tagsInput: e.target.value } }))}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: m[row.id]?.category || 'professional-services', tagsInput: e.target.value } }))}
                         className="rounded-xl border border-neutral-200 px-3 py-2 text-xs sm:col-span-2"
                       />
                     </div>
