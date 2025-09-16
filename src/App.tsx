@@ -770,13 +770,12 @@ function Hero() {
           img.src = `https://picsum.photos/seed/landing-hero-fallback/1600/900`
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/60 via-neutral-900/20 to-transparent" aria-hidden></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-neutral-900/60 to-transparent" aria-hidden></div>
       <div className="relative" style={{ minHeight: '33vh', alignContent: 'center' }}>
-      <div className="gradient-overlay"></div>
         <Container>
           <div className="py-10 sm:py-12 text-center">
             <SplitText 
-            className="text-3xl sm:text-4xl font-semibold tracking-tight text-white relative z-2" 
+            className="text-3xl sm:text-4xl font-semibold tracking-tight text-white relative z-1" 
             text="Discover, Support, and Grow Local Bonita." 
             duration={0.1}
             ease="power3.out"
