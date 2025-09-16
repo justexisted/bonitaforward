@@ -1826,18 +1826,6 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       booking_url: r.booking_url ?? null,
     })
   })
-  // Fallback: if a category has zero members flagged from Supabase, promote the first three
-  ;(Object.keys(grouped) as CategoryKey[]).forEach((ck: CategoryKey) => {
-    const list = grouped[ck]
-    // If Supabase returned nothing for this category, keep previous providers
-    if (list.length === 0 && previous?.[ck]?.length) {
-      grouped[ck] = previous[ck]
-      return
-    }
-    if (list.length > 0 && !list.some((p) => Boolean(p.isMember))) {
-      grouped[ck] = list.map((p, idx) => ({ ...p, isMember: idx < 3 }))
-    }
-  })
   providersByCategory = grouped
   console.log('[Supabase] Providers loaded', grouped)
   try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}

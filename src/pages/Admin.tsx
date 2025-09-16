@@ -887,7 +887,20 @@ export default function AdminPage() {
         setMessage('Provider updated successfully! Changes have been saved to the database.')
         setRetryProvider(null) // Clear retry state on success
         
-        // Refresh provider data to reflect changes
+        // CRITICAL FIX: Refresh admin page provider data immediately after save
+        // This ensures the admin page shows the updated data without requiring a page refresh
+        try {
+          const { data: pData } = await supabase
+            .from('providers')
+            .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+            .order('name', { ascending: true })
+          setProviders((pData as ProviderRow[]) || [])
+          console.log('[Admin] Provider data refreshed after save')
+        } catch (refreshError) {
+          console.error('[Admin] Failed to refresh provider data after save:', refreshError)
+        }
+        
+        // Also dispatch refresh event for main app
         try { 
           window.dispatchEvent(new CustomEvent('bf-refresh-providers')) 
         } catch (refreshError) {
