@@ -1441,12 +1441,12 @@ export default function AdminPage() {
                   ))}
                 </select>
                 <select value={section} onChange={(e) => setSection(e.target.value as any)} className="rounded-xl border border-neutral-200 px-3 py-1.5 text-sm bg-white">
-                  <option value="business-applications">Business Applications</option>
+                  <option value="providers">Providers</option>
                   <option value="contact-leads">Contact / Get Featured</option>
                   <option value="customer-users">Customer Users</option>
                   <option value="business-accounts">Business Accounts</option>
                   <option value="users">Users</option>
-                  <option value="providers">Providers</option>
+                  <option value="business-applications">Business Applications</option>
                   <option value="owner-change-requests">Owner Change Requests</option>
                   <option value="job-posts">Job Posts</option>
                   <option value="funnel-responses">Funnel Responses</option>
