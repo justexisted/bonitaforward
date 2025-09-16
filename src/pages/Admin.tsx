@@ -802,6 +802,13 @@ export default function AdminPage() {
       setSavingProvider(false)
       return
     }
+      
+    // ADD THIS: Force refresh the Supabase client before making the request
+    try {
+      await supabase.from('providers').select('id').limit(1)
+    } catch (err) {
+      console.error('[Admin] Connection test failed:', err)
+    }
     
     // CRITICAL FIX: Add timeout to prevent infinite loading state
     // This ensures the loading state is always reset even if the request hangs
