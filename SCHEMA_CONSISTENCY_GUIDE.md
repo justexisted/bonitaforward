@@ -54,8 +54,9 @@ export type SheetProvider = {
 - **NEVER use `category`** in database queries
 
 ### UI Components
-- **ALWAYS use `category_key`** when accessing provider data
-- **NEVER use `category`** for provider data
+- **Provider data**: Use `category_key` ✅
+- **Community data**: Use `category_key` ✅
+- **Provider object literals**: Use `category_key` ✅
 
 ### State Management
 - **appEdits state**: Uses `category` (this is correct - it's for form editing)
