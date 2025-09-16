@@ -503,7 +503,8 @@ export default function AdminPage() {
   // Refresh session when tab is focused
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (!document.hidden && auth.email) {
+      if (!document.hidden && auth.email && auth.isAuthed) {
+        // Only refresh if we're already authenticated - this prevents the sign-out issue
         try {
           const { error } = await supabase.auth.refreshSession()
           if (error) {
@@ -522,7 +523,7 @@ export default function AdminPage() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [auth.email])
+  }, [auth.email, auth.isAuthed])
 
   const isAdmin = adminStatus.isAdmin
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
