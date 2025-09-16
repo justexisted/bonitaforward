@@ -163,6 +163,12 @@ export default function AdminPage() {
    * When removing featured, it sets both is_featured=false and is_member=false.
    */
   const toggleFeaturedStatus = async (providerId: string, currentStatus: boolean) => {
+    // ADD THIS: Check if session is still valid before updating featured status
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setError('Session expired. Please refresh the page and try again.')
+      return
+    }
     try {
       setMessage('Updating featured status...')
       
@@ -214,6 +220,11 @@ export default function AdminPage() {
    * This function allows admins to update a provider's subscription type (monthly/yearly).
    */
   const updateSubscriptionType = async (providerId: string, subscriptionType: 'monthly' | 'yearly') => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setError('Session expired. Please refresh the page and try again.')
+      return
+    }
     try {
       setMessage('Updating subscription type...')
       
@@ -808,6 +819,14 @@ export default function AdminPage() {
     setMessage(null)
     setError(null)
     setSavingProvider(true)
+
+    // ADD THIS: Check if session is still valid before saving
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setError('Session expired. Please refresh the page and try again.')
+      setSavingProvider(false)
+      return
+    }
     
     // CRITICAL FIX: Add timeout to prevent infinite loading state
     // This ensures the loading state is always reset even if the request hangs
