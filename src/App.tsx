@@ -15,6 +15,7 @@ import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
+import SplitText from './components/SplitText'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -771,6 +772,7 @@ function Hero() {
       <div className="gradient-overlay"></div>
         <Container>
           <div className="py-10 sm:py-12 text-center">
+          <SplitText text="Discover, Support, and Grow Local Bonita Businesses." />
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white" style={{ position: 'relative', zIndex: 2 }}>
               Discover, Support, and Grow Local Bonita Businesses.
             </h1>
