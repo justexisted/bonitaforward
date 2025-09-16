@@ -118,7 +118,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [confirmDeleteProviderId, setConfirmDeleteProviderId] = useState<string | null>(null)
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
-  const [blogDraft, setBlogDraft] = useState<{ id?: string; category: string; title: string; content: string }>({ category: 'restaurants-cafes', title: '', content: '' })
+  const [blogDraft, setBlogDraft] = useState<{ id?: string; category_key: string; title: string; content: string }>({ category_key: 'restaurants-cafes', title: '', content: '' })
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiQuery, setEmojiQuery] = useState('')
@@ -2720,7 +2720,7 @@ export default function AdminPage() {
             <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
               <div className="md:col-span-2">
                 <div className="grid grid-cols-1 gap-2">
-                  <select value={blogDraft.category} onChange={(e) => setBlogDraft((d) => ({ ...d, category: e.target.value }))} className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
+                  <select value={blogDraft.category_key} onChange={(e) => setBlogDraft((d) => ({ ...d, category_key: e.target.value }))} className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
                     <option value="restaurants-cafes">Restaurants & Cafés — Top 5 Restaurants This Month</option>
                     <option value="home-services">Home Services — Bonita Home Service Deals</option>
                     <option value="health-wellness">Health & Wellness — Wellness Spotlight</option>
@@ -2769,13 +2769,13 @@ export default function AdminPage() {
                     <button
                       onClick={async () => {
                         setError(null); setMessage(null)
-                        const { error } = await upsertBlogPost({ id: blogDraft.id, category: blogDraft.category, title: blogDraft.title, content: blogDraft.content } as any)
+                        const { error } = await upsertBlogPost({ id: blogDraft.id, category_key: blogDraft.category_key, title: blogDraft.title, content: blogDraft.content } as any)
                         if (error) setError(error)
                         else {
                           setMessage('Blog post saved')
                           const posts = await fetchAllBlogPosts()
                           setBlogPosts(posts)
-                          setBlogDraft({ category: blogDraft.category, title: '', content: '' })
+                          setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })
                         }
                       }}
                       className="btn btn-secondary text-xs"
@@ -2783,7 +2783,7 @@ export default function AdminPage() {
                       Save Post
                     </button>
                     {blogDraft.id && (
-                      <button onClick={() => setBlogDraft({ category: blogDraft.category, title: '', content: '' })} className="text-xs underline">New</button>
+                      <button onClick={() => setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })} className="text-xs underline">New</button>
                     )}
                   </div>
                 </div>
@@ -2795,9 +2795,9 @@ export default function AdminPage() {
                   {blogPosts.map((bp) => (
                     <div key={bp.id} className="rounded-xl border border-neutral-200 p-2">
                       <div className="font-medium text-sm">{bp.title}</div>
-                      <div className="text-[11px] text-neutral-500">{bp.category} • {new Date(bp.created_at).toLocaleString()}</div>
+                      <div className="text-[11px] text-neutral-500">{bp.category_key} • {new Date(bp.created_at).toLocaleString()}</div>
                       <div className="mt-1 flex items-center gap-2">
-                        <button onClick={() => setBlogDraft({ id: bp.id, category: bp.category, title: bp.title, content: bp.content })} className="btn btn-secondary text-xs">Edit</button>
+                        <button onClick={() => setBlogDraft({ id: bp.id, category_key: bp.category_key, title: bp.title, content: bp.content })} className="btn btn-secondary text-xs">Edit</button>
                         <button onClick={async () => { const { error } = await deleteBlogPost(bp.id); if (error) setError(error); else { setMessage('Post deleted'); setBlogPosts((arr) => arr.filter((p) => p.id !== bp.id)) } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
                       </div>
                     </div>

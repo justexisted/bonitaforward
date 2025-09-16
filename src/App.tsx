@@ -1787,7 +1787,7 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
   }
 
   rows.forEach((r) => {
-    const key = (r.category_key as CategoryKey)
+    const key = (r.category as CategoryKey)
     if (!grouped[key]) return
     // Combine tags and badges to preserve featured/member flags
     const combinedTags = Array.from(new Set([...
