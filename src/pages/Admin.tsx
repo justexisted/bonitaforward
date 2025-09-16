@@ -500,6 +500,30 @@ export default function AdminPage() {
     }
   }, [auth.email, auth.loading]) // Removed isClientAdmin dependency
 
+  // Refresh session when tab is focused
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (!document.hidden && auth.email) {
+        try {
+          const { error } = await supabase.auth.refreshSession()
+          if (error) {
+            console.error('[Admin] Session refresh failed:', error)
+          } else {
+            console.log('[Admin] Session refreshed successfully')
+          }
+        } catch (err) {
+          console.error('[Admin] Session refresh error:', err)
+        }
+      }
+    }
+  
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [auth.email])
+
   const isAdmin = adminStatus.isAdmin
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
   const [section, setSection] = useState<'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'providers' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
