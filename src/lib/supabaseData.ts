@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 export type DbProvider = {
   id: string
   name: string
-  category: string // FIXED: Real database uses 'category' not 'category_key'
+  category_key: string // FIXED: Real database uses 'category_key' not 'category'
   tags?: string[] | null
   rating?: number | null
   phone?: string | null

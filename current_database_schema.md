@@ -6,7 +6,7 @@
 - tags (jsonb)
 - rating (numeric)
 - created_at (timestamptz)
-- category (text) - NOTE: This is 'category' not 'category_key' in the real DB
+- category_key (text) - NOTE: This is 'category_key' not 'category' in the real DB
 - published (bool)
 - badges (text[])
 - phone (text)
@@ -39,5 +39,5 @@
 - paid (bool) - REMOVED
 
 ## Key differences from old schema:
-- Column is 'category' not 'category_key'
+- Column is 'category_key' not 'category' (I was wrong earlier)
 - No 'paid', 'tier', or 'plan' columns exist

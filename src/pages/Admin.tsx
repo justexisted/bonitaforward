@@ -21,7 +21,7 @@ type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
 type ProviderRow = {
   id: string
   name: string
-  category: string
+  category_key: string
   tags: string[] | null
   badges: string[] | null
   rating: number | null
@@ -60,7 +60,7 @@ type ProviderRow = {
 type FunnelRow = {
   id: string
   user_email: string
-  category: string
+  category_key: string
   answers: Record<string, string>
   created_at: string
 }
@@ -68,7 +68,7 @@ type FunnelRow = {
 type BookingRow = {
   id: string
   user_email: string
-  category: string
+  category_key: string
   name: string | null
   notes: string | null
   answers: Record<string, string> | null
@@ -82,7 +82,7 @@ type BusinessApplicationRow = {
   business_name: string | null
   email: string | null
   phone: string | null
-  category: string | null
+  category_key: string | null
   challenge: string | null
   created_at: string
 }
@@ -199,7 +199,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -232,7 +232,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -524,7 +524,7 @@ export default function AdminPage() {
         // Enhanced providers query with all featured tracking fields
         const provQuery = isAdmin ? supabase
           .from('providers')
-          .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true }) : null
         const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
           fExec,
@@ -726,7 +726,7 @@ export default function AdminPage() {
     } catch {}
     const payload: Partial<ProviderRow> = {
       name: (app.business_name || 'Unnamed Business') as any,
-      category: draft.category as any,
+      category_key: draft.category_key as any,
       tags: tags as any,
       phone: (app.phone || null) as any,
       email: (app.email || null) as any,
@@ -749,7 +749,7 @@ export default function AdminPage() {
       try {
         const { data: pData } = await supabase
           .from('providers')
-          .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true })
         setProviders((pData as ProviderRow[]) || [])
       } catch {}
@@ -807,7 +807,7 @@ export default function AdminPage() {
       const updateData = {
         // Core business fields
         name: p.name,
-        category: p.category,
+        category_key: p.category_key,
         tags: p.tags || [],
         rating: p.rating ?? undefined,
         phone: p.phone,
@@ -1086,7 +1086,7 @@ export default function AdminPage() {
     try {
       const { data: pData, error: pErr } = await supabase
         .from('providers')
-        .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       if (pErr) {
         setProviders((arr) => arr.filter((p) => p.id !== providerId))
@@ -1583,12 +1583,12 @@ export default function AdminPage() {
                       <div className="text-xs text-neutral-500">{new Date(row.created_at).toLocaleString()}</div>
                     </div>
                     <div className="text-xs text-neutral-600 mt-1">Contact: {row.full_name || '-'} • {row.email || '-'} • {row.phone || '-'}</div>
-                    <div className="text-xs text-neutral-600 mt-1">Category (requested): {row.category || '-'}</div>
+                    <div className="text-xs text-neutral-600 mt-1">Category (requested): {row.category_key || '-'}</div>
                     <div className="text-xs text-neutral-600 mt-1">Challenge: {row.challenge || '-'}</div>
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <select
-                        value={(appEdits[row.id]?.category) || 'professional-services'}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
+                        value={(appEdits[row.id]?.category_key) || 'professional-services'}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
                         className="rounded-xl border border-neutral-200 px-3 py-2 bg-white text-xs"
                       >
                         {catOptions.map((opt) => (
@@ -1598,7 +1598,7 @@ export default function AdminPage() {
                       <input
                         placeholder="tags (comma separated)"
                         value={appEdits[row.id]?.tagsInput || ''}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: m[row.id]?.category || 'professional-services', tagsInput: e.target.value } }))}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: m[row.id]?.category_key || 'professional-services', tagsInput: e.target.value } }))}
                         className="rounded-xl border border-neutral-200 px-3 py-2 text-xs sm:col-span-2"
                       />
                     </div>
@@ -1700,7 +1700,7 @@ export default function AdminPage() {
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-neutral-600">
-                            <div><strong>Category:</strong> {provider.category}</div>
+                            <div><strong>Category:</strong> {provider.category_key}</div>
                             <div><strong>Email:</strong> {provider.email || 'N/A'}</div>
                             <div><strong>Phone:</strong> {provider.phone || 'N/A'}</div>
                             <div><strong>Created:</strong> {provider.created_at ? new Date(provider.created_at).toLocaleDateString() : 'N/A'}</div>
@@ -1833,7 +1833,7 @@ export default function AdminPage() {
                                   {business.address && <div>📍 {business.address}</div>}
                                   <div className="mt-1">
                                     <span className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs mr-1">
-                                      {business.category || 'No category'}
+                                      {business.category_key || 'No category'}
                                     </span>
                                     {business.is_member && (
                                       <span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs mr-1">
@@ -1969,7 +1969,7 @@ export default function AdminPage() {
               )}
               {filteredFunnels.map((row) => (
                 <div key={row.id} className="rounded-xl border border-neutral-200 p-3 hover-gradient interactive-card">
-                  <div className="text-neutral-800 font-medium">{row.category}</div>
+                  <div className="text-neutral-800 font-medium">{row.category_key}</div>
                   <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
                   <div className="mt-1 text-xs text-neutral-600">User: {row.user_email}</div>
                   <textarea className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs" style={{ height: '14vh' }} defaultValue={JSON.stringify(row.answers, null, 2)} onChange={(e) => setEditFunnel((m) => ({ ...m, [row.id]: e.target.value }))} />
@@ -1990,7 +1990,7 @@ export default function AdminPage() {
               {bookings.length === 0 && <div className="text-neutral-500">No entries yet.</div>}
               {bookings.map((row) => (
                 <div key={row.id} className="rounded-xl border border-neutral-200 p-3 hover-gradient interactive-card">
-                  <div className="text-neutral-800 font-medium">{row.category}</div>
+                  <div className="text-neutral-800 font-medium">{row.category_key}</div>
                   <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
                   <input className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" defaultValue={row.name || ''} placeholder="Name" onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), name: e.target.value } }))} />
                   <textarea className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" defaultValue={row.notes || ''} placeholder="Notes" onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), notes: e.target.value } }))} />
@@ -2074,7 +2074,7 @@ export default function AdminPage() {
                               }
                               return 'Free Account'
                             })()} • 
-                            Category: {providers[0].category}
+                            Category: {providers[0].category_key}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
@@ -2163,8 +2163,8 @@ export default function AdminPage() {
                                 Category *
                               </label>
                               <select 
-                                value={providers[0].category} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], category: e.target.value } as any, ...arr.slice(1)])} 
+                                value={providers[0].category_key} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], category_key: e.target.value } as any, ...arr.slice(1)])} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
                               >
                           {catOptions.map((opt) => (

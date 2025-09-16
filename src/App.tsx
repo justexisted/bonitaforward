@@ -801,7 +801,7 @@ function Hero() {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 flex items-center justify-between"
                           >
                             <span className="truncate mr-2">{r.name}</span>
-                            <span className="text-[11px] text-neutral-500">{r.category.replace('-', ' ')}</span>
+                            <span className="text-[11px] text-neutral-500">{r.category_key.replace('-', ' ')}</span>
                           </button>
                         </li>
                       ))}
@@ -951,7 +951,7 @@ function ProviderPage() {
                 )}
               </div>
               <div className="flex items-center gap-4 text-sm text-neutral-500">
-                <span>Category: {provider.category.replace('-', ' ')}</span>
+                <span>Category: {provider.category_key.replace('-', ' ')}</span>
                 {provider.rating && (
                   <div className="flex items-center gap-1">
                     <span className="text-amber-500">★</span>
@@ -1313,9 +1313,9 @@ function CommunitySection() {
               'real-estate': "https://picsum.photos/seed/real-estate/800/400",
               'professional-services': "https://picsum.photos/seed/professional-services/800/400",
             }
-            const bg = bgMap[c.category as CategoryKey]
+            const bg = bgMap[c.category_key as CategoryKey]
             return (
-              <Link key={c.title} to={`/community/${c.category}`} className="relative rounded-2xl overflow-hidden block hover:shadow-sm border border-white/40">
+              <Link key={c.title} to={`/community/${c.category_key}`} className="relative rounded-2xl overflow-hidden block hover:shadow-sm border border-white/40">
                 <img
                   src={bg}
                   alt=""
@@ -1325,7 +1325,7 @@ function CommunitySection() {
                   onError={(e) => {
                     const img = e.currentTarget as HTMLImageElement
                     img.onerror = null
-                    img.src = `https://picsum.photos/seed/${c.category}-fallback/800/400`
+                    img.src = `https://picsum.photos/seed/${c.category_key}-fallback/800/400`
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/60 via-neutral-900/20 to-transparent" aria-hidden></div>
@@ -1750,7 +1750,7 @@ async function loadProvidersFromSheet(): Promise<void> {
       'professional-services': [],
     }
     mapped.forEach((sp: SheetProvider) => {
-      const cat = (sp.category as CategoryKey)
+      const cat = (sp.category_key as CategoryKey)
       if (grouped[cat]) {
         grouped[cat].push({ id: sp.id, name: sp.name, slug: generateSlug(sp.name), category: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
       }
@@ -1787,7 +1787,7 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
   }
 
   rows.forEach((r) => {
-    const key = (r.category as CategoryKey)
+    const key = (r.category_key as CategoryKey)
     if (!grouped[key]) return
     // Combine tags and badges to preserve featured/member flags
     const combinedTags = Array.from(new Set([...
