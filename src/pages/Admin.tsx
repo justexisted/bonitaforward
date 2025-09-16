@@ -21,7 +21,7 @@ type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
 type ProviderRow = {
   id: string
   name: string
-  category_key: string
+  category: string
   tags: string[] | null
   badges: string[] | null
   rating: number | null
@@ -37,8 +37,8 @@ type ProviderRow = {
   featured_since?: string | null
   subscription_type?: string | null // 'monthly' or 'yearly'
   // REMOVED: tier?: string | null - This column doesn't exist in the database
+  // REMOVED: paid?: boolean | null - This column doesn't exist in the database
   // Using existing subscription_type, is_member, is_featured fields instead
-  paid?: boolean | null
   // Enhanced business management fields (matching My Business page)
   description?: string | null
   specialties?: string[] | null
@@ -118,7 +118,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [confirmDeleteProviderId, setConfirmDeleteProviderId] = useState<string | null>(null)
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
-  const [blogDraft, setBlogDraft] = useState<{ id?: string; category_key: string; title: string; content: string }>({ category_key: 'restaurants-cafes', title: '', content: '' })
+  const [blogDraft, setBlogDraft] = useState<{ id?: string; category: string; title: string; content: string }>({ category: 'restaurants-cafes', title: '', content: '' })
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiQuery, setEmojiQuery] = useState('')
@@ -199,7 +199,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -232,7 +232,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -524,7 +524,7 @@ export default function AdminPage() {
         // Enhanced providers query with all featured tracking fields
         const provQuery = isAdmin ? supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true }) : null
         const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
           fExec,
@@ -696,7 +696,7 @@ export default function AdminPage() {
   // Removed legacy businessAccounts (email-derived). Business accounts now come from profiles.role === 'business'.
 
   // Inline helpers for admin edits
-  const [appEdits, setAppEdits] = useState<Record<string, { category_key: string; tagsInput: string }>>({})
+  const [appEdits, setAppEdits] = useState<Record<string, { category: string; tagsInput: string }>>({})
 
   const catOptions: { key: string; name: string }[] = [
     { key: 'real-estate', name: 'Real Estate' },
@@ -710,7 +710,7 @@ export default function AdminPage() {
     setMessage(null)
     const app = bizApps.find((b) => b.id === appId)
     if (!app) return
-    const draft = appEdits[appId] || { category_key: 'professional-services', tagsInput: '' }
+    const draft = appEdits[appId] || { category: 'professional-services', tagsInput: '' }
     const tags = draft.tagsInput.split(',').map((s) => s.trim()).filter(Boolean)
     // Attempt to find a profile/user by the application's email so we can assign ownership to the applicant
     let ownerUserId: string | null = null
@@ -726,7 +726,7 @@ export default function AdminPage() {
     } catch {}
     const payload: Partial<ProviderRow> = {
       name: (app.business_name || 'Unnamed Business') as any,
-      category_key: draft.category_key as any,
+      category: draft.category as any,
       tags: tags as any,
       phone: (app.phone || null) as any,
       email: (app.email || null) as any,
@@ -749,7 +749,7 @@ export default function AdminPage() {
       try {
         const { data: pData } = await supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true })
         setProviders((pData as ProviderRow[]) || [])
       } catch {}
@@ -807,7 +807,7 @@ export default function AdminPage() {
       const updateData = {
         // Core business fields
         name: p.name,
-        category_key: p.category_key,
+        category: p.category,
         tags: p.tags || [],
         rating: p.rating ?? undefined,
         phone: p.phone,
@@ -824,8 +824,8 @@ export default function AdminPage() {
         featured_since: p.subscription_type ? (p.featured_since || null) : null,
         subscription_type: p.subscription_type || null,
         // REMOVED: tier: p.tier || null, - This field doesn't exist in database
+        // REMOVED: paid: p.subscription_type ? p.paid === true : false, - This field doesn't exist in database
         // Using subscription_type instead to track plan (monthly/yearly/free)
-        paid: p.subscription_type ? p.paid === true : false,
         
         // Enhanced business management fields (matching My Business page)
         description: p.description || null,
@@ -1086,7 +1086,7 @@ export default function AdminPage() {
     try {
       const { data: pData, error: pErr } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       if (pErr) {
         setProviders((arr) => arr.filter((p) => p.id !== providerId))
@@ -1247,7 +1247,7 @@ export default function AdminPage() {
       // Fetch providers owned by this user (by owner_user_id)
       const { data: businessDataByOwner, error: ownerError } = await supabase
         .from('providers')
-        .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
+        .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at')
         .eq('owner_user_id', userId)
         .order('created_at', { ascending: false })
 
@@ -1258,7 +1258,7 @@ export default function AdminPage() {
       if (userEmail) {
         const { data: emailData, error: emailError } = await supabase
           .from('providers')
-          .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
+          .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at')
           .eq('email', userEmail)
           .order('created_at', { ascending: false })
         
@@ -1274,7 +1274,7 @@ export default function AdminPage() {
       if (userName) {
         const { data: nameData, error: nameError } = await supabase
           .from('providers')
-          .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at')
+          .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at')
           .ilike('name', `%${userName}%`)
           .order('created_at', { ascending: false })
         
@@ -1587,8 +1587,8 @@ export default function AdminPage() {
                     <div className="text-xs text-neutral-600 mt-1">Challenge: {row.challenge || '-'}</div>
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <select
-                        value={(appEdits[row.id]?.category_key) || 'professional-services'}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
+                        value={(appEdits[row.id]?.category) || 'professional-services'}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
                         className="rounded-xl border border-neutral-200 px-3 py-2 bg-white text-xs"
                       >
                         {catOptions.map((opt) => (
@@ -1598,7 +1598,7 @@ export default function AdminPage() {
                       <input
                         placeholder="tags (comma separated)"
                         value={appEdits[row.id]?.tagsInput || ''}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category_key: m[row.id]?.category_key || 'professional-services', tagsInput: e.target.value } }))}
+                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: m[row.id]?.category || 'professional-services', tagsInput: e.target.value } }))}
                         className="rounded-xl border border-neutral-200 px-3 py-2 text-xs sm:col-span-2"
                       />
                     </div>
@@ -1700,7 +1700,7 @@ export default function AdminPage() {
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-neutral-600">
-                            <div><strong>Category:</strong> {provider.category_key}</div>
+                            <div><strong>Category:</strong> {provider.category}</div>
                             <div><strong>Email:</strong> {provider.email || 'N/A'}</div>
                             <div><strong>Phone:</strong> {provider.phone || 'N/A'}</div>
                             <div><strong>Created:</strong> {provider.created_at ? new Date(provider.created_at).toLocaleDateString() : 'N/A'}</div>
@@ -1833,7 +1833,7 @@ export default function AdminPage() {
                                   {business.address && <div>📍 {business.address}</div>}
                                   <div className="mt-1">
                                     <span className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs mr-1">
-                                      {business.category_key || 'No category'}
+                                      {business.category || 'No category'}
                                     </span>
                                     {business.is_member && (
                                       <span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs mr-1">
@@ -2074,7 +2074,7 @@ export default function AdminPage() {
                               }
                               return 'Free Account'
                             })()} • 
-                            Category: {providers[0].category_key}
+                            Category: {providers[0].category}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
@@ -2163,8 +2163,8 @@ export default function AdminPage() {
                                 Category *
                               </label>
                               <select 
-                                value={providers[0].category_key} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], category_key: e.target.value } as any, ...arr.slice(1)])} 
+                                value={providers[0].category} 
+                                onChange={(e) => setProviders((arr) => [{ ...arr[0], category: e.target.value } as any, ...arr.slice(1)])} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
                               >
                           {catOptions.map((opt) => (
@@ -2720,7 +2720,7 @@ export default function AdminPage() {
             <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
               <div className="md:col-span-2">
                 <div className="grid grid-cols-1 gap-2">
-                  <select value={blogDraft.category_key} onChange={(e) => setBlogDraft((d) => ({ ...d, category_key: e.target.value }))} className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
+                  <select value={blogDraft.category} onChange={(e) => setBlogDraft((d) => ({ ...d, category: e.target.value }))} className="rounded-xl border border-neutral-200 px-3 py-2 bg-white">
                     <option value="restaurants-cafes">Restaurants & Cafés — Top 5 Restaurants This Month</option>
                     <option value="home-services">Home Services — Bonita Home Service Deals</option>
                     <option value="health-wellness">Health & Wellness — Wellness Spotlight</option>
@@ -2769,13 +2769,13 @@ export default function AdminPage() {
                     <button
                       onClick={async () => {
                         setError(null); setMessage(null)
-                        const { error } = await upsertBlogPost({ id: blogDraft.id, category_key: blogDraft.category_key, title: blogDraft.title, content: blogDraft.content } as any)
+                        const { error } = await upsertBlogPost({ id: blogDraft.id, category: blogDraft.category, title: blogDraft.title, content: blogDraft.content } as any)
                         if (error) setError(error)
                         else {
                           setMessage('Blog post saved')
                           const posts = await fetchAllBlogPosts()
                           setBlogPosts(posts)
-                          setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })
+                          setBlogDraft({ category: blogDraft.category, title: '', content: '' })
                         }
                       }}
                       className="btn btn-secondary text-xs"
@@ -2783,7 +2783,7 @@ export default function AdminPage() {
                       Save Post
                     </button>
                     {blogDraft.id && (
-                      <button onClick={() => setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })} className="text-xs underline">New</button>
+                      <button onClick={() => setBlogDraft({ category: blogDraft.category, title: '', content: '' })} className="text-xs underline">New</button>
                     )}
                   </div>
                 </div>
@@ -2795,9 +2795,9 @@ export default function AdminPage() {
                   {blogPosts.map((bp) => (
                     <div key={bp.id} className="rounded-xl border border-neutral-200 p-2">
                       <div className="font-medium text-sm">{bp.title}</div>
-                      <div className="text-[11px] text-neutral-500">{bp.category_key} • {new Date(bp.created_at).toLocaleString()}</div>
+                      <div className="text-[11px] text-neutral-500">{bp.category} • {new Date(bp.created_at).toLocaleString()}</div>
                       <div className="mt-1 flex items-center gap-2">
-                        <button onClick={() => setBlogDraft({ id: bp.id, category_key: bp.category_key, title: bp.title, content: bp.content })} className="btn btn-secondary text-xs">Edit</button>
+                        <button onClick={() => setBlogDraft({ id: bp.id, category: bp.category, title: bp.title, content: bp.content })} className="btn btn-secondary text-xs">Edit</button>
                         <button onClick={async () => { const { error } = await deleteBlogPost(bp.id); if (error) setError(error); else { setMessage('Post deleted'); setBlogPosts((arr) => arr.filter((p) => p.id !== bp.id)) } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
                       </div>
                     </div>

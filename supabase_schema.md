@@ -202,3 +202,5 @@ CREATE TABLE public.user_notifications (
   CONSTRAINT user_notifications_pkey PRIMARY KEY (id),
   CONSTRAINT user_notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+
+// ok columns for provider are: id(uuid), name(text), tags(jsonb), rating(numeric), created_at(timestamptz), category(text), published(bool), badges(text[]), phone(text), email(text), website(text), address(text), images(text[]), name_norm(text), owner_user_id(uuid), is_member(bool), description(text), specialties(text[]), social_links(jsonb), business_hours(jsonb), service_areas(text[]), google_maps_url(text), updated_at(timestamptz), is_featured(bool), featured_since(timestamptz), subscription_type(text), bonita_resident_discount(text), booking_enabled(bool), booking_type(text), booking_instructions(text), booking_url(text) //
