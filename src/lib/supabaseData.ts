@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 export type DbProvider = {
   id: string
   name: string
-  category_key: string
+  category: string // FIXED: Real database uses 'category' not 'category_key'
   tags?: string[] | null
   rating?: number | null
   phone?: string | null
@@ -29,10 +29,8 @@ export type DbProvider = {
   member?: boolean | number | string | null
   is_featured?: boolean | number | string | null
   featured?: boolean | number | string | null
-  paid?: boolean | number | string | null
-  plan?: string | null
-  tier?: string | null
-  // MISSING FIELDS - ADD THESE:
+  // REMOVED: paid, plan, tier - These columns don't exist in the real database
+  // Using existing subscription_type, is_member, is_featured fields instead
   featured_since?: string | null
   subscription_type?: 'monthly' | 'yearly' | null
   // Booking system fields
@@ -63,7 +61,7 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
 
 export type BlogPost = {
   id: string
-  category_key: string
+  category_key: string // NOTE: Blog posts table uses category_key, providers table uses category
   title: string
   content: string
   created_at: string
