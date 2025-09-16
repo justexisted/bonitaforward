@@ -513,7 +513,7 @@ export default function AdminPage() {
 
   const isAdmin = adminStatus.isAdmin
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
-  const [section, setSection] = useState<'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'providers' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
+  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
 
   useEffect(() => {
     let cancelled = false
@@ -809,7 +809,7 @@ export default function AdminPage() {
     } catch (err) {
       console.error('[Admin] Connection test failed:', err)
     }
-    
+
     // CRITICAL FIX: Add timeout to prevent infinite loading state
     // This ensures the loading state is always reset even if the request hangs
     const timeoutId = setTimeout(() => {
