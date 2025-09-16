@@ -1766,7 +1766,6 @@ async function loadProvidersFromSheet(): Promise<void> {
 async function loadProvidersFromSupabase(): Promise<boolean> {
   const rows = await fetchProvidersFromSupabase()
   if (!rows || rows.length === 0) return false
-  const previous = providersByCategory
   const grouped: Record<CategoryKey, Provider[]> = {
     'real-estate': [],
     'home-services': [],
