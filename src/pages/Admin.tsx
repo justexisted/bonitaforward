@@ -950,7 +950,7 @@ export default function AdminPage() {
       // CRITICAL FIX: Always clear both timeouts and reset loading state
       // This ensures the UI never gets stuck in loading state
       clearTimeout(timeoutId)
-      clearTimeout(backupTimeoutId)
+      // clearTimeout(backupTimeoutId)
       setSavingProvider(false)
     }
   }
