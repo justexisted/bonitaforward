@@ -36,9 +36,8 @@ type ProviderRow = {
   is_featured?: boolean | null
   featured_since?: string | null
   subscription_type?: string | null // 'monthly' or 'yearly'
-  // REMOVED: plan?: string | null - This column doesn't exist in the database
+  // REMOVED: tier?: string | null - This column doesn't exist in the database
   // Using existing subscription_type, is_member, is_featured fields instead
-  tier?: string | null
   paid?: boolean | null
   // Enhanced business management fields (matching My Business page)
   description?: string | null
@@ -200,7 +199,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -233,7 +232,7 @@ export default function AdminPage() {
       // Refresh providers data
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -525,7 +524,7 @@ export default function AdminPage() {
         // Enhanced providers query with all featured tracking fields
         const provQuery = isAdmin ? supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true }) : null
         const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
           fExec,
@@ -750,7 +749,7 @@ export default function AdminPage() {
       try {
         const { data: pData } = await supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
           .order('name', { ascending: true })
         setProviders((pData as ProviderRow[]) || [])
       } catch {}
@@ -824,9 +823,8 @@ export default function AdminPage() {
         is_featured: p.subscription_type ? p.is_featured === true : false,
         featured_since: p.subscription_type ? (p.featured_since || null) : null,
         subscription_type: p.subscription_type || null,
-        // REMOVED: plan: p.plan || null, - This field doesn't exist in database
+        // REMOVED: tier: p.tier || null, - This field doesn't exist in database
         // Using subscription_type instead to track plan (monthly/yearly/free)
-        tier: p.tier || null,
         paid: p.subscription_type ? p.paid === true : false,
         
         // Enhanced business management fields (matching My Business page)
@@ -1088,7 +1086,7 @@ export default function AdminPage() {
     try {
       const { data: pData, error: pErr } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, tier, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, paid, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
         .order('name', { ascending: true })
       if (pErr) {
         setProviders((arr) => arr.filter((p) => p.id !== providerId))
