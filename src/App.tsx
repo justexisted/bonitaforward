@@ -16,6 +16,9 @@ import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
 import SplitText from './components/SplitText'
+import GlareHover from './components/GlareHover'
+import ScrollFloat from './components/ScrollFloat'
+import GradientText from './components/GradientText'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -772,10 +775,15 @@ function Hero() {
       <div className="gradient-overlay"></div>
         <Container>
           <div className="py-10 sm:py-12 text-center">
-          <SplitText text="Discover, Support, and Grow Local Bonita Businesses." />
-            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white" style={{ position: 'relative', zIndex: 2 }}>
-              Discover, Support, and Grow Local Bonita Businesses.
-            </h1>
+            <SplitText 
+            className="text-3xl sm:text-4xl font-semibold tracking-tight text-white relative z-2" 
+            text="Discover, Support, and Grow Local Bonita." 
+            duration={0.1}
+            ease="power3.out"
+            splitType="chars"
+            from={{ opacity: 0, y: 40 }}
+            to={{ opacity: 1, y: 0 }}
+            />
             <p className="mt-3 text-neutral-100" style={{ position: 'relative', zIndex: 2 }}>
               Minimal, modern, and made for our community. Explore top categories and get connected.
             </p>
@@ -1279,6 +1287,17 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
     'professional-services': '💼',
   }
   return (
+    <GlareHover
+      width="auto"
+      height="auto"
+      background="#ffffff"
+      glareColor="#999999"
+      glareOpacity={0.3}
+      glareAngle={-30}
+      glareSize={300}
+      transitionDuration={800}
+      playOnce={false}
+    >
     <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4 elevate">
       <div className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50 text-xl">
@@ -1291,6 +1310,7 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
         <ArrowRight className="ml-auto h-4 w-4 text-neutral-400" />
       </div>
     </Link>
+    </GlareHover>
   )
 }
 
@@ -1305,7 +1325,16 @@ function CommunitySection() {
   return (
     <section className="py-8">
       <Container>
-        <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Community</h2>
+        <ScrollFloat
+          animationDuration={1}
+          ease='back.inOut(2)'
+          scrollStart='center bottom+=50%'
+          scrollEnd='bottom bottom-=40%'
+          stagger={0.03}
+          textClassName="text-xl font-semibold tracking-tight text-neutral-900"
+        >
+          Community
+        </ScrollFloat>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {cards.map((c) => {
             const bgMap: Record<string, string> = {
@@ -1333,7 +1362,13 @@ function CommunitySection() {
                 <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/60 via-neutral-900/20 to-transparent" aria-hidden></div>
                 <div className="relative z-10 p-4 min-h-[160px] flex flex-col justify-between">
                   <div>
-                    <div className="font-medium text-white">{c.title}</div>
+                    <GradientText
+                      colors={["#313672", "#8cd884", "#ffe3c6", "#fcddff", "#914471"]}
+                      animationSpeed={6}
+                      showBorder={false}
+                      className="animated-gradient-text font-medium"
+                    >{c.title}
+                    </GradientText>
                     <div className="text-sm text-neutral-100 mt-1">{c.excerpt}</div>
                   </div>
                   <span className="mt-3 inline-block text-sm px-2 py-2 text-center full-w-bg self-center" style={{ color: 'white' }}>Read more</span>
