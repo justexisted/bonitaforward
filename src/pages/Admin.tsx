@@ -813,11 +813,11 @@ export default function AdminPage() {
     
     // ADDITIONAL SAFETY: Add a backup timeout that runs regardless of the main timeout
     // This provides a failsafe in case the main timeout doesn't work as expected
-    const backupTimeoutId = setTimeout(() => {
+    /* const backupTimeoutId = setTimeout(() => {
       console.error('[Admin] Backup timeout triggered - forcing loading state reset')
       setSavingProvider(false)
       setError('Save operation failed. Please refresh the page and try again.')
-    }, 15000) // 15 second backup timeout (reduced since we removed connection test)
+    }, 15000) // 15 second backup timeout (reduced since we removed connection test) */
     
     try {
       console.log('[Admin] Saving provider:', p.id, 'with data:', p)
