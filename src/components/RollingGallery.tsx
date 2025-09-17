@@ -40,12 +40,12 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const cylinderWidth: number = isScreenSizeSm ? 1100 : 1800;
+  const cylinderWidth: number = isScreenSizeSm ? 1100 : 1300;
   const faceCount: number = galleryImages.length;
-  const faceWidth: number = (cylinderWidth / faceCount) * 1.5;
+  const faceWidth: number = (cylinderWidth / faceCount) * 1.35;
   const radius: number = cylinderWidth / (2 * Math.PI);
 
-  const dragFactor: number = 0.05;
+  const dragFactor: number = 0.005;
   const rotation = useMotionValue(0);
   const controls = useAnimation();
 
@@ -55,7 +55,7 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
     controls.start({
       rotateY: [startAngle, startAngle - 360],
       transition: {
-        duration: 20,
+        duration: 10,
         ease: 'linear',
         repeat: Infinity
       }
@@ -105,23 +105,11 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
   };
 
   return (
-    <div className="relative h-[500px] w-full overflow-hidden">
-      <div
-        className="absolute top-0 left-0 h-full w-[48px] z-10"
-        style={{
-          background: 'linear-gradient(to left, rgba(0,0,0,0) 0%, #060010 100%)'
-        }}
-      />
-      <div
-        className="absolute top-0 right-0 h-full w-[48px] z-10"
-        style={{
-          background: 'linear-gradient(to right, rgba(0,0,0,0) 0%, #060010 100%)'
-        }}
-      />
-      <div className="flex h-full items-center justify-center [perspective:1000px] [transform-style:preserve-3d]">
+    <div className="relative h-[33vh] w-full overflow-hidden">
+      <div className="flex h-full items-center justify-center [perspective:60vh] [transform-style:preserve-3d]">
         <motion.div
           drag="x"
-          dragElastic={0}
+          dragElastic={1}
           onDrag={handleDrag}
           onDragEnd={handleDragEnd}
           onMouseEnter={handleMouseEnter}
