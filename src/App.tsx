@@ -15,6 +15,7 @@ import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
+import NotFoundPage from './pages/NotFound'
 import SplitText from './components/SplitText'
 import GlareHover from './components/GlareHover'
 import ScrollFloat from './components/ScrollFloat'
@@ -3031,6 +3032,7 @@ export default function App() {
             <Route path="category/:id" element={<CategoryPage />} />
             <Route path="provider/:id" element={<ProviderPage />} />
             <Route path="thank-you" element={<ThankYouPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
