@@ -1389,7 +1389,7 @@ function CommunitySection() {
                     img.src = `https://picsum.photos/seed/${c.category_key}-fallback/800/400`
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/60 via-neutral-900/20 to-transparent" aria-hidden></div>
+                <div className="absolute inset-0 bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/60" aria-hidden></div>
                 <div className="relative z-10 p-4 min-h-[160px] flex flex-col justify-between">
                   <div>
                     <GradientText

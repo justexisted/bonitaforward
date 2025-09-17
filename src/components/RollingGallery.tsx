@@ -34,18 +34,19 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
   const galleryImages = images.length > 0 ? images : IMGS;
 
   const [isScreenSizeSm, setIsScreenSizeSm] = useState<boolean>(window.innerWidth <= 640);
+  const [isAutoplayActive, setIsAutoplayActive] = useState<boolean>(autoplay);
   useEffect(() => {
     const handleResize = () => setIsScreenSizeSm(window.innerWidth <= 640);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const cylinderWidth: number = isScreenSizeSm ? 1100 : 1300;
+  const cylinderWidth: number = isScreenSizeSm ? 1100 : 1800;
   const faceCount: number = galleryImages.length;
-  const faceWidth: number = (cylinderWidth / faceCount) * 1.35;
+  const faceWidth: number = (cylinderWidth / faceCount) * 1.5;
   const radius: number = cylinderWidth / (2 * Math.PI);
 
-  const dragFactor: number = 0.005;
+  const dragFactor: number = 0.05;
   const rotation = useMotionValue(0);
   const controls = useAnimation();
 
@@ -55,7 +56,7 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
     controls.start({
       rotateY: [startAngle, startAngle - 360],
       transition: {
-        duration: 10,
+        duration: 20,
         ease: 'linear',
         repeat: Infinity
       }
@@ -63,14 +64,14 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
   };
 
   useEffect(() => {
-    if (autoplay) {
+    if (isAutoplayActive) {
       const currentAngle = rotation.get();
       startInfiniteSpin(currentAngle);
     } else {
       controls.stop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoplay]);
+  }, [isAutoplayActive]);
 
   const handleUpdate = (latest: ResolvedValues) => {
     if (typeof latest.rotateY === 'number') {
@@ -86,26 +87,40 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo): void => {
     const finalAngle = rotation.get() + info.velocity.x * dragFactor;
     rotation.set(finalAngle);
-    if (autoplay) {
+    if (isAutoplayActive) {
       startInfiniteSpin(finalAngle);
     }
   };
 
   const handleMouseEnter = (): void => {
-    if (autoplay && pauseOnHover) {
+    if (isAutoplayActive && pauseOnHover) {
       controls.stop();
     }
   };
 
   const handleMouseLeave = (): void => {
-    if (autoplay && pauseOnHover) {
+    if (isAutoplayActive && pauseOnHover) {
       const currentAngle = rotation.get();
       startInfiniteSpin(currentAngle);
     }
   };
 
+  // Handle click/tap to toggle autoplay
+  const handleClick = (): void => {
+    setIsAutoplayActive(!isAutoplayActive);
+  };
+
   return (
     <div className="relative h-[33vh] w-full overflow-hidden">
+      {/* Autoplay toggle indicator */}
+      <div className="absolute top-2 right-2 z-10">
+        <button
+          onClick={handleClick}
+          className="bg-black/70 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm hover:bg-black/80 transition-colors"
+        >
+          {isAutoplayActive ? '⏸️ Pause' : '▶️ Play'}
+        </button>
+      </div>
       <div className="flex h-full items-center justify-center [perspective:60vh] [transform-style:preserve-3d]">
         <motion.div
           drag="x"
@@ -114,6 +129,7 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
           onDragEnd={handleDragEnd}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
+          onClick={handleClick}
           animate={controls}
           onUpdate={handleUpdate}
           style={{

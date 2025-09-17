@@ -1024,7 +1024,7 @@ export default function AdminPage() {
     } catch (err) {
       console.error('[Admin] Connection test failed:', err)
     }
-
+    
     // CRITICAL FIX: Add timeout to prevent infinite loading state
     // This ensures the loading state is always reset even if the request hangs
     const timeoutId = setTimeout(() => {
@@ -2553,9 +2553,9 @@ export default function AdminPage() {
                                 setProviders((arr) => arr.map(p => 
                                   p.id === editingProvider.id ? {
                                     ...p, 
-                                    subscription_type: newPlan === 'free' ? null : newPlan,
-                                    is_member: newPlan !== 'free',
-                                    is_featured: newPlan !== 'free',
+                                  subscription_type: newPlan === 'free' ? null : newPlan,
+                                  is_member: newPlan !== 'free',
+                                  is_featured: newPlan !== 'free',
                                     featured_since: newPlan !== 'free' ? (p.featured_since || now) : null
                                   } : p
                                 ))
