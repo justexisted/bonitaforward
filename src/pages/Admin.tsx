@@ -145,6 +145,37 @@ export default function AdminPage() {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
   // State for creating new provider
   const [isCreatingNewProvider, setIsCreatingNewProvider] = useState(false)
+  const [newProviderForm, setNewProviderForm] = useState<Partial<ProviderRow>>({
+    name: '',
+    category_key: 'professional-services',
+    tags: [],
+    badges: [],
+    rating: null,
+    phone: null,
+    email: null,
+    website: null,
+    address: null,
+    images: [],
+    owner_user_id: null,
+    is_member: false,
+    is_featured: false,
+    featured_since: null,
+    subscription_type: null,
+    description: null,
+    specialties: null,
+    social_links: null,
+    business_hours: null,
+    service_areas: null,
+    google_maps_url: null,
+    bonita_resident_discount: null,
+    published: true,
+    created_at: null,
+    updated_at: null,
+    booking_enabled: false,
+    booking_type: null,
+    booking_instructions: null,
+    booking_url: null
+  })
   // State for selected section
   const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('providers')
 
@@ -383,6 +414,38 @@ export default function AdminPage() {
     setSelectedProviderId(null) // Clear any selected provider
     setMessage(null)
     setError(null)
+    // Reset form to default values
+    setNewProviderForm({
+      name: '',
+      category_key: 'professional-services',
+      tags: [],
+      badges: [],
+      rating: null,
+      phone: null,
+      email: null,
+      website: null,
+      address: null,
+      images: [],
+      owner_user_id: null,
+      is_member: false,
+      is_featured: false,
+      featured_since: null,
+      subscription_type: null,
+      description: null,
+      specialties: null,
+      social_links: null,
+      business_hours: null,
+      service_areas: null,
+      google_maps_url: null,
+      bonita_resident_discount: null,
+      published: true,
+      created_at: null,
+      updated_at: null,
+      booking_enabled: false,
+      booking_type: null,
+      booking_instructions: null,
+      booking_url: null
+    })
   }
 
   // Function to cancel creating new provider
@@ -391,6 +454,38 @@ export default function AdminPage() {
     setSelectedProviderId(null)
     setMessage(null)
     setError(null)
+    // Reset form to default values
+    setNewProviderForm({
+      name: '',
+      category_key: 'professional-services',
+      tags: [],
+      badges: [],
+      rating: null,
+      phone: null,
+      email: null,
+      website: null,
+      address: null,
+      images: [],
+      owner_user_id: null,
+      is_member: false,
+      is_featured: false,
+      featured_since: null,
+      subscription_type: null,
+      description: null,
+      specialties: null,
+      social_links: null,
+      business_hours: null,
+      service_areas: null,
+      google_maps_url: null,
+      bonita_resident_discount: null,
+      published: true,
+      created_at: null,
+      updated_at: null,
+      booking_enabled: false,
+      booking_type: null,
+      booking_instructions: null,
+      booking_url: null
+    })
   }
 
   function applyFormat(cmd: string, value?: string) {
@@ -2229,40 +2324,8 @@ export default function AdminPage() {
                   </div>
                   {/* Enhanced Provider Edit Form - Matching My Business Page Functionality */}
                   {(() => {
-                    // If creating new provider, use a blank template
+                    // If creating new provider, use the form state
                     if (isCreatingNewProvider) {
-                      const newProviderTemplate: ProviderRow = {
-                        id: 'new', // Temporary ID for new providers
-                        name: '',
-                        category_key: 'professional-services',
-                        tags: [],
-                        badges: [],
-                        rating: null,
-                        phone: null,
-                        email: null,
-                        website: null,
-                        address: null,
-                        images: [],
-                        owner_user_id: null,
-                        is_member: false,
-                        is_featured: false,
-                        featured_since: null,
-                        subscription_type: null,
-                        description: null,
-                        specialties: null,
-                        social_links: null,
-                        business_hours: null,
-                        service_areas: null,
-                        google_maps_url: null,
-                        bonita_resident_discount: null,
-                        published: true,
-                        created_at: null,
-                        updated_at: null,
-                        booking_enabled: false,
-                        booking_type: null,
-                        booking_instructions: null,
-                        booking_url: null
-                      }
                       return (
                         <div className="rounded-xl border border-green-200 p-6 bg-green-50">
                           <div className="flex items-center justify-between mb-6">
@@ -2290,11 +2353,9 @@ export default function AdminPage() {
                                     Business Name *
                                   </label>
                                   <input 
-                                    value={newProviderTemplate.name || ''} 
+                                    value={newProviderForm.name || ''} 
                                     onChange={(e) => {
-                                      newProviderTemplate.name = e.target.value
-                                      // Update the providers array to trigger re-render
-                                      setProviders((arr) => [...arr])
+                                      setNewProviderForm(prev => ({ ...prev, name: e.target.value }))
                                     }} 
                                     className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
                                     placeholder="Enter business name"
@@ -2305,10 +2366,9 @@ export default function AdminPage() {
                                     Category *
                                   </label>
                                   <select 
-                                    value={newProviderTemplate.category_key} 
+                                    value={newProviderForm.category_key || 'professional-services'} 
                                     onChange={(e) => {
-                                      newProviderTemplate.category_key = e.target.value
-                                      setProviders((arr) => [...arr])
+                                      setNewProviderForm(prev => ({ ...prev, category_key: e.target.value }))
                                     }} 
                                     className="w-full rounded-lg border border-green-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
                                   >
@@ -2322,10 +2382,9 @@ export default function AdminPage() {
                                     Phone Number
                                   </label>
                                   <input 
-                                    value={newProviderTemplate.phone || ''} 
+                                    value={newProviderForm.phone || ''} 
                                     onChange={(e) => {
-                                      newProviderTemplate.phone = e.target.value
-                                      setProviders((arr) => [...arr])
+                                      setNewProviderForm(prev => ({ ...prev, phone: e.target.value }))
                                     }} 
                                     className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
                                     placeholder="(619) 123-4567"
@@ -2336,10 +2395,9 @@ export default function AdminPage() {
                                     Email Address
                                   </label>
                                   <input 
-                                    value={newProviderTemplate.email || ''} 
+                                    value={newProviderForm.email || ''} 
                                     onChange={(e) => {
-                                      newProviderTemplate.email = e.target.value
-                                      setProviders((arr) => [...arr])
+                                      setNewProviderForm(prev => ({ ...prev, email: e.target.value }))
                                     }} 
                                     className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
                                     placeholder="business@example.com"
@@ -2350,10 +2408,9 @@ export default function AdminPage() {
                                     Website
                                   </label>
                                   <input 
-                                    value={newProviderTemplate.website || ''} 
+                                    value={newProviderForm.website || ''} 
                                     onChange={(e) => {
-                                      newProviderTemplate.website = e.target.value
-                                      setProviders((arr) => [...arr])
+                                      setNewProviderForm(prev => ({ ...prev, website: e.target.value }))
                                     }} 
                                     className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
                                     placeholder="https://www.example.com"
@@ -2364,10 +2421,9 @@ export default function AdminPage() {
                                     Address
                                   </label>
                                   <input 
-                                    value={newProviderTemplate.address || ''} 
+                                    value={newProviderForm.address || ''} 
                                     onChange={(e) => {
-                                      newProviderTemplate.address = e.target.value
-                                      setProviders((arr) => [...arr])
+                                      setNewProviderForm(prev => ({ ...prev, address: e.target.value }))
                                     }} 
                                     className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
                                     placeholder="123 Main St, Bonita, CA 91902"
@@ -2380,14 +2436,16 @@ export default function AdminPage() {
                             <div>
                               <h4 className="text-md font-medium text-green-800 mb-4">Plan Type</h4>
                               <select 
-                                value={newProviderTemplate.subscription_type || 'free'} 
+                                value={newProviderForm.subscription_type || 'free'} 
                                 onChange={(e) => {
                                   const newPlan = e.target.value
-                                  newProviderTemplate.subscription_type = newPlan === 'free' ? null : newPlan
-                                  newProviderTemplate.is_member = newPlan !== 'free'
-                                  newProviderTemplate.is_featured = newPlan !== 'free'
-                                  newProviderTemplate.featured_since = newPlan !== 'free' ? new Date().toISOString() : null
-                                  setProviders((arr) => [...arr])
+                                  setNewProviderForm(prev => ({
+                                    ...prev,
+                                    subscription_type: newPlan === 'free' ? null : newPlan,
+                                    is_member: newPlan !== 'free',
+                                    is_featured: newPlan !== 'free',
+                                    featured_since: newPlan !== 'free' ? new Date().toISOString() : null
+                                  }))
                                 }}
                                 className="rounded-lg border border-green-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                               >
@@ -2400,8 +2458,42 @@ export default function AdminPage() {
                             {/* Action Buttons */}
                             <div className="flex items-center gap-4 pt-4 border-t border-green-200">
                               <button 
-                                onClick={() => saveProvider(newProviderTemplate)} 
-                                disabled={savingProvider || !newProviderTemplate.name?.trim()}
+                                onClick={() => {
+                                  const providerToSave: ProviderRow = {
+                                    id: 'new',
+                                    name: newProviderForm.name || '',
+                                    category_key: newProviderForm.category_key || 'professional-services',
+                                    tags: newProviderForm.tags || [],
+                                    badges: newProviderForm.badges || [],
+                                    rating: newProviderForm.rating || null,
+                                    phone: newProviderForm.phone || null,
+                                    email: newProviderForm.email || null,
+                                    website: newProviderForm.website || null,
+                                    address: newProviderForm.address || null,
+                                    images: newProviderForm.images || [],
+                                    owner_user_id: newProviderForm.owner_user_id || null,
+                                    is_member: newProviderForm.is_member || false,
+                                    is_featured: newProviderForm.is_featured || false,
+                                    featured_since: newProviderForm.featured_since || null,
+                                    subscription_type: newProviderForm.subscription_type || null,
+                                    description: newProviderForm.description || null,
+                                    specialties: newProviderForm.specialties || null,
+                                    social_links: newProviderForm.social_links || null,
+                                    business_hours: newProviderForm.business_hours || null,
+                                    service_areas: newProviderForm.service_areas || null,
+                                    google_maps_url: newProviderForm.google_maps_url || null,
+                                    bonita_resident_discount: newProviderForm.bonita_resident_discount || null,
+                                    published: newProviderForm.published ?? true,
+                                    created_at: newProviderForm.created_at || null,
+                                    updated_at: newProviderForm.updated_at || null,
+                                    booking_enabled: newProviderForm.booking_enabled || false,
+                                    booking_type: newProviderForm.booking_type || null,
+                                    booking_instructions: newProviderForm.booking_instructions || null,
+                                    booking_url: newProviderForm.booking_url || null
+                                  }
+                                  saveProvider(providerToSave)
+                                }} 
+                                disabled={savingProvider || !newProviderForm.name?.trim()}
                                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                               >
                                 {savingProvider && (
