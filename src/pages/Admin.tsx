@@ -143,6 +143,8 @@ export default function AdminPage() {
   const [retryProvider, setRetryProvider] = useState<ProviderRow | null>(null)
   // State for selected provider being edited
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
+  // State for creating new provider
+  const [isCreatingNewProvider, setIsCreatingNewProvider] = useState(false)
   // State for selected section
   const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('providers')
 
@@ -373,6 +375,22 @@ export default function AdminPage() {
   const clearSavedState = () => {
     localStorage.removeItem('admin-state')
     setSelectedProviderId(null)
+  }
+
+  // Function to start creating a new provider
+  const startCreateNewProvider = () => {
+    setIsCreatingNewProvider(true)
+    setSelectedProviderId(null) // Clear any selected provider
+    setMessage(null)
+    setError(null)
+  }
+
+  // Function to cancel creating new provider
+  const cancelCreateProvider = () => {
+    setIsCreatingNewProvider(false)
+    setSelectedProviderId(null)
+    setMessage(null)
+    setError(null)
   }
 
   function applyFormat(cmd: string, value?: string) {
@@ -838,6 +856,64 @@ export default function AdminPage() {
     setMessage(null)
     setError(null)
     setSavingProvider(true)
+
+    // Check if this is a new provider being created
+    if (p.id === 'new') {
+      // Create new provider logic
+      try {
+        // Validate required fields
+        if (!p.name?.trim()) {
+          setError('Business name is required')
+          setSavingProvider(false)
+          return
+        }
+
+        // Check if session is still valid
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          setError('Session expired. Please refresh the page and try again.')
+          setSavingProvider(false)
+          return
+        }
+
+        // Create the provider (remove the temporary 'new' id)
+        const { id, ...providerData } = p
+        const { error } = await supabase
+          .from('providers')
+          .insert([{
+            ...providerData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }])
+
+        if (error) {
+          console.error('[Admin] Error creating provider:', error)
+          setError(`Failed to create provider: ${error.message}`)
+          setSavingProvider(false)
+          return
+        }
+
+        setMessage('New provider created successfully!')
+        
+        // Refresh providers data
+        const { data: pData } = await supabase
+          .from('providers')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .order('name', { ascending: true })
+        setProviders((pData as ProviderRow[]) || [])
+        
+        // Exit create mode
+        setIsCreatingNewProvider(false)
+        setSelectedProviderId(null)
+
+      } catch (err: any) {
+        console.error('[Admin] Unexpected error creating provider:', err)
+        setError(`Unexpected error: ${err.message}`)
+      } finally {
+        setSavingProvider(false)
+      }
+      return
+    }
 
     // ADD THIS: Check if session is still valid before saving
     const { data: { session } } = await supabase.auth.getSession()
@@ -2096,7 +2172,26 @@ export default function AdminPage() {
         </div>
         {isAdmin && section === 'providers' && (
           <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
-            <div className="font-medium">Providers (Edit existing)</div>
+            <div className="flex items-center justify-between">
+              <div className="font-medium">Providers Management</div>
+              <div className="flex items-center gap-2">
+                {!isCreatingNewProvider ? (
+                  <button
+                    onClick={startCreateNewProvider}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-medium text-sm"
+                  >
+                    + Create New Provider
+                  </button>
+                ) : (
+                  <button
+                    onClick={cancelCreateProvider}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 font-medium text-sm"
+                  >
+                    Cancel Create
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="mt-2 text-sm">
               {providers.length === 0 && <div className="text-neutral-500">No providers found.</div>}
               {providers.length > 0 && (
@@ -2134,6 +2229,64 @@ export default function AdminPage() {
                   </div>
                   {/* Enhanced Provider Edit Form - Matching My Business Page Functionality */}
                   {(() => {
+                    // If creating new provider, use a blank template
+                    if (isCreatingNewProvider) {
+                      const newProviderTemplate: ProviderRow = {
+                        id: 'new', // Temporary ID for new providers
+                        name: '',
+                        category_key: 'professional-services',
+                        tags: [],
+                        badges: [],
+                        rating: null,
+                        phone: null,
+                        email: null,
+                        website: null,
+                        address: null,
+                        images: [],
+                        owner_user_id: null,
+                        is_member: false,
+                        is_featured: false,
+                        featured_since: null,
+                        subscription_type: null,
+                        description: null,
+                        specialties: null,
+                        social_links: null,
+                        business_hours: null,
+                        service_areas: null,
+                        google_maps_url: null,
+                        bonita_resident_discount: null,
+                        published: true,
+                        created_at: null,
+                        updated_at: null,
+                        booking_enabled: false,
+                        booking_type: null,
+                        booking_instructions: null,
+                        booking_url: null
+                      }
+                      return (
+                        <div className="rounded-xl border border-green-200 p-6 bg-green-50">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-lg font-semibold text-green-900">Create New Provider</h3>
+                              <p className="text-sm text-green-700 mt-1">Fill out the form below to create a new provider</p>
+                            </div>
+                            <button
+                              onClick={cancelCreateProvider}
+                              className="text-green-600 hover:text-green-800 text-xl"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          {/* Use the existing form but with newProviderTemplate */}
+                          <ProviderEditFormContent 
+                            provider={newProviderTemplate} 
+                            isCreating={true}
+                          />
+                        </div>
+                      )
+                    }
+
+                    // Existing logic for editing
                     const editingProvider = selectedProviderId
                       ? providers.find(p => p.id === selectedProviderId)
                       : providers[0]

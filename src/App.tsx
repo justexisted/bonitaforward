@@ -19,6 +19,7 @@ import SplitText from './components/SplitText'
 import GlareHover from './components/GlareHover'
 import ScrollFloat from './components/ScrollFloat'
 import GradientText from './components/GradientText'
+import RollingGallery from './components/RollingGallery'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -1010,17 +1011,40 @@ function ProviderPage() {
                 {provider.images && provider.images.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 mb-3">Photos</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {provider.images.map((imageUrl, index) => (
-                        <div key={index} className="relative group">
+
+                    {/* Featured accounts get RollingGallery, non-featured get single image */}
+                    {isFeaturedProvider(provider) ? (
+                      // Featured accounts: RollingGallery for multiple images
+                      <RollingGallery 
+                        images={provider.images} 
+                        autoplay={true} 
+                        pauseOnHover={true} 
+                      />
+                    ) : (
+                      // Non-featured accounts: Single image display
+                      <div className="flex justify-center">
+                        <div className="relative group max-w-md">
                           <img
-                            src={imageUrl}
-                            alt={`${provider.name} - Image ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg border border-neutral-200 hover:shadow-md transition-shadow"
+                            src={provider.images[0]}
+                            alt={`${provider.name} - Main Image`}
+                            className="w-full h-64 object-cover rounded-lg border border-neutral-200 hover:shadow-lg transition-shadow"
                           />
+                          {/* Optional: Add a subtle indicator that this is a single image */}
+                          <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-neutral-600">
+                            1 of {provider.images.length}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
+
+                    {/* Optional: Show upgrade message for non-featured accounts with multiple images */}
+                    {!isFeaturedProvider(provider) && provider.images.length > 1 && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          <strong>Upgrade to Featured</strong> to showcase all {provider.images.length} images in an interactive gallery!
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
