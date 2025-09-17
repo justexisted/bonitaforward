@@ -2278,10 +2278,148 @@ export default function AdminPage() {
                             </button>
                           </div>
                           {/* Use the existing form but with newProviderTemplate */}
-                          <ProviderEditFormContent 
-                            provider={newProviderTemplate} 
-                            isCreating={true}
-                          />
+                          {/* The existing form content will be copied here - continuing with the form fields */}
+                          
+                          {/* Core Business Information */}
+                          <div className="space-y-6">
+                            <div>
+                              <h4 className="text-md font-medium text-green-800 mb-4">Core Business Information</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-green-700 mb-1">
+                                    Business Name *
+                                  </label>
+                                  <input 
+                                    value={newProviderTemplate.name || ''} 
+                                    onChange={(e) => {
+                                      newProviderTemplate.name = e.target.value
+                                      // Update the providers array to trigger re-render
+                                      setProviders((arr) => [...arr])
+                                    }} 
+                                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
+                                    placeholder="Enter business name"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-green-700 mb-1">
+                                    Category *
+                                  </label>
+                                  <select 
+                                    value={newProviderTemplate.category_key} 
+                                    onChange={(e) => {
+                                      newProviderTemplate.category_key = e.target.value
+                                      setProviders((arr) => [...arr])
+                                    }} 
+                                    className="w-full rounded-lg border border-green-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                                  >
+                                    {catOptions.map((opt) => (
+                                      <option key={opt.key} value={opt.key}>{opt.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-green-700 mb-1">
+                                    Phone Number
+                                  </label>
+                                  <input 
+                                    value={newProviderTemplate.phone || ''} 
+                                    onChange={(e) => {
+                                      newProviderTemplate.phone = e.target.value
+                                      setProviders((arr) => [...arr])
+                                    }} 
+                                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
+                                    placeholder="(619) 123-4567"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-green-700 mb-1">
+                                    Email Address
+                                  </label>
+                                  <input 
+                                    value={newProviderTemplate.email || ''} 
+                                    onChange={(e) => {
+                                      newProviderTemplate.email = e.target.value
+                                      setProviders((arr) => [...arr])
+                                    }} 
+                                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
+                                    placeholder="business@example.com"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-green-700 mb-1">
+                                    Website
+                                  </label>
+                                  <input 
+                                    value={newProviderTemplate.website || ''} 
+                                    onChange={(e) => {
+                                      newProviderTemplate.website = e.target.value
+                                      setProviders((arr) => [...arr])
+                                    }} 
+                                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
+                                    placeholder="https://www.example.com"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-green-700 mb-1">
+                                    Address
+                                  </label>
+                                  <input 
+                                    value={newProviderTemplate.address || ''} 
+                                    onChange={(e) => {
+                                      newProviderTemplate.address = e.target.value
+                                      setProviders((arr) => [...arr])
+                                    }} 
+                                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
+                                    placeholder="123 Main St, Bonita, CA 91902"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Plan Selection */}
+                            <div>
+                              <h4 className="text-md font-medium text-green-800 mb-4">Plan Type</h4>
+                              <select 
+                                value={newProviderTemplate.subscription_type || 'free'} 
+                                onChange={(e) => {
+                                  const newPlan = e.target.value
+                                  newProviderTemplate.subscription_type = newPlan === 'free' ? null : newPlan
+                                  newProviderTemplate.is_member = newPlan !== 'free'
+                                  newProviderTemplate.is_featured = newPlan !== 'free'
+                                  newProviderTemplate.featured_since = newPlan !== 'free' ? new Date().toISOString() : null
+                                  setProviders((arr) => [...arr])
+                                }}
+                                className="rounded-lg border border-green-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              >
+                                <option value="free">Free Plan</option>
+                                <option value="monthly">Monthly ($100/mo)</option>
+                                <option value="yearly">Yearly ($1000/yr)</option>
+                              </select>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-4 pt-4 border-t border-green-200">
+                              <button 
+                                onClick={() => saveProvider(newProviderTemplate)} 
+                                disabled={savingProvider || !newProviderTemplate.name?.trim()}
+                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                              >
+                                {savingProvider && (
+                                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                )}
+                                {savingProvider ? 'Creating...' : 'Create Provider'}
+                              </button>
+                              <button
+                                onClick={cancelCreateProvider}
+                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 font-medium"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )
                     }
