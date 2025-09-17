@@ -41,12 +41,12 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const cylinderWidth: number = isScreenSizeSm ? 1100 : 1800;
+  const cylinderWidth: number = isScreenSizeSm ? 1300 : 1200;
   const faceCount: number = galleryImages.length;
-  const faceWidth: number = (cylinderWidth / faceCount) * 1.5;
+  const faceWidth: number = (cylinderWidth / faceCount) * 1.4;
   const radius: number = cylinderWidth / (2 * Math.PI);
 
-  const dragFactor: number = 0.05;
+  const dragFactor: number = 0.01;
   const rotation = useMotionValue(0);
   const controls = useAnimation();
 
@@ -121,7 +121,7 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
           {isAutoplayActive ? '⏸️ Pause' : '▶️ Play'}
         </button>
       </div>
-      <div className="flex h-full items-center justify-center [perspective:60vh] [transform-style:preserve-3d]">
+      <div className="flex h-full items-center justify-center sm:[perspective:60vh] md:[perspective:40vh] [transform-style:preserve-3d]">
         <motion.div
           drag="x"
           dragElastic={1}
