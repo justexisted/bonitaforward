@@ -144,7 +144,7 @@ export default function AdminPage() {
   // State for selected provider being edited
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
   // State for selected section
-  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
+  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('providers')
 
   // Filtered providers based on featured status filter
   // This allows admins to easily view all providers, only featured ones, or only non-featured ones
@@ -368,6 +368,12 @@ export default function AdminPage() {
       }))
     }
   }, [section, selectedProviderId])
+
+  // Clear saved state function
+  const clearSavedState = () => {
+    localStorage.removeItem('admin-state')
+    setSelectedProviderId(null)
+  }
 
   function applyFormat(cmd: string, value?: string) {
     try {
@@ -944,6 +950,7 @@ export default function AdminPage() {
         console.log('[Admin] Provider saved successfully')
         setMessage('Provider updated successfully! Changes have been saved to the database.')
         setRetryProvider(null) // Clear retry state on success
+        clearSavedState() // Clear saved state after successful save
         
         // CRITICAL FIX: Refresh admin page provider data immediately after save
         // This ensures the admin page shows the updated data without requiring a page refresh
@@ -2096,26 +2103,15 @@ export default function AdminPage() {
                         const name = e.target.value
                         const match = providers.find((p) => p.name.toLowerCase() === name.toLowerCase())
                         if (match) {
-                          // Move selected to front so the edit card binds to it
-                          setProviders((arr) => {
-                            const sel = arr.find((p) => p.id === match.id)
-                            if (!sel) return arr
-                            return [sel, ...arr.filter((p) => p.id !== match.id)]
-                          })
+                          setSelectedProviderId(match.id)
                         }
                       }}
                       className="rounded-xl border border-neutral-200 px-3 py-2 sm:col-span-2"
                     />
                     <select
+                      value={selectedProviderId || ''}
                       onChange={(e) => {
-                        const id = e.target.value
-                        if (!id) return
-                        // Move selected to front for editing
-                        setProviders((arr) => {
-                          const sel = arr.find((p) => p.id === id)
-                          if (!sel) return arr
-                          return [sel, ...arr.filter((p) => p.id !== id)]
-                        })
+                        setSelectedProviderId(e.target.value || null)
                       }}
                       className="rounded-xl border border-neutral-200 px-3 py-2 bg-white"
                     >
@@ -2131,21 +2127,28 @@ export default function AdminPage() {
                     </datalist>
                   </div>
                   {/* Enhanced Provider Edit Form - Matching My Business Page Functionality */}
-                  {providers[0] && (
+                  {(() => {
+                    const editingProvider = selectedProviderId
+                      ? providers.find(p => p.id === selectedProviderId)
+                      : providers[0]
+                    
+                    if (!editingProvider) return null
+                    
+                    return (
                     <div className="rounded-xl border border-neutral-200 p-6 bg-white">
                       <div className="flex items-center justify-between mb-6">
                         <div>
-                          <h3 className="text-lg font-semibold text-neutral-900">Editing: {providers[0].name}</h3>
+                          <h3 className="text-lg font-semibold text-neutral-900">Editing: {editingProvider.name}</h3>
                           <p className="text-sm text-neutral-600 mt-1">
                             {(() => {
                               // ACCOUNT STATUS DISPLAY: Use subscription_type to determine account status
                               // This ensures the display matches the actual plan system
-                              if (providers[0].subscription_type) {
+                              if (editingProvider.subscription_type) {
                                 return 'Featured Account'
                               }
                               return 'Free Account'
                             })()} • 
-                            Category: {providers[0].category_key}
+                            Category: {editingProvider.category_key}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
@@ -2154,17 +2157,19 @@ export default function AdminPage() {
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-neutral-700">Plan Type:</label>
                             <select 
-                              value={providers[0].subscription_type || 'free'} 
+                              value={editingProvider.subscription_type || 'free'} 
                               onChange={(e) => {
                                 const newPlan = e.target.value
                                 const now = new Date().toISOString()
-                                setProviders((arr) => [{
-                                  ...arr[0], 
-                                  subscription_type: newPlan === 'free' ? null : newPlan,
-                                  is_member: newPlan !== 'free',
-                                  is_featured: newPlan !== 'free',
-                                  featured_since: newPlan !== 'free' ? (arr[0].featured_since || now) : null
-                                }, ...arr.slice(1)])
+                                setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? {
+                                    ...p, 
+                                    subscription_type: newPlan === 'free' ? null : newPlan,
+                                    is_member: newPlan !== 'free',
+                                    is_featured: newPlan !== 'free',
+                                    featured_since: newPlan !== 'free' ? (p.featured_since || now) : null
+                                  } : p
+                                ))
                               }}
                               className="rounded-lg border border-neutral-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-500"
                             >
@@ -2176,17 +2181,17 @@ export default function AdminPage() {
                           
                           {/* PLAN DURATION DISPLAY: Show how long the provider has been on their current plan */}
                           {/* This helps admins track plan duration and billing cycles */}
-                          {providers[0].subscription_type && providers[0].featured_since && (
+                          {editingProvider.subscription_type && editingProvider.featured_since && (
                             <div className="text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded">
-                              Featured since: {new Date(providers[0].featured_since).toLocaleDateString()}
-                              {providers[0].subscription_type && (
+                              Featured since: {new Date(editingProvider.featured_since).toLocaleDateString()}
+                              {editingProvider.subscription_type && (
                                 <span className="ml-1">
-                                  ({providers[0].subscription_type === 'monthly' ? 'Monthly' : 'Yearly'} plan)
+                                  ({editingProvider.subscription_type === 'monthly' ? 'Monthly' : 'Yearly'} plan)
                                 </span>
                               )}
                               {/* DURATION CALCULATOR: Show how long they've been featured */}
                               {(() => {
-                                const startDate = new Date(providers[0].featured_since!)
+                                const startDate = new Date(editingProvider.featured_since!)
                                 const now = new Date()
                                 const diffTime = Math.abs(now.getTime() - startDate.getTime())
                                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -2223,8 +2228,10 @@ export default function AdminPage() {
                                 Business Name *
                               </label>
                               <input 
-                                value={providers[0].name || ''} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], name: e.target.value }, ...arr.slice(1)])} 
+                                value={editingProvider.name || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, name: e.target.value } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="Enter business name"
                               />
@@ -2234,8 +2241,10 @@ export default function AdminPage() {
                                 Category *
                               </label>
                               <select 
-                                value={providers[0].category_key} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], category_key: e.target.value } as any, ...arr.slice(1)])} 
+                                value={editingProvider.category_key} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, category_key: e.target.value } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
                               >
                           {catOptions.map((opt) => (
@@ -2248,8 +2257,10 @@ export default function AdminPage() {
                                 Phone Number
                         </label>
                               <input 
-                                value={providers[0].phone || ''} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], phone: e.target.value }, ...arr.slice(1)])} 
+                                value={editingProvider.phone || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, phone: e.target.value } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="(619) 123-4567"
                               />
@@ -2260,8 +2271,10 @@ export default function AdminPage() {
                                 Email Address
                               </label>
                               <input 
-                                value={providers[0].email || ''} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], email: e.target.value }, ...arr.slice(1)])} 
+                                value={editingProvider.email || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, email: e.target.value } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="business@example.com"
                               />
@@ -2272,8 +2285,10 @@ export default function AdminPage() {
                                 Website
                               </label>
                               <input 
-                                value={providers[0].website || ''} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], website: e.target.value }, ...arr.slice(1)])} 
+                                value={editingProvider.website || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, website: e.target.value } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="https://www.example.com"
                               />
@@ -2284,8 +2299,10 @@ export default function AdminPage() {
                                 Address
                               </label>
                               <input 
-                                value={providers[0].address || ''} 
-                                onChange={(e) => setProviders((arr) => [{ ...arr[0], address: e.target.value }, ...arr.slice(1)])} 
+                                value={editingProvider.address || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, address: e.target.value } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="123 Main St, Bonita, CA 91902"
                               />
@@ -2299,26 +2316,28 @@ export default function AdminPage() {
                             <label className="block text-sm font-medium text-neutral-700 mb-1">
                               Description
                               <span className="text-xs text-neutral-500 ml-2">
-                                ({(providers[0].description?.length || 0)}/{providers[0].is_member ? '500' : '200'} characters)
+                                ({(editingProvider.description?.length || 0)}/{editingProvider.is_member ? '500' : '200'} characters)
                               </span>
                             </label>
                             <textarea
-                              value={providers[0].description || ''}
+                              value={editingProvider.description || ''}
                               onChange={(e) => {
                                 const newDescription = e.target.value
-                                if (!providers[0].is_member && newDescription.length > 200) {
+                                if (!editingProvider.is_member && newDescription.length > 200) {
                                   return
                                 }
-                                setProviders((arr) => [{ ...arr[0], description: newDescription }, ...arr.slice(1)])
+                                setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, description: newDescription } : p
+                                ))
                               }}
                               rows={4}
                               className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                                !providers[0].is_member && (providers[0].description?.length || 0) > 200
+                                !editingProvider.is_member && (editingProvider.description?.length || 0) > 200
                                   ? 'border-red-300 focus:ring-red-500'
                                   : 'border-neutral-300 focus:ring-neutral-500'
                               }`}
                               placeholder="Tell customers about your business..."
-                              maxLength={providers[0].is_member ? 500 : 200}
+                              maxLength={editingProvider.is_member ? 500 : 200}
                             />
                           </div>
                         </div>
@@ -2330,8 +2349,10 @@ export default function AdminPage() {
                               Special Discount for Bonita Residents
                             </label>
                             <input 
-                              value={providers[0].bonita_resident_discount || ''} 
-                              onChange={(e) => setProviders((arr) => [{ ...arr[0], bonita_resident_discount: e.target.value }, ...arr.slice(1)])} 
+                              value={editingProvider.bonita_resident_discount || ''} 
+                              onChange={(e) => setProviders((arr) => arr.map(p => 
+                                p.id === editingProvider.id ? { ...p, bonita_resident_discount: e.target.value } : p
+                              ))} 
                               className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                               placeholder="e.g., 10% off for Bonita residents, Free consultation for locals"
                             />
@@ -2345,8 +2366,10 @@ export default function AdminPage() {
                               Areas You Serve
                             </label>
                             <input 
-                              value={(providers[0].service_areas || []).join(', ')} 
-                              onChange={(e) => setProviders((arr) => [{ ...arr[0], service_areas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} 
+                              value={(editingProvider.service_areas || []).join(', ')} 
+                              onChange={(e) => setProviders((arr) => arr.map(p => 
+                                p.id === editingProvider.id ? { ...p, service_areas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
+                              ))} 
                               className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                               placeholder="Bonita, Chula Vista, San Diego, National City"
                             />
@@ -2354,10 +2377,10 @@ export default function AdminPage() {
                         </div>
 
                         {/* Social Media Links - Featured Only */}
-                        <div className={!providers[0].is_member ? 'opacity-50 pointer-events-none' : ''}>
+                        <div className={!editingProvider.is_member ? 'opacity-50 pointer-events-none' : ''}>
                           <h4 className="text-md font-medium text-neutral-800 mb-4">
                             Social Media Links
-                            {!providers[0].is_member && (
+                            {!editingProvider.is_member && (
                               <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
                             )}
                           </h4>
@@ -2366,27 +2389,31 @@ export default function AdminPage() {
                             <div>
                               <label className="block text-sm font-medium text-neutral-700 mb-1">Facebook</label>
                               <input 
-                                value={providers[0].social_links?.facebook || ''} 
-                                onChange={(e) => setProviders((arr) => [{ 
-                                  ...arr[0], 
-                                  social_links: { ...arr[0].social_links, facebook: e.target.value } 
-                                }, ...arr.slice(1)])} 
+                                value={editingProvider.social_links?.facebook || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { 
+                                    ...p, 
+                                    social_links: { ...p.social_links, facebook: e.target.value } 
+                                  } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="https://facebook.com/yourbusiness"
-                                disabled={!providers[0].is_member}
+                                disabled={!editingProvider.is_member}
                               />
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-neutral-700 mb-1">Instagram</label>
                               <input 
-                                value={providers[0].social_links?.instagram || ''} 
-                                onChange={(e) => setProviders((arr) => [{ 
-                                  ...arr[0], 
-                                  social_links: { ...arr[0].social_links, instagram: e.target.value } 
-                                }, ...arr.slice(1)])} 
+                                value={editingProvider.social_links?.instagram || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { 
+                                    ...p, 
+                                    social_links: { ...p.social_links, instagram: e.target.value } 
+                                  } : p
+                                ))} 
                                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                 placeholder="https://instagram.com/yourbusiness"
-                                disabled={!providers[0].is_member}
+                                disabled={!editingProvider.is_member}
                               />
                             </div>
                           </div>
@@ -2396,19 +2423,19 @@ export default function AdminPage() {
                         <div>
                           <h4 className="text-md font-medium text-neutral-800 mb-4">
                             Business Images
-                            {!providers[0].is_member && (
+                            {!editingProvider.is_member && (
                               <span className="text-sm text-amber-600 ml-2">(1 image for free accounts)</span>
                             )}
-                            {providers[0].is_member && (
+                            {editingProvider.is_member && (
                               <span className="text-sm text-green-600 ml-2">(Up to 10 images for featured accounts)</span>
                             )}
                           </h4>
                           
                           {/* Current Images Display */}
-                          {providers[0].images && providers[0].images.length > 0 && (
+                          {editingProvider.images && editingProvider.images.length > 0 && (
                             <div className="mb-4">
                               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {providers[0].images.map((imageUrl, index) => (
+                                {editingProvider.images.map((imageUrl, index) => (
                                   <div key={index} className="relative group">
                                     <img
                                       src={imageUrl}
@@ -2416,7 +2443,7 @@ export default function AdminPage() {
                                       className="w-full h-24 object-cover rounded-lg border border-neutral-200"
                                     />
                                     <button
-                                      onClick={() => removeImage(providers[0].id, imageUrl)}
+                                      onClick={() => removeImage(editingProvider.id, imageUrl)}
                                       className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
                                       title="Remove image"
                                     >
@@ -2436,14 +2463,14 @@ export default function AdminPage() {
                               </label>
                               <input
                                 type="file"
-                                multiple={providers[0].is_member === true}
+                                multiple={editingProvider.is_member === true}
                                 accept="image/*"
-                                onChange={(e) => handleImageUpload(e, providers[0].id)}
+                                onChange={(e) => handleImageUpload(e, editingProvider.id)}
                                 disabled={uploadingImages}
                                 className="w-full text-sm text-neutral-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
                               />
                               <p className="text-xs text-neutral-500 mt-1">
-                                {providers[0].is_member 
+                                {editingProvider.is_member 
                                   ? 'Select multiple images (JPG, PNG, GIF). Max 5MB per image, up to 10 total.'
                                   : 'Select one image (JPG, PNG, GIF). Max 5MB.'
                                 }
@@ -2462,11 +2489,11 @@ export default function AdminPage() {
                             )}
 
                             {/* Image Limit Warning */}
-                            {providers[0].images && providers[0].images.length >= (providers[0].is_member ? 10 : 1) && (
+                            {editingProvider.images && editingProvider.images.length >= (editingProvider.is_member ? 10 : 1) && (
                               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                                 <p className="text-sm text-amber-800">
-                                  <strong>Image limit reached:</strong> {providers[0].is_member ? 'Featured accounts can have up to 10 images.' : 'Free accounts can have 1 image.'} 
-                                  {!providers[0].is_member && ' Upgrade to featured to upload more images.'}
+                                  <strong>Image limit reached:</strong> {editingProvider.is_member ? 'Featured accounts can have up to 10 images.' : 'Free accounts can have 1 image.'} 
+                                  {!editingProvider.is_member && ' Upgrade to featured to upload more images.'}
                                 </p>
                               </div>
                             )}
@@ -2474,15 +2501,15 @@ export default function AdminPage() {
                         </div>
 
                         {/* Booking System - Featured Only */}
-                        <div className={!providers[0].is_member ? 'opacity-50 pointer-events-none' : ''}>
+                        <div className={!editingProvider.is_member ? 'opacity-50 pointer-events-none' : ''}>
                           <h4 className="text-md font-medium text-neutral-800 mb-4">
                             Booking System Configuration
-                            {!providers[0].is_member && (
+                            {!editingProvider.is_member && (
                               <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
                             )}
                           </h4>
                           
-                          {!providers[0].is_member && (
+                          {!editingProvider.is_member && (
                             <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                               <p className="text-sm text-amber-800">
                                 <strong>Upgrade to Featured</strong> to enable online booking and appointment scheduling.
@@ -2496,10 +2523,12 @@ export default function AdminPage() {
                               <label className="flex items-center gap-3">
                                 <input 
                                   type="checkbox" 
-                                  checked={providers[0].booking_enabled === true} 
-                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_enabled: e.target.checked }, ...arr.slice(1)])} 
+                                  checked={editingProvider.booking_enabled === true} 
+                                  onChange={(e) => setProviders((arr) => arr.map(p => 
+                                    p.id === editingProvider.id ? { ...p, booking_enabled: e.target.checked } : p
+                                  ))} 
                                   className="rounded border-neutral-300"
-                                  disabled={!providers[0].is_member}
+                                  disabled={!editingProvider.is_member}
                                 />
                                 <span className="text-sm font-medium text-neutral-700">
                                   Enable Online Booking
@@ -2511,16 +2540,18 @@ export default function AdminPage() {
                             </div>
 
                             {/* Booking Type */}
-                            {providers[0].booking_enabled && (
+                            {editingProvider.booking_enabled && (
                               <div>
                                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                                   Booking Type
                                 </label>
                                 <select 
-                                  value={providers[0].booking_type || ''} 
-                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_type: e.target.value as any || null }, ...arr.slice(1)])} 
+                                  value={editingProvider.booking_type || ''} 
+                                  onChange={(e) => setProviders((arr) => arr.map(p => 
+                                    p.id === editingProvider.id ? { ...p, booking_type: e.target.value as any || null } : p
+                                  ))} 
                                   className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
-                                  disabled={!providers[0].is_member}
+                                  disabled={!editingProvider.is_member}
                                 >
                                   <option value="">Select booking type...</option>
                                   <option value="appointment">Appointment</option>
@@ -2532,18 +2563,20 @@ export default function AdminPage() {
                             )}
 
                             {/* Booking Instructions */}
-                            {providers[0].booking_enabled && (
+                            {editingProvider.booking_enabled && (
                               <div>
                                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                                   Booking Instructions
                                 </label>
                                 <textarea
-                                  value={providers[0].booking_instructions || ''}
-                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_instructions: e.target.value }, ...arr.slice(1)])}
+                                  value={editingProvider.booking_instructions || ''}
+                                  onChange={(e) => setProviders((arr) => arr.map(p => 
+                                    p.id === editingProvider.id ? { ...p, booking_instructions: e.target.value } : p
+                                  ))}
                                   rows={3}
                                   className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
                                   placeholder="e.g., Please call ahead for same-day appointments, Book at least 24 hours in advance, Walk-ins welcome during business hours"
-                                  disabled={!providers[0].is_member}
+                                  disabled={!editingProvider.is_member}
                                 />
                                 <p className="text-xs text-neutral-500 mt-1">
                                   Instructions that will be shown to customers when they try to book
@@ -2552,17 +2585,19 @@ export default function AdminPage() {
                             )}
 
                             {/* External Booking URL */}
-                            {providers[0].booking_enabled && (
+                            {editingProvider.booking_enabled && (
                               <div>
                                 <label className="block text-sm font-medium text-neutral-700 mb-1">
                                   External Booking URL (Optional)
                                 </label>
                                 <input 
-                                  value={providers[0].booking_url || ''} 
-                                  onChange={(e) => setProviders((arr) => [{ ...arr[0], booking_url: e.target.value }, ...arr.slice(1)])} 
+                                  value={editingProvider.booking_url || ''} 
+                                  onChange={(e) => setProviders((arr) => arr.map(p => 
+                                    p.id === editingProvider.id ? { ...p, booking_url: e.target.value } : p
+                                  ))} 
                                   className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                                   placeholder="https://calendly.com/yourbusiness or https://yourbookingplatform.com"
-                                  disabled={!providers[0].is_member}
+                                  disabled={!editingProvider.is_member}
                                 />
                                 <p className="text-xs text-neutral-500 mt-1">
                                   If you use an external booking platform, enter the URL here. Otherwise, customers will see booking instructions.
@@ -2571,16 +2606,16 @@ export default function AdminPage() {
                             )}
 
                             {/* Booking Preview */}
-                            {providers[0].booking_enabled && providers[0].is_member && (
+                            {editingProvider.booking_enabled && editingProvider.is_member && (
                               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <h5 className="text-sm font-medium text-blue-900 mb-2">Booking Preview</h5>
                                 <div className="text-sm text-blue-800">
-                                  <p><strong>Type:</strong> {providers[0].booking_type || 'Not specified'}</p>
-                                  {providers[0].booking_url && (
-                                    <p><strong>External URL:</strong> <a href={providers[0].booking_url} target="_blank" rel="noopener noreferrer" className="underline">{providers[0].booking_url}</a></p>
+                                  <p><strong>Type:</strong> {editingProvider.booking_type || 'Not specified'}</p>
+                                  {editingProvider.booking_url && (
+                                    <p><strong>External URL:</strong> <a href={editingProvider.booking_url} target="_blank" rel="noopener noreferrer" className="underline">{editingProvider.booking_url}</a></p>
                                   )}
-                                  {providers[0].booking_instructions && (
-                                    <p><strong>Instructions:</strong> {providers[0].booking_instructions}</p>
+                                  {editingProvider.booking_instructions && (
+                                    <p><strong>Instructions:</strong> {editingProvider.booking_instructions}</p>
                                   )}
                                 </div>
                               </div>
@@ -2593,8 +2628,10 @@ export default function AdminPage() {
                           <div>
                             <label className="block text-sm font-medium text-neutral-700 mb-1">Tags</label>
                             <input 
-                              value={(providers[0].tags || []).join(', ')} 
-                              onChange={(e) => setProviders((arr) => [{ ...arr[0], tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }, ...arr.slice(1)])} 
+                              value={(editingProvider.tags || []).join(', ')} 
+                              onChange={(e) => setProviders((arr) => arr.map(p => 
+                                p.id === editingProvider.id ? { ...p, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
+                              ))} 
                               className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                               placeholder="professional, reliable, local, certified"
                             />
@@ -2605,7 +2642,7 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between mt-8 pt-6 border-t border-neutral-200">
                         <div className="flex items-center gap-4">
                           <button 
-                            onClick={() => saveProvider(providers[0])} 
+                            onClick={() => saveProvider(editingProvider)} 
                             disabled={savingProvider}
                             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                           >
@@ -2619,15 +2656,15 @@ export default function AdminPage() {
                           </button>
                         <button
                           onClick={() => {
-                            const id = providers[0].id
+                            const id = editingProvider.id
                             if (confirmDeleteProviderId === id) deleteProvider(id)
                             else setConfirmDeleteProviderId(id)
                           }}
                             className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 font-medium"
                         >
-                            {confirmDeleteProviderId === providers[0].id ? 'Confirm Delete' : 'Delete Provider'}
+                          {confirmDeleteProviderId === editingProvider.id ? 'Confirm Delete' : 'Delete Provider'}
                         </button>
-                        {confirmDeleteProviderId === providers[0].id && (
+                        {confirmDeleteProviderId === editingProvider.id && (
                             <button 
                               onClick={() => setConfirmDeleteProviderId(null)} 
                               className="px-4 py-2 text-neutral-500 hover:text-neutral-700 underline"
@@ -2638,7 +2675,7 @@ export default function AdminPage() {
                         </div>
                         
                         <div className="text-sm text-neutral-500">
-                          Last updated: {providers[0].updated_at ? new Date(providers[0].updated_at).toLocaleString() : 'Never'}
+                          Last updated: {editingProvider.updated_at ? new Date(editingProvider.updated_at).toLocaleString() : 'Never'}
                         </div>
                       </div>
                       
@@ -2692,7 +2729,8 @@ export default function AdminPage() {
                         </div>
                       )}
                     </div>
-                  )}
+                    )
+                  })()}
                 </div>
               )}
             </div>
