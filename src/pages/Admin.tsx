@@ -469,6 +469,12 @@ export default function AdminPage() {
         return
       }
 
+      // CRITICAL: Don't verify during auth loading to prevent race conditions
+      if (auth.loading) {
+        console.log('[Admin] Auth still loading, skipping verification')
+        return
+      }
+
       console.log('[Admin] Starting admin verification for:', auth.email)
       setAdminStatus(prev => ({ ...prev, loading: true }))
 

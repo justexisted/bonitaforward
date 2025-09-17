@@ -298,20 +298,27 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // CRITICAL FIX: Only process SIGNED_IN if we haven't already processed it during initialization
-      // This prevents duplicate profile setting and ensures clean authentication flow
+      // AND if the user is not already signed in (prevents duplicate processing)
       if (event === 'SIGNED_IN' && session?.user && initializationComplete) {
         const email = session.user.email
         const meta = session.user.user_metadata || {}
-      const name = meta?.name
-      let role = meta?.role as 'business' | 'community' | undefined
+        const name = meta?.name
+        let role = meta?.role as 'business' | 'community' | undefined
         const userId = session.user.id
+
+        // CRITICAL FIX: Don't process SIGNED_IN if user is already signed in with same email
+        // This prevents the auth state reset when switching tabs
+        if (profileRef.current?.email === email) {
+          console.log('[Auth] User already signed in with same email, ignoring SIGNED_IN event')
+          return
+        }
 
         console.log('User signed in:', { email, userId, metaRole: role })
 
         // CRITICAL FIX: Always fetch role from database for signed in users
         if (userId) {
-        try {
-          const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+          try {
+            const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
             const dbRole = String((prof as any)?.role || '').toLowerCase()
             if (dbRole === 'business' || dbRole === 'community') {
               role = dbRole as 'business' | 'community'
