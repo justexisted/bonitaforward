@@ -35,15 +35,16 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
 
   const [isScreenSizeSm, setIsScreenSizeSm] = useState<boolean>(window.innerWidth <= 640);
   const [isAutoplayActive, setIsAutoplayActive] = useState<boolean>(autoplay);
+  const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
   useEffect(() => {
     const handleResize = () => setIsScreenSizeSm(window.innerWidth <= 640);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const cylinderWidth: number = isScreenSizeSm ? 1300 : 1200;
+  const cylinderWidth: number = isScreenSizeSm ? 1300 : 1500;
   const faceCount: number = galleryImages.length;
-  const faceWidth: number = (cylinderWidth / faceCount) * 1.4;
+  const faceWidth: number = (cylinderWidth / faceCount) * 2;
   const radius: number = cylinderWidth / (2 * Math.PI);
 
   const dragFactor: number = 0.01;
@@ -110,18 +111,39 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
     setIsAutoplayActive(!isAutoplayActive);
   };
 
+  // Handle image hover/touch
+  const handleImageHover = (index: number): void => {
+    setHoveredImageIndex(index);
+    // Calculate the rotation needed to center this image (face it toward user)
+    const targetRotation = -(360 / faceCount) * index;
+    rotation.set(targetRotation);
+  };
+
+  const handleImageLeave = (): void => {
+    setHoveredImageIndex(null);
+    // Resume autoplay rotation if it was active
+    if (isAutoplayActive) {
+      const currentAngle = rotation.get();
+      startInfiniteSpin(currentAngle);
+    }
+  };
+
   return (
-    <div className="relative h-[33vh] w-full overflow-hidden">
-      {/* Autoplay toggle indicator */}
-      <div className="absolute top-2 right-2 z-10">
-        <button
-          onClick={handleClick}
-          className="bg-black/70 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm hover:bg-black/80 transition-colors"
-        >
-          {isAutoplayActive ? '⏸️ Pause' : '▶️ Play'}
-        </button>
-      </div>
-      <div className="flex h-full items-center justify-center sm:[perspective:60vh] md:[perspective:40vh] [transform-style:preserve-3d]">
+    <div className="w-full overflow-hidden">
+      <div className="relative lg:h-[33vh] h-[20vh] w-full overflow-hidden">
+        {/* Autoplay toggle indicator */}
+        <div className="absolute top-2 right-2 z-10">
+          <button
+            onClick={handleClick}
+            className="bg-black/70 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm hover:bg-black/80 transition-colors"
+            style={{
+              display: 'none'
+            }}
+          >
+            {isAutoplayActive ? '⏸️ Pause' : '▶️ Play'}
+          </button>
+        </div>
+        <div className="flex h-full items-center justify-center sm:[perspective:60vh] md:[perspective:40vh] [transform-style:preserve-3d]">
         <motion.div
           drag="x"
           dragElastic={1}
@@ -140,23 +162,35 @@ const RollingGallery: React.FC<RollingGalleryProps> = ({ autoplay = false, pause
           }}
           className="flex min-h-[200px] cursor-grab items-center justify-center [transform-style:preserve-3d]"
         >
-          {galleryImages.map((url, i) => (
-            <div
-              key={i}
-              className="group absolute flex h-fit items-center justify-center p-[8%] [backface-visibility:hidden] md:p-[6%]"
-              style={{
-                width: `${faceWidth}px`,
-                transform: `rotateY(${(360 / faceCount) * i}deg) translateZ(${radius}px)`
-              }}
-            >
-              <img
-                src={url}
-                alt="gallery"
-                className="pointer-events-none h-[120px] w-[300px] rounded-[15px] border-[3px] border-white object-cover transition-transform duration-300 ease-out group-hover:scale-105 sm:h-[100px] sm:w-[220px]"
-              />
-            </div>
-          ))}
+          {galleryImages.map((url, i) => {
+            const isHovered = hoveredImageIndex === i;
+            return (
+              <div
+                key={i}
+                className="group absolute flex h-fit items-center justify-center p-[8%] [backface-visibility:hidden] md:p-[6%]"
+                style={{
+                  width: `${faceWidth}px`,
+                  transform: `rotateY(${(360 / faceCount) * i}deg) translateZ(${isHovered ? radius + 20 : radius}px)`
+                }}
+                onMouseEnter={() => handleImageHover(i)}
+                onMouseLeave={handleImageLeave}
+                onTouchStart={() => handleImageHover(i)}
+                onTouchEnd={handleImageLeave}
+              >
+                <img
+                  src={url}
+                  alt="gallery"
+                  className={`rounded-[15px] border-[3px] border-white object-cover transition-all duration-500 ease-out ${
+                    isHovered 
+                      ? 'h-[150px] w-[350px] scale-105 z-20 shadow-xl ring-2 ring-white/30 sm:h-[100px] sm:w-[220px] sm:scale-100' 
+                      : 'h-[120px] w-[300px] group-hover:scale-105 sm:h-[100px] sm:w-[220px]'
+                  }`}
+                />
+              </div>
+            );
+          })}
         </motion.div>
+        </div>
       </div>
     </div>
   );
