@@ -141,6 +141,10 @@ export default function AdminPage() {
   const [uploadingImages, setUploadingImages] = useState(false)
   // Retry state for failed saves
   const [retryProvider, setRetryProvider] = useState<ProviderRow | null>(null)
+  // State for selected provider being edited
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
+  // State for selected section
+  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
 
   // Filtered providers based on featured status filter
   // This allows admins to easily view all providers, only featured ones, or only non-featured ones
@@ -336,6 +340,35 @@ export default function AdminPage() {
     setBlogDraft((d) => ({ ...d, content: editorRef.current!.innerHTML }))
   }
 
+  // Restore admin state when page loads
+  useEffect(() => {
+    const savedState = localStorage.getItem('admin-state')
+    if (savedState) {
+      try {
+        const { section: savedSection, selectedProviderId: savedProviderId, timestamp } = JSON.parse(savedState)
+        
+        // Only restore if it's recent (within 2 hours)
+        if (Date.now() - timestamp < 2 * 60 * 60 * 1000) {
+          setSection(savedSection)
+          setSelectedProviderId(savedProviderId)
+        }
+      } catch (err) {
+        console.error('Failed to restore admin state:', err)
+      }
+    }
+  }, [])
+
+  // Save admin state when it changes
+  useEffect(() => {
+    if (section === 'providers' && selectedProviderId) {
+      localStorage.setItem('admin-state', JSON.stringify({
+        section: 'providers',
+        selectedProviderId: selectedProviderId,
+        timestamp: Date.now()
+      }))
+    }
+  }, [section, selectedProviderId])
+
   function applyFormat(cmd: string, value?: string) {
     try {
       editorRef.current?.focus()
@@ -513,7 +546,6 @@ export default function AdminPage() {
 
   const isAdmin = adminStatus.isAdmin
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
-  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('business-applications')
 
   useEffect(() => {
     let cancelled = false
