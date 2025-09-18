@@ -358,3 +358,81 @@ body {
   .animate-gradient {
 	animation: gradient 8s linear infinite;
   }
+
+  /* ScrollStack Demo Styles - Clean rounded frame with styled scrollbar */
+  .scroll-stack-container {
+    height: 50vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: linear-gradient(135deg, #ffffff 0%, #e9ecf7 100%);
+    border-radius: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    position: relative;
+    margin: .5rem;
+    
+    /* Custom scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+  }
+
+  .scroll-stack-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scroll-stack-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin: 8px 0;
+  }
+
+  .scroll-stack-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  .scroll-stack-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .scroll-stack-inner {
+    padding: .3vh 2rem 50rem;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .scroll-stack-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: .5rem;
+    width: 100%;
+    max-width: 500px;
+    text-align: center;
+    color: rgb(0, 0, 0);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .scroll-stack-card h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+
+  .stack-img-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 60px;
+    margin-top: .5rem;
+  }
+
+  .stack-img-container svg {
+    width: 2rem;
+    height: 2rem;
+    opacity: 0.8;
+  }

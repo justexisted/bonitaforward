@@ -21,6 +21,8 @@ import GlareHover from './components/GlareHover'
 import ScrollFloat from './components/ScrollFloat'
 import GradientText from './components/GradientText'
 import RollingGallery from './components/RollingGallery'
+import CountUp from './components/CountUp'
+import ScrollStack, { ScrollStackItem } from './components/ScrollStack'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -2507,27 +2509,77 @@ function BusinessPage() {
     <section className="py-8">
       <Container>
         <div className="text-center">
-          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-900">Grow Your Bonita Business With Local Leads</h1>
-          <p className="mt-3 text-neutral-600">Bonita Forward helps you reach thousands of Bonita residents and turns them into paying customers.</p>
+          <SplitText 
+            className="text-3xl sm:text-4xl font-semibold tracking-tight text-black relative z-1" 
+            text="Grow Your Bonita Business!" 
+            duration={0.1}
+            ease="power3.out"
+            splitType="chars"
+            from={{ opacity: 0, y: 40 }}
+            to={{ opacity: 1, y: 0 }}
+          />
+          <p className="mt-3 text-neutral-600">Bonita Forward helps you reach thousands of Bonita, San Diego residents and turns them into paying customers.</p>
           <a href="#apply" className="inline-block mt-5 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Featured</a>
           <div>
             <a href="#how" className="mt-2 inline-block text-sm text-neutral-700 hover:text-neutral-900">See How It Works ↓</a>
           </div>
         </div>
-
-        <div id="how" className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[
-            { title: 'Step 1: Exposure', text: 'Your business gets featured on Bonita Forward — the local hub residents already trust.' },
-            { title: 'Step 2: Customers Find You', text: 'We ask Bonita residents what they want.' },
-            { title: 'Step 3: Growth', text: 'You receive customers weekly — no more chasing, just closing.' },
-          ].map((s) => (
-            <div key={s.title} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-              <div className="font-medium select-none cursor-default">{s.title}</div>
-              <div className="text-sm text-neutral-600 mt-1">{s.text}</div>
+        <ScrollStack>
+          <ScrollStackItem>
+            <h3>Step 1: Exposure</h3>
+            <p>Your business gets featured on Bonita Forward. The local hub residents already trust.</p>
+            <div className="stack-img-container">
+              <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                <circle cx="9" cy="9" r="2"></circle>
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+              </svg>
             </div>
-          ))}
-        </div>
+          </ScrollStackItem>
+          <ScrollStackItem>
+            <h3>Step 2: Customers Find You</h3>
+            <p>We ask Bonita residents what they want.</p>
+            <div className="stack-img-container">
+              <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"></path>
+                <path d="M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z"></path>
+                <path d="M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z"></path>
+                <path d="M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"></path>
+              </svg>
+            </div>
+          </ScrollStackItem>
+          <ScrollStackItem>
+            <h3>Step 3: Growth</h3>
+            <p>You receive local repeat-customers weekly.</p>
+            <div className="stack-img-container">
+              <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2a10 10 0 0 1 8.66 5" />
+                <path d="M20 2v5h-5" />
+                <path d="M22 12a10 10 0 0 1-5 8.66" />
+                <path d="M22 20h-5v-5" />
+                <path d="M12 22a10 10 0 0 1-8.66-5" />
+                <path d="M4 22v-5h5" />
+                <path d="M2 12a10 10 0 0 1 5-8.66" />
+                <path d="M2 4h5v5" />
+              </svg>
+            </div>
 
+          </ScrollStackItem>
+          <ScrollStackItem>
+            <h3>Step 4: Your Business Grows</h3>
+            <p>Locals enjoy discovering your business and you get to enjoy the benefits.</p>
+          </ScrollStackItem>
+          <ScrollStackItem>
+            <h3>Bonita's Economy Grows</h3>
+            <div className="stack-img-container">
+              <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2 L6 10 H9 L4 16 H10 L2 22 H22 L14 16 H20 L15 10 H18 Z" />
+                <path d="M12 22 V16" />
+              </svg>
+            </div>
+          </ScrollStackItem>
+        </ScrollStack>
+        
         <div className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
           <h2 className="text-xl font-semibold tracking-tight">What's a New Customer Worth to You?</h2>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
@@ -2541,7 +2593,16 @@ function BusinessPage() {
             </div>
             <div className="rounded-xl border border-neutral-200 p-3 bg-neutral-50">
               <div className="text-sm text-neutral-600">Estimated Monthly Value</div>
-              <div id="roi" className="text-lg font-semibold">$1,250</div>
+              <div id="roi" className="text-lg font-semibold">
+              <CountUp
+                from={0}
+                to={1250}
+                separator=","
+                direction="up"
+                duration={2}
+                className="count-up-text"
+              />
+              </div>
             </div>
           </div>
           <button
