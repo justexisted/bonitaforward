@@ -61,6 +61,7 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
   const cardsRef = useRef<HTMLElement[]>([]);
   const lastTransformsRef = useRef(new Map<number, any>());
   const isUpdatingRef = useRef(false);
+  
 
   const calculateProgress = useCallback((scrollTop: number, start: number, end: number) => {
     if (scrollTop < start) return 0;
@@ -152,7 +153,6 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
 
       let translateY = 0;
       const isPinned = scrollTop >= pinStart && scrollTop <= pinEnd;
-
       if (isPinned) {
         translateY = scrollTop - cardTop + stackPositionPx + itemStackDistance * i;
       } else if (scrollTop > pinEnd) {
@@ -184,15 +184,23 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
         lastTransformsRef.current.set(i, newTransform);
       }
 
-      if (i === cardsRef.current.length - 1) {
-        const isInView = scrollTop >= pinStart && scrollTop <= pinEnd;
-        if (isInView && !stackCompletedRef.current) {
-          stackCompletedRef.current = true;
-          onStackComplete?.();
-        } else if (!isInView && stackCompletedRef.current) {
-          stackCompletedRef.current = false;
+        if (i === cardsRef.current.length - 1) {
+          const isInView = scrollTop >= pinStart && scrollTop <= pinEnd;
+          if (isInView && !stackCompletedRef.current) {
+            stackCompletedRef.current = true;
+            onStackComplete?.();
+            
+            // ALLOW PAGE SCROLL: Once stacking is complete, allow page to scroll past
+            if (scrollerRef.current) {
+              const container = scrollerRef.current;
+              // Remove the height constraint to allow natural page flow
+              container.style.height = 'auto';
+              container.style.overflow = 'visible';
+            }
+          } else if (!isInView && stackCompletedRef.current) {
+            stackCompletedRef.current = false;
+          }
         }
-      }
     });
 
     isUpdatingRef.current = false;
@@ -334,6 +342,8 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
           scroller.removeEventListener('scroll', handleNativeScroll);
         }
       }
+      
+      
       stackCompletedRef.current = false;
       cardsRef.current = [];
       transformsCache.clear();
