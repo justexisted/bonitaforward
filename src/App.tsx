@@ -744,20 +744,41 @@ function Hero() {
 
   function recompute(q: string) {
     const text = q.trim().toLowerCase()
+    console.log('[Search] Searching for:', text)
     if (!text) { setResults([]); return }
     const all = getAllProviders()
+    console.log('[Search] Total providers loaded:', all.length)
+    
+    // Debug: Show all restaurant providers and their tags
+    const restaurants = all.filter(p => p.category_key === 'restaurants-cafes')
+    console.log('[Search] Restaurant providers:', restaurants.map(p => ({ name: p.name, tags: p.tags })))
+    
     const scored = all
       .map((p) => {
         const name = p.name.toLowerCase()
         const matchName = name.includes(text) ? 2 : 0
         const matchTag = (p.tags || []).some((t) => String(t).toLowerCase().includes(text)) ? 1 : 0
         const match = matchName + matchTag + (p.isMember ? 0.5 : 0)
+        
+        // Debug: Log any restaurant matches
+        if (p.category_key === 'restaurants-cafes' && (matchName > 0 || matchTag > 0)) {
+          console.log('[Search] Restaurant match found:', { 
+            name: p.name, 
+            tags: p.tags, 
+            matchName, 
+            matchTag, 
+            totalMatch: match 
+          })
+        }
+        
         return { p, match }
       })
       .filter((s) => s.match > 0)
       .sort((a, b) => b.match - a.match || (b.p.rating ?? 0) - (a.p.rating ?? 0) || a.p.name.localeCompare(b.p.name))
       .slice(0, 8)
       .map((s) => s.p)
+    
+    console.log('[Search] Final results:', scored.map(p => ({ name: p.name, category: p.category_key })))
     setResults(scored)
   }
 
@@ -1828,6 +1849,15 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       (((r.tags as string[] | null) || []) as string[]),
       (((r.badges as string[] | null) || []) as string[]),
     ].flat().map((s) => String(s).trim()).filter(Boolean)))
+
+    // Debug: Log restaurant providers being loaded
+    if (key === 'restaurants-cafes') {
+      console.log('[Supabase] Loading restaurant:', { 
+        name: r.name, 
+        tags: r.tags, 
+        combinedTags: combinedTags 
+      })
+    }
 
     grouped[key].push({
       id: r.id,
