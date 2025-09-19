@@ -1766,46 +1766,11 @@ function getProviderDetails(p: Provider): ProviderDetails {
 }
 
 let providersByCategory: Record<CategoryKey, Provider[]> = {
-  'real-estate': [
-    { id: 're-1', name: 'Bonita Realty Group', slug: 'bonita-realty-group', category_key: 'real-estate', tags: ['buy', '0-3', 'entry', '2', '3'], rating: 4.9, isMember: true },
-    { id: 're-2', name: 'South Bay Homes', slug: 'south-bay-homes', category_key: 'real-estate', tags: ['buy', '3-6', 'mid', '3', '4+'], rating: 4.8, isMember: true },
-    { id: 're-3', name: 'Vista Property Pros', slug: 'vista-property-pros', category_key: 'real-estate', tags: ['sell', 'now', '750-1200', '3', '4+'], rating: 4.7, isMember: true },
-    { id: 're-4', name: 'Bonita Rentals Co', slug: 'bonita-rentals-co', category_key: 'real-estate', tags: ['rent', 'this-month', 'low', '1', '2'], rating: 4.6 },
-    { id: 're-5', name: 'Canyon Estates', slug: 'canyon-estates', category_key: 'real-estate', tags: ['sell', '60+', '1200+', '4+'], rating: 4.6 },
-    { id: 're-6', name: 'Coastal Keys', slug: 'coastal-keys', category_key: 'real-estate', tags: ['buy', '6+', 'high', '4+'], rating: 4.5 },
-  ],
-  'home-services': [
-    { id: 'hs-1', name: 'GreenLeaf Landscaping', slug: 'greenleaf-landscaping', category_key: 'home-services', tags: ['landscaping', 'asap', 'house', 'low'], rating: 4.9, isMember: true },
-    { id: 'hs-2', name: 'SunBright Solar', slug: 'sunbright-solar', category_key: 'home-services', tags: ['solar', 'this-month', 'house', 'high'], rating: 4.8, isMember: true },
-    { id: 'hs-3', name: 'Sparkle Clean', slug: 'sparkle-clean', category_key: 'home-services', tags: ['cleaning', 'asap', 'condo', 'low'], rating: 4.7, isMember: true },
-    { id: 'hs-4', name: 'Bonita Remodel Co', slug: 'bonita-remodel-co', category_key: 'home-services', tags: ['remodeling', 'flexible', 'house', 'med'], rating: 4.7 },
-    { id: 'hs-5', name: 'CondoCare Pros', slug: 'condocare-pros', category_key: 'home-services', tags: ['cleaning', 'this-month', 'condo', 'med'], rating: 4.6 },
-    { id: 'hs-6', name: 'YardWorks', slug: 'yardworks', category_key: 'home-services', tags: ['landscaping', 'flexible', 'house', 'med'], rating: 4.5 },
-  ],
-  'health-wellness': [
-    { id: 'hw-1', name: 'Bonita Chiro Clinic', slug: 'bonita-chiro-clinic', category_key: 'health-wellness', tags: ['chiro', 'relief', 'this-week', 'one-off'], rating: 4.9, isMember: true },
-    { id: 'hw-2', name: 'Peak Fitness Gym', slug: 'peak-fitness-gym', category_key: 'health-wellness', tags: ['gym', 'fitness', 'this-month', 'membership'], rating: 4.8, isMember: true },
-    { id: 'hw-3', name: 'Glow Salon', slug: 'glow-salon', category_key: 'health-wellness', tags: ['salon', 'beauty', 'this-week', 'one-off'], rating: 4.7, isMember: true },
-    { id: 'hw-4', name: 'Serene Med Spa', slug: 'serene-med-spa', category_key: 'health-wellness', tags: ['medspa', 'beauty', 'later', 'one-off'], rating: 4.7 },
-    { id: 'hw-5', name: 'Core Strength Club', slug: 'core-strength-club', category_key: 'health-wellness', tags: ['gym', 'fitness', 'later', 'membership'], rating: 4.6 },
-    { id: 'hw-6', name: 'Align & Thrive', slug: 'align-thrive', category_key: 'health-wellness', tags: ['chiro', 'relief', 'this-month', 'one-off'], rating: 4.6 },
-  ],
-  'restaurants-cafes': [
-    { id: 'rc-1', name: 'Casa Bonita', slug: 'casa-bonita', category_key: 'restaurants-cafes', tags: ['mexican', 'casual', 'low', 'dine'], rating: 4.8, isMember: true },
-    { id: 'rc-2', name: 'Bamboo Grove', slug: 'bamboo-grove', category_key: 'restaurants-cafes', tags: ['asian', 'date', 'med', 'dine'], rating: 4.7, isMember: true },
-    { id: 'rc-3', name: 'Bluebird Café', slug: 'bluebird-cafe', category_key: 'restaurants-cafes', tags: ['cafes', 'casual', 'low', 'takeout'], rating: 4.7, isMember: true },
-    { id: 'rc-4', name: 'Bonita Grill', slug: 'bonita-grill', category_key: 'restaurants-cafes', tags: ['american', 'family', 'med', 'dine'], rating: 4.6 },
-    { id: 'rc-5', name: 'Salsa Verde', slug: 'salsa-verde', category_key: 'restaurants-cafes', tags: ['mexican', 'family', 'med', 'dine'], rating: 4.6 },
-    { id: 'rc-6', name: 'Noodle Haus', slug: 'noodle-haus', category_key: 'restaurants-cafes', tags: ['asian', 'casual', 'low', 'takeout'], rating: 4.5 },
-  ],
-  'professional-services': [
-    { id: 'ps-1', name: 'Bonita Legal', slug: 'bonita-legal', category_key: 'professional-services', tags: ['attorney', 'advice', 'now', 'med'], rating: 4.9, isMember: true },
-    { id: 'ps-2', name: 'Summit Accounting', slug: 'summit-accounting', category_key: 'professional-services', tags: ['accountant', 'ongoing', 'soon', 'low'], rating: 4.8, isMember: true },
-    { id: 'ps-3', name: 'Citrus Consulting', slug: 'citrus-consulting', category_key: 'professional-services', tags: ['consultant', 'project', 'flex', 'high'], rating: 4.7, isMember: true },
-    { id: 'ps-4', name: 'South Bay Counsel', slug: 'south-bay-counsel', category_key: 'professional-services', tags: ['attorney', 'project', 'now', 'high'], rating: 4.7 },
-    { id: 'ps-5', name: 'Ledger Pros', slug: 'ledger-pros', category_key: 'professional-services', tags: ['accountant', 'advice', 'soon', 'med'], rating: 4.6 },
-    { id: 'ps-6', name: 'Coastline Strategy', slug: 'coastline-strategy', category_key: 'professional-services', tags: ['consultant', 'ongoing', 'flex', 'high'], rating: 4.5 },
-  ],
+  'real-estate': [],
+  'home-services': [],
+  'health-wellness': [],
+  'restaurants-cafes': [],
+  'professional-services': [],
 }
 
 async function loadProvidersFromSheet(): Promise<void> {
