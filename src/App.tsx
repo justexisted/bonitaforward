@@ -1966,6 +1966,58 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
       })
       .map((s) => s.p)
   }
+  
+  // FIXED: Add specific logic for restaurants-cafes category
+  if (category === 'restaurants-cafes') {
+    const values = new Set<string>(Object.values(answers).map(v => v.toLowerCase()))
+    const cuisine = answers['cuisine']?.toLowerCase()
+    const occasion = answers['occasion']?.toLowerCase()
+    const price = answers['price']?.toLowerCase()
+    const service = answers['service']?.toLowerCase()
+    
+    console.log('[Restaurant Filter] Answers:', { cuisine, occasion, price, service })
+    console.log('[Restaurant Filter] All answer values:', Array.from(values))
+    
+    return providers
+      .map((p) => {
+        let score = 0
+        // Strong signals - exact matches get higher scores
+        if (cuisine && p.tags.some(t => t.toLowerCase() === cuisine)) score += 3
+        if (occasion && p.tags.some(t => t.toLowerCase() === occasion)) score += 2
+        if (price && p.tags.some(t => t.toLowerCase() === price)) score += 2
+        if (service && p.tags.some(t => t.toLowerCase() === service)) score += 2
+        
+        // Moderate signals - partial matches
+        p.tags.forEach((t) => { 
+          const tagLower = t.toLowerCase()
+          if (values.has(tagLower)) score += 1
+        })
+        
+        // Debug: Log scoring for restaurants
+        if (score > 0) {
+          console.log('[Restaurant Filter] Scored:', { 
+            name: p.name, 
+            tags: p.tags, 
+            score: score 
+          })
+        }
+        
+        return { p, score }
+      })
+      .sort((a, b) => {
+        // Featured providers first
+        const am = isFeaturedProvider(a.p) ? 1 : 0
+        const bm = isFeaturedProvider(b.p) ? 1 : 0
+        if (bm !== am) return bm - am
+        if (b.score !== a.score) return b.score - a.score
+        const ar = a.p.rating ?? 0
+        const br = b.p.rating ?? 0
+        if (br !== ar) return br - ar
+        return a.p.name.localeCompare(b.p.name)
+      })
+      .map((s) => s.p)
+  }
+  
   const values = new Set<string>(Object.values(answers))
   const withScores = providers.map((p) => {
     const matches = p.tags.reduce((acc, t) => acc + (values.has(t) ? 1 : 0), 0)
