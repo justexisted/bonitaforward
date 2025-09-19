@@ -1063,8 +1063,19 @@ export default function MyBusinessPage() {
                           {listing.description && <p>• <strong>Description:</strong> {listing.description.substring(0, 100)}{listing.description.length > 100 ? '...' : ''}</p>}
                           {listing.tags && listing.tags.length > 0 && <p>• <strong>Tags:</strong> {listing.tags.join(', ')}</p>}
                           {listing.is_member && <p>• <strong>Featured:</strong> Appears at top of search results</p>}
+                          {listing.rating && <p>• <strong>Rating:</strong> {listing.rating}</p>}
                         </div>
                       </div>
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">When Featured - What Community Users See:</h4>
+                        <div className="text-xs text-blue-800 space-y-1">
+                          <p>• <strong>Featured:</strong> Priority placement in search results</p>
+                          <p>• <strong>Enhanced description</strong> Up to 500 characters</p>
+                          <p>• <strong>Social Links:</strong> Allow users to check out your social media</p>
+                          <p>• <strong>Google Maps URL:</strong> Allow users to find your business on Google Maps</p>
+                          <p>• <strong>Bonita Residents Discount:</strong> Create a discount for Bonita residents</p>
+                          <p>• <strong>Multiple images:</strong> Showcase your business</p>
+                          <p>• <strong>Booking Enabled:</strong> Allow customers to book appointments online</p>
+                        </div>
                     </div>
                   </div>
                 </div>

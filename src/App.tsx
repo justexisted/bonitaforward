@@ -1975,22 +1975,63 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
     const price = answers['price']?.toLowerCase()
     const service = answers['service']?.toLowerCase()
     
+    // CUISINE SYNONYMS: Map cuisine selections to related terms
+    const getCuisineSynonyms = (cuisineType: string) => {
+      const synonyms: Record<string, string[]> = {
+        'mexican': ['mexican', 'mexican restaurant', 'tacos', 'taco', 'burrito', 'burritos', 'mexican food', 'tex-mex', 'texmex'],
+        'asian': ['asian', 'asian restaurant', 'chinese', 'japanese', 'thai', 'vietnamese', 'korean', 'indian', 'asian food', 'sushi', 'ramen', 'pho'],
+        'american': ['american', 'american restaurant', 'burger', 'burgers', 'bbq', 'barbecue', 'steak', 'steakhouse', 'american food'],
+        'cafes': ['cafes', 'cafe', 'coffee', 'coffee shop', 'coffeeshop', 'coffeehouse', 'espresso', 'latte', 'cappuccino', 'breakfast', 'brunch'],
+        'italian': ['italian', 'italian restaurant', 'pizza', 'pasta', 'italian food', 'trattoria', 'ristorante'],
+        'mediterranean': ['mediterranean', 'greek', 'middle eastern', 'mediterranean food', 'falafel', 'hummus', 'gyro'],
+        'seafood': ['seafood', 'fish', 'lobster', 'crab', 'shrimp', 'oyster', 'seafood restaurant'],
+        'vegetarian': ['vegetarian', 'vegan', 'plant-based', 'vegetarian restaurant', 'vegan restaurant'],
+        'fast food': ['fast food', 'quick service', 'drive-thru', 'fast casual'],
+        'fine dining': ['fine dining', 'upscale', 'gourmet', 'fine restaurant', 'elegant dining']
+      }
+      return synonyms[cuisineType] || [cuisineType]
+    }
+    
+    // Get all related terms for the selected cuisine
+    const cuisineSynonyms = cuisine ? getCuisineSynonyms(cuisine) : []
+    const allCuisineTerms = new Set([...cuisineSynonyms, ...values])
+    
     console.log('[Restaurant Filter] Answers:', { cuisine, occasion, price, service })
+    console.log('[Restaurant Filter] Cuisine synonyms:', cuisineSynonyms)
     console.log('[Restaurant Filter] All answer values:', Array.from(values))
     
     return providers
       .map((p) => {
         let score = 0
-        // Strong signals - exact matches get higher scores
-        if (cuisine && p.tags.some(t => t.toLowerCase() === cuisine)) score += 3
+        
+        // CUISINE MATCHING: Check for exact cuisine match first, then synonyms
+        if (cuisine) {
+          // Exact match gets highest score
+          if (p.tags.some(t => t.toLowerCase() === cuisine)) {
+            score += 4
+          } else {
+            // Check for cuisine synonyms
+            const cuisineMatch = p.tags.some(t => {
+              const tagLower = t.toLowerCase()
+              return cuisineSynonyms.some(synonym => 
+                tagLower === synonym || 
+                tagLower.includes(synonym) || 
+                synonym.includes(tagLower)
+              )
+            })
+            if (cuisineMatch) score += 3
+          }
+        }
+        
+        // OTHER MATCHES: Occasion, price, service
         if (occasion && p.tags.some(t => t.toLowerCase() === occasion)) score += 2
         if (price && p.tags.some(t => t.toLowerCase() === price)) score += 2
         if (service && p.tags.some(t => t.toLowerCase() === service)) score += 2
         
-        // Moderate signals - partial matches
+        // GENERAL TAG MATCHES: Check all answer values and cuisine terms
         p.tags.forEach((t) => { 
           const tagLower = t.toLowerCase()
-          if (values.has(tagLower)) score += 1
+          if (allCuisineTerms.has(tagLower)) score += 1
         })
         
         // Debug: Log scoring for restaurants
