@@ -361,7 +361,7 @@ body {
 
   /* ScrollStack Demo Styles - Clean rounded frame with styled scrollbar */
   .scroll-stack-container {
-    height: 50vh;
+    height: 100vh;
     overflow-y: auto;
     overflow-x: hidden;
     background: linear-gradient(135deg, #ffffff 0%, #e9ecf7 100%);
@@ -397,7 +397,7 @@ body {
   }
 
   .scroll-stack-inner {
-    padding: .3vh 2rem 50rem;
+    padding: .3vh 1rem 6rem;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -415,6 +415,7 @@ body {
     text-align: center;
     color: rgb(0, 0, 0);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+	place-self: anchor-center
   }
 
   .scroll-stack-card h3 {
@@ -435,4 +436,14 @@ body {
     width: 2rem;
     height: 2rem;
     opacity: 0.8;
+  }
+
+  .scroll-through-div {
+	position: relative; /* or fixed, or relative */
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background-color: transparent;
+	pointer-events: none;
   }

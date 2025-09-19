@@ -723,7 +723,7 @@ function Layout() {
     <div className="min-h-full flex flex-col">
       <SupabasePing />
       <Navbar />
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-hidden">
         <Outlet />
       </main>
       <Footer />
@@ -2553,248 +2553,249 @@ function BusinessPage() {
     }
   }, [])
   return (
+    <ScrollStack className="min-w-[100vw]">
     <section className="py-8">
       <Container>
-        <div className="text-center">
-          <SplitText 
-            className="text-3xl sm:text-4xl font-semibold tracking-tight text-black relative z-1" 
-            text="Grow Your Bonita Business!" 
-            duration={0.1}
-            ease="power3.out"
-            splitType="chars"
-            from={{ opacity: 0, y: 40 }}
-            to={{ opacity: 1, y: 0 }}
-          />
-          <p className="mt-3 text-neutral-600">Bonita Forward helps you reach thousands of Bonita, San Diego residents and turns them into paying customers.</p>
-          <a href="#apply" className="inline-block mt-5 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Featured</a>
-          <div>
-            <a href="#how" className="mt-2 inline-block text-sm text-neutral-700 hover:text-neutral-900">See How It Works ↓</a>
-          </div>
-        </div>
-        <ScrollStack>
-          <ScrollStackItem>
-            <h3>Step 1: Exposure</h3>
-            <p>Your business gets featured on Bonita Forward. The local hub residents already trust.</p>
-            <div className="stack-img-container">
-              <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                <circle cx="9" cy="9" r="2"></circle>
-                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-              </svg>
-            </div>
-          </ScrollStackItem>
-          <ScrollStackItem>
-            <h3>Step 2: Customers Find You</h3>
-            <p>We ask Bonita residents what they want.</p>
-            <div className="stack-img-container">
-              <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"></path>
-                <path d="M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z"></path>
-                <path d="M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z"></path>
-                <path d="M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"></path>
-              </svg>
-            </div>
-          </ScrollStackItem>
-          <ScrollStackItem>
-            <h3>Step 3: Growth</h3>
-            <p>You receive local repeat-customers weekly.</p>
-            <div className="stack-img-container">
-              <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2a10 10 0 0 1 8.66 5" />
-                <path d="M20 2v5h-5" />
-                <path d="M22 12a10 10 0 0 1-5 8.66" />
-                <path d="M22 20h-5v-5" />
-                <path d="M12 22a10 10 0 0 1-8.66-5" />
-                <path d="M4 22v-5h5" />
-                <path d="M2 12a10 10 0 0 1 5-8.66" />
-                <path d="M2 4h5v5" />
-              </svg>
-            </div>
-
-          </ScrollStackItem>
-          <ScrollStackItem>
-            <h3>Step 4: Your Business Grows</h3>
-            <p>Locals enjoy discovering your business and you get to enjoy the benefits.</p>
-          </ScrollStackItem>
-          <ScrollStackItem>
-            <h3>Bonita's Economy Grows</h3>
-            <div className="stack-img-container">
-              <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2 L6 10 H9 L4 16 H10 L2 22 H22 L14 16 H20 L15 10 H18 Z" />
-                <path d="M12 22 V16" />
-              </svg>
-            </div>
-          </ScrollStackItem>
-        </ScrollStack>
-        
-        <div className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
-          <h2 className="text-xl font-semibold tracking-tight">What's a New Customer Worth to You?</h2>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <div className="text-center">
+            <SplitText 
+              className="text-3xl sm:text-4xl font-semibold tracking-tight text-black relative z-1" 
+              text="Grow Your Bonita Business!" 
+              duration={0.1}
+              ease="power3.out"
+              splitType="chars"
+              from={{ opacity: 0, y: 40 }}
+              to={{ opacity: 1, y: 0 }}
+            />
+            <p className="mt-3 text-neutral-600">Bonita Forward helps you reach thousands of Bonita, San Diego residents and turns them into paying customers.</p>
+            <a href="#apply" className="inline-block mt-5 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Featured</a>
             <div>
-              <label className="block text-sm text-neutral-600">Avg. Sale Value ($)</label>
-              <input id="avg" type="number" defaultValue={250} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" />
+              <a href="#how" className="mt-2 inline-block text-sm text-neutral-700 hover:text-neutral-900">See How It Works ↓</a>
             </div>
-            <div>
-              <label className="block text-sm text-neutral-600">Monthly New Customers Goal</label>
-              <input id="goal" type="number" defaultValue={5} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" />
-            </div>
-            <div className="rounded-xl border border-neutral-200 p-3 bg-neutral-50">
-              <div className="text-sm text-neutral-600">Estimated Monthly Value</div>
-              <div id="roi" className="text-lg font-semibold">
-              <CountUp
-                from={0}
-                to={1250}
-                separator=","
-                direction="up"
-                duration={2}
-                className="count-up-text"
-              />
+          </div>
+            <ScrollStackItem>
+              <h3>Step 1: Exposure</h3>
+              <p>Your business gets featured on Bonita Forward. The local hub residents already trust.</p>
+              <div className="stack-img-container">
+                <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                  <circle cx="9" cy="9" r="2"></circle>
+                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                </svg>
               </div>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              const avg = Number((document.getElementById('avg') as HTMLInputElement)?.value || 0)
-              const goal = Number((document.getElementById('goal') as HTMLInputElement)?.value || 0)
-              const out = avg * goal
-              const el = document.getElementById('roi')
-              if (el) el.textContent = `$${out.toLocaleString()}`
-            }}
-            className="mt-3 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate"
-          >
-            Get My Free Growth Plan
-          </button>
-        </div>
-
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold tracking-tight">Bonita Businesses Already Growing</h2>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[
-              '"Our real estate leads doubled in 30 days."',
-              '"We had 47 new diners book in the first month."',
-              '"Finally, a marketing solution built for Bonita."',
-            ].map((t) => (
-              <div key={t} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate text-sm text-neutral-700">{t}</div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold tracking-tight">Plans That Fit Your Business</h2>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[
-              { name: 'Starter', price: 'From $750/mo', blurb: 'Restaurants, Gyms, Salons' },
-              { name: 'Growth', price: 'From $1,250/mo', blurb: 'Home Services, Health' },
-              { name: 'Pro', price: 'From $2,000/mo', blurb: 'Real Estate, Attorneys' },
-            ].map((p) => (
-              <div key={p.name} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-                <div className="font-medium">{p.name}</div>
-                <div className="text-2xl font-semibold mt-1">{p.price}</div>
-                <div className="text-sm text-neutral-600 mt-1">{p.blurb}</div>
+            </ScrollStackItem>
+            <ScrollStackItem>
+              <h3>Step 2: Customers Find You</h3>
+              <p>We ask Bonita residents what they want.</p>
+              <div className="stack-img-container">
+                <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"></path>
+                  <path d="M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z"></path>
+                  <path d="M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z"></path>
+                  <path d="M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"></path>
+                </svg>
               </div>
-            ))}
-          </div>
-        </div>
+            </ScrollStackItem>
+            <ScrollStackItem>
+              <h3>Step 3: Growth</h3>
+              <p>You receive local repeat-customers weekly.</p>
+              <div className="stack-img-container">
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2a10 10 0 0 1 8.66 5" />
+                  <path d="M20 2v5h-5" />
+                  <path d="M22 12a10 10 0 0 1-5 8.66" />
+                  <path d="M22 20h-5v-5" />
+                  <path d="M12 22a10 10 0 0 1-8.66-5" />
+                  <path d="M4 22v-5h5" />
+                  <path d="M2 12a10 10 0 0 1 5-8.66" />
+                  <path d="M2 4h5v5" />
+                </svg>
+              </div>
 
-        <div id="apply" className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
-          {!auth.isAuthed || String((auth as any)?.role || '').toLowerCase() !== 'business' ? (
-            <>
-              <h2 className="text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
-              <form
-                className="mt-4 grid grid-cols-1 gap-3"
-                onSubmit={async (e) => {
-                  e.preventDefault()
-                  const form = e.currentTarget as HTMLFormElement
-                  const full_name = (form.elements.item(0) as HTMLInputElement)?.value
-                  const business_name = (form.elements.item(1) as HTMLInputElement)?.value
-                  const email = (form.elements.item(2) as HTMLInputElement)?.value
-                  const phone = (form.elements.item(3) as HTMLInputElement)?.value
-                  // EXTRACT FORM DATA including tier selection
-                  const category = (form.elements.item(4) as HTMLSelectElement)?.value
-                  const tier = (form.querySelector('input[name="tier"]:checked') as HTMLInputElement)?.value || 'free'
-                  const challenge = (form.elements.item(6) as HTMLTextAreaElement)?.value
-                  
-                  // Save form data to localStorage for recovery if needed
-                  try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, tier, challenge, ts: Date.now() })) } catch {}
-                  
-                  // SUBMIT APPLICATION to business_applications table
-                  const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge, tier })
-                  
-                  if (!error) {
-                    // SUCCESS - Show confirmation and redirect to account creation
-                    setMsg(`Thanks! We received your ${tier} listing application. Create an account to track your application status and manage your business listing.`)
-                    form.reset()
-                    
-                    // Pre-fill signup form with business info
-                    try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
-                    
-                    // AUTO-REDIRECT to signup page with business account type pre-selected
-                    setTimeout(() => {
-                      window.location.href = `/signin?mode=signup&email=${encodeURIComponent(email)}&name=${encodeURIComponent(full_name)}&type=business`
-                    }, 3000)
-                  } else {
-                    // ERROR - Show failure message (likely database column missing)
-                    setMsg('We could not submit your application. Please try again.')
-                  }
-                }}
-              >
-                <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={(new URLSearchParams(window.location.search)).get('full_name') || ''} />
-                <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={(new URLSearchParams(window.location.search)).get('business_name') || ''} />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={(new URLSearchParams(window.location.search)).get('email') || ''} />
-                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={(new URLSearchParams(window.location.search)).get('phone') || ''} />
+            </ScrollStackItem>
+            <ScrollStackItem>
+              <h3>Step 4: Your Business Grows</h3>
+              <p>Locals enjoy discovering your business and you get to enjoy the benefits.</p>
+            </ScrollStackItem>
+            <ScrollStackItem>
+              <h3>Bonita's Economy Grows</h3>
+              <div className="stack-img-container">
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2 L6 10 H9 L4 16 H10 L2 22 H22 L14 16 H20 L15 10 H18 Z" />
+                  <path d="M12 22 V16" />
+                </svg>
+              </div>
+            </ScrollStackItem>
+          
+          <div className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade scroll-stack-end">
+            <h2 className="text-xl font-semibold tracking-tight">What's a New Customer Worth to You?</h2>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-sm text-neutral-600">Avg. Sale Value ($)</label>
+                <input id="avg" type="number" defaultValue={250} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" />
+              </div>
+              <div>
+                <label className="block text-sm text-neutral-600">Monthly New Customers Goal</label>
+                <input id="goal" type="number" defaultValue={5} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" />
+              </div>
+              <div className="rounded-xl border border-neutral-200 p-3 bg-neutral-50">
+                <div className="text-sm text-neutral-600">Estimated Monthly Value</div>
+                <div id="roi" className="text-lg font-semibold">
+                <CountUp
+                  from={0}
+                  to={1250}
+                  separator=","
+                  direction="up"
+                  duration={2}
+                  className="count-up-text"
+                />
                 </div>
-                <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={(new URLSearchParams(window.location.search)).get('category') || ''}>
-                  <option value="">Select category…</option>
-                  <option value="Real Estate">Real Estate</option>
-                  <option value="Home Services">Home Services</option>
-                  <option value="Health & Wellness">Health & Wellness</option>
-                  <option value="Restaurants">Restaurants</option>
-                  <option value="Professional Services">Professional Services</option>
-                </select>
-                {/* TIER SELECTION - Free vs Featured Listing */}
-                <div>
-                  <label className="block text-sm text-neutral-600 mb-2">Listing Type</label>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const avg = Number((document.getElementById('avg') as HTMLInputElement)?.value || 0)
+                const goal = Number((document.getElementById('goal') as HTMLInputElement)?.value || 0)
+                const out = avg * goal
+                const el = document.getElementById('roi')
+                if (el) el.textContent = `$${out.toLocaleString()}`
+              }}
+              className="mt-3 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate"
+            >
+              Get My Free Growth Plan
+            </button>
+          </div>
+
+          <div className="mt-10">
+            <h2 className="text-xl font-semibold tracking-tight z-10">Bonita Businesses Already Growing</h2>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                '"Our real estate leads doubled in 30 days."',
+                '"We had 47 new diners book in the first month."',
+                '"Finally, a marketing solution built for Bonita."',
+              ].map((t) => (
+                <div key={t} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate text-sm text-neutral-700">{t}</div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-10">
+            <h2 className="text-xl font-semibold tracking-tight">Plans That Fit Your Business</h2>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { name: 'Starter', price: 'From $750/mo', blurb: 'Restaurants, Gyms, Salons' },
+                { name: 'Growth', price: 'From $1,250/mo', blurb: 'Home Services, Health' },
+                { name: 'Pro', price: 'From $2,000/mo', blurb: 'Real Estate, Attorneys' },
+              ].map((p) => (
+                <div key={p.name} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
+                  <div className="font-medium">{p.name}</div>
+                  <div className="text-2xl font-semibold mt-1">{p.price}</div>
+                  <div className="text-sm text-neutral-600 mt-1">{p.blurb}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div id="apply" className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
+            {!auth.isAuthed || String((auth as any)?.role || '').toLowerCase() !== 'business' ? (
+              <>
+                <h2 className="text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
+                <form
+                  className="mt-4 grid grid-cols-1 gap-3"
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    const form = e.currentTarget as HTMLFormElement
+                    const full_name = (form.elements.item(0) as HTMLInputElement)?.value
+                    const business_name = (form.elements.item(1) as HTMLInputElement)?.value
+                    const email = (form.elements.item(2) as HTMLInputElement)?.value
+                    const phone = (form.elements.item(3) as HTMLInputElement)?.value
+                    // EXTRACT FORM DATA including tier selection
+                    const category = (form.elements.item(4) as HTMLSelectElement)?.value
+                    const tier = (form.querySelector('input[name="tier"]:checked') as HTMLInputElement)?.value || 'free'
+                    const challenge = (form.elements.item(6) as HTMLTextAreaElement)?.value
+                    
+                    // Save form data to localStorage for recovery if needed
+                    try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, tier, challenge, ts: Date.now() })) } catch {}
+                    
+                    // SUBMIT APPLICATION to business_applications table
+                    const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge, tier })
+                    
+                    if (!error) {
+                      // SUCCESS - Show confirmation and redirect to account creation
+                      setMsg(`Thanks! We received your ${tier} listing application. Create an account to track your application status and manage your business listing.`)
+                      form.reset()
+                      
+                      // Pre-fill signup form with business info
+                      try { localStorage.setItem('bf-signup-prefill', JSON.stringify({ name: full_name, email })) } catch {}
+                      
+                      // AUTO-REDIRECT to signup page with business account type pre-selected
+                      setTimeout(() => {
+                        window.location.href = `/signin?mode=signup&email=${encodeURIComponent(email)}&name=${encodeURIComponent(full_name)}&type=business`
+                      }, 3000)
+                    } else {
+                      // ERROR - Show failure message (likely database column missing)
+                      setMsg('We could not submit your application. Please try again.')
+                    }
+                  }}
+                >
+                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={(new URLSearchParams(window.location.search)).get('full_name') || ''} />
+                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={(new URLSearchParams(window.location.search)).get('business_name') || ''} />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* FREE TIER - Basic listing with essential business information */}
-                    <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
-                      <input type="radio" name="tier" value="free" className="mt-1 mr-3" defaultChecked />
-                      <div>
-                        <div className="font-medium text-sm">Free Listing</div>
-                        <div className="text-xs text-neutral-600">Basic business info, contact details, single image</div>
-                      </div>
-                    </label>
-                    {/* FEATURED TIER - Premium listing with enhanced features */}
-                    <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
-                      <input type="radio" name="tier" value="featured" className="mt-1 mr-3" />
-                      <div>
-                        <div className="font-medium text-sm">Featured Listing</div>
-                        <div className="text-xs text-neutral-600">Multiple images, social links, booking system, priority placement</div>
-                      </div>
-                    </label>
+                    <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={(new URLSearchParams(window.location.search)).get('email') || ''} />
+                    <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={(new URLSearchParams(window.location.search)).get('phone') || ''} />
                   </div>
-                </div>
-                <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={(new URLSearchParams(window.location.search)).get('challenge') || ''} />
-                <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Submit Application</button>
-              </form>
-              {msg && <p className="mt-2 text-sm text-neutral-700">{msg}</p>}
-              <p className="mt-2 text-xs text-neutral-500"></p>
-            </>
-          ) : (
-            <>
-              <h2 className="text-xl font-semibold tracking-tight">Create Your Business</h2>
-              <p className="mt-2 text-sm text-neutral-700">You’re signed in as a business. Share your details below to add your business.</p>
-              <CreateBusinessForm />
-            </>
-          )}
-        </div>
+                  <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={(new URLSearchParams(window.location.search)).get('category') || ''}>
+                    <option value="">Select category…</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Home Services">Home Services</option>
+                    <option value="Health & Wellness">Health & Wellness</option>
+                    <option value="Restaurants">Restaurants</option>
+                    <option value="Professional Services">Professional Services</option>
+                  </select>
+                  {/* TIER SELECTION - Free vs Featured Listing */}
+                  <div>
+                    <label className="block text-sm text-neutral-600 mb-2">Listing Type</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* FREE TIER - Basic listing with essential business information */}
+                      <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
+                        <input type="radio" name="tier" value="free" className="mt-1 mr-3" defaultChecked />
+                        <div>
+                          <div className="font-medium text-sm">Free Listing</div>
+                          <div className="text-xs text-neutral-600">Basic business info, contact details, single image</div>
+                        </div>
+                      </label>
+                      {/* FEATURED TIER - Premium listing with enhanced features */}
+                      <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
+                        <input type="radio" name="tier" value="featured" className="mt-1 mr-3" />
+                        <div>
+                          <div className="font-medium text-sm">Featured Listing</div>
+                          <div className="text-xs text-neutral-600">Multiple images, social links, booking system, priority placement</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={(new URLSearchParams(window.location.search)).get('challenge') || ''} />
+                  <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Submit Application</button>
+                </form>
+                {msg && <p className="mt-2 text-sm text-neutral-700">{msg}</p>}
+                <p className="mt-2 text-xs text-neutral-500"></p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-semibold tracking-tight">Create Your Business</h2>
+                <p className="mt-2 text-sm text-neutral-700">You’re signed in as a business. Share your details below to add your business.</p>
+                <CreateBusinessForm />
+              </>
+            )}
+          </div>
 
-        <div className="mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-5 text-center">
-          <h3 className="text-lg font-semibold">Bonita Residents Are Searching. Will They Find You?</h3>
-          <a href="#apply" className="inline-block mt-3 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Started Today</a>
-        </div>
+          <div className="mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-5 text-center">
+            <h3 className="text-lg font-semibold">Bonita Residents Are Searching. Will They Find You?</h3>
+            <a href="#apply" className="inline-block mt-3 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Started Today</a>
+          </div>
+        
       </Container>
     </section>
+    </ScrollStack>
   )
 }
 
