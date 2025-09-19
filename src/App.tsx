@@ -1352,7 +1352,7 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
       transitionDuration={800}
       playOnce={false}
     >
-    <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4 elevate">
+    <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4">
       <div className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50 text-xl">
           <span aria-hidden>{emojiMap[cat.key]}</span>
@@ -1487,7 +1487,7 @@ function HomePage() {
             {categories.slice(0, 4).map((c) => (
               <CategoryCard cat={c} key={c.key} />
             ))}
-            <details className="rounded-2xl p-4 bg-white elevate">
+            <details className="rounded-2xl p-4 bg-white">
               <summary className="cursor-pointer select-none text-sm" style={{ color: '#7070e3' }}>See more</summary>
               <div className="mt-3">
                 {categories.slice(4).map((c) => (
