@@ -33,6 +33,12 @@ const categories: {
   icon: React.ComponentType<{ className?: string }>
 }[] = [
   {
+    key: 'restaurants-cafes',
+    name: 'Restaurants & Cafés',
+    description: 'Local dining spots and trending food experiences around Bonita.',
+    icon: Utensils,
+  },
+  {
     key: 'real-estate',
     name: 'Real Estate',
     description: 'Agents, brokerages, and property managers helping Bonita residents move forward.',
@@ -49,12 +55,6 @@ const categories: {
     name: 'Health & Wellness',
     description: 'Chiropractors, gyms, salons, and med spas to keep Bonita thriving.',
     icon: HeartPulse,
-  },
-  {
-    key: 'restaurants-cafes',
-    name: 'Restaurants & Cafés',
-    description: 'Local dining spots and trending food experiences around Bonita.',
-    icon: Utensils,
   },
   {
     key: 'professional-services',
