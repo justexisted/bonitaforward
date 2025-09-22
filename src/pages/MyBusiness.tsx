@@ -938,57 +938,56 @@ export default function MyBusinessPage() {
               listings.map((listing) => (
                 <div key={listing.id} className="rounded-2xl border border-neutral-100 p-1 bg-white">
                   <div className="flex flex-wrap items-start justify-between">
-                    <div className="flex flex-col gap-2 mx-auto p-[1vh] min-w-[330px]">
-                      {/* Featured Status and Pricing Info */}
-                      {listing.is_member ? (
-                        <div className="text-center">
-                          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 mb-2">
-                            ⭐ Featured Listing
-                          </span>
-                          <p className="text-xs text-neutral-500">Priority placement in search results</p>
-                        </div>
-                      ) : (
-                        <div className="text-center">
-                          <button
-                            onClick={() => upgradeToFeatured(listing.id)}
-                            className="rounded-full bg-yellow-50 text-yellow-700 px-3 py-1.5 text-xs border border-yellow-200 hover:bg-yellow-100 mb-2"
-                          >
-                            Upgrade to Featured
-                          </button>
-                          <p className="text-xs text-neutral-500">
-                            $1/day annually or $1.50/day monthly
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Action Buttons */}
-                      <button
-                        onClick={() => {
-                          console.log('[MyBusiness] Edit button clicked for listing:', listing.id, listing.name)
-                          setEditingListing(listing)
-                        }}
-                        className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200"
-                      >
-                        Edit Details
-                      </button>
-                    </div>
                     <div className="flex-1 flex-wrap">
                       <div className="flex flex-wrap items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold">{listing.name}</h3>
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          listing.is_member 
-                            ? 'bg-yellow-100 text-yellow-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {listing.is_member ? '⭐ Featured' : '📋 Free'}
-                        </span>
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          listing.published 
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {listing.published ? 'Published' : 'Pending Review'}
-                        </span>
+                        <h3 className="text-lg font-semibold pl-[1vh]">{listing.name}</h3>
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            listing.is_member 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {listing.is_member ? '⭐ Featured' : '📋 Free'}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            listing.published 
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {listing.published ? 'Published' : 'Pending Review'}
+                          </span>
+                        <div className="flex flex-row gap-2 mx-auto p-[1vh] min-w-[330px]">
+                          {/* Featured Status and Pricing Info */}
+                          {listing.is_member ? (
+                            <div className="text-center">
+                              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 mb-2">
+                                ⭐ Featured Listing
+                              </span>
+                              <p className="text-xs text-neutral-500">Priority placement in search results</p>
+                            </div>
+                          ) : (
+                            <div className="text-center">
+                              <button
+                                onClick={() => upgradeToFeatured(listing.id)}
+                                className="rounded-full bg-yellow-50 text-yellow-700 px-3 py-1.5 text-xs border border-yellow-200 hover:bg-yellow-100 mb-2"
+                              >
+                                Upgrade to Featured
+                              </button>
+                              <p className="text-xs text-neutral-500">
+                                $1/day annually or $1.50/day monthly
+                              </p>
+                              {/* Action Buttons */}
+                              <button
+                                onClick={() => {
+                                  console.log('[MyBusiness] Edit button clicked for listing:', listing.id, listing.name)
+                                  setEditingListing(listing)
+                                }}
+                                className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200"
+                              >
+                                Edit Details
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
