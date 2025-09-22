@@ -784,10 +784,6 @@ export default function MyBusinessPage() {
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-6xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">My Business</h1>
-          <p className="text-neutral-600">Manage your business listings and applications</p>
-        </div>
 
         {message && (
           <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">

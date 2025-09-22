@@ -39,12 +39,6 @@ const categories: {
     icon: Utensils,
   },
   {
-    key: 'real-estate',
-    name: 'Real Estate',
-    description: 'Agents, brokerages, and property managers helping Bonita residents move forward.',
-    icon: Building2,
-  },
-  {
     key: 'home-services',
     name: 'Home Services',
     description: 'Landscaping, solar, cleaning, and remodeling by trusted local pros.',
@@ -55,6 +49,12 @@ const categories: {
     name: 'Health & Wellness',
     description: 'Chiropractors, gyms, salons, and med spas to keep Bonita thriving.',
     icon: HeartPulse,
+  },
+  {
+    key: 'real-estate',
+    name: 'Real Estate',
+    description: 'Agents, brokerages, and property managers helping Bonita residents move forward.',
+    icon: Building2,
   },
   {
     key: 'professional-services',
@@ -1354,8 +1354,8 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
     >
     <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50 text-xl">
-          <span aria-hidden>{emojiMap[cat.key]}</span>
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50">
+          <span style={{ fontSize: '2.5rem' }} aria-hidden>{emojiMap[cat.key]}</span>
         </span>
       <div>
           <div className="font-medium text-neutral-900">{cat.name}</div>
@@ -2723,9 +2723,8 @@ function BusinessPage() {
             <h2 className="text-xl font-semibold tracking-tight">Plans That Fit Your Business</h2>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { name: 'Starter', price: 'From $750/mo', blurb: 'Restaurants, Gyms, Salons' },
-                { name: 'Growth', price: 'From $1,250/mo', blurb: 'Home Services, Health' },
-                { name: 'Pro', price: 'From $2,000/mo', blurb: 'Real Estate, Attorneys' },
+                { name: 'Starter', price: 'Free', blurb: 'Free Listing' },
+                { name: 'Growth', price: '$97/year', blurb: 'Featured Listing' },
               ].map((p) => (
                 <div key={p.name} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
                   <div className="font-medium">{p.name}</div>
@@ -2808,7 +2807,7 @@ function BusinessPage() {
                       <label className="flex items-start p-3 border border-neutral-200 rounded-xl cursor-pointer hover:bg-neutral-50">
                         <input type="radio" name="tier" value="featured" className="mt-1 mr-3" />
                         <div>
-                          <div className="font-medium text-sm">Featured Listing</div>
+                          <div className="font-medium text-sm">Featured Listing $97/year</div>
                           <div className="text-xs text-neutral-600">Multiple images, social links, booking system, priority placement</div>
                         </div>
                       </label>
