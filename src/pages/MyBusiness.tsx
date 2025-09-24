@@ -924,153 +924,341 @@ export default function MyBusinessPage() {
             </div>
 
             {listings.length === 0 ? (
-              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-                <h3 className="text-lg font-medium text-neutral-900">No Business Listings</h3>
-                <p className="mt-2 text-neutral-600">You don't have any business listings yet. Create your first one to get started!</p>
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  className="mt-4 inline-block rounded-full bg-neutral-900 text-white px-6 py-2"
-                >
-                  Create Your First Listing
-                </button>
+              <div className="rounded-2xl border border-neutral-100 p-6 sm:p-8 bg-white text-center">
+                <div className="max-w-md mx-auto">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-neutral-900 mb-2">No Business Listings</h3>
+                  <p className="text-neutral-600 mb-6">You don't have any business listings yet. Create your first one to get started!</p>
+                  <button
+                    onClick={() => setShowCreateForm(true)}
+                    className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create Your First Listing
+                  </button>
+                </div>
               </div>
             ) : (
               listings.map((listing) => (
-                <div key={listing.id} className="rounded-2xl border border-neutral-100 p-1 bg-white">
-                  <div className="flex flex-wrap items-start justify-between">
-                    <div className="flex-1 flex-wrap">
-                      <div className="flex flex-wrap items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold pl-[1vh]">{listing.name}</h3>
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                <div key={listing.id} className="rounded-2xl border border-neutral-200 p-4 sm:p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+                  <div className="space-y-4">
+                    {/* Header Section */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-neutral-900 mb-2">{listing.name}</h3>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
                             listing.is_member 
                               ? 'bg-yellow-100 text-yellow-800' 
                               : 'bg-green-100 text-green-800'
                           }`}>
                             {listing.is_member ? '⭐ Featured' : '📋 Free'}
                           </span>
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
                             listing.published 
                               ? 'bg-green-100 text-green-800'
                               : 'bg-yellow-100 text-yellow-800'
                           }`}>
                             {listing.published ? 'Published' : 'Pending Review'}
                           </span>
-                        <div className="flex flex-row gap-2 mx-auto p-[1vh] min-w-[330px]">
-                          {/* Featured Status and Pricing Info */}
-                          {listing.is_member ? (
-                            <div className="text-center">
-                              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 mb-2">
-                                ⭐ Featured Listing
-                              </span>
-                              <p className="text-xs text-neutral-500">Priority placement in search results</p>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        {listing.is_member ? (
+                          <div className="text-center sm:text-right">
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 mb-2">
+                              ⭐ Featured Listing
                             </div>
-                          ) : (
-                            <div className="text-center">
-                              <button
-                                onClick={() => upgradeToFeatured(listing.id)}
-                                className="rounded-full bg-yellow-50 text-yellow-700 px-3 py-1.5 text-xs border border-yellow-200 hover:bg-yellow-100 mb-2"
-                              >
-                                Upgrade to Featured
-                              </button>
-                              <p className="text-xs text-neutral-500">
-                                $1/day annually or $1.50/day monthly
-                              </p>
-                              {/* Action Buttons */}
-                              <button
+                            <p className="text-xs text-neutral-500">Priority placement in search results</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button
+                              onClick={() => upgradeToFeatured(listing.id)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-yellow-50 text-yellow-700 text-sm font-medium rounded-lg border border-yellow-200 hover:bg-yellow-100 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                              </svg>
+                              Upgrade to Featured
+                            </button>
+                            <p className="text-xs text-neutral-500 text-center sm:text-right">
+                              $1/day annually or $1.50/day monthly
+                            </p>
+                          </div>
+                        )}
+                        
+                        <button
+                          onClick={() => {
+                            console.log('[MyBusiness] Edit button clicked for listing:', listing.id, listing.name)
+                            setEditingListing(listing)
+                          }}
+                          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-neutral-100 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-200 transition-colors"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit Details
+                        </button>
+                      </div>
+                    </div>
+                      
+                      {/* Business Images Gallery */}
+                      {listing.images && listing.images.length > 0 ? (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-neutral-700 mb-3">Business Images ({listing.images.length})</h4>
+                          {/* Mobile horizontal scroll */}
+                          <div className="sm:hidden overflow-x-auto -mx-4 px-4 mb-4">
+                            <div className="flex gap-3 pb-2" style={{width: 'max-content'}}>
+                              {listing.images.map((imageUrl, index) => (
+                                <div 
+                                  key={index} 
+                                  className="relative group cursor-pointer flex-shrink-0"
+                                  style={{width: '120px'}}
+                                  onClick={() => {
+                                    // Open image in full screen modal
+                                    const modal = document.createElement('div')
+                                    modal.className = 'fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4'
+                                    modal.innerHTML = `
+                                      <div class="relative max-w-4xl max-h-full">
+                                        <button onclick="this.closest('.fixed').remove()" class="absolute top-4 right-4 text-white hover:text-gray-300 z-10">
+                                          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                          </svg>
+                                        </button>
+                                        <img src="${imageUrl}" alt="${listing.name} - Image ${index + 1}" class="max-w-full max-h-full object-contain rounded-lg">
+                                        <div class="absolute bottom-4 left-4 text-white text-sm bg-black bg-opacity-50 px-2 py-1 rounded">
+                                          ${index + 1} of ${listing.images?.length || 0}
+                                        </div>
+                                      </div>
+                                    `
+                                    document.body.appendChild(modal)
+                                    modal.addEventListener('click', (e) => {
+                                      if (e.target === modal) modal.remove()
+                                    })
+                                  }}
+                                >
+                                  <img
+                                    src={imageUrl}
+                                    alt={`${listing.name} - Image ${index + 1}`}
+                                    className="w-full h-20 object-cover rounded-lg border border-neutral-200 hover:shadow-lg transition-all duration-200"
+                                    loading="lazy"
+                                  />
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-lg flex items-center justify-center">
+                                    <svg className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                    </svg>
+                                  </div>
+                                  <div className="absolute top-1 right-1 bg-black bg-opacity-60 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                    {index + 1}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Desktop grid */}
+                          <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                            {listing.images.map((imageUrl, index) => (
+                              <div 
+                                key={index} 
+                                className="relative group cursor-pointer"
                                 onClick={() => {
-                                  console.log('[MyBusiness] Edit button clicked for listing:', listing.id, listing.name)
-                                  setEditingListing(listing)
+                                  // Open image in full screen modal
+                                  const modal = document.createElement('div')
+                                  modal.className = 'fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4'
+                                  modal.innerHTML = `
+                                    <div class="relative max-w-4xl max-h-full">
+                                      <button onclick="this.closest('.fixed').remove()" class="absolute top-4 right-4 text-white hover:text-gray-300 z-10">
+                                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                      </button>
+                                      <img src="${imageUrl}" alt="${listing.name} - Image ${index + 1}" class="max-w-full max-h-full object-contain rounded-lg">
+                                      <div class="absolute bottom-4 left-4 text-white text-sm bg-black bg-opacity-50 px-2 py-1 rounded">
+                                        ${index + 1} of ${listing.images?.length || 0}
+                                      </div>
+                                    </div>
+                                  `
+                                  document.body.appendChild(modal)
+                                  modal.addEventListener('click', (e) => {
+                                    if (e.target === modal) modal.remove()
+                                  })
                                 }}
-                                className="rounded-full bg-neutral-100 text-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-200"
                               >
-                                Edit Details
+                                <img
+                                  src={imageUrl}
+                                  alt={`${listing.name} - Image ${index + 1}`}
+                                  className="w-full h-20 sm:h-24 md:h-28 object-cover rounded-lg border border-neutral-200 hover:shadow-lg transition-all duration-200 hover:scale-105"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-lg flex items-center justify-center">
+                                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                  </svg>
+                                </div>
+                                {/* Image counter badge */}
+                                <div className="absolute top-1 right-1 bg-black bg-opacity-60 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                  {index + 1}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-neutral-500 mt-2">Click any image to view full size</p>
+                        </div>
+                      ) : (
+                        <div className="mt-4">
+                          <div className="border-2 border-dashed border-neutral-300 rounded-xl p-8 text-center bg-neutral-50">
+                            <div className="flex flex-col items-center">
+                              <svg className="w-12 h-12 text-neutral-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <h4 className="text-lg font-medium text-neutral-700 mb-2">Upload Images</h4>
+                              <p className="text-sm text-neutral-500 mb-4 max-w-sm">
+                                Showcase your business with high-quality photos to attract more customers
+                              </p>
+                              <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Upload Images
                               </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Business Information */}
+                    <div className="bg-neutral-50 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-neutral-800 mb-3">Business Information</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-start">
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Category</span>
+                            <span className="text-sm text-neutral-700">{listing.category_key}</span>
+                          </div>
+                          <div className="flex items-start">
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Email</span>
+                            <span className="text-sm text-neutral-700">{listing.email || 'Not provided'}</span>
+                          </div>
+                          <div className="flex items-start">
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Phone</span>
+                            <span className="text-sm text-neutral-700">{listing.phone || 'Not provided'}</span>
+                          </div>
+                          <div className="flex items-start">
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Website</span>
+                            <span className="text-sm text-neutral-700">
+                              {listing.website ? (
+                                <a href={listing.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                  {listing.website}
+                                </a>
+                              ) : 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {listing.address && (
+                            <div className="flex items-start">
+                              <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Address</span>
+                              <span className="text-sm text-neutral-700">{listing.address}</span>
+                            </div>
+                          )}
+                          {listing.tags && listing.tags.length > 0 && (
+                            <div className="flex items-start">
+                              <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Tags</span>
+                              <span className="text-sm text-neutral-700">{listing.tags.join(', ')}</span>
                             </div>
                           )}
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                        <div>
-                          <p className="text-sm text-neutral-600"><strong>Category:</strong> {listing.category_key}</p>
-                          <p className="text-sm text-neutral-600"><strong>Email:</strong> {listing.email || 'Not provided'}</p>
-                          <p className="text-sm text-neutral-600"><strong>Phone:</strong> {listing.phone || 'Not provided'}</p>
-                          <p className="text-sm text-neutral-600"><strong>Website:</strong> {listing.website ? (
-                            <a href={listing.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">
-                              {listing.website}
-                            </a>
-                          ) : 'Not provided'}</p>
-                          {listing.description && (
-                            <p className="text-sm text-neutral-600"><strong>Description:</strong> {listing.description}</p>
-                          )}
-                          {listing.bonita_resident_discount && (
-                            <p className="text-sm text-green-600"><strong>Bonita Residents Discount:</strong> {listing.bonita_resident_discount}</p>
-                          )}
-                        </div>
-                        <div>
-                          {listing.address && (
-                            <p className="text-sm text-neutral-600"><strong>Address:</strong> {listing.address}</p>
-                          )}
-                          {listing.description && (
-                            <p className="text-sm text-neutral-600"><strong>Description:</strong> {listing.description}</p>
-                          )}
-                          {listing.tags && listing.tags.length > 0 && (
-                            <p className="text-sm text-neutral-600"><strong>Tags:</strong> {listing.tags.join(', ')}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Social Links */}
-                      {listing.social_links && Object.keys(listing.social_links).length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm font-medium text-neutral-700 mb-1">Social Media:</p>
-                          <div className="flex gap-2">
-                            {Object.entries(listing.social_links).map(([platform, url]) => (
-                              <a
-                                key={platform}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline text-sm"
-                              >
-                                {platform}
-                              </a>
-                            ))}
+                      {listing.description && (
+                        <div className="mt-4 pt-4 border-t border-neutral-200">
+                          <div className="flex items-start">
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Description</span>
+                            <p className="text-sm text-neutral-700 leading-relaxed">{listing.description}</p>
                           </div>
                         </div>
                       )}
+                      
+                      {listing.bonita_resident_discount && (
+                        <div className="mt-4 pt-4 border-t border-neutral-200">
+                          <div className="flex items-start">
+                            <span className="text-xs font-medium text-green-600 uppercase tracking-wide w-20 flex-shrink-0">Discount</span>
+                            <p className="text-sm text-green-700 font-medium">{listing.bonita_resident_discount}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => deleteBusinessListing(listing.id)}
-                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 text-xs border border-red-200 hover:bg-red-100"
-                      >
-                        Delete
-                      </button>
-
-                      {/* Community Visibility Info */}
-                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                        <h4 className="text-sm font-medium text-blue-900 mb-2">What Community Users See:</h4>
-                        <div className="text-xs text-blue-800 space-y-1">
-                          <p>• <strong>Basic Info:</strong> {listing.name}, {listing.category_key}, {listing.phone}</p>
-                          <p>• <strong>Contact:</strong> {listing.email} {listing.website && `• ${listing.website}`}</p>
-                          {listing.address && <p>• <strong>Location:</strong> {listing.address}</p>}
-                          {listing.description && <p>• <strong>Description:</strong> {listing.description.substring(0, 100)}{listing.description.length > 100 ? '...' : ''}</p>}
-                          {listing.tags && listing.tags.length > 0 && <p>• <strong>Tags:</strong> {listing.tags.join(', ')}</p>}
-                          {listing.is_member && <p>• <strong>Featured:</strong> Appears at top of search results</p>}
-                          {listing.rating && <p>• <strong>Rating:</strong> {listing.rating}</p>}
+                    {/* Social Links */}
+                    {listing.social_links && Object.keys(listing.social_links).length > 0 && (
+                      <div className="bg-neutral-50 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-neutral-800 mb-3">Social Media</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(listing.social_links).map(([platform, url]) => (
+                            <a
+                              key={platform}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-3 py-2 bg-white text-blue-600 text-sm font-medium rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
+                              </svg>
+                              {platform}
+                            </a>
+                          ))}
                         </div>
                       </div>
-                      <h4 className="text-sm font-medium text-blue-900 mb-2">When Featured - What Community Users See:</h4>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-200">
+                      <button
+                        onClick={() => deleteBusinessListing(listing.id)}
+                        className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete Listing
+                      </button>
+                    </div>
+
+                    {/* Community Visibility Info */}
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-3">What Community Users See:</h4>
+                      <div className="text-xs text-blue-800 space-y-1">
+                        <p>• <strong>Basic Info:</strong> {listing.name}, {listing.category_key}, {listing.phone}</p>
+                        <p>• <strong>Contact:</strong> {listing.email} {listing.website && `• ${listing.website}`}</p>
+                        {listing.address && <p>• <strong>Location:</strong> {listing.address}</p>}
+                        {listing.description && <p>• <strong>Description:</strong> {listing.description.substring(0, 100)}{listing.description.length > 100 ? '...' : ''}</p>}
+                        {listing.tags && listing.tags.length > 0 && <p>• <strong>Tags:</strong> {listing.tags.join(', ')}</p>}
+                        {listing.is_member && <p>• <strong>Featured:</strong> Appears at top of search results</p>}
+                        {listing.rating && <p>• <strong>Rating:</strong> {listing.rating}</p>}
+                      </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-blue-200">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-2">When Featured - What Community Users See:</h4>
                         <div className="text-xs text-blue-800 space-y-1">
                           <p>• <strong>Featured:</strong> Priority placement in search results</p>
-                          <p>• <strong>Enhanced description</strong> Up to 500 characters</p>
+                          <p>• <strong>Enhanced description:</strong> Up to 500 characters</p>
                           <p>• <strong>Social Links:</strong> Allow users to check out your social media</p>
                           <p>• <strong>Google Maps URL:</strong> Allow users to find your business on Google Maps</p>
                           <p>• <strong>Bonita Residents Discount:</strong> Create a discount for Bonita residents</p>
                           <p>• <strong>Multiple images:</strong> Showcase your business</p>
                           <p>• <strong>Booking Enabled:</strong> Allow customers to book appointments online</p>
                         </div>
+                      </div>
                     </div>
                   </div>
                 </div>
