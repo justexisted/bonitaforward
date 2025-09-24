@@ -665,6 +665,33 @@ export default function MyBusinessPage() {
     try {
       setMessage('Deleting business listing...')
       
+      // First, delete all related records that have foreign key constraints
+      // Delete provider change requests
+      const { error: changeRequestsError } = await supabase
+        .from('provider_change_requests')
+        .delete()
+        .eq('provider_id', listingId)
+
+      if (changeRequestsError) {
+        console.warn('Error deleting provider change requests:', changeRequestsError)
+        // Continue with deletion even if this fails
+      }
+
+      // Delete provider job posts
+      const { error: jobPostsError } = await supabase
+        .from('provider_job_posts')
+        .delete()
+        .eq('provider_id', listingId)
+
+      if (jobPostsError) {
+        console.warn('Error deleting provider job posts:', jobPostsError)
+        // Continue with deletion even if this fails
+      }
+
+      // Delete any other related records that might exist
+      // (Add more related tables here if they exist)
+
+      // Finally, delete the main provider record
       const { error } = await supabase
         .from('providers')
         .delete()
