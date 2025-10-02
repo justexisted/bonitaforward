@@ -807,9 +807,50 @@ export default function AdminPage() {
           setError((prev) => prev ?? `Failed to load change requests: ${err}`)
         }
         try {
-          const { data: jpData } = await supabase.from('provider_job_posts').select('*').order('created_at', { ascending: false })
-          setJobPosts((jpData as ProviderJobPost[]) || [])
-        } catch {}
+          console.log('[Admin] Loading job posts...')
+          
+          // Try the main query first
+          const { data: jpData, error: jpError } = await supabase
+            .from('provider_job_posts')
+            .select('*')
+            .order('created_at', { ascending: false })
+          
+          console.log('[Admin] Job posts query result:', { error: jpError, data: jpData, count: jpData?.length || 0 })
+          
+          if (jpError) {
+            console.error('[Admin] Job posts query error:', jpError)
+            
+            // Try a simpler query as fallback
+            console.log('[Admin] Trying fallback query...')
+            const { data: fallbackData, error: fallbackError } = await supabase
+              .from('provider_job_posts')
+              .select('id, provider_id, owner_user_id, title, status, created_at')
+              .order('created_at', { ascending: false })
+            
+            console.log('[Admin] Fallback query result:', { error: fallbackError, data: fallbackData })
+            
+            if (fallbackError) {
+              setError(`Failed to load job posts: ${jpError.message} (Fallback also failed: ${fallbackError.message})`)
+            } else {
+              // Use fallback data with minimal fields
+              const minimalJobs = (fallbackData || []).map(job => ({
+                ...job,
+                description: null,
+                apply_url: null,
+                salary_range: null,
+                decided_at: null
+              })) as ProviderJobPost[]
+              setJobPosts(minimalJobs)
+              console.log('[Admin] Using fallback job data:', minimalJobs)
+            }
+          } else {
+            setJobPosts((jpData as ProviderJobPost[]) || [])
+            console.log('[Admin] Job posts loaded successfully:', (jpData as ProviderJobPost[]) || [])
+          }
+        } catch (err: any) {
+          console.error('[Admin] Job posts loading exception:', err)
+          setError(`Failed to load job posts: ${err.message}`)
+        }
       } catch (err: any) {
         console.error('[Admin] unexpected failure', err)
         if (!cancelled) setError(err?.message || 'Failed to load')
@@ -1426,6 +1467,21 @@ export default function AdminPage() {
       setMessage('Job post rejected')
     } catch (err: any) {
       setError(err?.message || 'Failed to reject job post')
+    }
+  }
+
+  async function deleteJobPost(jobId: string) {
+    if (!confirm('Are you sure you want to delete this job post? This action cannot be undone.')) {
+      return
+    }
+
+    setMessage(null)
+    try {
+      await supabase.from('provider_job_posts').delete().eq('id', jobId)
+      setJobPosts((arr) => arr.filter((j) => j.id !== jobId))
+      setMessage('Job post deleted successfully')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete job post')
     }
   }
 
@@ -3192,9 +3248,63 @@ export default function AdminPage() {
         {isAdmin && section === 'job-posts' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Job Posts</div>
+            
+            {/* Debug Info */}
+            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
+              <div className="font-medium text-yellow-800 mb-1">Debug Info:</div>
+              <div className="text-yellow-700">
+                Total jobs: {jobPosts.length} | 
+                Pending: {jobPosts.filter(j => j.status === 'pending').length} | 
+                Approved: {jobPosts.filter(j => j.status === 'approved').length} | 
+                Rejected: {jobPosts.filter(j => j.status === 'rejected').length}
+              </div>
+              {jobPosts.length > 0 && (
+                <div className="mt-1 text-yellow-600">
+                  Statuses: {jobPosts.map(j => j.status).join(', ')}
+                </div>
+              )}
+            </div>
+            
             <div className="mt-2 space-y-2 text-sm">
               {jobPosts.length === 0 && <div className="text-neutral-500">No job posts yet.</div>}
-              {jobPosts.filter((j) => j.status === 'pending').map((j) => (
+              
+              {/* All Jobs - Grouped by Status */}
+              {jobPosts.length > 0 && (
+                <div className="space-y-4">
+                  {/* Pending Jobs */}
+                  {jobPosts.filter((j) => j.status === 'pending').length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-amber-800 mb-2">Pending Review ({jobPosts.filter((j) => j.status === 'pending').length})</h4>
+                      {jobPosts.filter((j) => j.status === 'pending').map((j) => (
+                        <JobCard key={j.id} job={j} onApprove={() => approveJobPost(j)} onReject={() => rejectJobPost(j)} onDelete={() => deleteJobPost(j.id)} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Approved Jobs */}
+                  {jobPosts.filter((j) => j.status === 'approved').length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-green-800 mb-2">Approved ({jobPosts.filter((j) => j.status === 'approved').length})</h4>
+                      {jobPosts.filter((j) => j.status === 'approved').map((j) => (
+                        <JobCard key={j.id} job={j} onApprove={() => approveJobPost(j)} onReject={() => rejectJobPost(j)} onDelete={() => deleteJobPost(j.id)} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Rejected Jobs */}
+                  {jobPosts.filter((j) => j.status === 'rejected').length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-red-800 mb-2">Rejected ({jobPosts.filter((j) => j.status === 'rejected').length})</h4>
+                      {jobPosts.filter((j) => j.status === 'rejected').map((j) => (
+                        <JobCard key={j.id} job={j} onApprove={() => approveJobPost(j)} onReject={() => rejectJobPost(j)} onDelete={() => deleteJobPost(j.id)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Legacy pending jobs display - keeping for now */}
+              {false && jobPosts.filter((j) => j.status === 'pending').map((j) => (
                 <div key={j.id} className="rounded-xl border border-neutral-200 p-3">
                   <div className="flex items-center justify-between">
                     <div className="font-medium">{j.title}</div>
@@ -3310,7 +3420,151 @@ export default function AdminPage() {
   )
 }
 
-// Blog Post Manager UI block will be rendered below the providers section
-// Inserted at bottom of file in the returned JSX above
+// Job Card Component for Admin
+function JobCard({ 
+  job, 
+  onApprove, 
+  onReject, 
+  onDelete 
+}: { 
+  job: ProviderJobPost
+  onApprove: () => void
+  onReject: () => void
+  onDelete: () => void
+}) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'approved': return 'bg-green-100 text-green-800 border-green-200'
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200'
+      default: return 'bg-neutral-100 text-neutral-800 border-neutral-200'
+    }
+  }
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return '⏳'
+      case 'approved': return '✅'
+      case 'rejected': return '❌'
+      default: return '📄'
+    }
+  }
+
+  return (
+    <div className={`rounded-xl border-2 p-4 ${getStatusColor(job.status)}`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">{getStatusIcon(job.status)}</span>
+            <h4 className="font-semibold text-lg">{job.title}</h4>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(job.status)}`}>
+              {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+            </span>
+          </div>
+          <div className="text-sm text-neutral-600">
+            Posted: {new Date(job.created_at).toLocaleString()}
+            {job.decided_at && (
+              <span className="ml-2">
+                | Decided: {new Date(job.decided_at).toLocaleString()}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Job Details */}
+      <div className="space-y-2 mb-4">
+        {job.description && (
+          <div>
+            <span className="text-sm font-medium">Description:</span>
+            <p className="text-sm mt-1 whitespace-pre-wrap">{job.description}</p>
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+          <div>
+            <span className="font-medium">Apply URL:</span>
+            <div className="mt-1">
+              {job.apply_url ? (
+                <a 
+                  href={job.apply_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline break-all"
+                >
+                  {job.apply_url}
+                </a>
+              ) : (
+                <span className="text-neutral-500">Not provided</span>
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <span className="font-medium">Salary Range:</span>
+            <div className="mt-1">
+              {job.salary_range || <span className="text-neutral-500">Not specified</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="text-sm">
+          <span className="font-medium">Provider ID:</span> {job.provider_id}
+        </div>
+        <div className="text-sm">
+          <span className="font-medium">Owner ID:</span> {job.owner_user_id}
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-current border-opacity-20">
+        {job.status === 'pending' && (
+          <>
+            <button
+              onClick={onApprove}
+              className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+            >
+              ✅ Approve
+            </button>
+            <button
+              onClick={onReject}
+              className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              ❌ Reject
+            </button>
+          </>
+        )}
+        
+        {job.status === 'approved' && (
+          <>
+            <button
+              onClick={onReject}
+              className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              ❌ Reject
+            </button>
+          </>
+        )}
+        
+        {job.status === 'rejected' && (
+          <>
+            <button
+              onClick={onApprove}
+              className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+            >
+              ✅ Approve
+            </button>
+          </>
+        )}
+        
+        <button
+          onClick={onDelete}
+          className="px-3 py-1.5 bg-neutral-600 text-white text-sm font-medium rounded-lg hover:bg-neutral-700 transition-colors"
+        >
+          🗑️ Delete
+        </button>
+      </div>
+    </div>
+  )
+}
 

@@ -15,6 +15,7 @@ import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
+import JobsPage from './pages/Jobs'
 import NotFoundPage from './pages/NotFound'
 import SplitText from './components/SplitText'
 import GlareHover from './components/GlareHover'
@@ -642,6 +643,7 @@ function Navbar() {
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/about">About</Link>
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
             <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/community">Community</Link>
+            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/jobs">💼 Jobs</Link>
             {auth.isAuthed && auth.role === 'business' && (
               <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/my-business">My Business</Link>
             )}
@@ -672,6 +674,7 @@ function Navbar() {
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/about">About</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
               <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/community">Community</Link>
+              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/jobs">💼 Jobs</Link>
               {auth.isAuthed && auth.role === 'business' && (
                 <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/my-business">My Business</Link>
               )}
@@ -2889,6 +2892,26 @@ function BookPage() {
                   const canShowRich = Boolean(r.isMember)
                   return (
                     <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
+                      {/* Business Image */}
+                      {d.images && d.images.length > 0 ? (
+                        <div className="mb-3">
+                          <img 
+                            src={d.images[0]} 
+                            alt={`${r.name} business photo`} 
+                            className="w-full h-32 object-cover rounded-lg border border-neutral-100"
+                          />
+                        </div>
+                      ) : (
+                        <div className="mb-3 h-32 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                          <div className="text-center text-neutral-500">
+                            <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            <p className="text-xs">No image available</p>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="flex items-center justify-between">
                         <Link to={`/provider/${r.slug}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
                           <div className="font-medium flex items-center gap-2">
@@ -2904,13 +2927,6 @@ function BookPage() {
                         <div className="mt-1 flex flex-wrap gap-1">
                           {r.tags.slice(0, 3).map((t) => (
                             <span key={t} className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-700 px-2 py-0.5 text-[11px]">{t}</span>
-                          ))}
-                        </div>
-                      )}
-                      {canShowRich && d.images && d.images.length > 0 && (
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          {d.images.map((src, idx) => (
-                            <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
                           ))}
                         </div>
                       )}
@@ -2989,6 +3005,26 @@ function BookPage() {
                       const d = getProviderDetails(r)
                       return (
                         <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
+                          {/* Business Image */}
+                          {d.images && d.images.length > 0 ? (
+                            <div className="mb-3">
+                              <img 
+                                src={d.images[0]} 
+                                alt={`${r.name} business photo`} 
+                                className="w-full h-24 object-cover rounded-lg border border-neutral-100"
+                              />
+                            </div>
+                          ) : (
+                            <div className="mb-3 h-24 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                              <div className="text-center text-neutral-500">
+                                <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                <p className="text-xs">No image</p>
+                              </div>
+                            </div>
+                          )}
+                          
                           <div className="flex items-center justify-between">
                             <Link to={`/provider/${r.slug}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
                               <div className="font-medium flex items-center gap-2">
@@ -3009,13 +3045,6 @@ function BookPage() {
                           )}
                           <button onClick={() => setExpanded((e: Record<string, boolean>) => ({ ...e, [r.id]: !open }))} className="mt-2 text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5">{open ? 'Hide' : 'View'}</button>
                           <div className="collapsible mt-3 text-sm" data-open={open ? 'true' : 'false'}>
-                              {r.isMember && d.images && d.images.length > 0 && (
-                                <div className="grid grid-cols-2 gap-2 mb-2">
-                                  {d.images.map((src, idx) => (
-                                    <img key={idx} src={src} alt={r.name + ' photo ' + (idx + 1)} className="rounded-lg border border-neutral-100" />
-                                  ))}
-                                </div>
-                              )}
                               {r.isMember && d.reviews && d.reviews.length > 0 && (
                                 <div className="mt-2">
                                   <div className="font-medium">Reviews</div>
@@ -3164,6 +3193,7 @@ export default function App() {
             <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="community" element={<CommunityIndex />} />
             <Route path="community/:category" element={<CommunityPost />} />
+            <Route path="jobs" element={<JobsPage />} />
             <Route path="admin" element={<AdminPage />} />
             <Route path="owner" element={
               <ProtectedRoute allowedRoles={['business']}>
