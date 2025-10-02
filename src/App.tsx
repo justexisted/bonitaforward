@@ -2521,17 +2521,17 @@ function AboutPage() {
       {/* Prism Background */}
       <div className="absolute inset-0 z-0">
         <Prism
-          height={4}
-          baseWidth={6}
+          height={8}
+          baseWidth={10}
           animationType="3drotate"
-          glow={1.2}
+          glow={.7}
           noise={0}
           transparent={true}
-          scale={1.8}
-          hueShift={0.2}
-          colorFrequency={1.2}
-          timeScale={0.8}
-          bloom={1.1}
+          scale={0.8}
+          hueShift={0.9}
+          colorFrequency={.9}
+          timeScale={.2}
+          bloom={.9}
           suspendWhenOffscreen={true}
         />
       </div>
