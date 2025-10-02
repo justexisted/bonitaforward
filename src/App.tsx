@@ -25,6 +25,8 @@ import RollingGallery from './components/RollingGallery'
 import CountUp from './components/CountUp'
 import ScrollStack, { ScrollStackItem } from './components/ScrollStack'
 import CardNav, { type CardNavItem } from './components/CardNav'
+import Prism from './components/Prism'
+import MagicBento from './components/MagicBento'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -2516,51 +2518,194 @@ function CategoryPage() {
 
 function AboutPage() {
   return (
-    <section className="py-3">
-      <Container>
-        <div className="prose max-w-none">
-        <img
-          src="/images/bonita-cartoon-hero.jpeg"
-          alt=""
-          loading="eager"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(e) => {
-            const img = e.currentTarget as HTMLImageElement
-            img.onerror = null
-            img.src = `https://picsum.photos/seed/landing-hero-fallback/1600/900`
-          }}
-          style={{ position: 'absolute', objectPosition: 'top', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: -1 }}
+    <section className="relative min-h-screen py-12">
+      {/* Prism Background */}
+      <div className="absolute inset-0 z-0">
+        <Prism
+          height={4}
+          baseWidth={6}
+          animationType="3drotate"
+          glow={1.2}
+          noise={0}
+          transparent={true}
+          scale={1.8}
+          hueShift={0.2}
+          colorFrequency={1.2}
+          timeScale={0.8}
+          bloom={1.1}
+          suspendWhenOffscreen={true}
         />
-          <h2 className="text-2xl font-semibold tracking-tight">About Bonita Forward</h2>
-          <br />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="text-neutral-600 bg-white p-6 rounded-xl text-center shadow-md hover:shadow-xl transition-shadow flex flex-col">
-              <div className="flex-1">
-                  <p className="text-lg font-semibold text-neutral-900">We Highlight Bonita Businesses</p>
-                  <p className="text-neutral-700 mt-2">We encourage residents to stay local and support local businesses.</p>
-              </div>
-              <p className="text-4xl mt-4">✔️</p>
-            </div>
+      </div>
 
-            <div className="text-neutral-600 bg-white p-6 rounded-xl text-center shadow-md hover:shadow-xl transition-shadow flex flex-col">
-              <div className="flex-1">
-                  <p className="text-lg font-semibold text-neutral-900">Reduce your carbon footprint</p>
-                  <p className="text-neutral-700 mt-2">Shop local, save gas, time, and money.</p>
-              </div>
-              <p className="text-4xl mt-4">💚</p>
-            </div>
+      {/* Content */}
+      <div className="relative z-10">
+        <Container>
+          {/* Hero Section */}
+          <div className="text-center mb-16">
+            <h1 className="text-4xl md:text-6xl font-bold text-black mb-6">
+              For Bonita, By Bonita
+            </h1>
+            <p className="text-xl md:text-2xl text-black/90 mb-8 max-w-4xl mx-auto">
+              Connecting Our Community. Supporting Our Businesses.
+            </p>
+            <p className="text-lg text-black/80 max-w-3xl mx-auto">
+              Your Digital Main Street
+            </p>
+          </div>
 
-            <div className="text-neutral-600 bg-white p-6 rounded-xl text-center shadow-md hover:shadow-xl transition-shadow flex flex-col">
-              <div className="flex-1">
-                  <p className="text-lg font-semibold text-neutral-900">Bridge the gap</p>
-                  <p className="text-neutral-700 mt-2">This site is a bridge between the community and businesses, the community gets trusted recommendations and businesses get customers.</p>
-              </div>
-              <p className="text-4xl mt-4">🌉</p>
+          {/* Story Section */}
+          <div className="mb-16">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 md:p-12 border border-white/20">
+              <h2 className="text-3xl font-bold text-black mb-6 text-center">Our Story</h2>
+              <p className="text-lg text-black/90 leading-relaxed text-center max-w-4xl mx-auto">
+                We were talking about how much we love our community, but worried that some of our favorite local gems were struggling to be seen online. We knew there had to be a better way to connect residents with the amazing businesses right in our backyard.
+              </p>
             </div>
           </div>
-        </div>
-      </Container>
+
+          {/* Mission & Vision */}
+          <div className="grid md:grid-cols-2 gap-8 mb-16">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+              <h3 className="text-2xl font-bold text-black mb-4">Our Mission</h3>
+              <p className="text-black/90 leading-relaxed">
+                Our mission is to empower Bonita's local businesses by providing a digital platform that fosters community connection, drives economic growth, and celebrates the unique character of our town.
+              </p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+              <h3 className="text-2xl font-bold text-black mb-4">Our Vision</h3>
+              <p className="text-black/90 leading-relaxed">
+                We envision a thriving, interconnected Bonita where every local business has the tools to succeed, and every resident feels a strong sense of pride and connection to their community.
+              </p>
+            </div>
+          </div>
+
+          {/* Values Section */}
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold text-black mb-8 text-center">Our Values</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {/* Community First */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
+                <div className="text-4xl mb-4">🤝</div>
+                <h3 className="text-xl font-bold text-black mb-3">Community First</h3>
+                <p className="text-black/80 text-sm">
+                  Every decision we make prioritizes the well-being and growth of our local community.
+                </p>
+              </div>
+
+              {/* Integrity */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
+                <div className="text-4xl mb-4">⚖️</div>
+                <h3 className="text-xl font-bold text-black mb-3">Integrity</h3>
+                <p className="text-black/80 text-sm">
+                  We operate with honesty, transparency, and ethical practices in everything we do.
+                </p>
+              </div>
+
+              {/* Collaboration */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
+                <div className="text-4xl mb-4">🤝</div>
+                <h3 className="text-xl font-bold text-black mb-3">Collaboration</h3>
+                <p className="text-black/80 text-sm">
+                  We believe in the power of working together to achieve common goals.
+                </p>
+              </div>
+
+              {/* Innovation */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
+                <div className="text-4xl mb-4">💡</div>
+                <h3 className="text-xl font-bold text-black mb-3">Innovation</h3>
+                <p className="text-black/80 text-sm">
+                  We continuously seek creative solutions to support our local businesses.
+                </p>
+              </div>
+
+              {/* Local Pride */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
+                <div className="text-4xl mb-4">🏠</div>
+                <h3 className="text-xl font-bold text-black mb-3">Local Pride</h3>
+                <p className="text-black/80 text-sm">
+                  We celebrate and promote the unique character and businesses of Bonita.
+                </p>
+              </div>
+
+              {/* Growth */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
+                <div className="text-4xl mb-4">📈</div>
+                <h3 className="text-xl font-bold text-black mb-3">Growth</h3>
+                <p className="text-black/80 text-sm">
+                  We're committed to fostering sustainable economic growth for our community.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Meet the Team Section */}
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold text-black mb-8 text-center">Meet the Team</h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Team Member 1 */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-white">JD</span>
+                </div>
+                <h3 className="text-xl font-bold text-black mb-2">John Doe</h3>
+                <p className="text-black/80 text-sm mb-3">Co-Founder & CEO</p>
+                <p className="text-black/70 text-sm">
+                  "My favorite spot in Bonita is the local farmers market - it's where I first realized how much our community needed better digital connections."
+                </p>
+              </div>
+
+              {/* Team Member 2 */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-white">JS</span>
+                </div>
+                <h3 className="text-xl font-bold text-black mb-2">Jane Smith</h3>
+                <p className="text-black/80 text-sm mb-3">Co-Founder & CTO</p>
+                <p className="text-black/70 text-sm">
+                  "Why I'm passionate about helping local businesses: I've seen too many amazing shops struggle with visibility while big chains thrive."
+                </p>
+              </div>
+
+              {/* Team Member 3 */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-white">MJ</span>
+                </div>
+                <h3 className="text-xl font-bold text-black mb-2">Mike Johnson</h3>
+                <p className="text-black/80 text-sm mb-3">Head of Community</p>
+                <p className="text-black/70 text-sm">
+                  "My favorite spot in Bonita is the community center - it's where I learned that strong communities start with strong local businesses."
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Call to Action */}
+          <div className="text-center">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 md:p-12 border border-white/20">
+              <h2 className="text-3xl font-bold text-black mb-4">Join Our Mission</h2>
+              <p className="text-lg text-black/90 mb-6 max-w-2xl mx-auto">
+                Be part of building a stronger, more connected Bonita community. Whether you're a business owner or a resident, together we can make our town thrive.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <a
+                  href="/business"
+                  className="bg-white text-purple-900 px-8 py-3 rounded-full font-semibold hover:bg-white/90 transition-colors"
+                >
+                  Add Your Business
+                </a>
+                <a
+                  href="/community"
+                  className="border-2 border-black text-black px-8 py-3 rounded-full font-semibold hover:bg-black/10 transition-colors"
+                >
+                  Join Community
+                </a>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </div>
     </section>
   )
 }
