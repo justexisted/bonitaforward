@@ -2518,23 +2518,26 @@ function CategoryPage() {
 function AboutPage() {
   return (
     <section className="relative min-h-screen py-12">
-      {/* Prism Background */}
-      <div className="absolute inset-0 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0)' }}>
+      {/* Prism Background - Top Section */}
+      <div className="absolute top-0 left-0 right-0 h-96 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0)' }}>
         <Prism
-          height={4}
-          baseWidth={6}
+          height={6}
+          baseWidth={18}
           animationType="rotate"
           glow={0.5}
           noise={0}
           transparent={true}
-          scale={1.2}
+          scale={1.8}
           hueShift={0.3}
-          colorFrequency={0.8}
-          timeScale={0.1}
-          bloom={0.6}
+          colorFrequency={0.6}
+          timeScale={0.05}
+          bloom={0.4}
           suspendWhenOffscreen={true}
         />
       </div>
+
+      {/* Subtle Background Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-purple-50/20 via-white/10 to-white/5 z-0"></div>
 
       {/* Content */}
       <div className="relative z-10" style={{ willChange: 'transform', transform: 'translate3d(0,0,0)' }}>
