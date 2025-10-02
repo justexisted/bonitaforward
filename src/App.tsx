@@ -2519,25 +2519,25 @@ function AboutPage() {
   return (
     <section className="relative min-h-screen py-12">
       {/* Prism Background */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0)' }}>
         <Prism
-          height={8}
-          baseWidth={10}
-          animationType="3drotate"
-          glow={.7}
+          height={4}
+          baseWidth={6}
+          animationType="rotate"
+          glow={0.5}
           noise={0}
           transparent={true}
-          scale={0.8}
-          hueShift={0.9}
-          colorFrequency={.9}
-          timeScale={.2}
-          bloom={.9}
+          scale={1.2}
+          hueShift={0.3}
+          colorFrequency={0.8}
+          timeScale={0.1}
+          bloom={0.6}
           suspendWhenOffscreen={true}
         />
       </div>
 
       {/* Content */}
-      <div className="relative z-10">
+      <div className="relative z-10" style={{ willChange: 'transform', transform: 'translate3d(0,0,0)' }}>
         <Container>
           {/* Hero Section */}
           <div className="text-center mb-16">
