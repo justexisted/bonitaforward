@@ -73,7 +73,7 @@ export default function JobsPage() {
       // Now get provider data for these jobs
       const providerIds = [...new Set(allJobs.map(job => job.provider_id))]
 
-      const { data: providersData, error: providersError } = await supabase
+      const { data: providersData } = await supabase
         .from('providers')
         .select('id, name, category_key, address, phone, email, website, images')
         .in('id', providerIds)
