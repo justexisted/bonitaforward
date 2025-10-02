@@ -26,7 +26,6 @@ import CountUp from './components/CountUp'
 import ScrollStack, { ScrollStackItem } from './components/ScrollStack'
 import CardNav, { type CardNavItem } from './components/CardNav'
 import Prism from './components/Prism'
-import MagicBento from './components/MagicBento'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
