@@ -184,9 +184,10 @@ const CardNav: React.FC<CardNavProps> = ({
             />
           </div>
 
-          <div className="logo-container flex items-center md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 order-1 md:order-none">
-            <a href="/" className="flex items-center">
+          <div className="logo-container flex items-center justify-center md:justify-center md:absolute md:left-4 md:top-1/2 md:-translate-y-1/2 order-1 md:order-none"  style={{ justifySelf: 'anchor-center' }}>
+            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <img src={logo} alt={logoAlt} className="logo h-[28px]" />
+              <span className="font-semibold tracking-tight text-lg">Bonita Forward</span>
             </a>
           </div>
 

@@ -717,7 +717,7 @@ function Navbar() {
       <div className="relative">
         <CardNav
           logo="/images/top-left-logo.png"
-          logoAlt="Bonita Forward"
+          logoAlt="Bonita Forward Logo"
           items={createNavItems()}
           baseColor="#fff"
           menuColor="#000"
