@@ -24,6 +24,7 @@ import GradientText from './components/GradientText'
 import RollingGallery from './components/RollingGallery'
 import CountUp from './components/CountUp'
 import ScrollStack, { ScrollStackItem } from './components/ScrollStack'
+import CardNav, { type CardNavItem } from './components/CardNav'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -592,109 +593,139 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
 
 function Navbar() {
   const auth = useAuth()
-  const [open, setOpen] = useState(false)
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
     .split(',')
     .map((s: string) => s.trim().toLowerCase())
     .filter(Boolean)
   const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
   const isAdmin = !!auth.email && adminList.includes(auth.email.toLowerCase())
-  function HamburgerIcon({ open }: { open: boolean }) {
-    return (
-      <span className="relative block h-5 w-5">
-        <span
-          className={`absolute left-1/2 top-[6px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transform-gpu ${open ? 'rotate-45 translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
-          style={{ transition: 'transform 1000ms ease-in-out' }}
-        />
-        <span
-          className={`absolute left-1/2 top-[11px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center ${open ? 'opacity-0' : 'opacity-100'}`}
-          style={{ transition: 'opacity 1000ms ease-in-out' }}
-        />
-        <span
-          className={`absolute left-1/2 top-[16px] h-[2px] w-5 -translate-x-1/2 bg-neutral-900 origin-center will-change-transform transform transform-gpu ${open ? '-rotate-45 -translate-y-[5px]' : 'rotate-0 translate-y-0'}`}
-          style={{ transition: 'transform 1000ms ease-in-out' }}
-        />
-      </span>
-    )
-  }
+
+  // Function to save return URL for redirect after sign in
   function saveReturnUrl() {
     try {
       const url = window.location.pathname + window.location.search + window.location.hash
       localStorage.setItem('bf-return-url', url)
     } catch {}
   }
+
+  // Create navigation items based on user authentication and role
+  const createNavItems = (): CardNavItem[] => {
+    const baseItems: CardNavItem[] = [
+      {
+        label: "Discover",
+        bgColor: "#0D0716",
+        textColor: "#fff",
+        links: [
+          { label: "Home", href: "/", ariaLabel: "Home Page" },
+          { label: "About", href: "/about", ariaLabel: "About Bonita Forward" },
+          { label: "Community", href: "/community", ariaLabel: "Community Posts" },
+          { label: "Jobs", href: "/jobs", ariaLabel: "Job Listings" }
+        ]
+      },
+      {
+        label: "Business",
+        bgColor: "#170D27",
+        textColor: "#fff",
+        links: [
+          { label: "Have a Business?", href: "/business", ariaLabel: "Add Your Business" },
+          ...(auth.isAuthed && auth.role === 'business' ? 
+            [{ label: "My Business", href: "/my-business", ariaLabel: "Manage My Business" }] : 
+            []
+          )
+        ]
+      }
+    ]
+
+    // Add authentication section based on user status
+    if (auth.isAuthed) {
+      // Authenticated users see Account section with sign out
+      baseItems.push({
+        label: "Account",
+        bgColor: "#271E37",
+        textColor: "#fff",
+        links: [
+          { label: "Account Settings", href: "/account", ariaLabel: "Account Settings" },
+          ...(isAdmin ? 
+            [{ label: "Admin Panel", href: "/admin", ariaLabel: "Admin Dashboard" }] : 
+            []
+          ),
+          { label: "Sign Out", href: "#", ariaLabel: "Sign Out" }
+        ]
+      })
+    } else {
+      // Unauthenticated users see Auth section with sign in/sign up
+      baseItems.push({
+        label: "Auth",
+        bgColor: "#271E37",
+        textColor: "#fff",
+        links: [
+          { label: "Sign In", href: "/signin", ariaLabel: "Sign In" },
+          { label: "Sign Up", href: "/signin", ariaLabel: "Sign Up" }
+        ]
+      })
+    }
+
+    return baseItems
+  }
+
+  // Handle CTA button click with useEffect
+  useEffect(() => {
+    const handleCtaClick = () => {
+      if (!auth.isAuthed) {
+        saveReturnUrl()
+        window.location.href = '/signin'
+      } else {
+        window.location.href = '/account'
+      }
+    }
+
+    // Add event listener to CTA button when component mounts
+    const ctaButton = document.querySelector('.card-nav-cta-button')
+    if (ctaButton) {
+      ctaButton.addEventListener('click', handleCtaClick)
+    }
+
+    // Cleanup event listener on unmount
+    return () => {
+      if (ctaButton) {
+        ctaButton.removeEventListener('click', handleCtaClick)
+      }
+    }
+  }, [auth.isAuthed, saveReturnUrl])
+
+  // Handle sign out link click
+  useEffect(() => {
+    const handleSignOutClick = (e: Event) => {
+      const target = e.target as HTMLElement
+      if (target && target.textContent === 'Sign Out') {
+        e.preventDefault()
+        auth.signOut()
+      }
+    }
+
+    // Add event listener for sign out links
+    document.addEventListener('click', handleSignOutClick)
+
+    // Cleanup event listener on unmount
+    return () => {
+      document.removeEventListener('click', handleSignOutClick)
+    }
+  }, [auth])
+
   return (
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
-      <Container className="flex items-center justify-between h-14">
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/images/top-left-logo.png" alt="Bonita Forward" className="h-8 w-8 rounded" />
-          <span className="font-semibold tracking-tight">Bonita Forward</span>
-        </Link>
-        <div className="flex items-center gap-2">
-          <button 
-            id="hamburger-btn" 
-            aria-label="Menu"
-            aria-expanded={open ? 'true' : 'false'} 
-            onClick={() => setOpen((v) => !v)} 
-            className={`sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-xl hover:bg-neutral-100 ${open ? 'active' : ''}`}>
-            <HamburgerIcon open={open} />
-          </button>
-          <nav className="hidden sm:flex items-center gap-3 text-sm">
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/about">About</Link>
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/community">Community</Link>
-            <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100 text-center" to="/jobs">💼 Jobs</Link>
-            {auth.isAuthed && auth.role === 'business' && (
-              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/my-business">My Business</Link>
-            )}
-            {auth.isAuthed && (
-              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/account">Account</Link>
-            )}
-            {isAdmin && (
-              <Link className="rounded-full px-3 py-1.5 hover:bg-neutral-100" to="/admin">Admin</Link>
-            )}
-            {!auth.isAuthed ? (
-              <div className="flex items-center gap-2">
-                <Link onClick={saveReturnUrl} to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-1.5">Sign In</Link>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-neutral-600 hidden sm:inline">{auth.email}</span>
-                <button onClick={auth.signOut} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200">Sign out</button>
-              </div>
-            )}
-          </nav>
-        </div>
-      </Container>
-      {/* Mobile sheet (fixed overlay to avoid layout shift) */}
-      {open && (
-        <div className="fixed inset-x-0 top-14 z-50 sm:hidden border-t border-neutral-100 bg-white shadow-md">
-          <Container className="py-3 text-sm">
-            <div className="flex flex-col gap-2">
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/about">About</Link>
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/business">📈 Have a Business?</Link>
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/community">Community</Link>
-              <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/jobs">💼 Jobs</Link>
-              {auth.isAuthed && auth.role === 'business' && (
-                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/my-business">My Business</Link>
-              )}
-              {auth.isAuthed && (
-                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/account">Account</Link>
-              )}
-              {isAdmin && (
-                <Link onClick={() => setOpen(false)} className="rounded-full px-3 py-2 hover:bg-neutral-100 text-center" to="/admin">Admin</Link>
-              )}
-              {!auth.isAuthed ? (
-                <>
-                  <Link onClick={() => { saveReturnUrl(); setOpen(false) }} to="/signin" className="rounded-full bg-neutral-900 text-white px-3 py-2 text-center">Sign In</Link>
-                </>
-              ) : (
-                <button onClick={() => { setOpen(false); auth.signOut() }} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-2 hover:bg-neutral-200 text-center">Sign out</button>
-              )}
-            </div>
-          </Container>
-        </div>
-      )}
+      <div className="relative">
+        <CardNav
+          logo="/images/top-left-logo.png"
+          logoAlt="Bonita Forward"
+          items={createNavItems()}
+          baseColor="#fff"
+          menuColor="#000"
+          buttonBgColor="#111"
+          buttonTextColor="#fff"
+          ease="power3.out"
+        />
+      </div>
     </header>
   )
 }
@@ -726,7 +757,7 @@ function Layout() {
     <div className="min-h-full flex flex-col">
       <SupabasePing />
       <Navbar />
-      <main className="flex-1 overflow-x-hidden">
+      <main className="flex-1 overflow-x-hidden pt-24 md:pt-28">
         <Outlet />
       </main>
       <Footer />
