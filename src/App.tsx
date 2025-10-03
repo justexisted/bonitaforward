@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } from 'react-router-dom'
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
 import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight } from 'lucide-react'
@@ -2474,18 +2474,196 @@ function Funnel({ category }: { category: typeof categories[number] }) {
   )
 }
 
+function CategoryFilters({ 
+  category, 
+  answers
+}: { 
+  category: typeof categories[number]
+  answers: Record<string, string>
+}) {
+  const [selectedFilters, setSelectedFilters] = useState<Record<string, string>>(answers)
+  const [filteredProviders, setFilteredProviders] = useState<Provider[]>([])
+  const auth = useAuth()
+  const navigate = useNavigate()
+
+  // Get available filter options based on category
+  const getFilterOptions = (questionId: string) => {
+    const questions = getFunnelQuestions(category.key, {})
+    const question = questions.find(q => q.id === questionId)
+    return question?.options || []
+  }
+
+  const updateFilter = (questionId: string, value: string) => {
+    const newFilters = { ...selectedFilters, [questionId]: value }
+    setSelectedFilters(newFilters)
+    
+    // Immediately apply filters and show results
+    const scored = scoreProviders(category.key, newFilters)
+    setFilteredProviders(scored)
+  }
+
+  const clearFilter = (questionId: string) => {
+    const newFilters = { ...selectedFilters }
+    delete newFilters[questionId]
+    setSelectedFilters(newFilters)
+    
+    // Immediately apply filters and show results
+    const scored = scoreProviders(category.key, newFilters)
+    setFilteredProviders(scored)
+  }
+
+  // Apply initial filters on mount
+  useEffect(() => {
+    const scored = scoreProviders(category.key, selectedFilters)
+    setFilteredProviders(scored)
+  }, [category.key, selectedFilters])
+
+  const questions = getFunnelQuestions(category.key, {})
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+          Refine Your {category.name} Search
+        </h3>
+        <p className="text-sm text-neutral-600">
+          Adjust your preferences to find the perfect match
+        </p>
+      </div>
+
+      {/* Compact Filter Controls - Horizontal Layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {questions.map((question) => {
+          const options = getFilterOptions(question.id)
+          const currentValue = selectedFilters[question.id]
+          
+          return (
+            <div key={question.id} className="space-y-1">
+              <label className="text-xs font-medium text-neutral-600 block">
+                {question.prompt}
+              </label>
+              <select
+                value={currentValue || ''}
+                onChange={(e) => {
+                  if (e.target.value === '') {
+                    clearFilter(question.id)
+                  } else {
+                    updateFilter(question.id, e.target.value)
+                  }
+                }}
+                className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              >
+                <option value="">All</option>
+                {options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Results - Always Visible */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-lg font-semibold text-neutral-900">
+            Your Matches ({filteredProviders.length})
+          </h4>
+        </div>
+        
+        {filteredProviders.length > 0 ? (
+          <div className="space-y-3">
+            {filteredProviders.slice(0, 5).map((provider) => (
+              <div key={provider.id} className="p-4 border border-neutral-200 rounded-lg hover:shadow-sm transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h5 className="font-medium text-neutral-900">{provider.name}</h5>
+                    {provider.description && (
+                      <p className="text-sm text-neutral-600 mt-1">{provider.description}</p>
+                    )}
+                    {provider.tags && provider.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {provider.tags.slice(0, 3).map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Link
+                    to={`/provider/${provider.slug}`}
+                    className="ml-4 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    View Details
+                  </Link>
+                </div>
+              </div>
+            ))}
+            
+            {filteredProviders.length > 5 && (
+              <div className="text-center">
+                <Link
+                  to={`/book?category=${category.key}`}
+                  onClick={(e) => {
+                    if (!auth.isAuthed) {
+                      e.preventDefault()
+                      navigate('/signin', { state: { from: `/book?category=${category.key}` } })
+                      return
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
+                >
+                  View All {filteredProviders.length} Results
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-neutral-500">
+            <p>No matches found with your current filters.</p>
+            <p className="text-sm mt-1">Try adjusting your preferences or clearing some filters.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function CategoryPage() {
   const path = window.location.pathname.split('/').pop() as CategoryKey
   const category = categories.find((c) => c.key === path)
   if (!category) return <Container className="py-10">Category not found.</Container>
   const Icon = category.icon
   const [, setVersion] = useState(0)
+  const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false)
+  const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
   
   useEffect(() => {
     function onUpdate() { setVersion((v: number) => v + 1) }
     window.addEventListener('bf-providers-updated', onUpdate as EventListener)
     return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
   }, [])
+
+  // Check if user has completed questionnaire for this category
+  useEffect(() => {
+    try {
+      const key = `bf-tracking-${category.key}`
+      const existing = JSON.parse(localStorage.getItem(key) || '{}')
+      if (existing && typeof existing === 'object') {
+        const questions = getFunnelQuestions(category.key, existing)
+        const isComplete = questions.every((q) => existing[q.id])
+        setHasCompletedQuestionnaire(isComplete)
+        setQuestionnaireAnswers(existing)
+      }
+    } catch {}
+  }, [category.key])
   
   return (
     <section className="py-8">
@@ -2503,8 +2681,17 @@ function CategoryPage() {
             <div className="flex-1">
               <div className="mt-4">
                 <div className="rounded-xl p-3">
-                  <div className="text-lg font-medium mb-2 text-center">{`Let's find the best match for you in ${category.name}`}</div>
-                  <Funnel category={category} />
+                  {hasCompletedQuestionnaire ? (
+                    <CategoryFilters 
+                      category={category} 
+                      answers={questionnaireAnswers}
+                    />
+                  ) : (
+                    <>
+                      <div className="text-lg font-medium mb-2 text-center">{`Let's find the best match for you in ${category.name}`}</div>
+                      <Funnel category={category} />
+                    </>
+                  )}
                 </div>
               </div>
             </div>
