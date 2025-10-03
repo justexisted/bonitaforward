@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { fetchBlogPostsByCategory, type BlogPost } from '../lib/supabaseData'
 import { ArrowLeft, ArrowRight, Home } from 'lucide-react'
 
@@ -33,7 +33,6 @@ export function CommunityIndex() {
 
 export function CommunityPost() {
   const params = useParams()
-  const navigate = useNavigate()
   const categoryKey = params.category as string
   const title = categoryToTitle[categoryKey] || 'Community Post'
   const [posts, setPosts] = useState<BlogPost[]>([])
