@@ -2831,40 +2831,17 @@ function AboutPage() {
           {/* Meet the Team Section */}
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-black mb-8 text-center">Meet the Team</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-1 lg:grid-cols-1 gap-8">
+
               {/* Team Member 1 */}
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-white">JD</span>
-                </div>
-                <h3 className="text-xl font-bold text-black mb-2">John Doe</h3>
-                <p className="text-black/80 text-sm mb-3">Co-Founder & CEO</p>
-                <p className="text-black/70 text-sm">
-                  "My favorite spot in Bonita is the local farmers market - it's where I first realized how much our community needed better digital connections."
-                </p>
-              </div>
-
-              {/* Team Member 2 */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
                 <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-white">JS</span>
+                  <span className="text-2xl font-bold text-white">AC</span>
                 </div>
-                <h3 className="text-xl font-bold text-black mb-2">Jane Smith</h3>
-                <p className="text-black/80 text-sm mb-3">Co-Founder & CTO</p>
+                <h3 className="text-xl font-bold text-black mb-2">Agustin Chavez</h3>
+                <p className="text-black/80 text-sm mb-3">Founder</p>
                 <p className="text-black/70 text-sm">
-                  "Why I'm passionate about helping local businesses: I've seen too many amazing shops struggle with visibility while big chains thrive."
-                </p>
-              </div>
-
-              {/* Team Member 3 */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-white">MJ</span>
-                </div>
-                <h3 className="text-xl font-bold text-black mb-2">Mike Johnson</h3>
-                <p className="text-black/80 text-sm mb-3">Head of Community</p>
-                <p className="text-black/70 text-sm">
-                  "My favorite spot in Bonita is the community center - it's where I learned that strong communities start with strong local businesses."
+                  "I've seen too many amazing shops struggle with visibility while big chains thrive."
                 </p>
               </div>
             </div>
@@ -2885,7 +2862,7 @@ function AboutPage() {
                   Add Your Business
                 </a>
                 <a
-                  href="/community"
+                  href="/signin"
                   className="border-2 border-black text-black px-8 py-3 rounded-full font-semibold hover:bg-black/10 transition-colors"
                 >
                   Join Community

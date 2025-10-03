@@ -64,6 +64,7 @@ export type BlogPost = {
   category_key: string // NOTE: Blog posts table uses category_key, providers table uses category
   title: string
   content: string
+  images?: string[] | null
   created_at: string
   updated_at?: string | null
 }
@@ -72,7 +73,7 @@ export async function fetchAllBlogPosts(): Promise<BlogPost[]> {
   try {
     const { data, error } = await supabase
       .from('blog_posts')
-      .select('id,category_key,title,content,created_at,updated_at')
+      .select('id,category_key,title,content,images,created_at,updated_at')
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) {
@@ -90,7 +91,7 @@ export async function fetchLatestBlogPostByCategory(category_key: string): Promi
   try {
     const { data, error } = await supabase
       .from('blog_posts')
-      .select('id,category_key,title,content,created_at,updated_at')
+      .select('id,category_key,title,content,images,created_at,updated_at')
       .eq('category_key', category_key)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -101,6 +102,32 @@ export async function fetchLatestBlogPostByCategory(category_key: string): Promi
     return (data && data[0]) || null
   } catch (err) {
     console.warn('[Supabase] blog_posts select by category failed', err)
+    return null
+  }
+}
+
+export async function uploadBlogImage(file: File): Promise<string | null> {
+  try {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+    const filePath = `blog-images/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('blog-images')
+      .upload(filePath, file)
+
+    if (uploadError) {
+      console.error('Error uploading image:', uploadError)
+      return null
+    }
+
+    const { data } = supabase.storage
+      .from('blog-images')
+      .getPublicUrl(filePath)
+
+    return data.publicUrl
+  } catch (err) {
+    console.error('Error uploading blog image:', err)
     return null
   }
 }

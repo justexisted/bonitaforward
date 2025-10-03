@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
-import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, type BlogPost } from '../lib/supabaseData'
+import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, uploadBlogImage, type BlogPost } from '../lib/supabaseData'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 // Extended type for change requests with joined provider and profile data
@@ -118,7 +118,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [confirmDeleteProviderId, setConfirmDeleteProviderId] = useState<string | null>(null)
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
-  const [blogDraft, setBlogDraft] = useState<{ id?: string; category_key: string; title: string; content: string }>({ category_key: 'restaurants-cafes', title: '', content: '' })
+  const [blogDraft, setBlogDraft] = useState<{ id?: string; category_key: string; title: string; content: string; images?: string[] }>({ category_key: 'restaurants-cafes', title: '', content: '', images: [] })
   const editorRef = useRef<HTMLDivElement | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiQuery, setEmojiQuery] = useState('')
@@ -3373,17 +3373,79 @@ export default function AdminPage() {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Image Upload Section */}
+                  <div className="mt-4 space-y-3">
+                    <div className="text-sm font-medium text-neutral-700">Images</div>
+                    <div className="space-y-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || [])
+                          if (files.length === 0) return
+                          
+                          setMessage('Uploading images...')
+                          const uploadPromises = files.map(file => uploadBlogImage(file))
+                          const urls = await Promise.all(uploadPromises)
+                          const validUrls = urls.filter(url => url !== null) as string[]
+                          
+                          if (validUrls.length > 0) {
+                            setBlogDraft(prev => ({
+                              ...prev,
+                              images: [...(prev.images || []), ...validUrls]
+                            }))
+                            setMessage(`${validUrls.length} image(s) uploaded successfully`)
+                          } else {
+                            setMessage('Failed to upload images')
+                          }
+                        }}
+                        className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white"
+                      />
+                      <div className="text-xs text-neutral-500">
+                        Upload AI-generated images or photos to make your blog posts more engaging
+                      </div>
+                    </div>
+                    
+                    {/* Display uploaded images */}
+                    {blogDraft.images && blogDraft.images.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {blogDraft.images.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Blog image ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-lg border border-neutral-200"
+                            />
+                            <button
+                              onClick={() => {
+                                setBlogDraft(prev => ({
+                                  ...prev,
+                                  images: prev.images?.filter((_, i) => i !== index) || []
+                                }))
+                              }}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {
                         setError(null); setMessage(null)
-                        const { error } = await upsertBlogPost({ id: blogDraft.id, category_key: blogDraft.category_key, title: blogDraft.title, content: blogDraft.content } as any)
+                        const { error } = await upsertBlogPost({ id: blogDraft.id, category_key: blogDraft.category_key, title: blogDraft.title, content: blogDraft.content, images: blogDraft.images } as any)
                         if (error) setError(error)
                         else {
                           setMessage('Blog post saved')
                           const posts = await fetchAllBlogPosts()
                           setBlogPosts(posts)
-                          setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })
+                          setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '', images: [] })
                         }
                       }}
                       className="btn btn-secondary text-xs"
@@ -3391,7 +3453,7 @@ export default function AdminPage() {
                       Save Post
                     </button>
                     {blogDraft.id && (
-                      <button onClick={() => setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '' })} className="text-xs underline">New</button>
+                      <button onClick={() => setBlogDraft({ category_key: blogDraft.category_key, title: '', content: '', images: [] })} className="text-xs underline">New</button>
                     )}
                   </div>
                 </div>
@@ -3405,7 +3467,7 @@ export default function AdminPage() {
                       <div className="font-medium text-sm">{bp.title}</div>
                       <div className="text-[11px] text-neutral-500">{bp.category_key} • {new Date(bp.created_at).toLocaleString()}</div>
                       <div className="mt-1 flex items-center gap-2">
-                        <button onClick={() => setBlogDraft({ id: bp.id, category_key: bp.category_key, title: bp.title, content: bp.content })} className="btn btn-secondary text-xs">Edit</button>
+                        <button onClick={() => setBlogDraft({ id: bp.id, category_key: bp.category_key, title: bp.title, content: bp.content, images: bp.images || [] })} className="btn btn-secondary text-xs">Edit</button>
                         <button onClick={async () => { const { error } = await deleteBlogPost(bp.id); if (error) setError(error); else { setMessage('Post deleted'); setBlogPosts((arr) => arr.filter((p) => p.id !== bp.id)) } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
                       </div>
                     </div>
