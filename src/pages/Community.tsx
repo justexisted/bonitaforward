@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { fetchBlogPostsByCategory, type BlogPost } from '../lib/supabaseData'
+import { ArrowLeft, ArrowRight, Home } from 'lucide-react'
 
 const categoryToTitle: Record<string, string> = {
   'restaurants-cafes': 'Top 5 Restaurants This Month',
@@ -32,11 +33,18 @@ export function CommunityIndex() {
 
 export function CommunityPost() {
   const params = useParams()
+  const navigate = useNavigate()
   const categoryKey = params.category as string
   const title = categoryToTitle[categoryKey] || 'Community Post'
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Get all category keys for navigation
+  const allCategories = Object.keys(categoryToTitle)
+  const currentIndex = allCategories.indexOf(categoryKey)
+  const prevCategory = currentIndex > 0 ? allCategories[currentIndex - 1] : null
+  const nextCategory = currentIndex < allCategories.length - 1 ? allCategories[currentIndex + 1] : null
 
   useEffect(() => {
     let cancelled = false
@@ -54,6 +62,38 @@ export function CommunityPost() {
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-3xl">
+        {/* Top Navigation */}
+        <div className="mb-4 flex items-center justify-between">
+          <Link 
+            to="/community" 
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm text-neutral-600 hover:text-neutral-800 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            Back to Blog
+          </Link>
+          
+          <div className="flex items-center gap-2">
+            {prevCategory && (
+              <Link 
+                to={`/community/${prevCategory}`}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-neutral-600 hover:text-neutral-800 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Previous
+              </Link>
+            )}
+            {nextCategory && (
+              <Link 
+                to={`/community/${nextCategory}`}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-neutral-600 hover:text-neutral-800 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                Next
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {loading && <div className="mt-3 text-sm text-neutral-600">Loading…</div>}
@@ -65,6 +105,21 @@ export function CommunityPost() {
                   <article key={post.id}>
                     <h2 className="text-xl font-semibold">{post.title}</h2>
                     <div className="mt-1 text-xs text-neutral-500">{new Date(post.created_at).toLocaleString()}</div>
+                    
+                    {/* Display images if they exist */}
+                    {post.images && post.images.length > 0 && (
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {post.images.map((imageUrl, index) => (
+                          <img
+                            key={index}
+                            src={imageUrl}
+                            alt={`Blog image ${index + 1}`}
+                            className="w-full h-48 object-cover rounded-lg border border-neutral-200"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    
                     <div className="mt-3">
                       {containsHtml(post.content) ? (
                         <div
@@ -82,6 +137,38 @@ export function CommunityPost() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className="mt-6 flex items-center justify-between">
+          <Link 
+            to="/community" 
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm text-neutral-600 hover:text-neutral-800 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            Back to Blog
+          </Link>
+          
+          <div className="flex items-center gap-2">
+            {prevCategory && (
+              <Link 
+                to={`/community/${prevCategory}`}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-neutral-600 hover:text-neutral-800 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Previous
+              </Link>
+            )}
+            {nextCategory && (
+              <Link 
+                to={`/community/${nextCategory}`}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-neutral-600 hover:text-neutral-800 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                Next
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </section>
