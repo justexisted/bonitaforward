@@ -45,6 +45,7 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     const { data, error } = await supabase
       .from('providers')
       .select('*')
+      .eq('published', true) // Only fetch published providers
       .limit(500)
     if (error) {
       console.warn('[Supabase] providers select error', error)
@@ -52,7 +53,9 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     }
     const rows = (data || []) as DbProvider[]
     // Exclude soft-deleted providers (badges includes 'deleted')
-    return rows.filter((r) => !Array.isArray(r.badges) || !r.badges?.includes('deleted'))
+    const filtered = rows.filter((r) => !Array.isArray(r.badges) || !r.badges?.includes('deleted'))
+    console.log(`[Supabase] Fetched ${filtered.length} published providers (${rows.length} total)`)
+    return filtered
   } catch (err) {
     console.warn('[Supabase] providers select failed', err)
     return []

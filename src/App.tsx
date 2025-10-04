@@ -1811,7 +1811,10 @@ function getProviderDetails(p: Provider): ProviderDetails {
     website: p.website || undefined,
     address: p.address || undefined,
     // Use actual business images from database if available, otherwise show no images
-    images: p.images && p.images.length > 0 ? p.images : undefined,
+    // Filter out empty or invalid image URLs
+    images: p.images && p.images.length > 0 
+      ? p.images.filter(img => img && typeof img === 'string' && img.trim().length > 0)
+      : undefined,
     // Only show reviews if they exist in the database (currently no reviews table exists)
     // TODO: Add reviews table to database and fetch actual reviews
     reviews: undefined, // Remove placeholder reviews until reviews system is implemented
@@ -1856,7 +1859,12 @@ async function loadProvidersFromSheet(): Promise<void> {
 
 async function loadProvidersFromSupabase(): Promise<boolean> {
   const rows = await fetchProvidersFromSupabase()
-  if (!rows || rows.length === 0) return false
+  if (!rows || rows.length === 0) {
+    console.warn('[Supabase] No providers found or failed to load')
+    return false
+  }
+  console.log(`[Supabase] Loaded ${rows.length} providers from database`)
+  
   const grouped: Record<CategoryKey, Provider[]> = {
     'real-estate': [],
     'home-services': [],
@@ -1885,14 +1893,16 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       (((r.badges as string[] | null) || []) as string[]),
     ].flat().map((s) => String(s).trim()).filter(Boolean)))
 
-    // Debug: Log restaurant providers being loaded
-    if (key === 'restaurants-cafes') {
-      console.log('[Supabase] Loading restaurant:', { 
-        name: r.name, 
-        tags: r.tags, 
-        combinedTags: combinedTags 
-      })
-    }
+    // Debug: Log all providers being loaded by category
+    console.log(`[Supabase] Loading ${key} provider:`, { 
+      name: r.name, 
+      category_key: r.category_key,
+      published: r.published,
+      tags: r.tags, 
+      badges: r.badges,
+      combinedTags: combinedTags,
+      images: r.images
+    })
 
     grouped[key].push({
       id: r.id,
@@ -1926,7 +1936,14 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
     })
   })
   providersByCategory = grouped
-  console.log('[Supabase] Providers loaded', grouped)
+  
+  // Log summary of loaded providers by category
+  Object.keys(grouped).forEach((category) => {
+    const count = grouped[category as CategoryKey].length
+    console.log(`[Supabase] ${category}: ${count} providers loaded`)
+  })
+  
+  console.log('[Supabase] Providers loaded successfully', grouped)
   try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
   return true
 }
@@ -1950,10 +1967,28 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         return { p, score }
       })
       .sort((a, b) => {
-        // Featured providers first
-        const am = isFeaturedProvider(a.p) ? 1 : 0
-        const bm = isFeaturedProvider(b.p) ? 1 : 0
+        // Featured providers first, but ONLY if they match the selected criteria
+        const aIsFeatured = isFeaturedProvider(a.p)
+        const bIsFeatured = isFeaturedProvider(b.p)
+        
+        // For health-wellness, check if featured providers match the selected type/goal
+        const aFeaturedMatchesCriteria = aIsFeatured && (type || goal) ? 
+          ((type && a.p.tags.includes(type)) || (goal && a.p.tags.includes(goal))) : false
+        const bFeaturedMatchesCriteria = bIsFeatured && (type || goal) ? 
+          ((type && b.p.tags.includes(type)) || (goal && b.p.tags.includes(goal))) : false
+        
+        // Only prioritize featured providers that match the criteria
+        const am = aFeaturedMatchesCriteria ? 1 : 0
+        const bm = bFeaturedMatchesCriteria ? 1 : 0
         if (bm !== am) return bm - am
+        
+        // If no specific criteria selected, fall back to original featured logic
+        if (!type && !goal) {
+          const amFallback = aIsFeatured ? 1 : 0
+          const bmFallback = bIsFeatured ? 1 : 0
+          if (bmFallback !== amFallback) return bmFallback - amFallback
+        }
+        
         if (b.score !== a.score) return b.score - a.score
         const ar = a.p.rating ?? 0
         const br = b.p.rating ?? 0
@@ -1989,10 +2024,28 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         return { p, score }
       })
       .sort((a, b) => {
-        // Featured providers first
-        const am = isFeaturedProvider(a.p) ? 1 : 0
-        const bm = isFeaturedProvider(b.p) ? 1 : 0
+        // Featured providers first, but ONLY if they match the selected criteria
+        const aIsFeatured = isFeaturedProvider(a.p)
+        const bIsFeatured = isFeaturedProvider(b.p)
+        
+        // For real-estate, check if featured providers match the selected need/property type
+        const aFeaturedMatchesCriteria = aIsFeatured && (need || propertyType) ? 
+          ((need && a.p.tags.includes(need)) || (propertyType && a.p.tags.includes(propertyType))) : false
+        const bFeaturedMatchesCriteria = bIsFeatured && (need || propertyType) ? 
+          ((need && b.p.tags.includes(need)) || (propertyType && b.p.tags.includes(propertyType))) : false
+        
+        // Only prioritize featured providers that match the criteria
+        const am = aFeaturedMatchesCriteria ? 1 : 0
+        const bm = bFeaturedMatchesCriteria ? 1 : 0
         if (bm !== am) return bm - am
+        
+        // If no specific criteria selected, fall back to original featured logic
+        if (!need && !propertyType) {
+          const amFallback = aIsFeatured ? 1 : 0
+          const bmFallback = bIsFeatured ? 1 : 0
+          if (bmFallback !== amFallback) return bmFallback - amFallback
+        }
+        
         if (b.score !== a.score) return b.score - a.score
         const ar = a.p.rating ?? 0
         const br = b.p.rating ?? 0
@@ -2081,10 +2134,45 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         return { p, score }
       })
       .sort((a, b) => {
-        // Featured providers first
-        const am = isFeaturedProvider(a.p) ? 1 : 0
-        const bm = isFeaturedProvider(b.p) ? 1 : 0
+        // Featured providers first, but ONLY if they match the selected cuisine
+        const aIsFeatured = isFeaturedProvider(a.p)
+        const bIsFeatured = isFeaturedProvider(b.p)
+        
+        // Check if featured providers match the selected cuisine
+        const aFeaturedMatchesCuisine = aIsFeatured && cuisine ? 
+          (a.p.tags.some(t => t.toLowerCase() === cuisine) || 
+           a.p.tags.some(t => {
+             const tagLower = t.toLowerCase()
+             return cuisineSynonyms.some(synonym => 
+               tagLower === synonym || 
+               tagLower.includes(synonym) || 
+               synonym.includes(tagLower)
+             )
+           })) : false
+           
+        const bFeaturedMatchesCuisine = bIsFeatured && cuisine ? 
+          (b.p.tags.some(t => t.toLowerCase() === cuisine) || 
+           b.p.tags.some(t => {
+             const tagLower = t.toLowerCase()
+             return cuisineSynonyms.some(synonym => 
+               tagLower === synonym || 
+               tagLower.includes(synonym) || 
+               synonym.includes(tagLower)
+             )
+           })) : false
+        
+        // Only prioritize featured providers that match the cuisine
+        const am = aFeaturedMatchesCuisine ? 1 : 0
+        const bm = bFeaturedMatchesCuisine ? 1 : 0
         if (bm !== am) return bm - am
+        
+        // If no cuisine selected, fall back to original featured logic
+        if (!cuisine) {
+          const amFallback = aIsFeatured ? 1 : 0
+          const bmFallback = bIsFeatured ? 1 : 0
+          if (bmFallback !== amFallback) return bmFallback - amFallback
+        }
+        
         if (b.score !== a.score) return b.score - a.score
         const ar = a.p.rating ?? 0
         const br = b.p.rating ?? 0
@@ -2100,10 +2188,28 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
     return { p, score: matches }
   })
   withScores.sort((a, b) => {
-    // Featured providers first
-    const am = isFeaturedProvider(a.p) ? 1 : 0
-    const bm = isFeaturedProvider(b.p) ? 1 : 0
+    // Featured providers first, but ONLY if they match the selected criteria
+    const aIsFeatured = isFeaturedProvider(a.p)
+    const bIsFeatured = isFeaturedProvider(b.p)
+    
+    // For generic categories, check if featured providers match any selected criteria
+    const aFeaturedMatchesCriteria = aIsFeatured && values.size > 0 ? 
+      a.p.tags.some(t => values.has(t)) : false
+    const bFeaturedMatchesCriteria = bIsFeatured && values.size > 0 ? 
+      b.p.tags.some(t => values.has(t)) : false
+    
+    // Only prioritize featured providers that match the criteria
+    const am = aFeaturedMatchesCriteria ? 1 : 0
+    const bm = bFeaturedMatchesCriteria ? 1 : 0
     if (bm !== am) return bm - am
+    
+    // If no specific criteria selected, fall back to original featured logic
+    if (values.size === 0) {
+      const amFallback = aIsFeatured ? 1 : 0
+      const bmFallback = bIsFeatured ? 1 : 0
+      if (bmFallback !== amFallback) return bmFallback - amFallback
+    }
+    
     if (b.score !== a.score) return b.score - a.score
     const ar = a.p.rating ?? 0
     const br = b.p.rating ?? 0
@@ -2609,11 +2715,11 @@ function CategoryFilters({
             {filteredProviders.length > 5 && (
               <div className="text-center">
                 <Link
-                  to={`/book?category=${category.key}`}
+                  to={`/book?category=${category.key}&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}`}
                   onClick={(e) => {
                     if (!auth.isAuthed) {
                       e.preventDefault()
-                      navigate('/signin', { state: { from: `/book?category=${category.key}` } })
+                      navigate('/signin', { state: { from: `/book?category=${category.key}&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}` } })
                       return
                     }
                   }}
@@ -3194,8 +3300,21 @@ function BookPage() {
   const [claimAsk, setClaimAsk] = useState<Record<string, boolean>>({})
   // Removed contact toggle for top matches (always expanded)
   const answers = useMemo(() => {
+    // First try to get filter answers from URL parameters (from CategoryFilters)
+    const urlFilters = params.get('filters')
+    if (urlFilters) {
+      try {
+        const parsedFilters = JSON.parse(decodeURIComponent(urlFilters))
+        if (parsedFilters && typeof parsedFilters === 'object') {
+          return parsedFilters
+        }
+      } catch (e) {
+        console.warn('Failed to parse URL filters:', e)
+      }
+    }
+    // Fallback to localStorage answers (from questionnaire)
     try { return JSON.parse(localStorage.getItem(`bf-tracking-${categoryKey}`) || '{}') } catch { return {} }
-  }, [categoryKey])
+  }, [categoryKey, params])
   const auth = useAuth()
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
     .split(',')
@@ -3238,9 +3357,24 @@ function BookPage() {
                       {d.images && d.images.length > 0 ? (
                         <div className="mb-3">
                           <img 
-                            src={d.images[0]} 
+                            src={d.images?.[0] || ''} 
                             alt={`${r.name} business photo`} 
                             className="w-full h-32 object-cover rounded-lg border border-neutral-100"
+                            onError={(e) => {
+                              console.warn(`[BookPage] Failed to load image for ${r.name}:`, d.images?.[0])
+                              const img = e.currentTarget as HTMLImageElement
+                              img.style.display = 'none'
+                              img.parentElement!.innerHTML = `
+                                <div class="w-full h-32 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                                  <div class="text-center text-neutral-500">
+                                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    <p class="text-xs">No image available</p>
+                                  </div>
+                                </div>
+                              `
+                            }}
                           />
                         </div>
                       ) : (
@@ -3351,9 +3485,24 @@ function BookPage() {
                           {d.images && d.images.length > 0 ? (
                             <div className="mb-3">
                               <img 
-                                src={d.images[0]} 
+                                src={d.images?.[0] || ''} 
                                 alt={`${r.name} business photo`} 
                                 className="w-full h-24 object-cover rounded-lg border border-neutral-100"
+                                onError={(e) => {
+                                  console.warn(`[BookPage] Failed to load image for ${r.name}:`, d.images?.[0])
+                                  const img = e.currentTarget as HTMLImageElement
+                                  img.style.display = 'none'
+                                  img.parentElement!.innerHTML = `
+                                    <div class="w-full h-24 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                                      <div class="text-center text-neutral-500">
+                                        <svg class="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        <p class="text-xs">No image</p>
+                                      </div>
+                                    </div>
+                                  `
+                                }}
                               />
                             </div>
                           ) : (
