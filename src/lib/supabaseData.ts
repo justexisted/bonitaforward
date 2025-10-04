@@ -87,7 +87,10 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
 
     // Filter for published providers (handle both boolean true and string 'true')
     const publishedRows = allRows.filter((r) => {
-      const isPublished = r.published === true || r.published === 'true' || r.published === 1
+      const publishedValue = r.published
+      const isPublished = publishedValue === true || 
+                         (typeof publishedValue === 'string' && publishedValue === 'true') ||
+                         (typeof publishedValue === 'number' && publishedValue === 1)
       return isPublished
     })
 
@@ -99,7 +102,7 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     console.log(`[Supabase] Final filtered providers: ${filtered.length}`)
     
     // Log category breakdown
-    const categoryBreakdown = {}
+    const categoryBreakdown: Record<string, number> = {}
     filtered.forEach(r => {
       const cat = r.category_key || 'unknown'
       categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1
@@ -109,7 +112,7 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     // Fix image URLs for all providers
     const providersWithFixedImages = filtered.map(provider => ({
       ...provider,
-      images: fixImageUrls(provider.images)
+      images: fixImageUrls(provider.images || null)
     }))
     
     return providersWithFixedImages
