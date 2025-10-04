@@ -75,7 +75,7 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     const { data: allData, error: allError } = await supabase
       .from('providers')
       .select('*')
-      .limit(500)
+      .limit(1000)
     
     if (allError) {
       console.warn('[Supabase] providers select error', allError)
@@ -83,21 +83,40 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     }
 
     const allRows = (allData || []) as DbProvider[]
-    console.log(`[Supabase] Total providers in database: ${allRows.length}`)
+    console.log(`[Supabase] Fetched ${allRows.length} providers from database (limit: 1000)`)
+    
+    // Warn if we hit the limit
+    if (allRows.length === 1000) {
+      console.warn(`[Supabase] WARNING: Hit 1000 record limit! You may have more providers that weren't fetched.`)
+    }
 
     // Filter for published providers (handle both boolean true and string 'true')
+    // Also include providers where published is null/undefined (treat as published)
     const publishedRows = allRows.filter((r) => {
       const publishedValue = r.published
       const isPublished = publishedValue === true || 
                          (typeof publishedValue === 'string' && publishedValue === 'true') ||
-                         (typeof publishedValue === 'number' && publishedValue === 1)
+                         (typeof publishedValue === 'number' && publishedValue === 1) ||
+                         publishedValue === null ||
+                         publishedValue === undefined
       return isPublished
     })
 
     console.log(`[Supabase] Published providers: ${publishedRows.length}`)
 
-    // Exclude soft-deleted providers (badges includes 'deleted')
-    const filtered = publishedRows.filter((r) => !Array.isArray(r.badges) || !r.badges?.includes('deleted'))
+    // Exclude soft-deleted providers and providers without valid category_key
+    const filtered = publishedRows.filter((r) => {
+      // Must have valid category_key
+      const hasValidCategory = r.category_key && typeof r.category_key === 'string' && r.category_key.trim().length > 0
+      if (!hasValidCategory) {
+        console.log(`[Supabase] Excluding provider without category_key: ${r.name} (category_key: "${r.category_key}")`)
+        return false
+      }
+      
+      // Exclude deleted providers
+      const isNotDeleted = !Array.isArray(r.badges) || !r.badges?.includes('deleted')
+      return isNotDeleted
+    })
     
     console.log(`[Supabase] Final filtered providers: ${filtered.length}`)
     
@@ -109,12 +128,30 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     })
     console.log('[Supabase] Category breakdown:', categoryBreakdown)
     
+    // Debug: Show all unique category_key values to identify any issues
+    const uniqueCategories = [...new Set(filtered.map(r => r.category_key).filter(Boolean))]
+    console.log('[Supabase] Unique category_key values:', uniqueCategories)
+    
+    // Debug: Show health-wellness specifically
+    const healthWellnessCount = filtered.filter(r => r.category_key === 'health-wellness').length
+    console.log(`[Supabase] Health-wellness providers found: ${healthWellnessCount}`)
+    
+    // Debug: Show any providers with "health" in category_key
+    const healthRelated = filtered.filter(r => 
+      r.category_key && r.category_key.toLowerCase().includes('health')
+    )
+    console.log(`[Supabase] Providers with "health" in category_key: ${healthRelated.length}`)
+    if (healthRelated.length > 0) {
+      console.log('[Supabase] Health-related category_keys:', [...new Set(healthRelated.map(r => r.category_key))])
+    }
+    
     // Fix image URLs for all providers
     const providersWithFixedImages = filtered.map(provider => ({
       ...provider,
       images: fixImageUrls(provider.images || null)
     }))
     
+    // NO AUTOMATIC CATEGORY CORRECTION - providers stay in their actual category_key
     return providersWithFixedImages
   } catch (err) {
     console.warn('[Supabase] providers select failed', err)

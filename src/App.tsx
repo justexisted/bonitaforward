@@ -1893,16 +1893,10 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       (((r.badges as string[] | null) || []) as string[]),
     ].flat().map((s) => String(s).trim()).filter(Boolean)))
 
-    // Debug: Log all providers being loaded by category
-    console.log(`[Supabase] Loading ${key} provider:`, { 
-      name: r.name, 
-      category_key: r.category_key,
-      published: r.published,
-      tags: r.tags, 
-      badges: r.badges,
-      combinedTags: combinedTags,
-      images: r.images
-    })
+    // Debug: Only log health-wellness providers to avoid spam
+    if (key === 'health-wellness') {
+      console.log(`[Supabase] Loading health-wellness provider: ${r.name} (published: ${r.published})`)
+    }
 
     grouped[key].push({
       id: r.id,
@@ -1949,21 +1943,54 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
 }
 
 function scoreProviders(category: CategoryKey, answers: Record<string, string>): Provider[] {
+  // CRITICAL FIX: Only get providers from the specified category
   const providers = providersByCategory[category] || []
+  
+  // Remove console spam - no logging here
+  
   if (category === 'health-wellness') {
     const values = new Set<string>(Object.values(answers))
     const type = answers['type']
     const goal = answers['goal'] || answers['salon_kind']
     const when = answers['when']
     const payment = answers['payment']
-    return providers
+    
+    // Helper function to check if tags contain a keyword (more flexible matching)
+    const tagsContainKeyword = (tags: string[], keyword: string): boolean => {
+      if (!keyword || !tags) return false
+      const lowerKeyword = keyword.toLowerCase()
+      return tags.some(tag => tag.toLowerCase().includes(lowerKeyword))
+    }
+    
+    // Helper function to check if any tag matches any answer value
+    const tagsMatchAnyAnswer = (tags: string[], answerValues: Set<string>): boolean => {
+      if (!tags || answerValues.size === 0) return false
+      return tags.some(tag => 
+        Array.from(answerValues).some(value => 
+          tag.toLowerCase().includes(value.toLowerCase()) || 
+          value.toLowerCase().includes(tag.toLowerCase())
+        )
+      )
+    }
+    
+    const scoredProviders = providers
       .map((p) => {
         let score = 0
-        if (type && p.tags.includes(type)) score += 2
-        if (goal && p.tags.includes(goal)) score += 2
-        if (when && p.tags.includes(when)) score += 1
-        if (payment && p.tags.includes(payment)) score += 1
-        p.tags.forEach((t) => { if (values.has(t)) score += 0 })
+        
+        // More flexible matching - check if tags contain the keyword
+        if (type && tagsContainKeyword(p.tags, type)) score += 2
+        if (goal && tagsContainKeyword(p.tags, goal)) score += 2
+        if (when && tagsContainKeyword(p.tags, when)) score += 1
+        if (payment && tagsContainKeyword(p.tags, payment)) score += 1
+        
+        // Generic tag match fallback - give some points for any partial match
+        if (tagsMatchAnyAnswer(p.tags, values)) score += 0.5
+        
+        // If no specific criteria selected, give all providers a base score
+        if (!type && !goal && !when && !payment) {
+          score = 1 // Base score so all providers show up when no filters applied
+        }
+        
         return { p, score }
       })
       .sort((a, b) => {
@@ -1973,9 +2000,9 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         
         // For health-wellness, check if featured providers match the selected type/goal
         const aFeaturedMatchesCriteria = aIsFeatured && (type || goal) ? 
-          ((type && a.p.tags.includes(type)) || (goal && a.p.tags.includes(goal))) : false
+          ((type && tagsContainKeyword(a.p.tags, type)) || (goal && tagsContainKeyword(a.p.tags, goal))) : false
         const bFeaturedMatchesCriteria = bIsFeatured && (type || goal) ? 
-          ((type && b.p.tags.includes(type)) || (goal && b.p.tags.includes(goal))) : false
+          ((type && tagsContainKeyword(b.p.tags, type)) || (goal && tagsContainKeyword(b.p.tags, goal))) : false
         
         // Only prioritize featured providers that match the criteria
         const am = aFeaturedMatchesCriteria ? 1 : 0
@@ -1996,6 +2023,8 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         return a.p.name.localeCompare(b.p.name)
       })
       .map((s) => s.p)
+    
+    return scoredProviders
   }
   if (category === 'real-estate') {
     const values = new Set<string>(Object.values(answers))
@@ -2685,7 +2714,12 @@ function CategoryFilters({
               <div key={provider.id} className="p-4 border border-neutral-200 rounded-lg hover:shadow-sm transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h5 className="font-medium text-neutral-900">{provider.name}</h5>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h5 className="font-medium text-neutral-900">{provider.name}</h5>
+                      <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded-full">
+                        {provider.category_key.replace('-', ' ')}
+                      </span>
+                    </div>
                     {provider.description && (
                       <p className="text-sm text-neutral-600 mt-1">{provider.description}</p>
                     )}
@@ -2750,6 +2784,7 @@ function CategoryPage() {
   const [, setVersion] = useState(0)
   const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false)
   const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
+  const [showDebug, setShowDebug] = useState(false)
   
   useEffect(() => {
     function onUpdate() { setVersion((v: number) => v + 1) }
@@ -2771,6 +2806,16 @@ function CategoryPage() {
     } catch {}
   }, [category.key])
   
+  // Debug info
+  const debugInfo = {
+    category: category.key,
+    availableProviders: providersByCategory[category.key]?.length || 0,
+    providerNames: providersByCategory[category.key]?.map(p => p.name) || [],
+    providerCategories: providersByCategory[category.key]?.map(p => p.category_key) || [],
+    questionnaireAnswers,
+    hasCompletedQuestionnaire
+  }
+  
   return (
     <section className="py-8">
       <Container>
@@ -2780,9 +2825,32 @@ function CategoryPage() {
               <Icon className="h-5 w-5 text-neutral-700" />
             </span>
             <div className="flex-1">
-              <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{category.name}</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{category.name}</h2>
+                <button
+                  onClick={() => setShowDebug(!showDebug)}
+                  className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                >
+                  {showDebug ? 'Hide Debug' : 'Show Debug'}
+                </button>
+              </div>
             </div>
           </div>
+          
+          {/* Debug Window */}
+          {showDebug && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+              <h3 className="text-sm font-semibold mb-2">🐛 Debug Info</h3>
+              <div className="text-xs space-y-1">
+                <div><strong>Category:</strong> {debugInfo.category}</div>
+                <div><strong>Available Providers:</strong> {debugInfo.availableProviders}</div>
+                <div><strong>Provider Names:</strong> {debugInfo.providerNames.join(', ')}</div>
+                <div><strong>Provider Categories:</strong> {debugInfo.providerCategories.join(', ')}</div>
+                <div><strong>Questionnaire Answers:</strong> {JSON.stringify(debugInfo.questionnaireAnswers)}</div>
+                <div><strong>Has Completed Questionnaire:</strong> {debugInfo.hasCompletedQuestionnaire ? 'Yes' : 'No'}</div>
+              </div>
+            </div>
+          )}
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <div className="mt-4">
@@ -3314,7 +3382,7 @@ function BookPage() {
     }
     // Fallback to localStorage answers (from questionnaire)
     try { return JSON.parse(localStorage.getItem(`bf-tracking-${categoryKey}`) || '{}') } catch { return {} }
-  }, [categoryKey, params])
+  }, [categoryKey, params.get('filters')])
   const auth = useAuth()
   const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
     .split(',')
@@ -3398,6 +3466,17 @@ function BookPage() {
                           </div>
                         </Link>
                         <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                      </div>
+                      {/* Show category and tags */}
+                      <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                          {r.category_key.replace('-', ' ')}
+                        </span>
+                        {isAdmin && r.tags && r.tags.length > 0 && (
+                          <span className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full">
+                            {r.tags.slice(0, 2).join(', ')}
+                          </span>
+                        )}
                       </div>
                       {isAdmin && (r.tags && r.tags.length > 0) && (
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -3526,6 +3605,17 @@ function BookPage() {
                               </div>
                             </Link>
                             <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                          </div>
+                          {/* Show category and tags */}
+                          <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                              {r.category_key.replace('-', ' ')}
+                            </span>
+                            {isAdmin && r.tags && r.tags.length > 0 && (
+                              <span className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full">
+                                {r.tags.slice(0, 2).join(', ')}
+                              </span>
+                            )}
                           </div>
                           {isAdmin && (r.tags && r.tags.length > 0) && (
                             <div className="mt-1 flex flex-wrap gap-1">

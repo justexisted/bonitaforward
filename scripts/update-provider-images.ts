@@ -111,7 +111,7 @@ async function listProviders() {
   try {
     const { data: providers, error } = await supabase
       .from('providers')
-      .select('id, name, category_key, images')
+      .select('id, name, category_key, images, published, badges')
       .order('name')
     
     if (error) {
@@ -126,12 +126,35 @@ async function listProviders() {
     
     console.log(`📊 Found ${providers.length} providers:\n`)
     
-    providers.forEach(provider => {
+    // Find health-related providers
+    const healthKeywords = ['salon', 'spa', 'massage', 'therapy', 'physical', 'dental', 'medical', 'wellness', 'health', 'beauty', 'nail', 'hair', 'skin', 'fitness', 'gym', 'yoga', 'pilates', 'chiropractic', 'acupuncture']
+    
+    const healthRelated = providers.filter(p => {
+      const name = p.name?.toLowerCase() || ''
+      const category = p.category_key?.toLowerCase() || ''
+      return healthKeywords.some(keyword => name.includes(keyword)) || category === 'health-wellness'
+    })
+    
+    console.log(`🏥 Health-related providers found: ${healthRelated.length}\n`)
+    
+    healthRelated.forEach(provider => {
       const imageCount = provider.images ? (Array.isArray(provider.images) ? provider.images.length : 1) : 0
-      console.log(`${provider.name} (${provider.category_key}) - ${imageCount} images`)
+      console.log(`${provider.name} (${provider.category_key}) - Published: ${provider.published} - Badges: [${provider.badges?.join(', ') || 'none'}] - ${imageCount} images`)
       if (provider.images && Array.isArray(provider.images) && provider.images.length > 0) {
         provider.images.forEach(img => console.log(`  📷 ${img}`))
       }
+    })
+    
+    // Show category breakdown
+    const categoryBreakdown: Record<string, number> = {}
+    providers.forEach(p => {
+      const cat = p.category_key || 'unknown'
+      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1
+    })
+    
+    console.log('\n📊 Category breakdown:')
+    Object.entries(categoryBreakdown).forEach(([cat, count]) => {
+      console.log(`   ${cat}: ${count}`)
     })
     
   } catch (error) {
