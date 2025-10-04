@@ -40,22 +40,79 @@ export type DbProvider = {
   booking_url?: string | null
 }
 
+// Helper function to fix image URLs if they're relative paths
+function fixImageUrls(images: string[] | null): string[] | null {
+  if (!images || !Array.isArray(images)) return null
+  
+  return images.map(img => {
+    if (!img || typeof img !== 'string') return img
+    
+    // If it's already a full URL, return as-is
+    if (img.startsWith('http://') || img.startsWith('https://')) {
+      return img
+    }
+    
+    // If it's a Supabase storage path, convert to public URL
+    if (img.startsWith('business-images/') || img.startsWith('blog-images/')) {
+      const { data } = supabase.storage.from('business-images').getPublicUrl(img)
+      return data.publicUrl
+    }
+    
+    // If it's a relative path, assume it's in business-images bucket
+    if (img.startsWith('/') || !img.includes('/')) {
+      const { data } = supabase.storage.from('business-images').getPublicUrl(img)
+      return data.publicUrl
+    }
+    
+    // Return as-is if we can't determine the format
+    return img
+  }).filter(Boolean)
+}
+
 export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
   try {
-    const { data, error } = await supabase
+    // First, let's get all providers to see what we're working with
+    const { data: allData, error: allError } = await supabase
       .from('providers')
       .select('*')
-      .eq('published', true) // Only fetch published providers
       .limit(500)
-    if (error) {
-      console.warn('[Supabase] providers select error', error)
+    
+    if (allError) {
+      console.warn('[Supabase] providers select error', allError)
       return []
     }
-    const rows = (data || []) as DbProvider[]
+
+    const allRows = (allData || []) as DbProvider[]
+    console.log(`[Supabase] Total providers in database: ${allRows.length}`)
+
+    // Filter for published providers (handle both boolean true and string 'true')
+    const publishedRows = allRows.filter((r) => {
+      const isPublished = r.published === true || r.published === 'true' || r.published === 1
+      return isPublished
+    })
+
+    console.log(`[Supabase] Published providers: ${publishedRows.length}`)
+
     // Exclude soft-deleted providers (badges includes 'deleted')
-    const filtered = rows.filter((r) => !Array.isArray(r.badges) || !r.badges?.includes('deleted'))
-    console.log(`[Supabase] Fetched ${filtered.length} published providers (${rows.length} total)`)
-    return filtered
+    const filtered = publishedRows.filter((r) => !Array.isArray(r.badges) || !r.badges?.includes('deleted'))
+    
+    console.log(`[Supabase] Final filtered providers: ${filtered.length}`)
+    
+    // Log category breakdown
+    const categoryBreakdown = {}
+    filtered.forEach(r => {
+      const cat = r.category_key || 'unknown'
+      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1
+    })
+    console.log('[Supabase] Category breakdown:', categoryBreakdown)
+    
+    // Fix image URLs for all providers
+    const providersWithFixedImages = filtered.map(provider => ({
+      ...provider,
+      images: fixImageUrls(provider.images)
+    }))
+    
+    return providersWithFixedImages
   } catch (err) {
     console.warn('[Supabase] providers select failed', err)
     return []
