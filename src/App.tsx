@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } fr
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
-import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight } from 'lucide-react'
+import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, X, ArrowLeft, ArrowRight as ArrowRightIcon, User, BookOpen } from 'lucide-react'
 import CreateBusinessForm from './pages/CreateBusinessForm'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
@@ -26,6 +26,7 @@ import CountUp from './components/CountUp'
 import ScrollStack, { ScrollStackItem } from './components/ScrollStack'
 import CardNav, { type CardNavItem } from './components/CardNav'
 import Prism from './components/Prism'
+import Dock, { type DockItemData } from './components/Dock'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -754,6 +755,37 @@ function Footer() {
 }
 
 function Layout() {
+  const navigate = useNavigate()
+  const auth = useAuth()
+
+  const dockItems: DockItemData[] = [
+    {
+      icon: <ArrowLeft className="w-6 h-6 text-white" />,
+      label: "Back",
+      onClick: () => window.history.back()
+    },
+    {
+      icon: <ArrowRightIcon className="w-6 h-6 text-white" />,
+      label: "Forward", 
+      onClick: () => window.history.forward()
+    },
+    {
+      icon: <Home className="w-6 h-6 text-white" />,
+      label: "Home",
+      onClick: () => navigate('/')
+    },
+    {
+      icon: <User className="w-6 h-6 text-white" />,
+      label: "Profile",
+      onClick: () => navigate(auth.isAuthed ? '/account' : '/signin')
+    },
+    {
+      icon: <BookOpen className="w-6 h-6 text-white" />,
+      label: "Blog",
+      onClick: () => navigate('/community')
+    }
+  ]
+
   return (
     <div className="min-h-full flex flex-col">
       <SupabasePing />
@@ -762,6 +794,12 @@ function Layout() {
         <Outlet />
       </main>
       <Footer />
+      
+      {/* Dock Navigation */}
+      <Dock 
+        items={dockItems}
+        className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-40"
+      />
     </div>
   )
 }
@@ -927,6 +965,7 @@ function ProviderPage() {
   const [couponBusy, setCouponBusy] = useState(false)
   const [couponMsg, setCouponMsg] = useState<string | null>(null)
   const [jobs, setJobs] = useState<{ id: string; title: string; description?: string | null; apply_url?: string | null; salary_range?: string | null }[]>([])
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -1081,11 +1120,12 @@ function ProviderPage() {
                         'grid-cols-2' // 4 or more images
                       }`}>
                         {provider.images.map((image, index) => (
-                          <div key={index} className="relative group aspect-square overflow-hidden rounded-lg">
+                          <div key={index} className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer">
                             <img
                               src={image}
                               alt={`${provider.name} photo ${index + 1}`}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              onClick={() => setSelectedImage(image)}
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement
                                 img.style.display = 'none'
@@ -1107,11 +1147,12 @@ function ProviderPage() {
                     ) : (
                       // Non-featured accounts: Single image display
                       <div className="flex justify-center">
-                        <div className="relative group max-w-md">
+                        <div className="relative group max-w-md cursor-pointer">
                           <img
-                            src={provider.images[0]}
+                            src={provider.images?.[0] || ''}
                             alt={`${provider.name} - Main Image`}
                             className="w-full h-64 object-cover rounded-lg border border-neutral-200 hover:shadow-lg transition-shadow"
+                            onClick={() => setSelectedImage(provider.images?.[0] || '')}
                           />
                           {/* Optional: Add a subtle indicator that this is a single image */}
                           <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-neutral-600">
@@ -1388,6 +1429,30 @@ function ProviderPage() {
           )}
         </div>
       </Container>
+
+      {/* Full-screen Image Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <img
+              src={selectedImage}
+              alt={`${provider?.name} full-size image`}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-4 right-4 bg-white rounded-full p-2 hover:bg-gray-100 transition-colors"
+              aria-label="Close image"
+            >
+              <X className="w-6 h-6 text-black" />
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
@@ -2996,7 +3061,8 @@ function CategoryFilters({
               {filteredProviders.slice(0, 8).map((provider) => {
                 const details = getProviderDetails(provider)
                 return (
-                  <div key={provider.id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                  <Link key={provider.id} to={`/provider/${provider.slug}`} className="block">
+                    <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                     {/* Provider Image */}
                     {details.images && details.images.length > 0 ? (
                       <div className="aspect-video bg-neutral-100">
@@ -3057,15 +3123,9 @@ function CategoryFilters({
                           ))}
                         </div>
                       )}
-                      
-                      <Link
-                        to={`/provider/${provider.slug}`}
-                        className="inline-block w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                      >
-                        View Details
-                      </Link>
                     </div>
-                  </div>
+                    </div>
+                  </Link>
                 )
               })}
             </div>
