@@ -1072,8 +1072,13 @@ function ProviderPage() {
 
                     {/* Featured accounts get image grid, non-featured get single image */}
                     {isFeaturedProvider(provider) ? (
-                      // Featured accounts: Responsive image grid for multiple images
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      // Featured accounts: Dynamic responsive image grid based on image count
+                      <div className={`grid gap-3 ${
+                        provider.images.length === 1 ? 'grid-cols-1' :
+                        provider.images.length === 2 ? 'grid-cols-2' :
+                        provider.images.length === 3 ? 'grid-cols-3' :
+                        'grid-cols-2' // 4 or more images
+                      }`}>
                         {provider.images.map((image, index) => (
                           <div key={index} className="relative group aspect-square overflow-hidden rounded-lg">
                             <img
