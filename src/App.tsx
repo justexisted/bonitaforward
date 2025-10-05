@@ -1563,13 +1563,28 @@ const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
   ],
   'home-services': [
     {
-      id: 'service',
+      id: 'type',
       prompt: 'Which service do you need?',
       options: [
         { id: 'landscaping', label: 'Landscaping' },
-        { id: 'solar', label: 'Solar' },
         { id: 'cleaning', label: 'Cleaning' },
+        { id: 'solar', label: 'Solar' },
         { id: 'remodeling', label: 'Remodeling' },
+        { id: 'plumbing', label: 'Plumbing' },
+        { id: 'electrical', label: 'Electrical' },
+        { id: 'hvac', label: 'HVAC' },
+        { id: 'roofing', label: 'Roofing' },
+        { id: 'flooring', label: 'Flooring' },
+        { id: 'painting', label: 'Painting' },
+        { id: 'handyman', label: 'Handyman' },
+        { id: 'pool', label: 'Pool Service' },
+        { id: 'pest control', label: 'Pest Control' },
+        { id: 'security', label: 'Security' },
+        { id: 'windows', label: 'Windows' },
+        { id: 'doors', label: 'Doors' },
+        { id: 'insulation', label: 'Insulation' },
+        { id: 'concrete', label: 'Concrete' },
+        { id: 'masonry', label: 'Masonry' },
       ],
     },
     {
@@ -2280,6 +2295,174 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         return a.p.name.localeCompare(b.p.name)
       })
       .map((s) => s.p)
+  }
+  
+  // FIXED: Add comprehensive logic for home-services category
+  if (category === 'home-services') {
+    const type = answers['type']
+    const goal = answers['goal'] || answers['urgency']
+    const when = answers['urgency']
+    const budget = answers['budget']
+    
+    // Comprehensive synonym mapping for home-services provider types
+    const getProviderSynonyms = (serviceType: string): string[] => {
+      const synonymMap: Record<string, string[]> = {
+        // Landscaping
+        'landscaping': ['landscaping', 'landscape', 'landscape design', 'garden', 'gardening', 'lawn care', 'lawn', 'yard', 'outdoor', 'plants', 'trees', 'shrubs', 'irrigation', 'sprinkler', 'maintenance', 'tree service', 'tree trimming', 'tree removal'],
+        'landscape': ['landscaping', 'landscape', 'landscape design', 'garden', 'gardening', 'lawn care', 'lawn', 'yard', 'outdoor', 'plants', 'trees', 'shrubs', 'irrigation', 'sprinkler', 'maintenance', 'tree service', 'tree trimming', 'tree removal'],
+        
+        // Cleaning Services
+        'cleaning': ['cleaning', 'house cleaning', 'residential cleaning', 'commercial cleaning', 'deep clean', 'maid service', 'janitorial', 'carpet cleaning', 'upholstery cleaning', 'window cleaning', 'move-in cleaning', 'move-out cleaning', 'post construction cleaning'],
+        'house cleaning': ['cleaning', 'house cleaning', 'residential cleaning', 'commercial cleaning', 'deep clean', 'maid service', 'janitorial', 'carpet cleaning', 'upholstery cleaning', 'window cleaning', 'move-in cleaning', 'move-out cleaning', 'post construction cleaning'],
+        
+        // Solar/Energy
+        'solar': ['solar', 'solar panels', 'solar installation', 'solar energy', 'renewable energy', 'photovoltaic', 'pv', 'solar system', 'solar power', 'green energy', 'clean energy', 'solar contractor', 'solar company'],
+        'solar installation': ['solar', 'solar panels', 'solar installation', 'solar energy', 'renewable energy', 'photovoltaic', 'pv', 'solar system', 'solar power', 'green energy', 'clean energy', 'solar contractor', 'solar company'],
+        
+        // Remodeling/Construction
+        'remodeling': ['remodeling', 'renovation', 'home improvement', 'construction', 'general contractor', 'gc', 'kitchen remodel', 'bathroom remodel', 'addition', 'home addition', 'basement finishing', 'room addition', 'custom home'],
+        'renovation': ['remodeling', 'renovation', 'home improvement', 'construction', 'general contractor', 'gc', 'kitchen remodel', 'bathroom remodel', 'addition', 'home addition', 'basement finishing', 'room addition', 'custom home'],
+        
+        // Plumbing
+        'plumbing': ['plumbing', 'plumber', 'pipe', 'pipes', 'drain', 'drain cleaning', 'water heater', 'toilet', 'faucet', 'leak repair', 'pipe repair', 'sewer', 'septic', 'bathroom plumbing', 'kitchen plumbing'],
+        'plumber': ['plumbing', 'plumber', 'pipe', 'pipes', 'drain', 'drain cleaning', 'water heater', 'toilet', 'faucet', 'leak repair', 'pipe repair', 'sewer', 'septic', 'bathroom plumbing', 'kitchen plumbing'],
+        
+        // Electrical
+        'electrical': ['electrical', 'electrician', 'electrical work', 'electrical installation', 'electrical repair', 'outlet', 'outlets', 'switch', 'switches', 'lighting', 'electrical panel', 'circuit breaker', 'wiring', 'electrical contractor'],
+        'electrician': ['electrical', 'electrician', 'electrical work', 'electrical installation', 'electrical repair', 'outlet', 'outlets', 'switch', 'switches', 'lighting', 'electrical panel', 'circuit breaker', 'wiring', 'electrical contractor'],
+        
+        // HVAC
+        'hvac': ['hvac', 'heating', 'cooling', 'air conditioning', 'ac', 'heating and cooling', 'furnace', 'air conditioner', 'heat pump', 'ductwork', 'duct cleaning', 'thermostat', 'hvac contractor', 'hvac technician'],
+        'heating': ['hvac', 'heating', 'cooling', 'air conditioning', 'ac', 'heating and cooling', 'furnace', 'air conditioner', 'heat pump', 'ductwork', 'duct cleaning', 'thermostat', 'hvac contractor', 'hvac technician'],
+        'cooling': ['hvac', 'heating', 'cooling', 'air conditioning', 'ac', 'heating and cooling', 'furnace', 'air conditioner', 'heat pump', 'ductwork', 'duct cleaning', 'thermostat', 'hvac contractor', 'hvac technician'],
+        
+        // Roofing
+        'roofing': ['roofing', 'roofer', 'roof', 'roof repair', 'roof replacement', 'roofing contractor', 'shingles', 'tile', 'metal roofing', 'flat roof', 'roofing company'],
+        'roofer': ['roofing', 'roofer', 'roof', 'roof repair', 'roof replacement', 'roofing contractor', 'shingles', 'tile', 'metal roofing', 'flat roof', 'roofing company'],
+        
+        // Flooring
+        'flooring': ['flooring', 'floor', 'floors', 'hardwood', 'carpet', 'tile', 'laminate', 'vinyl', 'flooring installation', 'flooring contractor', 'floor refinishing', 'floor sanding'],
+        'floor': ['flooring', 'floor', 'floors', 'hardwood', 'carpet', 'tile', 'laminate', 'vinyl', 'flooring installation', 'flooring contractor', 'floor refinishing', 'floor sanding'],
+        
+        // Painting
+        'painting': ['painting', 'painter', 'paint', 'interior painting', 'exterior painting', 'house painting', 'paint contractor', 'color consultation', 'paint job', 'painting company'],
+        'painter': ['painting', 'painter', 'paint', 'interior painting', 'exterior painting', 'house painting', 'paint contractor', 'color consultation', 'paint job', 'painting company'],
+        
+        // Handyman
+        'handyman': ['handyman', 'handy man', 'general repair', 'home repair', 'maintenance', 'fix', 'repair', 'small jobs', 'odd jobs', 'home maintenance', 'handyman services'],
+        'handy man': ['handyman', 'handy man', 'general repair', 'home repair', 'maintenance', 'fix', 'repair', 'small jobs', 'odd jobs', 'home maintenance', 'handyman services'],
+        
+        // Pool Services
+        'pool': ['pool', 'pool service', 'pool maintenance', 'pool cleaning', 'pool repair', 'pool contractor', 'swimming pool', 'pool equipment', 'pool installation'],
+        'pool service': ['pool', 'pool service', 'pool maintenance', 'pool cleaning', 'pool repair', 'pool contractor', 'swimming pool', 'pool equipment', 'pool installation'],
+        
+        // Pest Control
+        'pest control': ['pest control', 'pest management', 'exterminator', 'extermination', 'termite', 'rodent', 'ant', 'spider', 'pest removal', 'pest prevention'],
+        'exterminator': ['pest control', 'pest management', 'exterminator', 'extermination', 'termite', 'rodent', 'ant', 'spider', 'pest removal', 'pest prevention'],
+        
+        // Security
+        'security': ['security', 'security system', 'alarm', 'alarm system', 'security camera', 'surveillance', 'home security', 'security installation', 'security company'],
+        'alarm': ['security', 'security system', 'alarm', 'alarm system', 'security camera', 'surveillance', 'home security', 'security installation', 'security company'],
+        
+        // Windows & Doors
+        'windows': ['windows', 'window', 'window replacement', 'window installation', 'window repair', 'window contractor', 'glass', 'glass repair', 'window company'],
+        'doors': ['doors', 'door', 'door replacement', 'door installation', 'door repair', 'door contractor', 'garage door', 'garage door repair', 'door company'],
+        
+        // Insulation
+        'insulation': ['insulation', 'insulate', 'insulation installation', 'insulation contractor', 'attic insulation', 'wall insulation', 'energy efficiency'],
+        
+        // Concrete/Masonry
+        'concrete': ['concrete', 'concrete work', 'concrete contractor', 'concrete repair', 'concrete installation', 'driveway', 'patio', 'sidewalk', 'foundation'],
+        'masonry': ['masonry', 'mason', 'stone work', 'brick', 'brick work', 'stone', 'fireplace', 'chimney', 'masonry contractor'],
+      }
+      
+      return synonymMap[serviceType.toLowerCase()] || [serviceType]
+    }
+    
+    // Enhanced matching function that checks synonyms
+    const tagsMatchSynonyms = (tags: string[], targetType: string): boolean => {
+      if (!tags || !targetType) return false
+      const synonyms = getProviderSynonyms(targetType)
+      const lowerTags = tags.map(tag => tag.toLowerCase())
+      
+      return synonyms.some(synonym => 
+        lowerTags.some(tag => 
+          tag.includes(synonym.toLowerCase()) || 
+          synonym.toLowerCase().includes(tag)
+        )
+      )
+    }
+    
+    // Helper function for simple keyword matching (for secondary criteria)
+    const tagsContainKeyword = (tags: string[], keyword: string): boolean => {
+      if (!keyword || !tags) return false
+      const lowerKeyword = keyword.toLowerCase()
+      return tags.some(tag => tag.toLowerCase().includes(lowerKeyword))
+    }
+    
+    // Enhanced scoring with synonym matching
+    const scoredProviders = providers
+      .map((p) => {
+        let score = 0
+        
+        // Primary type matching with synonyms
+        if (type && tagsMatchSynonyms(p.tags, type)) {
+          score += 5 // High priority for exact type match
+        }
+        
+        // Goal matching with synonyms
+        if (goal && tagsMatchSynonyms(p.tags, goal)) {
+          score += 3 // Medium-high priority for goal match
+        }
+        
+        // Secondary criteria
+        if (when && tagsContainKeyword(p.tags, when)) score += 1
+        if (budget && tagsContainKeyword(p.tags, budget)) score += 1
+        
+        // If no specific criteria selected, give all providers a base score
+        if (!type && !goal && !when && !budget) {
+          score = 1 // Base score so all providers show up when no filters applied
+        }
+        
+        return { p, score }
+      })
+      .sort((a, b) => {
+        // Featured providers first, but ONLY if they match the selected criteria
+        const aIsFeatured = isFeaturedProvider(a.p)
+        const bIsFeatured = isFeaturedProvider(b.p)
+        
+        // Check if featured providers match the selected type with synonyms
+        const aFeaturedMatchesCriteria = aIsFeatured && (type || goal) ? 
+          ((type && tagsMatchSynonyms(a.p.tags, type)) || (goal && tagsMatchSynonyms(a.p.tags, goal))) : false
+        const bFeaturedMatchesCriteria = bIsFeatured && (type || goal) ? 
+          ((type && tagsMatchSynonyms(b.p.tags, type)) || (goal && tagsMatchSynonyms(b.p.tags, goal))) : false
+        
+        // Only prioritize featured providers that match the criteria
+        const am = aFeaturedMatchesCriteria ? 1 : 0
+        const bm = bFeaturedMatchesCriteria ? 1 : 0
+        if (bm !== am) return bm - am
+        
+        // If no specific criteria selected, fall back to original featured logic
+        if (!type && !goal) {
+          const amFallback = aIsFeatured ? 1 : 0
+          const bmFallback = bIsFeatured ? 1 : 0
+          if (bmFallback !== amFallback) return bmFallback - amFallback
+        }
+        
+        // Sort by score (highest first)
+        if (b.score !== a.score) return b.score - a.score
+        
+        // Then by rating
+        const ar = a.p.rating ?? 0
+        const br = b.p.rating ?? 0
+        if (br !== ar) return br - ar
+        
+        // Finally by name
+        return a.p.name.localeCompare(b.p.name)
+      })
+      .map((s) => s.p)
+    
+    return scoredProviders
   }
   
   const values = new Set<string>(Object.values(answers))
