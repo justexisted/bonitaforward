@@ -3141,13 +3141,13 @@ function AboutPage() {
           height={6}
           baseWidth={18}
           animationType="rotate"
-          glow={0.5}
+          glow={0.6}
           noise={0}
           transparent={true}
           scale={1.8}
           hueShift={0.3}
           colorFrequency={0.6}
-          timeScale={0.05}
+          timeScale={0.08}
           bloom={0.4}
           suspendWhenOffscreen={true}
         />
