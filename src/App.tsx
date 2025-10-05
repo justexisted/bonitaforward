@@ -21,7 +21,6 @@ import SplitText from './components/SplitText'
 import GlareHover from './components/GlareHover'
 import ScrollFloat from './components/ScrollFloat'
 import GradientText from './components/GradientText'
-import RollingGallery from './components/RollingGallery'
 import CountUp from './components/CountUp'
 import ScrollStack, { ScrollStackItem } from './components/ScrollStack'
 import CardNav, { type CardNavItem } from './components/CardNav'
@@ -1071,14 +1070,34 @@ function ProviderPage() {
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 mb-3">Photos</h3>
 
-                    {/* Featured accounts get RollingGallery, non-featured get single image */}
+                    {/* Featured accounts get image grid, non-featured get single image */}
                     {isFeaturedProvider(provider) ? (
-                      // Featured accounts: RollingGallery for multiple images
-                      <RollingGallery 
-                        images={provider.images} 
-                        autoplay={true} 
-                        pauseOnHover={true} 
-                      />
+                      // Featured accounts: Responsive image grid for multiple images
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {provider.images.map((image, index) => (
+                          <div key={index} className="relative group aspect-square overflow-hidden rounded-lg">
+                            <img
+                              src={image}
+                              alt={`${provider.name} photo ${index + 1}`}
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement
+                                img.style.display = 'none'
+                                img.parentElement!.innerHTML = `
+                                  <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                                    <div class="text-center text-neutral-500">
+                                      <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                      <p class="text-xs">Image unavailable</p>
+                                    </div>
+                                  </div>
+                                `
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       // Non-featured accounts: Single image display
                       <div className="flex justify-center">
