@@ -145,6 +145,50 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
       console.log('[Supabase] Health-related category_keys:', [...new Set(healthRelated.map(r => r.category_key))])
     }
     
+    // Debug: Analyze health-wellness provider tags to understand what types exist
+    const healthWellnessProviders = filtered.filter(r => r.category_key === 'health-wellness')
+    if (healthWellnessProviders.length > 0) {
+      console.log(`[Supabase] Analyzing ${healthWellnessProviders.length} health-wellness providers...`)
+      
+      // Collect all unique tags from health-wellness providers
+      const allTags = new Set<string>()
+      const providerTagMap = new Map<string, string[]>()
+      
+      healthWellnessProviders.forEach(provider => {
+        const tags = provider.tags || []
+        tags.forEach(tag => allTags.add(tag.toLowerCase()))
+        providerTagMap.set(provider.name, tags.map(t => t.toLowerCase()))
+      })
+      
+      console.log('[Supabase] All health-wellness tags:', Array.from(allTags).sort())
+      
+      // Show sample providers and their tags
+      console.log('[Supabase] Sample health-wellness providers:')
+      healthWellnessProviders.slice(0, 10).forEach(p => {
+        console.log(`  ${p.name}: [${(p.tags || []).join(', ')}]`)
+      })
+      
+      // Identify common provider types based on tags
+      const providerTypes = new Map<string, number>()
+      allTags.forEach(tag => {
+        let type = 'other'
+        if (tag.includes('dental') || tag.includes('dentist')) type = 'dental'
+        else if (tag.includes('chiropractor') || tag.includes('chiro')) type = 'chiropractor'
+        else if (tag.includes('gym') || tag.includes('fitness') || tag.includes('24 hour')) type = 'gym'
+        else if (tag.includes('salon') || tag.includes('hair') || tag.includes('beauty')) type = 'salon'
+        else if (tag.includes('spa') || tag.includes('medspa') || tag.includes('massage')) type = 'spa'
+        else if (tag.includes('medical') || tag.includes('doctor') || tag.includes('physician')) type = 'medical'
+        else if (tag.includes('therapy') || tag.includes('therapist') || tag.includes('physical therapy')) type = 'therapy'
+        else if (tag.includes('naturopath') || tag.includes('naturopathic')) type = 'naturopathic'
+        else if (tag.includes('mental') || tag.includes('psychology') || tag.includes('counseling')) type = 'mental health'
+        else if (tag.includes('optometry') || tag.includes('vision') || tag.includes('eye')) type = 'vision'
+        
+        providerTypes.set(type, (providerTypes.get(type) || 0) + 1)
+      })
+      
+      console.log('[Supabase] Provider types found:', Object.fromEntries(providerTypes))
+    }
+    
     // Fix image URLs for all providers
     const providersWithFixedImages = filtered.map(provider => ({
       ...provider,

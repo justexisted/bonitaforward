@@ -2657,8 +2657,8 @@ function CategoryFilters({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+      <div className="text-center mb-6">
+        <h3 className="text-xl font-semibold text-neutral-900 mb-2">
           Refine Your {category.name} Search
         </h3>
         <p className="text-sm text-neutral-600">
@@ -2701,53 +2701,95 @@ function CategoryFilters({
       </div>
 
       {/* Results - Always Visible */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-lg font-semibold text-neutral-900">
+      <div className="space-y-6">
+        <div className="text-center">
+          <h4 className="text-xl font-semibold text-neutral-900">
             Your Matches ({filteredProviders.length})
           </h4>
         </div>
         
         {filteredProviders.length > 0 ? (
-          <div className="space-y-3">
-            {filteredProviders.slice(0, 5).map((provider) => (
-              <div key={provider.id} className="p-4 border border-neutral-200 rounded-lg hover:shadow-sm transition-shadow">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h5 className="font-medium text-neutral-900">{provider.name}</h5>
-                      <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded-full">
-                        {provider.category_key.replace('-', ' ')}
-                      </span>
-                    </div>
-                    {provider.description && (
-                      <p className="text-sm text-neutral-600 mt-1">{provider.description}</p>
-                    )}
-                    {provider.tags && provider.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {provider.tags.slice(0, 3).map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded"
-                          >
-                            {tag}
-                          </span>
-                        ))}
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredProviders.slice(0, 6).map((provider) => {
+                const details = getProviderDetails(provider)
+                return (
+                  <div key={provider.id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                    {/* Provider Image */}
+                    {details.images && details.images.length > 0 ? (
+                      <div className="aspect-video bg-neutral-100">
+                        <img
+                          src={details.images[0]}
+                          alt={`${provider.name} business photo`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const img = e.currentTarget as HTMLImageElement
+                            img.style.display = 'none'
+                            img.parentElement!.innerHTML = `
+                              <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                                <div class="text-center text-neutral-500">
+                                  <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                  </svg>
+                                  <p class="text-xs">No image available</p>
+                                </div>
+                              </div>
+                            `
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                        <div className="text-center text-neutral-500">
+                          <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                          <p className="text-xs">No image available</p>
+                        </div>
                       </div>
                     )}
+                    
+                    {/* Provider Info */}
+                    <div className="p-4 text-center">
+                      <div className="flex flex-col items-center gap-2 mb-3">
+                        <h3 className="font-semibold text-neutral-900 text-lg">{provider.name}</h3>
+                        <span className="px-3 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">
+                          {provider.category_key.replace('-', ' ')}
+                        </span>
+                      </div>
+                      
+                      {provider.description && (
+                        <p className="text-sm text-neutral-600 mb-3 line-clamp-2">{provider.description}</p>
+                      )}
+                      
+                      {/* Tags - Only visible to admin */}
+                      {auth.isAuthed && provider.tags && provider.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 justify-center mb-3">
+                          {provider.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded-full"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <Link
+                        to={`/provider/${provider.slug}`}
+                        className="inline-block w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        View Details
+                      </Link>
+                    </div>
                   </div>
-                  <Link
-                    to={`/provider/${provider.slug}`}
-                    className="ml-4 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                  >
-                    View Details
-                  </Link>
-                </div>
-              </div>
-            ))}
+                )
+              })}
+            </div>
             
-            {filteredProviders.length > 5 && (
-              <div className="text-center">
+            {filteredProviders.length > 6 && (
+              <div className="text-center mt-6">
                 <Link
                   to={`/book?category=${category.key}&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}`}
                   onClick={(e) => {
@@ -2757,14 +2799,14 @@ function CategoryFilters({
                       return
                     }
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
+                  className="inline-flex items-center gap-2 px-6 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   View All {filteredProviders.length} Results
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             )}
-          </div>
+          </>
         ) : (
           <div className="text-center py-8 text-neutral-500">
             <p>No matches found with your current filters.</p>
@@ -2784,8 +2826,6 @@ function CategoryPage() {
   const [, setVersion] = useState(0)
   const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false)
   const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
-  const [showDebug, setShowDebug] = useState(false)
-  
   useEffect(() => {
     function onUpdate() { setVersion((v: number) => v + 1) }
     window.addEventListener('bf-providers-updated', onUpdate as EventListener)
@@ -2806,72 +2846,34 @@ function CategoryPage() {
     } catch {}
   }, [category.key])
   
-  // Debug info
-  const debugInfo = {
-    category: category.key,
-    availableProviders: providersByCategory[category.key]?.length || 0,
-    providerNames: providersByCategory[category.key]?.map(p => p.name) || [],
-    providerCategories: providersByCategory[category.key]?.map(p => p.category_key) || [],
-    questionnaireAnswers,
-    hasCompletedQuestionnaire
-  }
-  
   return (
-    <section className="py-8">
-      <Container>
-        <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-neutral-50">
-              <Icon className="h-5 w-5 text-neutral-700" />
-            </span>
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{category.name}</h2>
-                <button
-                  onClick={() => setShowDebug(!showDebug)}
-                  className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-                >
-                  {showDebug ? 'Hide Debug' : 'Show Debug'}
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Debug Window */}
-          {showDebug && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-              <h3 className="text-sm font-semibold mb-2">🐛 Debug Info</h3>
-              <div className="text-xs space-y-1">
-                <div><strong>Category:</strong> {debugInfo.category}</div>
-                <div><strong>Available Providers:</strong> {debugInfo.availableProviders}</div>
-                <div><strong>Provider Names:</strong> {debugInfo.providerNames.join(', ')}</div>
-                <div><strong>Provider Categories:</strong> {debugInfo.providerCategories.join(', ')}</div>
-                <div><strong>Questionnaire Answers:</strong> {JSON.stringify(debugInfo.questionnaireAnswers)}</div>
-                <div><strong>Has Completed Questionnaire:</strong> {debugInfo.hasCompletedQuestionnaire ? 'Yes' : 'No'}</div>
-              </div>
-            </div>
-          )}
-          <div className="flex items-start gap-3">
-            <div className="flex-1">
-              <div className="mt-4">
-                <div className="rounded-xl p-3">
-                  {hasCompletedQuestionnaire ? (
-                    <CategoryFilters 
-                      category={category} 
-                      answers={questionnaireAnswers}
-                    />
-                  ) : (
-                    <>
-                      <div className="text-lg font-medium mb-2 text-center">{`Let's find the best match for you in ${category.name}`}</div>
-                      <Funnel category={category} />
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+    <section className="py-4 px-4">
+      {/* Category Header */}
+      <div className="text-center mb-6">
+        <div className="inline-flex items-center gap-3 mb-2">
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-50">
+            <Icon className="h-6 w-6 text-neutral-700" />
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">{category.name}</h1>
         </div>
-      </Container>
+      </div>
+
+      {/* Content */}
+      {hasCompletedQuestionnaire ? (
+        <CategoryFilters 
+          category={category} 
+          answers={questionnaireAnswers}
+        />
+      ) : (
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-6">
+            <h2 className="text-lg font-medium text-neutral-900 mb-2">
+              Let's find the best match for you in {category.name}
+            </h2>
+          </div>
+          <Funnel category={category} />
+        </div>
+      )}
     </section>
   )
 }
