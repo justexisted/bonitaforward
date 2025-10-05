@@ -1,3 +1,4 @@
+import React from 'react'
 import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import ResetPasswordPage from './pages/ResetPassword'
@@ -2936,6 +2937,9 @@ function CategoryFilters({
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-50">
+          {React.createElement(category.icon, { className: "h-6 w-6 text-neutral-700" })}
+        </span>
         <h3 className="text-xl font-semibold text-neutral-900 mb-2">
           Refine Your {category.name} Search
         </h3>
@@ -2988,8 +2992,8 @@ function CategoryFilters({
         
         {filteredProviders.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredProviders.slice(0, 6).map((provider) => {
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {filteredProviders.slice(0, 8).map((provider) => {
                 const details = getProviderDetails(provider)
                 return (
                   <div key={provider.id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
@@ -3066,7 +3070,7 @@ function CategoryFilters({
               })}
             </div>
             
-            {filteredProviders.length > 6 && (
+            {filteredProviders.length > 8 && (
               <div className="text-center mt-6">
                 <Link
                   to={`/book?category=${category.key}&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}`}
@@ -3100,7 +3104,6 @@ function CategoryPage() {
   const path = window.location.pathname.split('/').pop() as CategoryKey
   const category = categories.find((c) => c.key === path)
   if (!category) return <Container className="py-10">Category not found.</Container>
-  const Icon = category.icon
   const [, setVersion] = useState(0)
   const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false)
   const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
@@ -3126,15 +3129,6 @@ function CategoryPage() {
   
   return (
     <section className="py-4 px-4">
-      {/* Category Header */}
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-3 mb-2">
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-50">
-            <Icon className="h-6 w-6 text-neutral-700" />
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">{category.name}</h1>
-        </div>
-      </div>
 
       {/* Content */}
       {hasCompletedQuestionnaire ? (
