@@ -1609,6 +1609,10 @@ const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
         { id: 'gym', label: 'Gym' },
         { id: 'salon', label: 'Salon' },
         { id: 'medspa', label: 'Med Spa' },
+        { id: 'dental', label: 'Dental' },
+        { id: 'medical', label: 'Medical' },
+        { id: 'therapy', label: 'Therapy' },
+        { id: 'naturopathic', label: 'Naturopathic' },
       ],
     },
     {
@@ -1949,42 +1953,104 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
   // Remove console spam - no logging here
   
   if (category === 'health-wellness') {
-    const values = new Set<string>(Object.values(answers))
     const type = answers['type']
     const goal = answers['goal'] || answers['salon_kind']
     const when = answers['when']
     const payment = answers['payment']
     
-    // Helper function to check if tags contain a keyword (more flexible matching)
+    // Comprehensive synonym mapping for health-wellness provider types
+    const getProviderSynonyms = (providerType: string): string[] => {
+      const synonymMap: Record<string, string[]> = {
+        // Dental
+        'dental': ['dental', 'dentist', 'dentistry', 'oral', 'orthodontist', 'periodontist', 'endodontist', 'oral surgery', 'dental care', 'dental center', 'dental group', 'dental office', 'dds', 'dmd'],
+        'dentist': ['dental', 'dentist', 'dentistry', 'oral', 'orthodontist', 'periodontist', 'endodontist', 'oral surgery', 'dental care', 'dental center', 'dental group', 'dental office', 'dds', 'dmd'],
+        
+        // Gym/Fitness
+        'gym': ['gym', 'fitness', '24 hour', '24-hour', '24hr', 'fitness center', 'workout', 'training', 'personal training', 'crossfit', 'yoga', 'pilates', 'martial arts', 'boxing', 'swimming', 'tennis'],
+        'fitness': ['gym', 'fitness', '24 hour', '24-hour', '24hr', 'fitness center', 'workout', 'training', 'personal training', 'crossfit', 'yoga', 'pilates', 'martial arts', 'boxing', 'swimming', 'tennis'],
+        
+        // Salon/Beauty
+        'salon': ['salon', 'hair', 'beauty', 'hair salon', 'beauty salon', 'haircut', 'styling', 'color', 'highlights', 'perm', 'extensions', 'barber', 'barbershop', 'nail', 'nail salon', 'manicure', 'pedicure'],
+        'beauty': ['salon', 'hair', 'beauty', 'hair salon', 'beauty salon', 'haircut', 'styling', 'color', 'highlights', 'perm', 'extensions', 'barber', 'barbershop', 'nail', 'nail salon', 'manicure', 'pedicure'],
+        
+        // Spa/Med Spa
+        'spa': ['spa', 'medspa', 'medical spa', 'massage', 'facial', 'skincare', 'aesthetic', 'cosmetic', 'botox', 'fillers', 'laser', 'rejuvenation', 'wellness spa', 'day spa'],
+        'medspa': ['spa', 'medspa', 'medical spa', 'massage', 'facial', 'skincare', 'aesthetic', 'cosmetic', 'botox', 'fillers', 'laser', 'rejuvenation', 'wellness spa', 'day spa'],
+        
+        // Chiropractor
+        'chiro': ['chiropractor', 'chiro', 'spinal', 'adjustment', 'back pain', 'neck pain', 'wellness'],
+        'chiropractor': ['chiropractor', 'chiro', 'spinal', 'adjustment', 'back pain', 'neck pain', 'wellness'],
+        
+        // Medical
+        'medical': ['medical', 'doctor', 'physician', 'clinic', 'healthcare', 'primary care', 'family medicine', 'internal medicine', 'pediatrics', 'urgent care'],
+        
+        // Therapy
+        'therapy': ['therapy', 'therapist', 'physical therapy', 'pt', 'occupational therapy', 'ot', 'speech therapy', 'rehabilitation', 'rehab', 'counseling', 'mental health', 'psychology', 'psychiatry'],
+        
+        // Naturopathic
+        'naturopathic': ['naturopath', 'naturopathic', 'nd', 'natural medicine', 'holistic', 'alternative medicine', 'functional medicine', 'integrative medicine'],
+        
+        // Vision/Eye Care
+        'vision': ['optometry', 'optometrist', 'vision', 'eye care', 'eyewear', 'glasses', 'contacts', 'ophthalmology', 'ophthalmologist'],
+        
+        // Mental Health
+        'mental': ['mental health', 'psychology', 'psychiatrist', 'psychologist', 'counseling', 'therapist', 'therapy', 'depression', 'anxiety', 'counselor'],
+        
+        // Physical Therapy
+        'physical': ['physical therapy', 'pt', 'physiotherapy', 'rehabilitation', 'rehab', 'sports medicine', 'injury recovery'],
+        
+        // Podiatry
+        'podiatry': ['podiatrist', 'foot care', 'foot doctor', 'ankle', 'foot surgery'],
+        
+        // Dermatology
+        'dermatology': ['dermatologist', 'skin care', 'dermatology', 'skin doctor', 'acne', 'moles', 'skin cancer'],
+        
+        // Acupuncture
+        'acupuncture': ['acupuncture', 'acupuncturist', 'traditional chinese medicine', 'tcm'],
+      }
+      
+      return synonymMap[providerType.toLowerCase()] || [providerType]
+    }
+    
+    // Enhanced matching function that checks synonyms
+    const tagsMatchSynonyms = (tags: string[], targetType: string): boolean => {
+      if (!tags || !targetType) return false
+      const synonyms = getProviderSynonyms(targetType)
+      const lowerTags = tags.map(tag => tag.toLowerCase())
+      
+      return synonyms.some(synonym => 
+        lowerTags.some(tag => 
+          tag.includes(synonym.toLowerCase()) || 
+          synonym.toLowerCase().includes(tag)
+        )
+      )
+    }
+    
+    // Helper function for simple keyword matching (for secondary criteria)
     const tagsContainKeyword = (tags: string[], keyword: string): boolean => {
       if (!keyword || !tags) return false
       const lowerKeyword = keyword.toLowerCase()
       return tags.some(tag => tag.toLowerCase().includes(lowerKeyword))
     }
     
-    // Helper function to check if any tag matches any answer value
-    const tagsMatchAnyAnswer = (tags: string[], answerValues: Set<string>): boolean => {
-      if (!tags || answerValues.size === 0) return false
-      return tags.some(tag => 
-        Array.from(answerValues).some(value => 
-          tag.toLowerCase().includes(value.toLowerCase()) || 
-          value.toLowerCase().includes(tag.toLowerCase())
-        )
-      )
-    }
-    
+    // Enhanced scoring with synonym matching
     const scoredProviders = providers
       .map((p) => {
         let score = 0
         
-        // More flexible matching - check if tags contain the keyword
-        if (type && tagsContainKeyword(p.tags, type)) score += 2
-        if (goal && tagsContainKeyword(p.tags, goal)) score += 2
+        // Primary type matching with synonyms
+        if (type && tagsMatchSynonyms(p.tags, type)) {
+          score += 5 // High priority for exact type match
+        }
+        
+        // Goal matching with synonyms
+        if (goal && tagsMatchSynonyms(p.tags, goal)) {
+          score += 3 // Medium-high priority for goal match
+        }
+        
+        // Secondary criteria
         if (when && tagsContainKeyword(p.tags, when)) score += 1
         if (payment && tagsContainKeyword(p.tags, payment)) score += 1
-        
-        // Generic tag match fallback - give some points for any partial match
-        if (tagsMatchAnyAnswer(p.tags, values)) score += 0.5
         
         // If no specific criteria selected, give all providers a base score
         if (!type && !goal && !when && !payment) {
@@ -1998,11 +2064,11 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         const aIsFeatured = isFeaturedProvider(a.p)
         const bIsFeatured = isFeaturedProvider(b.p)
         
-        // For health-wellness, check if featured providers match the selected type/goal
+        // Check if featured providers match the selected type with synonyms
         const aFeaturedMatchesCriteria = aIsFeatured && (type || goal) ? 
-          ((type && tagsContainKeyword(a.p.tags, type)) || (goal && tagsContainKeyword(a.p.tags, goal))) : false
+          ((type && tagsMatchSynonyms(a.p.tags, type)) || (goal && tagsMatchSynonyms(a.p.tags, goal))) : false
         const bFeaturedMatchesCriteria = bIsFeatured && (type || goal) ? 
-          ((type && tagsContainKeyword(b.p.tags, type)) || (goal && tagsContainKeyword(b.p.tags, goal))) : false
+          ((type && tagsMatchSynonyms(b.p.tags, type)) || (goal && tagsMatchSynonyms(b.p.tags, goal))) : false
         
         // Only prioritize featured providers that match the criteria
         const am = aFeaturedMatchesCriteria ? 1 : 0
@@ -2016,10 +2082,15 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
           if (bmFallback !== amFallback) return bmFallback - amFallback
         }
         
+        // Sort by score (highest first)
         if (b.score !== a.score) return b.score - a.score
+        
+        // Then by rating
         const ar = a.p.rating ?? 0
         const br = b.p.rating ?? 0
         if (br !== ar) return br - ar
+        
+        // Finally by name
         return a.p.name.localeCompare(b.p.name)
       })
       .map((s) => s.p)
