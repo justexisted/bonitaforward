@@ -715,7 +715,7 @@ function Navbar() {
   }, [auth])
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-100">
+    <header className="relative z-40 bg-white/80 backdrop-blur border-b border-neutral-100 pt-2.5">
       <div className="relative">
         <CardNav
           logo="/images/top-left-logo.png"
@@ -790,7 +790,7 @@ function Layout() {
     <div className="min-h-full flex flex-col">
       <SupabasePing />
       <Navbar />
-      <main className="flex-1 overflow-x-hidden pt-24 md:pt-28">
+      <main className="flex-1 overflow-x-hidden pt-4">
         <Outlet />
       </main>
       <Footer />
