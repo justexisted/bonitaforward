@@ -18,79 +18,28 @@ export default function PricingPage() {
   const auth = useAuth()
   const navigate = useNavigate()
   const [message, setMessage] = useState<string | null>(null)
-  const [showSubscriptionCard, setShowSubscriptionCard] = useState(true)
-  const [userPlanChoice, setUserPlanChoice] = useState<'free' | 'featured-pending' | 'featured-approved' | null>(null)
-
-  // Suppress unused warning - this state is used for internal tracking logic
-  void userPlanChoice
 
   /**
    * SELECT FREE ACCOUNT
    * 
-   * This function handles when a user selects the Free Account option.
-   * It displays a thank you message, saves the choice, and hides the subscription card.
+   * This function redirects to My Business page where the free account selection is handled.
    */
   const selectFreeAccount = () => {
-    if (!auth.userId) return
-    
-    setMessage('Thanks for choosing Bonita Forward.')
-    setUserPlanChoice('free')
-    setShowSubscriptionCard(false)
-    
-    // Save choice to localStorage
-    localStorage.setItem(`user_plan_choice_${auth.userId}`, 'free')
-    
-    // Auto-dismiss message after 30 seconds
-    setTimeout(() => {
-      setMessage(null)
-    }, 30000)
+    // Redirect to My Business page
+    navigate('/my-business')
   }
 
   /**
    * UPGRADE TO FEATURED TIER
    * 
-   * This function allows business owners to request an upgrade from free to featured tier.
-   * It creates a change request for admin review and payment processing.
+   * This function redirects to My Business page where the featured upgrade is handled.
    */
-  const upgradeToFeatured = async () => {
-    try {
-      setMessage('Requesting featured upgrade...')
-      
-      // For now, we'll redirect to MyBusiness page where the full upgrade logic exists
-      // This could be enhanced later to include the full upgrade functionality here
-      navigate('/my-business', { state: { showFeaturedUpgrade: true } })
-      
-    } catch (error: any) {
-      setMessage(`Error: ${error.message}`)
-    }
+  const upgradeToFeatured = () => {
+    // Redirect to My Business page
+    navigate('/my-business')
   }
 
-  /**
-   * CHECK USER PLAN CHOICE
-   * 
-   * This function checks the user's plan choice from localStorage and determines
-   * what state to show based on their previous choices.
-   */
-  const checkUserPlanChoice = () => {
-    if (!auth.userId) return
-
-    // Check localStorage for user's previous choice
-    const savedChoice = localStorage.getItem(`user_plan_choice_${auth.userId}`)
-    
-    if (savedChoice === 'free') {
-      setUserPlanChoice('free')
-      setShowSubscriptionCard(false)
-      return
-    }
-    
-    if (savedChoice === 'featured-pending' || savedChoice === 'featured-approved') {
-      setUserPlanChoice(savedChoice as 'featured-pending' | 'featured-approved')
-      setShowSubscriptionCard(false)
-      setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $97/year.')
-    }
-  }
-
-  // Check user plan choice when component loads
+  // Check authentication when component loads
   useEffect(() => {
     if (!auth.isAuthed) {
       navigate('/signin', { state: { from: '/pricing' } })
@@ -101,9 +50,7 @@ export default function PricingPage() {
       setMessage(`This page is only available for business accounts. Your current role: ${auth.role || 'none'}`)
       return
     }
-
-    checkUserPlanChoice()
-  }, [auth.userId, auth.role, auth.isAuthed, navigate])
+  }, [auth.role, auth.isAuthed, navigate])
 
   // Redirect if not authenticated or not business account
   if (!auth.isAuthed) {
@@ -147,9 +94,8 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* Subscription Comparison Section */}
-        {showSubscriptionCard && (
-          <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        {/* Subscription Comparison Section - Always visible on Pricing page */}
+        <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-neutral-900 mb-6 text-center">Compare Plans</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Free Account Section */}
@@ -268,8 +214,7 @@ export default function PricingPage() {
                 </button>
               </div>
             </div>
-          </div>
-        )}
+        </div>
 
         {/* Additional Information */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
