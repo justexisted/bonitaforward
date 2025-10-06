@@ -3208,7 +3208,15 @@ export default function AdminPage() {
                           <div key={field} className="flex justify-between">
                             <span className="font-medium capitalize">{field.replace('_', ' ')}:</span>
                             <span className="ml-2">
-                              {typeof value === 'object' ? JSON.stringify(value) : String(value || 'Not provided')}
+                              {field === 'pricing_options' ? (
+                                // Format pricing options nicely
+                                typeof value === 'object' && value !== null ? 
+                                  (value as any).annual || '$97/year' : 
+                                  '$97/year'
+                              ) : typeof value === 'object' ? 
+                                JSON.stringify(value) : 
+                                String(value || 'Not provided')
+                              }
                             </span>
                           </div>
                         ))}

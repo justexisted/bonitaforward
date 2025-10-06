@@ -16,6 +16,7 @@ import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
+import PricingPage from './pages/Pricing'
 import JobsPage from './pages/Jobs'
 import NotFoundPage from './pages/NotFound'
 import SplitText from './components/SplitText'
@@ -631,7 +632,10 @@ function Navbar() {
         links: [
           { label: "Have a Business?", href: "/business", ariaLabel: "Add Your Business" },
           ...(auth.isAuthed && auth.role === 'business' ? 
-            [{ label: "My Business", href: "/my-business", ariaLabel: "Manage My Business" }] : 
+            [
+              { label: "My Business", href: "/my-business", ariaLabel: "Manage My Business" },
+              { label: "Pricing", href: "/pricing", ariaLabel: "View Pricing Plans" }
+            ] : 
             []
           )
         ]
@@ -4118,6 +4122,11 @@ export default function App() {
             <Route path="my-business" element={
               <ProtectedRoute allowedRoles={['business']}>
                 <MyBusinessPage />
+              </ProtectedRoute>
+            } />
+            <Route path="pricing" element={
+              <ProtectedRoute allowedRoles={['business']}>
+                <PricingPage />
               </ProtectedRoute>
             } />
             <Route path="account" element={<AccountPage />} />

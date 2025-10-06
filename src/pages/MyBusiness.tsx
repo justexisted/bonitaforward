@@ -110,15 +110,28 @@ type JobPost = {
   decided_at: string | null
 }
 
+// Type definition for user activity tracking
+type UserActivity = {
+  id: string
+  provider_id: string
+  user_email: string | null
+  user_name: string | null
+  activity_type: 'profile_view' | 'discount_copy' | 'booking_request' | 'question_asked'
+  activity_details: string | null
+  created_at: string
+  provider_name: string
+}
+
 export default function MyBusinessPage() {
   const auth = useAuth()
   const [listings, setListings] = useState<BusinessListing[]>([])
   const [applications, setApplications] = useState<BusinessApplication[]>([])
   const [jobPosts, setJobPosts] = useState<JobPost[]>([])
   const [changeRequests, setChangeRequests] = useState<ProviderChangeRequest[]>([])
+  const [userActivity, setUserActivity] = useState<UserActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'jobs' | 'change-requests' | 'analytics'>('listings')
+  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'jobs' | 'change-requests' | 'user-activity' | 'analytics'>('listings')
   const [editingListing, setEditingListing] = useState<BusinessListing | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showJobForm, setShowJobForm] = useState(false)
@@ -126,6 +139,13 @@ export default function MyBusinessPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   // Dropdown state for mobile-friendly tab navigation
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  // State to control subscription card visibility
+  const [showSubscriptionCard, setShowSubscriptionCard] = useState(true)
+  // State to track user's plan choice and status (used for internal logic)
+  const [userPlanChoice, setUserPlanChoice] = useState<'free' | 'featured-pending' | 'featured-approved' | null>(null)
+  
+  // Suppress unused warning - this state is used for internal tracking logic
+  void userPlanChoice
 
   /**
    * TAB CONFIGURATION
@@ -138,6 +158,7 @@ export default function MyBusinessPage() {
     { key: 'applications', label: 'Applications', count: applications.length },
     { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
     { key: 'change-requests', label: 'Change Requests', count: changeRequests.filter(req => req.status === 'pending').length },
+    { key: 'user-activity', label: 'User Activity', count: userActivity.length },
     { key: 'analytics', label: 'Analytics' }
   ] as const
 
@@ -198,6 +219,7 @@ export default function MyBusinessPage() {
       return
     }
     loadBusinessData()
+    checkUserPlanChoice()
   }, [auth.userId, auth.role, auth.isAuthed])
 
   /**
@@ -320,10 +342,36 @@ export default function MyBusinessPage() {
         )
       ]
 
+      // Load user activity data for all owned businesses
+      const ownedBusinessIds = allListings.map(listing => listing.id)
+      let userActivityData: UserActivity[] = []
+      
+      if (ownedBusinessIds.length > 0) {
+        const { data: activityData, error: activityError } = await supabase
+          .from('user_activity')
+          .select(`
+            *,
+            providers!inner(name)
+          `)
+          .in('provider_id', ownedBusinessIds)
+          .order('created_at', { ascending: false })
+          .limit(100) // Limit to recent 100 activities
+        
+        if (activityError) {
+          console.warn('[MyBusiness] User activity error (non-critical):', activityError)
+        } else {
+          userActivityData = (activityData || []).map(activity => ({
+            ...activity,
+            provider_name: activity.providers?.name || 'Unknown Business'
+          })) as UserActivity[]
+        }
+      }
+
       setListings((allListings as BusinessListing[]) || [])
       setApplications((appsData as BusinessApplication[]) || [])
       setJobPosts(jobPostsData)
       setChangeRequests((changeRequestsData as ProviderChangeRequest[]) || [])
+      setUserActivity(userActivityData)
       
       console.log('[MyBusiness] Final comprehensive state:', {
         listings: allListings.length,
@@ -343,6 +391,69 @@ export default function MyBusinessPage() {
       setMessage(`Error loading data: ${error.message}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * CHECK USER PLAN CHOICE AND STATUS
+   * 
+   * This function checks the user's plan choice from localStorage and determines
+   * what state to show based on their previous choices and current featured request status.
+   */
+  const checkUserPlanChoice = async () => {
+    if (!auth.userId) return
+
+    // Check localStorage for user's previous choice
+    const savedChoice = localStorage.getItem(`user_plan_choice_${auth.userId}`)
+    
+    if (savedChoice === 'free') {
+      setUserPlanChoice('free')
+      setShowSubscriptionCard(false)
+      return
+    }
+    
+    if (savedChoice === 'featured-pending' || savedChoice === 'featured-approved') {
+      // Check if there are any pending featured requests
+      const { data: pendingRequests, error } = await supabase
+        .from('provider_change_requests')
+        .select('*')
+        .eq('owner_user_id', auth.userId)
+        .eq('type', 'feature_request')
+        .eq('status', 'pending')
+      
+      if (error) {
+        console.error('[MyBusiness] Error checking pending requests:', error)
+        return
+      }
+      
+      if (pendingRequests && pendingRequests.length > 0) {
+        setUserPlanChoice('featured-pending')
+        setShowSubscriptionCard(false)
+        setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $97/year.')
+      } else {
+        // Check if user has any featured listings (approved)
+        const { data: featuredListings, error: featuredError } = await supabase
+          .from('providers')
+          .select('id, is_member')
+          .eq('owner_user_id', auth.userId)
+          .eq('is_member', true)
+        
+        if (featuredError) {
+          console.error('[MyBusiness] Error checking featured listings:', featuredError)
+          return
+        }
+        
+        if (featuredListings && featuredListings.length > 0) {
+          setUserPlanChoice('featured-approved')
+          setShowSubscriptionCard(false)
+          // Don't show message for approved featured accounts
+        } else {
+          // No pending requests and no featured listings, reset choice
+          localStorage.removeItem(`user_plan_choice_${auth.userId}`)
+          setUserPlanChoice(null)
+          setShowSubscriptionCard(true)
+        }
+      }
     }
   }
 
@@ -396,14 +507,35 @@ export default function MyBusinessPage() {
   }
 
   /**
+   * SELECT FREE ACCOUNT
+   * 
+   * This function handles when a user selects the Free Account option.
+   * It displays a thank you message, saves the choice, and hides the subscription card.
+   */
+  const selectFreeAccount = () => {
+    if (!auth.userId) return
+    
+    setMessage('Thanks for choosing Bonita Forward.')
+    setUserPlanChoice('free')
+    setShowSubscriptionCard(false)
+    
+    // Save choice to localStorage
+    localStorage.setItem(`user_plan_choice_${auth.userId}`, 'free')
+    
+    // Auto-dismiss message after 30 seconds
+    setTimeout(() => {
+      setMessage(null)
+    }, 30000)
+  }
+
+  /**
    * UPGRADE TO FEATURED TIER
    * 
    * This function allows business owners to request an upgrade from free to featured tier.
    * It creates a change request for admin review and payment processing.
    * 
    * Featured tier pricing:
-   * - $1/day billed annually ($365/year)
-   * - $1.50/day billed monthly ($45/month)
+   * - $97/year
    * 
    * Featured tier benefits:
    * - Priority placement in search results (appears at top)
@@ -415,23 +547,32 @@ export default function MyBusinessPage() {
    * - Analytics and insights
    * - Premium customer support
    */
-  const upgradeToFeatured = async (listingId: string) => {
+  const upgradeToFeatured = async (listingId?: string) => {
     try {
       setMessage('Requesting featured upgrade...')
+      
+      // Determine provider_id - use provided listingId or first available listing
+      let providerId = listingId
+      if (!providerId && listings.length > 0) {
+        providerId = listings[0].id // Use first listing if none specified
+      }
+      
+      if (!providerId) {
+        throw new Error('No business listing found. Please create a business listing first.')
+      }
       
       // Create upgrade request for admin to review and process payment
       const { error } = await supabase
         .from('provider_change_requests')
         .insert([{
-          provider_id: listingId,
+          provider_id: providerId, // Always provide a valid provider_id
           owner_user_id: auth.userId,
           type: 'feature_request',
           changes: {
             tier: 'featured',
-            upgrade_reason: 'User requested featured upgrade',
+            upgrade_reason: listingId ? 'User requested featured upgrade for specific listing' : 'User requested featured upgrade from subscription selection',
             pricing_options: {
-              annual: '$1/day ($365/year)',
-              monthly: '$1.50/day ($45/month)'
+              annual: '$97/year'
             },
             benefits: [
               'Priority placement in search results',
@@ -449,7 +590,18 @@ export default function MyBusinessPage() {
 
       if (error) throw error
 
-      setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $1/day annually or $1.50/day monthly.')
+      setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $97/year.')
+      
+      // Hide the subscription card if it was called from the subscription selection
+      if (!listingId) {
+        setShowSubscriptionCard(false)
+        setUserPlanChoice('featured-pending')
+        
+        // Save choice to localStorage
+        if (auth.userId) {
+          localStorage.setItem(`user_plan_choice_${auth.userId}`, 'featured-pending')
+        }
+      }
     } catch (error: any) {
       setMessage(`Error: ${error.message}`)
     }
@@ -815,6 +967,130 @@ export default function MyBusinessPage() {
         {message && (
           <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
             <p className="text-blue-800">{message}</p>
+          </div>
+        )}
+
+        {/* Subscription Comparison Section */}
+        {showSubscriptionCard && (
+          <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-neutral-900 mb-6 text-center">Choose Your Business Plan</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Free Account Section */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-neutral-900 flex items-center justify-center">
+                  <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
+                  Free Account
+                </h3>
+                <p className="text-2xl font-bold text-green-600 mt-2">$0/month</p>
+              </div>
+              <ul className="text-sm text-neutral-700 space-y-2">
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Business name, category, phone, email
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Website and address
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Basic business description (up to 200 characters)
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Basic tags and specialties
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  1 business image
+                </li>
+              </ul>
+              <button
+                onClick={selectFreeAccount}
+                className="w-full mt-4 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+              >
+                Choose Free Account
+              </button>
+            </div>
+            
+            {/* Featured Account Section */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-neutral-900 flex items-center justify-center">
+                  <span className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></span>
+                  Featured Account
+                </h3>
+                <p className="text-2xl font-bold text-yellow-600 mt-2">$97/year</p>
+              </div>
+              <ul className="text-sm text-neutral-700 space-y-2">
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Everything in Free, plus:</strong>
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Priority placement</strong> - appears at top of search results
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Enhanced description</strong> - up to 500 characters
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Social media links</strong> - Facebook, Instagram, etc.
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Google Maps integration</strong> - interactive location
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Multiple images</strong> - showcase your business
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Booking system</strong> - direct appointment scheduling
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>Analytics</strong> - view customer interactions
+                </li>
+              </ul>
+              <button
+                onClick={() => upgradeToFeatured()}
+                className="w-full mt-4 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition-colors font-medium"
+              >
+                Choose Featured Account
+              </button>
+            </div>
+          </div>
           </div>
         )}
 
@@ -1261,32 +1537,6 @@ export default function MyBusinessPage() {
                       </button>
                     </div>
 
-                    {/* Community Visibility Info */}
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                      <h4 className="text-sm font-semibold text-blue-900 mb-3">What Community Users See:</h4>
-                      <div className="text-xs text-blue-800 space-y-1">
-                        <p>• <strong>Basic Info:</strong> {listing.name}, {listing.category_key}, {listing.phone}</p>
-                        <p>• <strong>Contact:</strong> {listing.email} {listing.website && `• ${listing.website}`}</p>
-                        {listing.address && <p>• <strong>Location:</strong> {listing.address}</p>}
-                        {listing.description && <p>• <strong>Description:</strong> {listing.description.substring(0, 100)}{listing.description.length > 100 ? '...' : ''}</p>}
-                        {listing.tags && listing.tags.length > 0 && <p>• <strong>Tags:</strong> {listing.tags.join(', ')}</p>}
-                        {listing.is_member && <p>• <strong>Featured:</strong> Appears at top of search results</p>}
-                        {listing.rating && <p>• <strong>Rating:</strong> {listing.rating}</p>}
-                      </div>
-                      
-                      <div className="mt-4 pt-4 border-t border-blue-200">
-                        <h4 className="text-sm font-semibold text-blue-900 mb-2">When Featured - What Community Users See:</h4>
-                        <div className="text-xs text-blue-800 space-y-1">
-                          <p>• <strong>Featured:</strong> Priority placement in search results</p>
-                          <p>• <strong>Enhanced description:</strong> Up to 500 characters</p>
-                          <p>• <strong>Social Links:</strong> Allow users to check out your social media</p>
-                          <p>• <strong>Google Maps URL:</strong> Allow users to find your business on Google Maps</p>
-                          <p>• <strong>Bonita Residents Discount:</strong> Create a discount for Bonita residents</p>
-                          <p>• <strong>Multiple images:</strong> Showcase your business</p>
-                          <p>• <strong>Booking Enabled:</strong> Allow customers to book appointments online</p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               ))
@@ -1521,6 +1771,98 @@ export default function MyBusinessPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* User Activity Tab */}
+        {activeTab === 'user-activity' && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-neutral-100 p-6 bg-white">
+              <h3 className="text-lg font-semibold text-neutral-900 mb-4">Customer Interactions</h3>
+              <p className="text-sm text-neutral-600 mb-6">
+                Track how customers interact with your business listings - profile views, discount copies, booking requests, and questions.
+              </p>
+              
+              {userActivity.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-100 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-medium text-neutral-900 mb-2">No Activity Yet</h4>
+                  <p className="text-neutral-600">
+                    Customer interactions will appear here once people start viewing your listings and engaging with your business.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {userActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-4 p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors">
+                      <div className="flex-shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          activity.activity_type === 'profile_view' ? 'bg-blue-100 text-blue-600' :
+                          activity.activity_type === 'discount_copy' ? 'bg-green-100 text-green-600' :
+                          activity.activity_type === 'booking_request' ? 'bg-purple-100 text-purple-600' :
+                          'bg-orange-100 text-orange-600'
+                        }`}>
+                          {activity.activity_type === 'profile_view' && (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
+                          {activity.activity_type === 'discount_copy' && (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                          {activity.activity_type === 'booking_request' && (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                          {activity.activity_type === 'question_asked' && (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-neutral-900">
+                            {activity.user_name || activity.user_email || 'Anonymous User'}
+                          </span>
+                          <span className="text-xs text-neutral-500">
+                            {new Date(activity.created_at).toLocaleDateString()} at {new Date(activity.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        
+                        <div className="text-sm text-neutral-600 mb-1">
+                          <span className="font-medium">
+                            {activity.activity_type === 'profile_view' && 'Viewed profile'}
+                            {activity.activity_type === 'discount_copy' && 'Copied discount code'}
+                            {activity.activity_type === 'booking_request' && 'Requested booking'}
+                            {activity.activity_type === 'question_asked' && 'Asked a question'}
+                          </span>
+                          {' for '}
+                          <span className="font-medium text-blue-600">{activity.provider_name}</span>
+                        </div>
+                        
+                        {activity.activity_details && (
+                          <div className="text-sm text-neutral-500 bg-neutral-50 p-2 rounded border-l-2 border-neutral-200">
+                            {activity.activity_details}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2528,30 +2870,6 @@ function BusinessListingForm({
               </div>
             </div>
 
-            {/* Community Visibility Information */}
-            <div className="bg-blue-50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-blue-900 mb-2">Community User Visibility</h3>
-              <div className="text-xs text-blue-800 space-y-1">
-                <p><strong>Free Listing (Always Visible):</strong></p>
-                <ul className="ml-4 space-y-1">
-                  <li>• Business name, category, phone, email</li>
-                  <li>• Website and address</li>
-                  <li>• Basic business description (up to 200 characters)</li>
-                  <li>• Basic tags and specialties</li>
-                </ul>
-                <p className="mt-2"><strong>Featured Listing (Additional Benefits):</strong></p>
-                <ul className="ml-4 space-y-1">
-                  <li>• <strong>Priority placement</strong> - appears at top of search results</li>
-                  <li>• <strong>Enhanced description</strong> - up to 500 characters</li>
-                  <li>• <strong>Social media links</strong> - Facebook, Instagram, etc.</li>
-                  <li>• <strong>Google Maps integration</strong> - interactive location</li>
-                  <li>• <strong>Multiple images</strong> - showcase your business</li>
-                  <li>• <strong>Booking system</strong> - direct appointment scheduling</li>
-                  <li>• <strong>Analytics</strong> - view customer interactions</li>
-                </ul>
-                <p className="mt-2 text-blue-600"><strong>Featured Pricing:</strong> $1/day annually ($365/year) or $1.50/day monthly ($45/month)</p>
-              </div>
-            </div>
 
             {/* Form Actions */}
             <div className="flex gap-3 pt-4">
