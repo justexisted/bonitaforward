@@ -181,7 +181,7 @@ export default function OwnerPage() {
 
   async function requestFeatured(p: ProviderRow) {
     setMessage(null)
-    const { error } = await createProviderChangeRequest({ provider_id: p.id, owner_user_id: userId!, type: 'feature_request', changes: {}, reason: 'Request to be Featured — $100/mo' })
+    const { error } = await createProviderChangeRequest({ provider_id: p.id, owner_user_id: userId!, type: 'feature_request', changes: {}, reason: 'Request to be Featured — $97/year' })
     if (error) setMessage('Request failed: ' + error)
     else setMessage('Request sent. Awaiting admin approval.')
   }
@@ -225,7 +225,7 @@ export default function OwnerPage() {
                       <div className="text-xs text-neutral-500">Category: {p.category_key}</div>
                     </div>
                     {!p.is_member && (
-                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] ml-auto">Get Featured • $100/mo</span>
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] ml-auto">Get Featured • $97/year</span>
                     )}
                   </div>
                   <div className="grid grid-cols-1 gap-3 mt-3">
@@ -246,7 +246,7 @@ export default function OwnerPage() {
                       </button>
                     )}
                     {!p.is_member && (
-                      <button onClick={() => requestFeatured(p)} className="ml-2 btn btn-primary text-xs">Request to be Featured ($100/mo)</button>
+                      <button onClick={() => requestFeatured(p)} className="ml-2 btn btn-primary text-xs">Request to be Featured ($97/year)</button>
                     )}
                   </div>
                   {/* Job posting section intentionally removed from owner view per requirements clarification */}

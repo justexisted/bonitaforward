@@ -1294,7 +1294,7 @@ export default function MyBusinessPage() {
                               Upgrade to Featured
                             </button>
                             <p className="text-xs text-neutral-500 text-center sm:text-right">
-                              $1/day annually or $1.50/day monthly
+                              $97/year
                             </p>
                           </div>
                         )}

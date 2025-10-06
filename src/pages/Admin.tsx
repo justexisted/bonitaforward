@@ -2506,8 +2506,7 @@ export default function AdminPage() {
                                 className="rounded-lg border border-green-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                               >
                                 <option value="free">Free Plan</option>
-                                <option value="monthly">Monthly ($100/mo)</option>
-                                <option value="yearly">Yearly ($1000/yr)</option>
+                                <option value="yearly">Yearly ($97/yr)</option>
                               </select>
                             </div>
 
@@ -2619,8 +2618,7 @@ export default function AdminPage() {
                               className="rounded-lg border border-neutral-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-500"
                             >
                               <option value="free">Free</option>
-                              <option value="monthly">Monthly ($100/mo)</option>
-                              <option value="yearly">Yearly ($1000/yr)</option>
+                              <option value="yearly">Yearly ($97/yr)</option>
                             </select>
                           </div>
                           
