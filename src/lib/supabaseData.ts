@@ -276,6 +276,34 @@ export async function uploadBlogImage(file: File): Promise<string | null> {
   }
 }
 
+export async function deleteBlogImage(imageUrl: string): Promise<{ error?: string }> {
+  try {
+    // Extract the file path from the URL
+    // URL format: https://[project].supabase.co/storage/v1/object/public/blog-images/[filename]
+    const urlParts = imageUrl.split('/blog-images/')
+    if (urlParts.length !== 2) {
+      return { error: 'Invalid image URL format' }
+    }
+    
+    const fileName = urlParts[1]
+    const filePath = `blog-images/${fileName}`
+
+    const { error } = await supabase.storage
+      .from('blog-images')
+      .remove([filePath])
+
+    if (error) {
+      console.error('Error deleting blog image:', error)
+      return { error: error.message }
+    }
+
+    return {}
+  } catch (err: any) {
+    console.error('Error deleting blog image:', err)
+    return { error: err.message || 'Failed to delete image' }
+  }
+}
+
 export async function fetchBlogPostsByCategory(category_key: string): Promise<BlogPost[]> {
   try {
     const { data, error } = await supabase

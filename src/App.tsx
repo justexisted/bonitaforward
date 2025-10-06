@@ -833,9 +833,12 @@ function Hero() {
     const scored = all
       .map((p) => {
         const name = p.name.toLowerCase()
-        const matchName = name.includes(text) ? 2 : 0
-        const matchTag = (p.tags || []).some((t) => String(t).toLowerCase().includes(text)) ? 1 : 0
-        const match = matchName + matchTag + (p.isMember ? 0.5 : 0)
+        const matchName = name.includes(text) ? 1 : 0
+        const matchTag = (p.tags || []).some((t) => String(t).toLowerCase().includes(text)) ? 2 : 0
+        const baseMatch = matchName + matchTag
+        // Only give featured bonus if there's an actual match
+        const featuredBonus = (baseMatch > 0 && p.isMember) ? 1.5 : 0
+        const match = baseMatch + featuredBonus
         
         // Debug: Log any restaurant matches
         if (p.category_key === 'restaurants-cafes' && (matchName > 0 || matchTag > 0)) {

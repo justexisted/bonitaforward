@@ -235,6 +235,9 @@ export default function MyBusinessPage() {
     if (state?.autoSelectPlan && auth.userId) {
       console.log('[MyBusiness] Auto-selecting plan from pricing page:', state.autoSelectPlan)
       
+      // Hide subscription card immediately since user already saw pricing info on pricing page
+      setShowSubscriptionCard(false)
+      
       if (state.autoSelectPlan === 'free') {
         // Auto-select free account
         selectFreeAccount()

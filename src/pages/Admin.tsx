@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
-import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, uploadBlogImage, type BlogPost } from '../lib/supabaseData'
+import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, uploadBlogImage, deleteBlogImage, type BlogPost } from '../lib/supabaseData'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 // Extended type for change requests with joined provider and profile data
@@ -509,17 +509,6 @@ export default function AdminPage() {
     editorRef.current?.focus()
   }
 
-  function applyHeading(level: 2 | 3) {
-    try {
-      const block = level === 2 ? 'H2' : 'H3'
-      editorRef.current?.focus()
-      document.execCommand('formatBlock', false, block)
-      syncEditorToState()
-    } catch {
-      // Fallback wrap
-      wrapSelectionWith(level === 2 ? 'h2' : 'h3')
-    }
-  }
 
   function clearFormattingToNormal() {
     try {
@@ -3347,8 +3336,6 @@ export default function AdminPage() {
                     <button type="button" onClick={() => applyFormat('bold')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white font-semibold">B</button>
                     <button type="button" onClick={() => applyFormat('italic')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white italic">I</button>
                     <button type="button" onClick={() => applyFormat('underline')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white underline">U</button>
-                    <button type="button" onClick={() => applyHeading(2)} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">H2</button>
-                    <button type="button" onClick={() => applyHeading(3)} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">H3</button>
                     <button type="button" onClick={() => wrapSelectionWith('span', undefined, 'font-size:20px;')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Large</button>
                     <button type="button" onClick={() => wrapSelectionWith('span', undefined, 'font-size:24px; font-weight:700;')} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">XL Bold</button>
                     <button type="button" onClick={clearFormattingToNormal} className="rounded-full border border-neutral-200 px-2 py-1 bg-white">Normal</button>
@@ -3425,11 +3412,24 @@ export default function AdminPage() {
                               className="w-full h-24 object-cover rounded-lg border border-neutral-200"
                             />
                             <button
-                              onClick={() => {
+                              onClick={async () => {
+                                const imageUrl = blogDraft.images?.[index]
+                                if (!imageUrl) return
+                                
+                                // Delete from storage first
+                                const { error } = await deleteBlogImage(imageUrl)
+                                if (error) {
+                                  setError(`Failed to delete image: ${error}`)
+                                  return
+                                }
+                                
+                                // Remove from local state
                                 setBlogDraft(prev => ({
                                   ...prev,
                                   images: prev.images?.filter((_, i) => i !== index) || []
                                 }))
+                                
+                                setMessage('Image deleted successfully')
                               }}
                               className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                             >
