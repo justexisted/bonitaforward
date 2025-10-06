@@ -583,20 +583,20 @@ export default function MyBusinessPage() {
         providerId = listings[0].id // Use first listing if none specified
       }
       
-      if (!providerId) {
-        throw new Error('No business listing found. Please create a business listing first.')
-      }
-      
       // Create upgrade request for admin to review and process payment
       const { error } = await supabase
         .from('provider_change_requests')
         .insert([{
-          provider_id: providerId, // Always provide a valid provider_id
+          provider_id: providerId, // Can be null if no listing exists yet
           owner_user_id: auth.userId,
           type: 'feature_request',
           changes: {
             tier: 'featured',
-            upgrade_reason: listingId ? 'User requested featured upgrade for specific listing' : 'User requested featured upgrade from subscription selection',
+            upgrade_reason: listingId 
+              ? 'User requested featured upgrade for specific listing' 
+              : providerId 
+                ? 'User requested featured upgrade from subscription selection' 
+                : 'User requested featured upgrade for future business listings',
             pricing_options: {
               annual: '$97/year'
             },
@@ -616,7 +616,11 @@ export default function MyBusinessPage() {
 
       if (error) throw error
 
-      setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $97/year.')
+      if (providerId) {
+        setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $97/year.')
+      } else {
+        setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. When you create your business listing, it will automatically be featured. Featured pricing: $97/year.')
+      }
       
       // Hide the subscription card if it was called from the subscription selection
       if (!listingId) {
