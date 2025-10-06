@@ -23,20 +23,22 @@ export default function PricingPage() {
    * SELECT FREE ACCOUNT
    * 
    * This function redirects to My Business page where the free account selection is handled.
+   * Passes 'selectFree' state so MyBusiness page can auto-select the free option.
    */
   const selectFreeAccount = () => {
-    // Redirect to My Business page
-    navigate('/my-business')
+    // Redirect to My Business page with state indicating free account selection
+    navigate('/my-business', { state: { autoSelectPlan: 'free' } })
   }
 
   /**
    * UPGRADE TO FEATURED TIER
    * 
    * This function redirects to My Business page where the featured upgrade is handled.
+   * Passes 'selectFeatured' state so MyBusiness page can auto-select the featured option.
    */
   const upgradeToFeatured = () => {
-    // Redirect to My Business page
-    navigate('/my-business')
+    // Redirect to My Business page with state indicating featured account selection
+    navigate('/my-business', { state: { autoSelectPlan: 'featured' } })
   }
 
   // Check authentication when component loads

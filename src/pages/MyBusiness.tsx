@@ -49,7 +49,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { createProviderChangeRequest, type ProviderChangeRequest } from '../lib/supabaseData'
 
 // Type definition for business listings in the providers table
@@ -124,6 +124,7 @@ type UserActivity = {
 
 export default function MyBusinessPage() {
   const auth = useAuth()
+  const location = useLocation()
   const [listings, setListings] = useState<BusinessListing[]>([])
   const [applications, setApplications] = useState<BusinessApplication[]>([])
   const [jobPosts, setJobPosts] = useState<JobPost[]>([])
@@ -221,6 +222,31 @@ export default function MyBusinessPage() {
     loadBusinessData()
     checkUserPlanChoice()
   }, [auth.userId, auth.role, auth.isAuthed])
+
+  /**
+   * AUTO-SELECT PLAN FROM PRICING PAGE
+   * 
+   * This effect handles automatic plan selection when redirected from the pricing page.
+   * The pricing page passes state indicating which plan the user selected.
+   */
+  useEffect(() => {
+    const state = location.state as { autoSelectPlan?: 'free' | 'featured' } | null
+    
+    if (state?.autoSelectPlan && auth.userId) {
+      console.log('[MyBusiness] Auto-selecting plan from pricing page:', state.autoSelectPlan)
+      
+      if (state.autoSelectPlan === 'free') {
+        // Auto-select free account
+        selectFreeAccount()
+      } else if (state.autoSelectPlan === 'featured') {
+        // Auto-select featured account
+        upgradeToFeatured()
+      }
+      
+      // Clear the state so it doesn't trigger again
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state, auth.userId])
 
   /**
    * LOAD BUSINESS DATA
