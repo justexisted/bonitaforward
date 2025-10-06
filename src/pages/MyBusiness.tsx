@@ -583,20 +583,19 @@ export default function MyBusinessPage() {
         providerId = listings[0].id // Use first listing if none specified
       }
       
-      // Create upgrade request for admin to review and process payment
-      const { error } = await supabase
-        .from('provider_change_requests')
-        .insert([{
-          provider_id: providerId, // Can be null if no listing exists yet
+      if (providerId) {
+        // User has existing listing - create provider_change_request
+        const { error } = await supabase
+          .from('provider_change_requests')
+          .insert([{
+            provider_id: providerId,
           owner_user_id: auth.userId,
           type: 'feature_request',
           changes: {
             tier: 'featured',
             upgrade_reason: listingId 
               ? 'User requested featured upgrade for specific listing' 
-              : providerId 
-                ? 'User requested featured upgrade from subscription selection' 
-                : 'User requested featured upgrade for future business listings',
+              : 'User requested featured upgrade from subscription selection',
             pricing_options: {
               annual: '$97/year'
             },
@@ -614,11 +613,21 @@ export default function MyBusinessPage() {
           status: 'pending'
         }])
 
-      if (error) throw error
-
-      if (providerId) {
+        if (error) throw error
         setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. Featured pricing: $97/year.')
+        
       } else {
+        // User has no existing listing - create business_application with featured tier
+        const { error } = await supabase
+          .from('business_applications')
+          .insert([{
+            email: auth.email,
+            tier_requested: 'featured',
+            status: 'pending',
+            challenge: 'Featured upgrade request from pricing page - user will provide business details during application process'
+          }])
+
+        if (error) throw error
         setMessage('Featured upgrade request submitted! We\'ll contact you about payment options and setup. When you create your business listing, it will automatically be featured. Featured pricing: $97/year.')
       }
       
