@@ -727,8 +727,8 @@ function Navbar() {
           items={createNavItems()}
           baseColor="#fff"
           menuColor="#000"
-          buttonBgColor="#111"
-          buttonTextColor="#fff"
+          buttonBgColor="#89D185"
+          buttonTextColor="#000"
           ease="power3.out"
         />
       </div>
@@ -887,7 +887,7 @@ function Hero() {
         <Container>
           <div className="py-10 sm:py-12 text-center">
             <SplitText 
-            className="text-3xl sm:text-4xl font-semibold tracking-tight text-white relative z-1" 
+            className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-white relative z-1 font-display" 
             text="Discover, Support, and Grow Local Bonita." 
             duration={0.1}
             ease="power3.out"
@@ -900,15 +900,15 @@ function Hero() {
             </p>
             <div className="mt-4 mx-auto max-w-md text-left" style={{ position: 'relative', zIndex: 2 }}>
               <div className="relative">
-                <div className="flex items-center rounded-full bg-white border border-neutral-200 px-3 py-2 shadow-sm">
-                  <span className="mr-2 select-none">🔎</span>
+                <div className="flex items-center rounded-full bg-white border-2 border-blue-400 px-4 py-3 shadow-lg focus-within:border-blue-500 focus-within:shadow-xl transition-all duration-300 hover:border-blue-300 search-bar-shine">
+                  <span className="mr-3 select-none text-lg">🔎</span>
                   <input
                     value={query}
                     onChange={(e) => { setQuery(e.target.value); setOpen(true); recompute(e.target.value) }}
                     onFocus={() => { if (results.length) setOpen(true) }}
                     onBlur={() => setTimeout(() => setOpen(false), 120)}
                     placeholder="Discover Bonita"
-                    className="flex-1 outline-none text-sm bg-transparent placeholder:text-neutral-400"
+                    className="flex-1 outline-none text-base bg-transparent placeholder:text-neutral-400"
                   />
                 </div>
                 {open && results.length > 0 && (
@@ -1517,18 +1517,18 @@ function CommunitySection() {
           scrollStart='center bottom+=50%'
           scrollEnd='bottom bottom-=40%'
           stagger={0.03}
-          textClassName="text-xl font-semibold tracking-tight text-neutral-900"
+          textClassName="text-2xl md:text-4xl font-semibold tracking-tight text-neutral-900 font-display"
         >
-          Community
+          Community Blogs
         </ScrollFloat>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {cards.map((c) => {
             const bgMap: Record<string, string> = {
-              'restaurants-cafes': "https://picsum.photos/seed/restaurants-cafes/800/400",
-              'home-services': "https://picsum.photos/seed/home-services/800/400",
-              'health-wellness': "https://picsum.photos/seed/health-wellness/800/400",
-              'real-estate': "https://picsum.photos/seed/real-estate/800/400",
-              'professional-services': "https://picsum.photos/seed/professional-services/800/400",
+              'restaurants-cafes': "/images/community/restaurants-cafes.png",
+     'home-services': "/images/community/home-services.png",
+     'health-wellness': "/images/community/health-wellness.png",
+     'real-estate': "/images/community/real-estate.png",
+     'professional-services': "/images/community/professional-services.png",
             }
             const bg = bgMap[c.category_key as CategoryKey]
             return (
@@ -1542,7 +1542,7 @@ function CommunitySection() {
                   onError={(e) => {
                     const img = e.currentTarget as HTMLImageElement
                     img.onerror = null
-                    img.src = `https://picsum.photos/seed/${c.category_key}-fallback/800/400`
+                    img.src = `/images/community/{c.category_key}-fallback.png`
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/60" aria-hidden></div>

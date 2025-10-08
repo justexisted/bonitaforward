@@ -13,18 +13,126 @@ const categoryToTitle: Record<string, string> = {
 
 export function CommunityIndex() {
   const cats = Object.keys(categoryToTitle)
+  const [blogPosts, setBlogPosts] = useState<Record<string, BlogPost[]>>({})
+  const [loading, setLoading] = useState(true)
+  
+  // Image mapping for each category
+  const categoryImages: Record<string, string> = {
+    'restaurants-cafes': '/images/community/restaurants-cafes.png',
+    'home-services': '/images/community/home-services.png',
+    'health-wellness': '/images/community/health-wellness.png',
+    'real-estate': '/images/community/real-estate.png',
+    'professional-services': '/images/community/professional-services.png',
+  }
+
+  // Fetch blog posts for all categories
+  useEffect(() => {
+    let cancelled = false
+    const fetchAllPosts = async () => {
+      setLoading(true)
+      const postsByCategory: Record<string, BlogPost[]> = {}
+      
+      for (const category of cats) {
+        try {
+          const posts = await fetchBlogPostsByCategory(category)
+          if (!cancelled) {
+            postsByCategory[category] = posts
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch posts for ${category}:`, error)
+          if (!cancelled) {
+            postsByCategory[category] = []
+          }
+        }
+      }
+      
+      if (!cancelled) {
+        setBlogPosts(postsByCategory)
+        setLoading(false)
+      }
+    }
+    
+    fetchAllPosts()
+    return () => { cancelled = true }
+  }, [])
+  
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight">Community</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight font-display">Community Blogs</h1>
         <div className="mt-4 grid grid-cols-1 gap-3">
-          {cats.map((ck) => (
-            <Link key={ck} to={`/community/${ck}`} className="rounded-2xl border border-neutral-100 p-5 bg-white hover:shadow-sm">
-              <div className="font-medium">{categoryToTitle[ck]}</div>
-              <div className="mt-2 text-sm text-neutral-600">Read the latest post for this category.</div>
-              <span className="mt-3 inline-block text-sm" style={{ color: '#7070e3' }}>Read more</span>
-            </Link>
-          ))}
+          {cats.map((ck) => {
+            const imageUrl = categoryImages[ck]
+            const posts = blogPosts[ck] || []
+            const latestPost = posts[0] // Most recent post
+            
+            return (
+              <Link key={ck} to={`/community/${ck}`} className="block">
+                {/* Mobile: Full image background with overlay */}
+                <div className="md:hidden relative rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
+                  <img
+                    src={imageUrl}
+                    alt=""
+                    className="w-full h-48 object-cover scale-115 -translate-x-5"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement
+                      img.src = `https://picsum.photos/seed/${ck}/800/400`
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-transparent to-transparent" aria-hidden></div>
+                  <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                    <div className="font-medium text-3xl font-display">{categoryToTitle[ck]}</div>
+                    {loading ? (
+                      <div className="text-sm text-neutral-200 mt-1">Loading posts...</div>
+                    ) : latestPost ? (
+                      <div className="text-sm text-neutral-200 mt-1">
+                        <div className="font-medium text-xl">{latestPost.title}</div>
+                        <div className="text-xs text-neutral-300 mt-1">
+                          {new Date(latestPost.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-neutral-200 mt-1">No posts yet for this category.</div>
+                    )}
+                    <span className="mt-2 inline-block text-sm text-white font-medium">Read more →</span>
+                  </div>
+                </div>
+
+                {/* Desktop: Half image, half content */}
+                <div className="hidden md:flex rounded-2xl border border-neutral-100 bg-white overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="w-1/2 relative">
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      className="w-full h-full object-cover scale-115 -translate-x-5"
+                      onError={(e) => {
+                        const img = e.currentTarget as HTMLImageElement
+                        img.src = `https://picsum.photos/seed/${ck}/800/400`
+                      }}
+                    />
+                  </div>
+                  <div className="w-1/2 p-6 flex flex-col justify-between">
+                    <div>
+                      <div className="font-medium text-3xl font-display">{categoryToTitle[ck]}</div>
+                      {loading ? (
+                        <div className="text-sm text-neutral-600 mt-2">Loading posts...</div>
+                      ) : latestPost ? (
+                        <div className="text-sm text-neutral-600 mt-2">
+                          <div className="font-medium text-xl">{latestPost.title}</div>
+                          <div className="text-xs text-neutral-500 mt-1">
+                            {new Date(latestPost.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-neutral-600 mt-2">No posts yet for this category.</div>
+                      )}
+                    </div>
+                    <span className="mt-4 inline-block text-sm" style={{ color: '#7070e3' }}>Read more</span>
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
         </div>
       </div>
     </section>
