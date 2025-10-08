@@ -68,16 +68,12 @@ interface ICalEvent {
 }
 
 /**
- * Extract time from description text
+ * Extract time from description text - detect AM/PM times
  * Looks for patterns like "10:00 a.m.", "5:00 PM", "3:30pm", etc.
  */
 const extractTimeFromDescription = (description: string): string | null => {
   if (!description) return null
   
-  // Patterns to match:
-  // - "10:00 a.m." or "10:00 AM" or "10:00am"
-  // - "5:30 p.m." or "5:30 PM" or "5:30pm"
-  // - "10 a.m." or "10 AM"
   const timePatterns = [
     /(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)/i,  // 10:00 a.m. or 10:00am
     /(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)/i,          // 10 a.m. or 10am
@@ -106,42 +102,6 @@ const extractTimeFromDescription = (description: string): string | null => {
   }
   
   // Return the earliest time found (lowest index in description)
-  if (times.length > 0) {
-    times.sort((a, b) => a.index - b.index)
-    return times[0].time
-  }
-  
-  return null
-}
-
-/**
- * Extract time from description text - detect AM/PM times
- */
-const extractTimeFromDescription = (description: string): string | null => {
-  if (!description) return null
-  
-  const timePatterns = [
-    /(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)/i,
-    /(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)/i,
-  ]
-  
-  const times: { time: string, index: number }[] = []
-  
-  for (const pattern of timePatterns) {
-    const matches = description.matchAll(new RegExp(pattern, 'gi'))
-    for (const match of matches) {
-      const hours = parseInt(match[1])
-      const minutes = match[2] ? match[2] : '00'
-      const ampm = match[match.length - 1].replace(/\./g, '').toUpperCase()
-      
-      let hours24 = hours
-      if (ampm.startsWith('P') && hours !== 12) hours24 = hours + 12
-      else if (ampm.startsWith('A') && hours === 12) hours24 = 0
-      
-      times.push({ time: `${hours24.toString().padStart(2, '0')}:${minutes}`, index: match.index || 0 })
-    }
-  }
-  
   if (times.length > 0) {
     times.sort((a, b) => a.index - b.index)
     return times[0].time
