@@ -207,49 +207,109 @@ export default function AdminPage() {
     }
   }
   
+  // Function to parse CSV properly handling quoted fields
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      const nextChar = line[i + 1]
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote
+          current += '"'
+          i++
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        // Field separator
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    
+    // Push last field
+    result.push(current.trim())
+    return result
+  }
+  
   // Function to process CSV file
   const handleCsvUpload = async (file: File) => {
     try {
       const text = await file.text()
-      const lines = text.split('\n')
+      const lines = text.split(/\r?\n/) // Handle both Unix and Windows line endings
       const events: Omit<CalendarEvent, 'id' | 'created_at'>[] = []
       
       // Skip header row if it exists
       const startIndex = lines[0]?.toLowerCase().includes('title') ? 1 : 0
       
+      console.log(`Processing ${lines.length - startIndex} lines from CSV...`)
+      
       for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
         
-        const [title, date, time, location, address, category, description] = line.split(',').map(s => s.trim())
+        // Parse CSV line properly handling quoted fields
+        const fields = parseCSVLine(line)
+        const [title, date, time, location, address, category, description] = fields
         
         if (!title || !date) {
-          console.warn(`Skipping invalid line ${i + 1}: ${line}`)
+          console.warn(`Skipping line ${i + 1}: Missing title or date. Fields:`, fields)
           continue
         }
         
-        const eventDate = new Date(date + 'T' + (time || '12:00'))
-        if (isNaN(eventDate.getTime())) {
-          console.warn(`Skipping line ${i + 1} with invalid date: ${date}`)
+        // Parse date - handle multiple formats
+        let eventDate: Date
+        try {
+          // Try YYYY-MM-DD format first
+          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            eventDate = new Date(date + 'T' + (time || '12:00') + ':00')
+          } 
+          // Try MM/DD/YYYY format
+          else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) {
+            const [month, day, year] = date.split('/')
+            eventDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${time || '12:00'}:00`)
+          }
+          // Try parsing as-is
+          else {
+            eventDate = new Date(date + (time ? 'T' + time : ''))
+          }
+          
+          if (isNaN(eventDate.getTime())) {
+            throw new Error('Invalid date')
+          }
+        } catch (err) {
+          console.warn(`Skipping line ${i + 1} with invalid date: "${date}". Expected format: YYYY-MM-DD or MM/DD/YYYY`)
           continue
         }
         
         events.push({
-          title: title,
-          description: description || '',
+          title: title.replace(/^"|"$/g, ''), // Remove surrounding quotes if any
+          description: (description || '').replace(/^"|"$/g, ''),
           date: eventDate.toISOString(),
           time: time || '12:00',
-          location: location || '',
-          address: address || '',
-          category: category || 'Community',
+          location: (location || '').replace(/^"|"$/g, ''),
+          address: (address || '').replace(/^"|"$/g, ''),
+          category: (category || 'Community').replace(/^"|"$/g, ''),
           source: 'Local',
           upvotes: 0,
           downvotes: 0
         })
+        
+        console.log(`✓ Parsed line ${i + 1}: ${title}`)
       }
       
+      console.log(`Successfully parsed ${events.length} events`)
+      
       if (events.length === 0) {
-        alert('No valid events found in CSV file')
+        alert('No valid events found in CSV file.\n\nPlease ensure:\n- File has required columns: Title, Date, Time, Location, Address, Category, Description\n- Date format is YYYY-MM-DD (e.g., 2025-01-15) or MM/DD/YYYY\n- Each row has at least a title and date\n\nCheck the browser console for detailed error messages.')
         return
       }
       
