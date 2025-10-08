@@ -303,10 +303,15 @@ export default function AdminPage() {
             // Try YYYY-MM-DD format first (most common)
             if (dateStr.includes('-')) {
               const parts = dateStr.split('-')
+              console.log(`  Parts:`, parts, `Length: ${parts.length}, First part length: ${parts[0]?.length}`)
+              
               if (parts.length === 3 && parts[0].length === 4) {
                 const year = parseInt(parts[0])
                 const month = parseInt(parts[1])
                 const day = parseInt(parts[2])
+                
+                console.log(`  Parsed integers: year=${year}, month=${month}, day=${day}`)
+                console.log(`  Validation: year check=${year >= 2000 && year <= 2100}, month check=${month >= 1 && month <= 12}, day check=${day >= 1 && day <= 31}`)
                 
                 // Validate ranges
                 if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
@@ -315,9 +320,16 @@ export default function AdminPage() {
                   const monthStr = month.toString().padStart(2, '0')
                   const dayStr = day.toString().padStart(2, '0')
                   
-                  parsedDate = new Date(`${yearStr}-${monthStr}-${dayStr}T${timeStr}:00`)
-                  console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}`)
+                  const dateTimeStr = `${yearStr}-${monthStr}-${dayStr}T${timeStr}:00`
+                  console.log(`  Creating Date from: "${dateTimeStr}"`)
+                  
+                  parsedDate = new Date(dateTimeStr)
+                  console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}, isNaN: ${isNaN(parsedDate.getTime())}`)
+                } else {
+                  console.log(`  ✗ Validation failed!`)
                 }
+              } else {
+                console.log(`  ✗ Parts check failed`)
               }
             }
             // Try MM/DD/YYYY format
