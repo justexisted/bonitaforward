@@ -1,11 +1,5 @@
-// Import ical library with fallback for browser compatibility
-let ical: any
-try {
-  ical = require('ical')
-} catch (error) {
-  console.warn('ical library not available, iCalendar parsing disabled:', error)
-  ical = null
-}
+// Import browser-compatible ical.js library
+import ICAL from 'ical.js'
 
 export interface ICalEvent {
   id: string
@@ -65,12 +59,6 @@ export const ICAL_FEEDS: ICalFeed[] = [
  */
 export const parseICalFeed = async (feedUrl: string, source: string): Promise<ICalEvent[]> => {
   try {
-    // Check if ical library is available
-    if (!ical) {
-      console.warn('ical library not available, skipping iCalendar parsing')
-      return []
-    }
-    
     console.log(`Fetching iCalendar feed: ${feedUrl}`)
     
     // Fetch the iCalendar content
@@ -93,57 +81,63 @@ export const parseICalFeed = async (feedUrl: string, source: string): Promise<IC
       throw new Error('Invalid or empty iCalendar content')
     }
 
-    // Parse the iCalendar content
-    const data = ical.parseICS(icsContent)
+    // Parse the iCalendar content using ICAL.js
+    const jcalData = ICAL.parse(icsContent)
+    const vcalendar = new ICAL.Component(jcalData)
+    const vevents = vcalendar.getAllSubcomponents('vevent')
     const events: ICalEvent[] = []
 
-    for (const key in data) {
-      const event = data[key]
-      
-      // Only process VEVENT entries
-      if (event.type !== 'VEVENT') {
-        continue
-      }
-
+    vevents.forEach((vevent, index) => {
       try {
-        const startDate = event.start ? new Date(event.start) : null
-        const endDate = event.end ? new Date(event.end) : null
+        const event = new ICAL.Event(vevent)
+        
+        // Get event properties
+        const summary = event.summary || 'Untitled Event'
+        const description = event.description || ''
+        const location = event.location || ''
+        const uid = event.uid || `ical-${source}-${index}`
+        
+        // Get start and end times
+        const startTime = event.startDate
+        const endTime = event.endDate
         
         // Skip events without valid start date
-        if (!startDate || isNaN(startDate.getTime())) {
-          continue
+        if (!startTime) {
+          return
         }
-
+        
+        const startDate = startTime.toJSDate()
+        
         // Skip past events (older than 1 day)
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
         if (startDate < oneDayAgo) {
-          continue
+          return
         }
 
         // Skip events too far in the future (more than 1 year)
         const oneYearFromNow = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
         if (startDate > oneYearFromNow) {
-          continue
+          return
         }
 
         const icalEvent: ICalEvent = {
-          id: event.uid || `ical-${source}-${key}`,
-          title: event.summary || 'Untitled Event',
-          description: event.description || '',
-          startDate,
-          endDate: endDate && !isNaN(endDate.getTime()) ? endDate : undefined,
-          location: event.location || '',
-          url: event.url || '',
+          id: uid,
+          title: summary,
+          description: description,
+          startDate: startDate,
+          endDate: endTime ? endTime.toJSDate() : undefined,
+          location: location,
+          url: '', // URL not available in ICAL.js Event object
           source,
-          allDay: event.datetype === 'date'
+          allDay: startTime.isDate
         }
 
         events.push(icalEvent)
       } catch (eventError) {
-        console.warn(`Error parsing iCalendar event ${key}:`, eventError)
-        continue
+        console.warn(`Error parsing iCalendar event ${index}:`, eventError)
+        return
       }
-    }
+    })
 
     console.log(`Successfully parsed ${events.length} events from ${source}`)
     return events
