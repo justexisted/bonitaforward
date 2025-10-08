@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, uploadBlogImage, deleteBlogImage, type BlogPost } from '../lib/supabaseData'
 import { type CalendarEvent } from './Calendar'
-import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
+// iCalendar parsing moved to server-side Netlify function for reliability
+// import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 // Extended type for change requests with joined provider and profile data
