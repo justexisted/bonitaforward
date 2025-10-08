@@ -86,7 +86,7 @@ const parseRSSFeed = async (feedUrl: string, source: string): Promise<CalendarEv
         const title = item.querySelector('title')?.textContent || 'Untitled Event'
         const description = item.querySelector('description')?.textContent || ''
         const pubDate = item.querySelector('pubDate')?.textContent
-        const link = item.querySelector('link')?.textContent || ''
+        // const link = item.querySelector('link')?.textContent || '' // Reserved for future use
         
         // Skip if title is empty or too short
         if (!title || title.length < 3) {

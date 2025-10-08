@@ -1,4 +1,11 @@
-import ical from 'ical'
+// Import ical library with fallback for browser compatibility
+let ical: any
+try {
+  ical = require('ical')
+} catch (error) {
+  console.warn('ical library not available, iCalendar parsing disabled:', error)
+  ical = null
+}
 
 export interface ICalEvent {
   id: string
@@ -58,6 +65,12 @@ export const ICAL_FEEDS: ICalFeed[] = [
  */
 export const parseICalFeed = async (feedUrl: string, source: string): Promise<ICalEvent[]> => {
   try {
+    // Check if ical library is available
+    if (!ical) {
+      console.warn('ical library not available, skipping iCalendar parsing')
+      return []
+    }
+    
     console.log(`Fetching iCalendar feed: ${feedUrl}`)
     
     // Fetch the iCalendar content

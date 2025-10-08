@@ -13,6 +13,8 @@ The Bonita Forward calendar now includes comprehensive iCalendar (.ics) feed int
    - Error handling and validation
    - Automatic deduplication
    - Date filtering (past events and events >1 year out)
+   - Browser compatibility with fallback handling
+   - TypeScript support with proper type declarations
 
 2. **Feed Management** 
    - Pre-configured feeds from major San Diego area organizations
