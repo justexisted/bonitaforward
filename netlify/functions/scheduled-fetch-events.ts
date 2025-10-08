@@ -71,8 +71,15 @@ interface ICalEvent {
  * Extract time from description text
  * Handles: "10:00 a.m.", "10:30 and 11:00 am", "10:30-11:45 a.m.", etc.
  */
-const extractTimeFromDescription = (description: string): string | null => {
-  if (!description) return null
+const extractTimeFromDescription = (description: string, eventTitle?: string): string | null => {
+  if (!description) {
+    console.log(`[Time Extract] No description provided`)
+    return null
+  }
+  
+  console.log(`[Time Extract] ========================================`)
+  console.log(`[Time Extract] Event: ${eventTitle || 'Unknown'}`)
+  console.log(`[Time Extract] Description (first 200 chars): "${description.substring(0, 200)}"`)
   
   // Extract first 500 chars (times are usually at the beginning)
   const text = description.substring(0, 500)
@@ -85,19 +92,29 @@ const extractTimeFromDescription = (description: string): string | null => {
     /(\d{1,2})\s*([ap]\.?\s*m\.?)/gi,
   ]
   
-  const times: { time: string, index: number, hours24: number }[] = []
+  const times: { time: string, index: number, hours24: number, original: string }[] = []
   
-  for (const pattern of timePatterns) {
+  for (let i = 0; i < timePatterns.length; i++) {
+    const pattern = timePatterns[i]
     let match
     const regex = new RegExp(pattern)
+    
+    console.log(`[Time Extract] Testing pattern ${i + 1}: ${pattern}`)
+    
     while ((match = regex.exec(text)) !== null) {
       const hours = parseInt(match[1])
       const minutes = match[2] || '00'
       const ampmRaw = match[match.length - 1]
       const ampm = ampmRaw.replace(/[\.\s]/g, '').toUpperCase()
       
+      console.log(`[Time Extract]   - Found match: "${match[0]}" at index ${match.index}`)
+      console.log(`[Time Extract]     Hours: ${hours}, Minutes: ${minutes}, AM/PM: ${ampm}`)
+      
       // Skip if hours are invalid (e.g., matched a date like "October 9")
-      if (hours < 1 || hours > 12) continue
+      if (hours < 1 || hours > 12) {
+        console.log(`[Time Extract]     ✗ SKIPPED: Invalid hour (${hours})`)
+        continue
+      }
       
       // Convert to 24-hour format
       let hours24 = hours
@@ -108,10 +125,13 @@ const extractTimeFromDescription = (description: string): string | null => {
       }
       
       const timeStr = `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+      console.log(`[Time Extract]     ✓ Converted to 24-hour: ${timeStr}`)
+      
       times.push({ 
         time: timeStr, 
         index: match.index,
-        hours24: hours24
+        hours24: hours24,
+        original: match[0]
       })
     }
   }
@@ -119,11 +139,15 @@ const extractTimeFromDescription = (description: string): string | null => {
   // Return the earliest time found (based on index position in description)
   if (times.length > 0) {
     times.sort((a, b) => a.index - b.index)
-    console.log(`[Time Extract] Found ${times.length} times, using earliest: ${times[0].time}`)
+    console.log(`[Time Extract] FOUND ${times.length} total times:`)
+    times.forEach((t, i) => {
+      console.log(`[Time Extract]   ${i + 1}. "${t.original}" → ${t.time} (index: ${t.index})`)
+    })
+    console.log(`[Time Extract] ✓ USING EARLIEST: ${times[0].time}`)
     return times[0].time
   }
   
-  console.log(`[Time Extract] No time found in description`)
+  console.log(`[Time Extract] ✗ No valid times found in description`)
   return null
 }
 
@@ -160,13 +184,20 @@ const parseICalContent = (icsContent: string, source: string, category: string):
         
         // If the event appears to be all-day but has a time in description, use that time
         if (startTime.isDate) {
-          const extractedTime = extractTimeFromDescription(description)
+          console.log(`[iCal Parse] Event "${summary}" is marked as all-day`)
+          const extractedTime = extractTimeFromDescription(description, summary)
           if (extractedTime) {
+            console.log(`[iCal Parse] ✓ Extracted time from description: ${extractedTime}`)
             const [hours, minutes] = extractedTime.split(':')
             const dateWithTime = new Date(startDate)
             dateWithTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
             startDate = dateWithTime
+            console.log(`[iCal Parse] ✓ Updated startDate to: ${startDate.toISOString()}`)
+          } else {
+            console.log(`[iCal Parse] ✗ No time found in description, keeping as all-day`)
           }
+        } else {
+          console.log(`[iCal Parse] Event "${summary}" has explicit time: ${startDate.toISOString()}`)
         }
         
         // Skip past events (older than 1 day)
@@ -265,6 +296,11 @@ const generateUuidFromString = (str: string): string => {
  * Convert iCalendar event to database format
  */
 const convertToDatabaseEvent = (icalEvent: ICalEvent) => {
+  console.log(`[DB Convert] ========================================`)
+  console.log(`[DB Convert] Converting event: "${icalEvent.title}"`)
+  console.log(`[DB Convert] Start date: ${icalEvent.startDate.toISOString()}`)
+  console.log(`[DB Convert] All-day flag: ${icalEvent.allDay}`)
+  
   // Extract time from startDate in consistent 24-hour format
   let timeStr: string | undefined
   
@@ -272,13 +308,20 @@ const convertToDatabaseEvent = (icalEvent: ICalEvent) => {
     const hours = icalEvent.startDate.getHours()
     const minutes = icalEvent.startDate.getMinutes()
     timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+    console.log(`[DB Convert] ✓ Using time from startDate: ${timeStr}`)
   } else {
+    console.log(`[DB Convert] Event is all-day, trying to extract from description...`)
     // For all-day events, try to extract time from description as fallback
-    const extractedTime = extractTimeFromDescription(icalEvent.description || '')
+    const extractedTime = extractTimeFromDescription(icalEvent.description || '', icalEvent.title)
     if (extractedTime) {
       timeStr = extractedTime
+      console.log(`[DB Convert] ✓ Using extracted time: ${timeStr}`)
+    } else {
+      console.log(`[DB Convert] ✗ No time extracted, will be undefined`)
     }
   }
+  
+  console.log(`[DB Convert] FINAL TIME VALUE: ${timeStr || 'undefined'}`)
   
   return {
     // Don't use the iCal UID directly - generate a proper UUID from it
