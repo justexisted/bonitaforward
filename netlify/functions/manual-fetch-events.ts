@@ -68,6 +68,53 @@ interface ICalEvent {
 }
 
 /**
+ * Extract time from description text
+ * Looks for patterns like "10:00 a.m.", "5:00 PM", "3:30pm", etc.
+ */
+const extractTimeFromDescription = (description: string): string | null => {
+  if (!description) return null
+  
+  // Patterns to match:
+  // - "10:00 a.m." or "10:00 AM" or "10:00am"
+  // - "5:30 p.m." or "5:30 PM" or "5:30pm"
+  // - "10 a.m." or "10 AM"
+  const timePatterns = [
+    /(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)/i,  // 10:00 a.m. or 10:00am
+    /(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)/i,          // 10 a.m. or 10am
+  ]
+  
+  const times: { time: string, index: number }[] = []
+  
+  for (const pattern of timePatterns) {
+    const matches = description.matchAll(new RegExp(pattern, 'gi'))
+    for (const match of matches) {
+      const hours = parseInt(match[1])
+      const minutes = match[2] ? match[2] : '00'
+      const ampm = match[match.length - 1].replace(/\./g, '').toUpperCase()
+      
+      // Convert to 24-hour format
+      let hours24 = hours
+      if (ampm.startsWith('P') && hours !== 12) {
+        hours24 = hours + 12
+      } else if (ampm.startsWith('A') && hours === 12) {
+        hours24 = 0
+      }
+      
+      const timeStr = `${hours24.toString().padStart(2, '0')}:${minutes}`
+      times.push({ time: timeStr, index: match.index || 0 })
+    }
+  }
+  
+  // Return the earliest time found (lowest index in description)
+  if (times.length > 0) {
+    times.sort((a, b) => a.index - b.index)
+    return times[0].time
+  }
+  
+  return null
+}
+
+/**
  * Parse iCalendar content and extract events
  */
 const parseICalContent = (icsContent: string, source: string, category: string): ICalEvent[] => {
@@ -96,7 +143,18 @@ const parseICalContent = (icsContent: string, source: string, category: string):
           return
         }
         
-        const startDate = startTime.toJSDate()
+        let startDate = startTime.toJSDate()
+        
+        // If the event appears to be all-day but has a time in description, use that time
+        if (startTime.isDate) {
+          const extractedTime = extractTimeFromDescription(description)
+          if (extractedTime) {
+            const [hours, minutes] = extractedTime.split(':')
+            const dateWithTime = new Date(startDate)
+            dateWithTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+            startDate = dateWithTime
+          }
+        }
         
         // Skip past events (older than 1 day)
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -119,7 +177,7 @@ const parseICalContent = (icsContent: string, source: string, category: string):
           location: location,
           source,
           category,
-          allDay: startTime.isDate
+          allDay: startTime.isDate && !extractTimeFromDescription(description) // Not all-day if we found a time
         }
 
         events.push(icalEvent)
