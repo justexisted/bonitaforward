@@ -21,37 +21,39 @@ export interface ICalFeed {
 }
 
 // Known iCalendar feeds for Bonita/San Diego area
+// Temporarily disabled until we can verify working URLs and implement proper proxy
 export const ICAL_FEEDS: ICalFeed[] = [
-  {
-    url: 'https://www.sandiego.gov/sites/default/files/calendar.ics',
-    source: 'City of San Diego',
-    category: 'Government',
-    enabled: true
-  },
-  {
-    url: 'https://www.sandiegolibrary.org/events.ics',
-    source: 'San Diego Public Library',
-    category: 'Education',
-    enabled: true
-  },
-  {
-    url: 'https://calendar.ucsd.edu/events.ics',
-    source: 'UC San Diego',
-    category: 'Education',
-    enabled: true
-  },
-  {
-    url: 'https://www.sandiegozoo.org/events.ics',
-    source: 'San Diego Zoo',
-    category: 'Entertainment',
-    enabled: true
-  },
-  {
-    url: 'https://www.balboapark.org/events.ics',
-    source: 'Balboa Park',
-    category: 'Culture',
-    enabled: true
-  }
+  // Disabled until we can verify these URLs work and implement proper CORS handling
+  // {
+  //   url: 'https://www.sandiego.gov/calendar/events.ics',
+  //   source: 'City of San Diego',
+  //   category: 'Government',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://www.sandiegolibrary.org/calendar/events.ics',
+  //   source: 'San Diego Public Library',
+  //   category: 'Education',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://calendar.ucsd.edu/calendar/events.ics',
+  //   source: 'UC San Diego',
+  //   category: 'Education',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://www.sandiegozoo.org/calendar/events.ics',
+  //   source: 'San Diego Zoo',
+  //   category: 'Entertainment',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://www.balboapark.org/calendar/events.ics',
+  //   source: 'Balboa Park',
+  //   category: 'Culture',
+  //   enabled: false
+  // }
 ]
 
 /**
@@ -61,21 +63,39 @@ export const parseICalFeed = async (feedUrl: string, source: string): Promise<IC
   try {
     console.log(`Fetching iCalendar feed: ${feedUrl}`)
     
-    // Fetch the iCalendar content
-    const response = await fetch(feedUrl, {
+    // Use Netlify function proxy to bypass CORS
+    const proxyUrl = `/.netlify/functions/ical-proxy?url=${encodeURIComponent(feedUrl)}`
+    
+    // Fetch the iCalendar content through proxy
+    const response = await fetch(proxyUrl, {
       method: 'GET',
       headers: {
         'Accept': 'text/calendar, application/calendar, text/plain',
-        'User-Agent': 'Bonita Forward Calendar/1.0'
       },
       signal: AbortSignal.timeout(30000) // 30 second timeout
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      // Try to get error details from proxy
+      try {
+        const errorData = await response.json()
+        throw new Error(`Proxy error: ${errorData.error || 'Unknown error'}`)
+      } catch {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
     }
 
     const icsContent = await response.text()
+    
+    // Check if response is JSON error
+    if (icsContent.trim().startsWith('{')) {
+      try {
+        const errorData = JSON.parse(icsContent)
+        throw new Error(`Proxy error: ${errorData.error || 'Unknown error'}`)
+      } catch {
+        // Not JSON, continue with parsing
+      }
+    }
     
     if (!icsContent || icsContent.length < 100) {
       throw new Error('Invalid or empty iCalendar content')

@@ -270,6 +270,7 @@ export default function AdminPage() {
       if (calendarEvents.length === 0) {
         setMessage('No events found in iCalendar feeds')
         return
+
       }
       
       // Clear existing iCalendar events (those with source matching our feeds)
@@ -4039,4 +4040,5 @@ function JobCard({
     </div>
   )
 }
+
 
