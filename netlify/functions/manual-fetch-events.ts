@@ -181,23 +181,23 @@ const parseICalContent = (icsContent: string, source: string, category: string):
         }
         
         let startDate = startTime.toJSDate()
+        const originalTime = startDate.toISOString()
         
-        // If the event appears to be all-day but has a time in description, use that time
-        if (startTime.isDate) {
-          console.log(`[iCal Parse] Event "${summary}" is marked as all-day`)
-          const extractedTime = extractTimeFromDescription(description, summary)
-          if (extractedTime) {
-            console.log(`[iCal Parse] ✓ Extracted time from description: ${extractedTime}`)
-            const [hours, minutes] = extractedTime.split(':')
-            const dateWithTime = new Date(startDate)
-            dateWithTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
-            startDate = dateWithTime
-            console.log(`[iCal Parse] ✓ Updated startDate to: ${startDate.toISOString()}`)
-          } else {
-            console.log(`[iCal Parse] ✗ No time found in description, keeping as all-day`)
-          }
+        console.log(`[iCal Parse] Event "${summary}"`)
+        console.log(`[iCal Parse]   Original iCal time: ${originalTime}`)
+        console.log(`[iCal Parse]   Is all-day in iCal: ${startTime.isDate}`)
+        
+        // ALWAYS try to extract time from description FIRST (description is more accurate than iCal times)
+        const extractedTime = extractTimeFromDescription(description, summary)
+        if (extractedTime) {
+          console.log(`[iCal Parse]   ✓ FOUND time in description: ${extractedTime}`)
+          const [hours, minutes] = extractedTime.split(':')
+          const dateWithTime = new Date(startDate)
+          dateWithTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+          startDate = dateWithTime
+          console.log(`[iCal Parse]   ✓ USING description time, updated to: ${startDate.toISOString()}`)
         } else {
-          console.log(`[iCal Parse] Event "${summary}" has explicit time: ${startDate.toISOString()}`)
+          console.log(`[iCal Parse]   ✗ No time in description, using iCal time: ${originalTime}`)
         }
         
         // Skip past events (older than 1 day)
@@ -221,7 +221,7 @@ const parseICalContent = (icsContent: string, source: string, category: string):
           location: location,
           source,
           category,
-          allDay: startTime.isDate && !extractTimeFromDescription(description) // Not all-day if we found a time
+          allDay: !extractedTime // If we extracted a time from description, it's not all-day
         }
 
         events.push(icalEvent)
