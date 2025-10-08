@@ -507,17 +507,41 @@ export default function AdminPage() {
     }
   }
 
-  // Function to refresh iCalendar feeds
-  const refreshICalFeeds = async () => {
+  // Function to refresh iCalendar feeds using server-side Netlify function
+  const refreshICalFeedsServer = async () => {
     try {
-      console.log('Refreshing iCalendar feeds...')
+      setMessage('Triggering server-side iCalendar refresh...')
+      
+      const response = await fetch('/.netlify/functions/manual-fetch-events')
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        setMessage(`Successfully fetched ${result.totalEvents} events from ${result.processedFeeds} feeds!`)
+        
+        // Refresh the calendar events list
+        const { fetchCalendarEvents } = await import('./Calendar')
+        const events = await fetchCalendarEvents()
+        setCalendarEvents(events)
+      } else {
+        setError(`Server returned error: ${result.message || result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error calling manual-fetch-events:', error)
+      setError('Failed to trigger server fetch: ' + error)
+    }
+  }
+  
+  // Old client-side refresh kept as fallback (CORS issues make this unreliable)
+  // Use refreshICalFeedsServer() instead
+  /* const refreshICalFeeds = async () => {
+    try {
+      console.log('Refreshing iCalendar feeds (client-side)...')
       const icalEvents = await parseMultipleICalFeeds(ICAL_FEEDS)
       const calendarEvents = icalEvents.map(convertICalToCalendarEvent)
       
       if (calendarEvents.length === 0) {
         setMessage('No events found in iCalendar feeds')
         return
-
       }
       
       // Clear existing iCalendar events (those with source matching our feeds)
@@ -538,7 +562,7 @@ export default function AdminPage() {
       console.error('Error refreshing iCalendar feeds:', error)
       setError('Failed to refresh iCalendar feeds: ' + error)
     }
-  }
+  } */
   const [error, setError] = useState<string | null>(null)
   const [bizApps, setBizApps] = useState<BusinessApplicationRow[]>([])
   const [contactLeads, setContactLeads] = useState<ContactLeadRow[]>([])
@@ -4028,13 +4052,13 @@ export default function AdminPage() {
                 
                 <button
                   onClick={() => {
-                    if (confirm('Refresh events from iCalendar feeds? This will update events from government and civic organizations.')) {
-                      refreshICalFeeds()
+                    if (confirm('Trigger server-side iCalendar refresh? This will fetch events from government and civic organizations using the Netlify function.')) {
+                      refreshICalFeedsServer()
                     }
                   }}
                   className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
                 >
-                  🔄 Refresh iCal Feeds
+                  🔄 Refresh iCal Feeds (Server)
                 </button>
               </div>
               
