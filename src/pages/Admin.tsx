@@ -315,16 +315,36 @@ export default function AdminPage() {
                 
                 // Validate ranges
                 if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-                  const timeStr = (time || '12:00').trim()
+                  // Convert time to 24-hour format if it's in 12-hour format (AM/PM)
+                  let timeStr = (time || '12:00').trim()
+                  
+                  // Check if time has AM/PM
+                  const ampmMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+                  if (ampmMatch) {
+                    let hours = parseInt(ampmMatch[1])
+                    const minutes = ampmMatch[2]
+                    const ampm = ampmMatch[3].toUpperCase()
+                    
+                    // Convert to 24-hour
+                    if (ampm === 'PM' && hours !== 12) {
+                      hours += 12
+                    } else if (ampm === 'AM' && hours === 12) {
+                      hours = 0
+                    }
+                    
+                    timeStr = `${hours.toString().padStart(2, '0')}:${minutes}`
+                  }
+                  
                   const yearStr = year.toString()
                   const monthStr = month.toString().padStart(2, '0')
                   const dayStr = day.toString().padStart(2, '0')
                   
                   const dateTimeStr = `${yearStr}-${monthStr}-${dayStr}T${timeStr}:00`
-                  console.log(`  Creating Date from: "${dateTimeStr}"`)
-                  
                   parsedDate = new Date(dateTimeStr)
-                  console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}, isNaN: ${isNaN(parsedDate.getTime())}`)
+                  
+                  if (!isNaN(parsedDate.getTime())) {
+                    console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}`)
+                  }
                 } else {
                   console.log(`  ✗ Validation failed!`)
                 }
@@ -347,13 +367,35 @@ export default function AdminPage() {
                 
                 // Validate ranges
                 if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-                  const timeStr = (time || '12:00').trim()
+                  // Convert time to 24-hour format if it's in 12-hour format (AM/PM)
+                  let timeStr = (time || '12:00').trim()
+                  
+                  // Check if time has AM/PM
+                  const ampmMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+                  if (ampmMatch) {
+                    let hours = parseInt(ampmMatch[1])
+                    const minutes = ampmMatch[2]
+                    const ampm = ampmMatch[3].toUpperCase()
+                    
+                    // Convert to 24-hour
+                    if (ampm === 'PM' && hours !== 12) {
+                      hours += 12
+                    } else if (ampm === 'AM' && hours === 12) {
+                      hours = 0
+                    }
+                    
+                    timeStr = `${hours.toString().padStart(2, '0')}:${minutes}`
+                  }
+                  
                   const yearStr = year.toString()
                   const monthStr = month.toString().padStart(2, '0')
                   const dayStr = day.toString().padStart(2, '0')
                   
                   parsedDate = new Date(`${yearStr}-${monthStr}-${dayStr}T${timeStr}:00`)
-                  console.log(`  ✓ Parsed as MM/DD/YYYY: ${parsedDate.toISOString()}`)
+                  
+                  if (!isNaN(parsedDate.getTime())) {
+                    console.log(`  ✓ Parsed as MM/DD/YYYY: ${parsedDate.toISOString()}`)
+                  }
                 }
               }
             }
