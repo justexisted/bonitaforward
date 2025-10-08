@@ -115,6 +115,11 @@ export default function AdminPage() {
   const [providers, setProviders] = useState<ProviderRow[]>([])
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Form states for calendar events
+  const [showAddEventForm, setShowAddEventForm] = useState(false)
+  const [showBulkImportForm, setShowBulkImportForm] = useState(false)
+  const [csvFile, setCsvFile] = useState<File | null>(null)
 
   // Function to add a new calendar event
   const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at'>) => {
@@ -194,9 +199,64 @@ export default function AdminPage() {
       setCalendarEvents(updatedEvents)
       
       setMessage(`Successfully added ${events.length} events!`)
+      setShowBulkImportForm(false)
+      setCsvFile(null)
     } catch (error) {
       console.error('Error adding multiple calendar events:', error)
       alert('Failed to add events: ' + error)
+    }
+  }
+  
+  // Function to process CSV file
+  const handleCsvUpload = async (file: File) => {
+    try {
+      const text = await file.text()
+      const lines = text.split('\n')
+      const events: Omit<CalendarEvent, 'id' | 'created_at'>[] = []
+      
+      // Skip header row if it exists
+      const startIndex = lines[0]?.toLowerCase().includes('title') ? 1 : 0
+      
+      for (let i = startIndex; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (!line) continue
+        
+        const [title, date, time, location, address, category, description] = line.split(',').map(s => s.trim())
+        
+        if (!title || !date) {
+          console.warn(`Skipping invalid line ${i + 1}: ${line}`)
+          continue
+        }
+        
+        const eventDate = new Date(date + 'T' + (time || '12:00'))
+        if (isNaN(eventDate.getTime())) {
+          console.warn(`Skipping line ${i + 1} with invalid date: ${date}`)
+          continue
+        }
+        
+        events.push({
+          title: title,
+          description: description || '',
+          date: eventDate.toISOString(),
+          time: time || '12:00',
+          location: location || '',
+          address: address || '',
+          category: category || 'Community',
+          source: 'Local',
+          upvotes: 0,
+          downvotes: 0
+        })
+      }
+      
+      if (events.length === 0) {
+        alert('No valid events found in CSV file')
+        return
+      }
+      
+      await addMultipleEvents(events)
+    } catch (error) {
+      console.error('Error processing CSV file:', error)
+      alert('Failed to process CSV file: ' + error)
     }
   }
 
@@ -3755,106 +3815,17 @@ export default function AdminPage() {
             <div className="mt-4 pt-4 border-t border-neutral-200 space-y-3">
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => {
-                    const title = prompt('Event Title:')
-                    if (!title) return
-                    
-                    const description = prompt('Event Description:') || ''
-                    const location = prompt('Location:') || ''
-                    const address = prompt('Address:') || ''
-                    const category = prompt('Category (Community/Family/Business/Health & Wellness/Food & Entertainment/Community Service/Senior Activities/Arts & Crafts):') || 'Community'
-                    const dateInput = prompt('Date (YYYY-MM-DD):')
-                    if (!dateInput) return
-                    
-                    const time = prompt('Time (HH:MM):') || '12:00'
-                    
-                    try {
-                      const eventDate = new Date(dateInput + 'T' + time)
-                      if (isNaN(eventDate.getTime())) {
-                        alert('Invalid date format. Please use YYYY-MM-DD format.')
-                        return
-                      }
-                      
-                      // Add event to database
-                      addCalendarEvent({
-                        title,
-                        description,
-                        date: eventDate.toISOString(),
-                        time,
-                        location,
-                        address,
-                        category,
-                        source: 'Local',
-                        upvotes: 0,
-                        downvotes: 0
-                      })
-                    } catch (error) {
-                      alert('Error adding event: ' + error)
-                    }
-                  }}
+                  onClick={() => setShowAddEventForm(!showAddEventForm)}
                   className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  + Add Single Event
+                  {showAddEventForm ? '✕ Cancel' : '+ Add Single Event'}
                 </button>
                 
                 <button
-                  onClick={() => {
-                    const csvData = prompt(`Paste CSV data here (one event per line):
-Format: Title,Date,Time,Location,Address,Category,Description
-Example: Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,Weekly market`)?.trim()
-                    
-                    if (!csvData) return
-                    
-                    try {
-                      const lines = csvData.split('\n')
-                      const events = []
-                      
-                      for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i].trim()
-                        if (!line) continue
-                        
-                        const [title, date, time, location, address, category, description] = line.split(',')
-                        
-                        if (!title || !date) {
-                          alert(`Invalid data on line ${i + 1}: ${line}`)
-                          return
-                        }
-                        
-                        const eventDate = new Date(date + 'T' + (time || '12:00'))
-                        if (isNaN(eventDate.getTime())) {
-                          alert(`Invalid date on line ${i + 1}: ${date}`)
-                          return
-                        }
-                        
-                        events.push({
-                          title: title.trim(),
-                          description: (description || '').trim(),
-                          date: eventDate.toISOString(),
-                          time: (time || '12:00').trim(),
-                          location: (location || '').trim(),
-                          address: (address || '').trim(),
-                          category: (category || 'Community').trim(),
-                          source: 'Local',
-                          upvotes: 0,
-                          downvotes: 0
-                        })
-                      }
-                      
-                      if (events.length === 0) {
-                        alert('No valid events found in CSV data')
-                        return
-                      }
-                      
-                      if (confirm(`Add ${events.length} events to calendar?`)) {
-                        addMultipleEvents(events)
-                      }
-                    } catch (error) {
-                      alert('Error parsing CSV data: ' + error)
-                    }
-                  }}
+                  onClick={() => setShowBulkImportForm(!showBulkImportForm)}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  📥 Bulk Import CSV
+                  {showBulkImportForm ? '✕ Cancel' : '📥 Bulk Import CSV'}
                 </button>
                 
                 <button
@@ -3886,6 +3857,228 @@ Example: Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,We
                 <strong>iCal Feeds:</strong> Automatically imports events from City of San Diego, Libraries, UC San Diego, Zoo, and Balboa Park
               </div>
             </div>
+            
+            {/* Add Single Event Form */}
+            {showAddEventForm && (
+              <div className="mt-4 p-6 rounded-xl border-2 border-green-200 bg-green-50">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Add New Event</h3>
+                <form onSubmit={(e) => {
+                  e.preventDefault()
+                  const formData = new FormData(e.currentTarget)
+                  const date = formData.get('date') as string
+                  const time = formData.get('time') as string
+                  
+                  addCalendarEvent({
+                    title: formData.get('title') as string,
+                    description: formData.get('description') as string || '',
+                    date: new Date(date + 'T' + time).toISOString(),
+                    time: time,
+                    location: formData.get('location') as string || '',
+                    address: formData.get('address') as string || '',
+                    category: formData.get('category') as string,
+                    source: 'Local',
+                    upvotes: 0,
+                    downvotes: 0
+                  })
+                  setShowAddEventForm(false)
+                  e.currentTarget.reset()
+                }} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Event Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="title"
+                        required
+                        placeholder="e.g., Bonita Farmers Market"
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        name="date"
+                        required
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        name="time"
+                        required
+                        defaultValue="12:00"
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Location
+                      </label>
+                      <input
+                        type="text"
+                        name="location"
+                        placeholder="e.g., Bonita Community Park"
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        name="address"
+                        placeholder="e.g., 3215 Bonita Rd, Bonita, CA 91902"
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Category <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="category"
+                        required
+                        defaultValue="Community"
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="Community">Community</option>
+                        <option value="Family">Family</option>
+                        <option value="Business">Business</option>
+                        <option value="Health & Wellness">Health & Wellness</option>
+                        <option value="Food & Entertainment">Food & Entertainment</option>
+                        <option value="Community Service">Community Service</option>
+                        <option value="Senior Activities">Senior Activities</option>
+                        <option value="Arts & Crafts">Arts & Crafts</option>
+                      </select>
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        name="description"
+                        rows={3}
+                        placeholder="Event description, details, and any additional information..."
+                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddEventForm(false)}
+                      className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      Add Event
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+            
+            {/* Bulk Import CSV Form */}
+            {showBulkImportForm && (
+              <div className="mt-4 p-6 rounded-xl border-2 border-blue-200 bg-blue-50">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Bulk Import Events (CSV)</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Upload CSV File <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex-1 cursor-pointer">
+                        <div className="border-2 border-dashed border-neutral-300 rounded-lg p-6 hover:border-blue-500 transition-colors text-center">
+                          <input
+                            type="file"
+                            accept=".csv"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                setCsvFile(file)
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <div className="text-blue-600 mb-2">📁</div>
+                          {csvFile ? (
+                            <div>
+                              <div className="font-medium text-neutral-900">{csvFile.name}</div>
+                              <div className="text-sm text-neutral-500">{(csvFile.size / 1024).toFixed(2)} KB</div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="font-medium text-neutral-700">Click to upload CSV file</div>
+                              <div className="text-sm text-neutral-500 mt-1">or drag and drop</div>
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg p-4 border border-blue-200">
+                    <h4 className="text-sm font-semibold text-neutral-900 mb-2">CSV Format:</h4>
+                    <code className="block text-xs bg-neutral-100 p-3 rounded font-mono overflow-x-auto">
+                      Title,Date,Time,Location,Address,Category,Description<br/>
+                      Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,Weekly market
+                    </code>
+                    <p className="text-xs text-neutral-600 mt-2">
+                      <strong>Note:</strong> First row can be a header (will be auto-detected and skipped)
+                    </p>
+                  </div>
+                  
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBulkImportForm(false)
+                        setCsvFile(null)
+                      }}
+                      className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (csvFile) {
+                          handleCsvUpload(csvFile)
+                        } else {
+                          alert('Please select a CSV file first')
+                        }
+                      }}
+                      disabled={!csvFile}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-neutral-300 disabled:cursor-not-allowed"
+                    >
+                      Import Events
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
