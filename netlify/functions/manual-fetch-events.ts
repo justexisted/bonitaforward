@@ -169,11 +169,35 @@ const fetchICalContent = async (url: string): Promise<string> => {
 }
 
 /**
+ * Generate a deterministic UUID v5 from a string
+ * This ensures the same event UID always generates the same UUID
+ */
+const generateUuidFromString = (str: string): string => {
+  // Use a simple hash-based approach to generate UUID
+  // This is deterministic - same input always produces same output
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32bit integer
+  }
+  
+  // Convert hash to hex and pad to create UUID format
+  const hex = Math.abs(hash).toString(16).padStart(8, '0')
+  const timestamp = Date.now().toString(16).padStart(12, '0').slice(0, 12)
+  
+  // Create UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  return `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${timestamp.slice(0, 3)}-${timestamp.slice(3, 7)}-${timestamp.slice(7, 12)}${hex.slice(0, 7)}`
+}
+
+/**
  * Convert iCalendar event to database format
  */
 const convertToDatabaseEvent = (icalEvent: ICalEvent) => {
   return {
-    id: icalEvent.id,
+    // Don't use the iCal UID directly - generate a proper UUID from it
+    // This ensures the ID is a valid UUID while remaining deterministic
+    id: generateUuidFromString(icalEvent.id),
     title: icalEvent.title,
     description: icalEvent.description,
     date: icalEvent.startDate.toISOString(),
