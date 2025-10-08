@@ -254,16 +254,35 @@ const scheduledHandler: Handler = async (event, context) => {
       }
     }
     
-    // Remove duplicates based on title, date, and source
-    const uniqueEvents = allEvents.filter((event, index, self) => 
-      index === self.findIndex(e => 
-        e.title === event.title && 
-        e.date === event.date &&
-        e.source === event.source
-      )
-    )
+    // Enhanced duplicate detection - match on title, date (within 1 hour), and similar location
+    const uniqueEvents = allEvents.filter((event, index, self) => {
+      return index === self.findIndex(e => {
+        // Exact match on title and source
+        if (e.title === event.title && e.source === event.source && e.date === event.date) {
+          return true
+        }
+        
+        // Fuzzy match: similar title (case-insensitive, normalized) and date within 1 hour
+        const normalizeTitle = (title: string) => title.toLowerCase().trim().replace(/[^\w\s]/g, '')
+        const e1Title = normalizeTitle(e.title)
+        const e2Title = normalizeTitle(event.title)
+        
+        // Check if titles are very similar (>80% match or one contains the other)
+        const titleMatch = e1Title === e2Title || 
+                          e1Title.includes(e2Title) || 
+                          e2Title.includes(e1Title)
+        
+        // Check if dates are within 1 hour of each other
+        const date1 = new Date(e.date).getTime()
+        const date2 = new Date(event.date).getTime()
+        const oneHour = 60 * 60 * 1000
+        const dateMatch = Math.abs(date1 - date2) < oneHour
+        
+        return titleMatch && dateMatch
+      })
+    })
     
-    console.log(`Found ${allEvents.length} total events, ${uniqueEvents.length} unique events`)
+    console.log(`Found ${allEvents.length} total events, ${uniqueEvents.length} unique events (removed ${allEvents.length - uniqueEvents.length} duplicates)`)
     
     // Clear existing iCalendar events (those from external sources)
     const icalSources = enabledFeeds.map(feed => feed.source)
@@ -276,6 +295,42 @@ const scheduledHandler: Handler = async (event, context) => {
       console.error('Error clearing existing iCalendar events:', deleteError)
     } else {
       console.log('Cleared existing iCalendar events')
+    }
+    
+    // Before inserting, check for and remove any existing duplicates in database
+    // This handles cases where events might have been added from different sources
+    console.log('Checking for existing duplicates in database...')
+    const { data: existingEvents } = await supabase
+      .from('calendar_events')
+      .select('id, title, date, source')
+    
+    if (existingEvents && existingEvents.length > 0) {
+      const duplicateIds: string[] = []
+      
+      for (const newEvent of uniqueEvents) {
+        for (const existing of existingEvents) {
+          const normalizeTitle = (title: string) => title.toLowerCase().trim().replace(/[^\w\s]/g, '')
+          const title1 = normalizeTitle(newEvent.title)
+          const title2 = normalizeTitle(existing.title)
+          
+          const titleMatch = title1 === title2 || title1.includes(title2) || title2.includes(title1)
+          const date1 = new Date(newEvent.date).getTime()
+          const date2 = new Date(existing.date).getTime()
+          const dateMatch = Math.abs(date1 - date2) < 60 * 60 * 1000 // Within 1 hour
+          
+          if (titleMatch && dateMatch && newEvent.source !== existing.source) {
+            duplicateIds.push(existing.id)
+          }
+        }
+      }
+      
+      if (duplicateIds.length > 0) {
+        console.log(`Removing ${duplicateIds.length} duplicate events from database`)
+        await supabase
+          .from('calendar_events')
+          .delete()
+          .in('id', duplicateIds)
+      }
     }
     
     // Insert new events in batches
