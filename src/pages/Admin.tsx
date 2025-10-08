@@ -292,39 +292,46 @@ export default function AdminPage() {
           console.log(`📅 Recurring event detected on line ${i + 1}: ${title} (${dateRaw})`)
         } else {
           try {
-            // Clean date string - remove any non-standard characters
+            // Clean date string - remove any non-standard characters but keep digits, hyphens, slashes
             const dateStr = dateRaw.replace(/[^\d\-\/]/g, '').trim()
             
             console.log(`Parsing date on line ${i + 1}: "${dateRaw}" -> cleaned: "${dateStr}"`)
             
-            // Try YYYY-MM-DD format first
-            if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(dateStr)) {
-              const parts = dateStr.split('-')
-              const year = parts[0]
-              const month = parts[1].padStart(2, '0')
-              const day = parts[2].padStart(2, '0')
-              eventDate = new Date(`${year}-${month}-${day}T${time || '12:00'}:00`)
-              console.log(`  ✓ Parsed as YYYY-MM-DD: ${eventDate.toISOString()}`)
-            } 
-            // Try MM/DD/YYYY format
-            else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-              const [month, day, year] = dateStr.split('/')
-              eventDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${time || '12:00'}:00`)
-              console.log(`  ✓ Parsed as MM/DD/YYYY: ${eventDate.toISOString()}`)
-            }
-            // Try M/D/YYYY format
-            else if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dateStr)) {
-              const [month, day, year] = dateStr.split('/')
-              const fullYear = year.length === 2 ? '20' + year : year
-              eventDate = new Date(`${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${time || '12:00'}:00`)
-              console.log(`  ✓ Parsed as M/D/YYYY: ${eventDate.toISOString()}`)
-            }
-            // Try parsing as-is
-            else {
-              eventDate = new Date(dateStr + (time ? 'T' + time : ''))
-              console.log(`  ✓ Parsed as-is: ${eventDate.toISOString()}`)
+            // Try to parse the date using JavaScript's native Date parser first (most lenient)
+            // This handles formats like YYYY-MM-DD, MM/DD/YYYY, etc.
+            let parsedDate = new Date(dateStr + 'T' + (time || '12:00') + ':00')
+            
+            // If native parser fails, try manual parsing
+            if (isNaN(parsedDate.getTime())) {
+              // Try YYYY-MM-DD format (any number of digits for month/day)
+              if (dateStr.includes('-')) {
+                const parts = dateStr.split('-')
+                if (parts.length === 3) {
+                  const year = parts[0]
+                  const month = parts[1].padStart(2, '0')
+                  const day = parts[2].padStart(2, '0')
+                  parsedDate = new Date(`${year}-${month}-${day}T${time || '12:00'}:00`)
+                  console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}`)
+                }
+              }
+              // Try MM/DD/YYYY format
+              else if (dateStr.includes('/')) {
+                const parts = dateStr.split('/')
+                if (parts.length === 3) {
+                  const month = parts[0].padStart(2, '0')
+                  const day = parts[1].padStart(2, '0')
+                  const year = parts[2].length === 2 ? '20' + parts[2] : parts[2]
+                  parsedDate = new Date(`${year}-${month}-${day}T${time || '12:00'}:00`)
+                  console.log(`  ✓ Parsed as MM/DD/YYYY: ${parsedDate.toISOString()}`)
+                }
+              }
+            } else {
+              console.log(`  ✓ Parsed using native parser: ${parsedDate.toISOString()}`)
             }
             
+            eventDate = parsedDate
+            
+            // Final validation
             if (isNaN(eventDate.getTime())) {
               throw new Error('Invalid date')
             }
