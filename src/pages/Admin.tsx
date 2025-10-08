@@ -6,6 +6,7 @@ import { type CalendarEvent } from './Calendar'
 // iCalendar parsing moved to server-side Netlify function for reliability
 // import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 // Extended type for change requests with joined provider and profile data
 type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
@@ -123,6 +124,7 @@ export default function AdminPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set())
 
   // Function to add a new calendar event
   const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at'>) => {
@@ -188,6 +190,19 @@ export default function AdminPage() {
   const cancelEditingEvent = () => {
     setEditingEventId(null)
     setEditingEvent(null)
+  }
+
+  // Function to toggle event expansion
+  const toggleEventExpansion = (eventId: string) => {
+    setExpandedEventIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId)
+      } else {
+        newSet.add(eventId)
+      }
+      return newSet
+    })
   }
 
   // Function to save edited calendar event
@@ -4186,9 +4201,27 @@ export default function AdminPage() {
                             </div>
                           </div>
                           {event.description && (
-                            <div className="mt-2 text-xs text-neutral-600 line-clamp-2">
-                              {event.description}
-                            </div>
+                            <>
+                              <div className={`mt-2 text-xs text-neutral-600 ${expandedEventIds.has(event.id) ? '' : 'line-clamp-2'}`}>
+                                {event.description}
+                              </div>
+                              <button
+                                onClick={() => toggleEventExpansion(event.id)}
+                                className="mt-1 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                              >
+                                {expandedEventIds.has(event.id) ? (
+                                  <>
+                                    <ChevronUp className="w-3 h-3" />
+                                    <span>Show less</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="w-3 h-3" />
+                                    <span>Show more</span>
+                                  </>
+                                )}
+                              </button>
+                            </>
                           )}
                         </>
                       )}
