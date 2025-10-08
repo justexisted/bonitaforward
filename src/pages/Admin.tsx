@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, uploadBlogImage, deleteBlogImage, type BlogPost } from '../lib/supabaseData'
 import { type CalendarEvent } from './Calendar'
+import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 // Extended type for change requests with joined provider and profile data
@@ -256,6 +257,38 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error adding sample events:', error)
       alert('Failed to add sample events: ' + error)
+    }
+  }
+
+  // Function to refresh iCalendar feeds
+  const refreshICalFeeds = async () => {
+    try {
+      console.log('Refreshing iCalendar feeds...')
+      const icalEvents = await parseMultipleICalFeeds(ICAL_FEEDS)
+      const calendarEvents = icalEvents.map(convertICalToCalendarEvent)
+      
+      if (calendarEvents.length === 0) {
+        setMessage('No events found in iCalendar feeds')
+        return
+      }
+      
+      // Clear existing iCalendar events (those with source matching our feeds)
+      const icalSources = ICAL_FEEDS.map(feed => feed.source)
+      const { error: deleteError } = await supabase
+        .from('calendar_events')
+        .delete()
+        .in('source', icalSources)
+      
+      if (deleteError) {
+        console.warn('Error clearing existing iCalendar events:', deleteError)
+      }
+      
+      // Add new iCalendar events
+      await addMultipleEvents(calendarEvents)
+      setMessage(`Successfully refreshed ${calendarEvents.length} events from iCalendar feeds!`)
+    } catch (error) {
+      console.error('Error refreshing iCalendar feeds:', error)
+      setError('Failed to refresh iCalendar feeds: ' + error)
     }
   }
   const [error, setError] = useState<string | null>(null)
@@ -3833,11 +3866,23 @@ Example: Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,We
                 >
                   🏘️ Add Bonita Events
                 </button>
+                
+                <button
+                  onClick={() => {
+                    if (confirm('Refresh events from iCalendar feeds? This will update events from government and civic organizations.')) {
+                      refreshICalFeeds()
+                    }
+                  }}
+                  className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                >
+                  🔄 Refresh iCal Feeds
+                </button>
               </div>
               
               <div className="text-xs text-neutral-500">
                 <strong>Bulk Import:</strong> Use CSV format: Title,Date,Time,Location,Address,Category,Description<br/>
-                <strong>Sample:</strong> Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,Weekly market
+                <strong>Sample:</strong> Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,Weekly market<br/>
+                <strong>iCal Feeds:</strong> Automatically imports events from City of San Diego, Libraries, UC San Diego, Zoo, and Balboa Park
               </div>
             </div>
           </div>

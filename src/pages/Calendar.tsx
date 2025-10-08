@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { ChevronUp, ChevronDown, MapPin, Calendar, Clock } from 'lucide-react'
+import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 
 export type CalendarEvent = {
   id: string
@@ -148,7 +149,7 @@ export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
       console.warn('Database events error:', dbError)
     }
     
-    // Fetch events from RSS feeds
+    // Fetch events from RSS feeds (disabled - all proxies failing)
     const rssPromises = RSS_FEEDS.map(feed => 
       parseRSSFeed(feed.url, feed.source).then(events => 
         events.map(event => ({
@@ -163,10 +164,16 @@ export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
       .filter(result => result.status === 'fulfilled')
       .flatMap(result => (result as PromiseFulfilledResult<CalendarEvent[]>).value)
     
-    // Combine database events and RSS events only
+    // Load events from iCalendar feeds
+    console.log('Fetching events from iCalendar feeds...')
+    const icalEvents = await parseMultipleICalFeeds(ICAL_FEEDS)
+    const calendarEvents = icalEvents.map(convertICalToCalendarEvent)
+    
+    // Combine database events, RSS events, and iCalendar events
     const allEvents = [
       ...(dbEvents || []),
-      ...rssEvents
+      ...rssEvents,
+      ...calendarEvents
     ]
     
     // Sort by date
