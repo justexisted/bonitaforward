@@ -8,37 +8,51 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // iCalendar feed sources
+// Note: webcal:// URLs are converted to https:// for fetching
 const ICAL_FEEDS = [
   {
-    url: 'https://www.sandiego.gov/calendar/events.ics',
-    source: 'City of San Diego',
-    category: 'Government',
-    enabled: true
-  },
-  {
-    url: 'https://www.sandiegolibrary.org/calendar/events.ics',
-    source: 'San Diego Public Library',
-    category: 'Education',
-    enabled: true
-  },
-  {
-    url: 'https://calendar.ucsd.edu/calendar/events.ics',
-    source: 'UC San Diego',
-    category: 'Education',
-    enabled: true
-  },
-  {
-    url: 'https://www.sandiegozoo.org/calendar/events.ics',
-    source: 'San Diego Zoo',
-    category: 'Entertainment',
-    enabled: true
-  },
-  {
-    url: 'https://www.balboapark.org/calendar/events.ics',
-    source: 'Balboa Park',
+    url: 'https://www.sdmart.org/?post_type=tribe_events&ical=1&eventDisplay=list',
+    source: 'San Diego Museum of Art',
     category: 'Culture',
     enabled: true
-  }
+  },
+  {
+    url: 'https://thinkplaycreate.org/?post_type=tribe_events&ical=1&eventDisplay=list',
+    source: 'Think Play Create',
+    category: 'Education',
+    enabled: true
+  },
+  // Disabled feeds (404 errors - URLs no longer exist)
+  // {
+  //   url: 'https://www.sandiego.gov/calendar/events.ics',
+  //   source: 'City of San Diego',
+  //   category: 'Government',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://www.sandiegolibrary.org/calendar/events.ics',
+  //   source: 'San Diego Public Library',
+  //   category: 'Education',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://calendar.ucsd.edu/calendar/events.ics',
+  //   source: 'UC San Diego',
+  //   category: 'Education',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://www.sandiegozoo.org/calendar/events.ics',
+  //   source: 'San Diego Zoo',
+  //   category: 'Entertainment',
+  //   enabled: false
+  // },
+  // {
+  //   url: 'https://www.balboapark.org/calendar/events.ics',
+  //   source: 'Balboa Park',
+  //   category: 'Culture',
+  //   enabled: false
+  // }
 ]
 
 interface ICalEvent {

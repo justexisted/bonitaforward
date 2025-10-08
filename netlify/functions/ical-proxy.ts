@@ -41,11 +41,14 @@ export const handler: Handler = async (event, context) => {
     // Validate URL to prevent SSRF attacks
     const parsedUrl = new URL(url)
     const allowedHosts = [
-      'www.sandiego.gov',
-      'www.sandiegolibrary.org',
-      'calendar.ucsd.edu',
-      'www.sandiegozoo.org',
-      'www.balboapark.org',
+      'www.sdmart.org',
+      'thinkplaycreate.org',
+      // Old/disabled feeds (404 errors)
+      // 'www.sandiego.gov',
+      // 'www.sandiegolibrary.org',
+      // 'calendar.ucsd.edu',
+      // 'www.sandiegozoo.org',
+      // 'www.balboapark.org',
       'www.chulavista.gov',
       'www.bonita.gov'
     ]
