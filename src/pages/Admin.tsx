@@ -297,44 +297,60 @@ export default function AdminPage() {
             
             console.log(`Parsing date on line ${i + 1}: "${dateRaw}" -> cleaned: "${dateStr}"`)
             
-            // Try to parse the date using JavaScript's native Date parser first (most lenient)
-            // This handles formats like YYYY-MM-DD, MM/DD/YYYY, etc.
-            let parsedDate = new Date(dateStr + 'T' + (time || '12:00') + ':00')
+            // ALWAYS use manual parsing - most reliable across all browsers
+            let parsedDate: Date | undefined
             
-            // If native parser fails, try manual parsing
-            if (isNaN(parsedDate.getTime())) {
-              // Try YYYY-MM-DD format (any number of digits for month/day)
-              if (dateStr.includes('-')) {
-                const parts = dateStr.split('-')
-                if (parts.length === 3) {
-                  const year = parts[0]
-                  const month = parts[1].padStart(2, '0')
-                  const day = parts[2].padStart(2, '0')
-                  parsedDate = new Date(`${year}-${month}-${day}T${time || '12:00'}:00`)
+            // Try YYYY-MM-DD format first (most common)
+            if (dateStr.includes('-')) {
+              const parts = dateStr.split('-')
+              if (parts.length === 3 && parts[0].length === 4) {
+                const year = parseInt(parts[0])
+                const month = parseInt(parts[1])
+                const day = parseInt(parts[2])
+                
+                // Validate ranges
+                if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+                  const timeStr = (time || '12:00').trim()
+                  const yearStr = year.toString()
+                  const monthStr = month.toString().padStart(2, '0')
+                  const dayStr = day.toString().padStart(2, '0')
+                  
+                  parsedDate = new Date(`${yearStr}-${monthStr}-${dayStr}T${timeStr}:00`)
                   console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}`)
                 }
               }
-              // Try MM/DD/YYYY format
-              else if (dateStr.includes('/')) {
-                const parts = dateStr.split('/')
-                if (parts.length === 3) {
-                  const month = parts[0].padStart(2, '0')
-                  const day = parts[1].padStart(2, '0')
-                  const year = parts[2].length === 2 ? '20' + parts[2] : parts[2]
-                  parsedDate = new Date(`${year}-${month}-${day}T${time || '12:00'}:00`)
+            }
+            // Try MM/DD/YYYY format
+            else if (dateStr.includes('/')) {
+              const parts = dateStr.split('/')
+              if (parts.length === 3) {
+                const month = parseInt(parts[0])
+                const day = parseInt(parts[1])
+                let year = parseInt(parts[2])
+                
+                // Handle 2-digit years
+                if (year < 100) {
+                  year += 2000
+                }
+                
+                // Validate ranges
+                if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+                  const timeStr = (time || '12:00').trim()
+                  const yearStr = year.toString()
+                  const monthStr = month.toString().padStart(2, '0')
+                  const dayStr = day.toString().padStart(2, '0')
+                  
+                  parsedDate = new Date(`${yearStr}-${monthStr}-${dayStr}T${timeStr}:00`)
                   console.log(`  ✓ Parsed as MM/DD/YYYY: ${parsedDate.toISOString()}`)
                 }
               }
-            } else {
-              console.log(`  ✓ Parsed using native parser: ${parsedDate.toISOString()}`)
+            }
+            
+            if (!parsedDate || isNaN(parsedDate.getTime())) {
+              throw new Error('Invalid date')
             }
             
             eventDate = parsedDate
-            
-            // Final validation
-            if (isNaN(eventDate.getTime())) {
-              throw new Error('Invalid date')
-            }
           } catch (err) {
             console.warn(`Skipping line ${i + 1} with invalid date: "${dateRaw}" (cleaned: "${dateRaw.replace(/[^\d\-\/]/g, '')}"). Expected format: YYYY-MM-DD or MM/DD/YYYY`)
             continue
