@@ -69,28 +69,35 @@ interface ICalEvent {
 
 /**
  * Extract time from description text
- * Looks for patterns like "10:00 a.m.", "5:00 PM", "3:30pm", etc.
+ * Handles: "10:00 a.m.", "10:30 and 11:00 am", "10:30-11:45 a.m.", etc.
  */
 const extractTimeFromDescription = (description: string): string | null => {
   if (!description) return null
   
-  // Patterns to match:
-  // - "10:00 a.m." or "10:00 AM" or "10:00am"
-  // - "5:30 p.m." or "5:30 PM" or "5:30pm"
-  // - "10 a.m." or "10 AM"
+  // Extract first 500 chars (times are usually at the beginning)
+  const text = description.substring(0, 500)
+  
+  // Comprehensive time patterns
   const timePatterns = [
-    /(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)/i,  // 10:00 a.m. or 10:00am
-    /(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)/i,          // 10 a.m. or 10am
+    // "10:00 a.m." or "10:00 AM" or "10:00am" or "10:00 a.m" (with or without dots/spaces)
+    /(\d{1,2}):(\d{2})\s*([ap]\.?\s*m\.?)/gi,
+    // "10 a.m." or "10 AM" or "10am" (hour without minutes)
+    /(\d{1,2})\s*([ap]\.?\s*m\.?)/gi,
   ]
   
-  const times: { time: string, index: number }[] = []
+  const times: { time: string, index: number, hours24: number }[] = []
   
   for (const pattern of timePatterns) {
-    const matches = description.matchAll(new RegExp(pattern, 'gi'))
-    for (const match of matches) {
+    let match
+    const regex = new RegExp(pattern)
+    while ((match = regex.exec(text)) !== null) {
       const hours = parseInt(match[1])
-      const minutes = match[2] ? match[2] : '00'
-      const ampm = match[match.length - 1].replace(/\./g, '').toUpperCase()
+      const minutes = match[2] || '00'
+      const ampmRaw = match[match.length - 1]
+      const ampm = ampmRaw.replace(/[\.\s]/g, '').toUpperCase()
+      
+      // Skip if hours are invalid (e.g., matched a date like "October 9")
+      if (hours < 1 || hours > 12) continue
       
       // Convert to 24-hour format
       let hours24 = hours
@@ -100,17 +107,23 @@ const extractTimeFromDescription = (description: string): string | null => {
         hours24 = 0
       }
       
-      const timeStr = `${hours24.toString().padStart(2, '0')}:${minutes}`
-      times.push({ time: timeStr, index: match.index || 0 })
+      const timeStr = `${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+      times.push({ 
+        time: timeStr, 
+        index: match.index,
+        hours24: hours24
+      })
     }
   }
   
-  // Return the earliest time found (lowest index in description)
+  // Return the earliest time found (based on index position in description)
   if (times.length > 0) {
     times.sort((a, b) => a.index - b.index)
+    console.log(`[Time Extract] Found ${times.length} times, using earliest: ${times[0].time}`)
     return times[0].time
   }
   
+  console.log(`[Time Extract] No time found in description`)
   return null
 }
 
@@ -252,6 +265,21 @@ const generateUuidFromString = (str: string): string => {
  * Convert iCalendar event to database format
  */
 const convertToDatabaseEvent = (icalEvent: ICalEvent) => {
+  // Extract time from startDate in consistent 24-hour format
+  let timeStr: string | undefined
+  
+  if (!icalEvent.allDay) {
+    const hours = icalEvent.startDate.getHours()
+    const minutes = icalEvent.startDate.getMinutes()
+    timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+  } else {
+    // For all-day events, try to extract time from description as fallback
+    const extractedTime = extractTimeFromDescription(icalEvent.description || '')
+    if (extractedTime) {
+      timeStr = extractedTime
+    }
+  }
+  
   return {
     // Don't use the iCal UID directly - generate a proper UUID from it
     // This ensures the ID is a valid UUID while remaining deterministic
@@ -259,7 +287,7 @@ const convertToDatabaseEvent = (icalEvent: ICalEvent) => {
     title: icalEvent.title,
     description: icalEvent.description,
     date: icalEvent.startDate.toISOString(),
-    time: icalEvent.allDay ? undefined : icalEvent.startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+    time: timeStr, // Use extracted 24-hour format time
     location: icalEvent.location,
     address: icalEvent.location, // Use location as address for now
     category: icalEvent.category,
