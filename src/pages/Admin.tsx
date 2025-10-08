@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, uploadBlogImage, deleteBlogImage, type BlogPost } from '../lib/supabaseData'
+import { type CalendarEvent } from './Calendar'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 // Extended type for change requests with joined provider and profile data
@@ -111,7 +112,152 @@ export default function AdminPage() {
   const [funnels, setFunnels] = useState<FunnelRow[]>([])
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [providers, setProviders] = useState<ProviderRow[]>([])
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Function to add a new calendar event
+  const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at'>) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .insert([{
+          ...eventData,
+          created_at: new Date().toISOString()
+        }])
+      
+      if (error) {
+        console.error('Error adding calendar event:', error)
+        alert('Failed to add event: ' + error.message)
+        return
+      }
+      
+      // Refresh calendar events
+      const { fetchCalendarEvents } = await import('./Calendar')
+      const events = await fetchCalendarEvents()
+      setCalendarEvents(events)
+      
+      setMessage('Event added successfully!')
+    } catch (error) {
+      console.error('Error adding calendar event:', error)
+      alert('Failed to add event: ' + error)
+    }
+  }
+
+  // Function to delete a calendar event
+  const deleteCalendarEvent = async (eventId: string) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('id', eventId)
+      
+      if (error) {
+        console.error('Error deleting calendar event:', error)
+        alert('Failed to delete event: ' + error.message)
+        return
+      }
+      
+      // Refresh calendar events
+      const { fetchCalendarEvents } = await import('./Calendar')
+      const events = await fetchCalendarEvents()
+      setCalendarEvents(events)
+      
+      setMessage('Event deleted successfully!')
+    } catch (error) {
+      console.error('Error deleting calendar event:', error)
+      alert('Failed to delete event: ' + error)
+    }
+  }
+
+  // Function to add multiple events at once
+  const addMultipleEvents = async (events: Omit<CalendarEvent, 'id' | 'created_at'>[]) => {
+    try {
+      const eventsWithTimestamp = events.map(event => ({
+        ...event,
+        created_at: new Date().toISOString()
+      }))
+
+      const { error } = await supabase
+        .from('calendar_events')
+        .insert(eventsWithTimestamp)
+      
+      if (error) {
+        console.error('Error adding multiple calendar events:', error)
+        alert('Failed to add events: ' + error.message)
+        return
+      }
+      
+      // Refresh calendar events
+      const { fetchCalendarEvents } = await import('./Calendar')
+      const updatedEvents = await fetchCalendarEvents()
+      setCalendarEvents(updatedEvents)
+      
+      setMessage(`Successfully added ${events.length} events!`)
+    } catch (error) {
+      console.error('Error adding multiple calendar events:', error)
+      alert('Failed to add events: ' + error)
+    }
+  }
+
+  // Function to add sample Bonita events (only when requested)
+  const addSampleBonitaEvents = async () => {
+    const sampleEvents = [
+      {
+        title: 'Bonita Farmers Market',
+        description: 'Weekly farmers market featuring local produce, artisanal goods, and community vendors.',
+        date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        time: '09:00',
+        location: 'Bonita Community Park',
+        address: '3215 Bonita Rd, Bonita, CA 91902',
+        category: 'Community',
+        source: 'Local',
+        upvotes: 12,
+        downvotes: 1,
+      },
+      {
+        title: 'Children\'s Story Time',
+        description: 'Interactive story time for children ages 3-8 with crafts and activities.',
+        date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        time: '10:30',
+        location: 'Bonita-Sunnyside Library',
+        address: '4375 Bonita Rd, Bonita, CA 91902',
+        category: 'Family',
+        source: 'Local',
+        upvotes: 8,
+        downvotes: 0,
+      },
+      {
+        title: 'Bonita Chamber Mixer',
+        description: 'Monthly networking event for local business owners and community leaders.',
+        date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        time: '17:30',
+        location: 'Bonita Community Center',
+        address: '2900 Bonita Rd, Bonita, CA 91902',
+        category: 'Business',
+        source: 'Local',
+        upvotes: 15,
+        downvotes: 2,
+      }
+    ]
+
+    try {
+      // Clear existing events first
+      const { error: deleteError } = await supabase
+        .from('calendar_events')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all events
+      
+      if (deleteError) {
+        console.warn('Error clearing existing events:', deleteError)
+      }
+
+      // Add sample events
+      await addMultipleEvents(sampleEvents)
+    } catch (error) {
+      console.error('Error adding sample events:', error)
+      alert('Failed to add sample events: ' + error)
+    }
+  }
   const [error, setError] = useState<string | null>(null)
   const [bizApps, setBizApps] = useState<BusinessApplicationRow[]>([])
   const [contactLeads, setContactLeads] = useState<ContactLeadRow[]>([])
@@ -177,7 +323,7 @@ export default function AdminPage() {
     booking_url: null
   })
   // State for selected section
-  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog'>('providers')
+  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog' | 'calendar-events'>('providers')
 
   // Filtered providers based on featured status filter
   // This allows admins to easily view all providers, only featured ones, or only non-featured ones
@@ -711,6 +857,14 @@ export default function AdminPage() {
         try {
           const posts = await fetchAllBlogPosts()
           setBlogPosts(posts)
+        } catch {}
+        try {
+          // Load calendar events for admin panel
+          if (isAdmin && section === 'calendar-events') {
+            const { fetchCalendarEvents } = await import('./Calendar')
+            const events = await fetchCalendarEvents()
+            setCalendarEvents(events)
+          }
         } catch {}
         try {
           if (isAdmin) {
@@ -1713,6 +1867,7 @@ export default function AdminPage() {
                   <option value="funnel-responses">Funnel Responses</option>
                   <option value="bookings">Bookings</option>
                   <option value="blog">Blog Manager</option>
+                  <option value="calendar-events">Calendar Events</option>
                 </select>
               </>
             )}
@@ -3479,6 +3634,210 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {isAdmin && section === 'calendar-events' && (
+          <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white">
+            <div className="font-medium">Calendar Events Manager</div>
+            <div className="mt-2 text-sm text-neutral-600">
+              Manage local events for the Bonita community calendar. Events are automatically fetched from RSS feeds and can be manually curated.
+            </div>
+            
+            {/* Calendar Events List */}
+            <div className="mt-4">
+              <div className="text-sm font-medium mb-2">Current Events ({calendarEvents.length})</div>
+              <div className="space-y-2 max-h-96 overflow-auto">
+                {calendarEvents.length === 0 ? (
+                  <div className="text-neutral-500 text-sm">No events found. Events will appear here from RSS feeds and manual additions.</div>
+                ) : (
+                  calendarEvents.map((event) => (
+                    <div key={event.id} className="rounded-lg border border-neutral-200 p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">{event.title}</div>
+                          <div className="text-xs text-neutral-500 mt-1">
+                            {new Date(event.date).toLocaleDateString()} at {event.time || 'TBD'}
+                          </div>
+                          <div className="text-xs text-neutral-600 mt-1">
+                            {event.location && <span>📍 {event.location}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              event.source.includes('San Diego') ? 'bg-blue-100 text-blue-800' :
+                              event.source.includes('Library') ? 'bg-green-100 text-green-800' :
+                              event.source.includes('Parks') ? 'bg-emerald-100 text-emerald-800' :
+                              event.source.includes('CNN') ? 'bg-red-100 text-red-800' :
+                              event.source === 'Local' ? 'bg-neutral-100 text-neutral-800' :
+                              'bg-neutral-100 text-neutral-800'
+                            }`}>
+                              {event.source}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              event.category === 'Community' ? 'bg-green-100 text-green-700' :
+                              event.category === 'Family' ? 'bg-blue-100 text-blue-700' :
+                              event.category === 'Business' ? 'bg-purple-100 text-purple-700' :
+                              event.category === 'Health & Wellness' ? 'bg-pink-100 text-pink-700' :
+                              event.category === 'Food & Entertainment' ? 'bg-orange-100 text-orange-700' :
+                              event.category === 'Community Service' ? 'bg-red-100 text-red-700' :
+                              event.category === 'Senior Activities' ? 'bg-indigo-100 text-indigo-700' :
+                              event.category === 'Arts & Crafts' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-neutral-100 text-neutral-700'
+                            }`}>
+                              {event.category}
+                            </span>
+                            <div className="flex items-center gap-1 text-xs text-neutral-500">
+                              <span>👍 {event.upvotes}</span>
+                              <span>👎 {event.downvotes}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2">
+                          <button
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete "${event.title}"?`)) {
+                                deleteCalendarEvent(event.id)
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      {event.description && (
+                        <div className="mt-2 text-xs text-neutral-600 line-clamp-2">
+                          {event.description}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            {/* Event Management Buttons */}
+            <div className="mt-4 pt-4 border-t border-neutral-200 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    const title = prompt('Event Title:')
+                    if (!title) return
+                    
+                    const description = prompt('Event Description:') || ''
+                    const location = prompt('Location:') || ''
+                    const address = prompt('Address:') || ''
+                    const category = prompt('Category (Community/Family/Business/Health & Wellness/Food & Entertainment/Community Service/Senior Activities/Arts & Crafts):') || 'Community'
+                    const dateInput = prompt('Date (YYYY-MM-DD):')
+                    if (!dateInput) return
+                    
+                    const time = prompt('Time (HH:MM):') || '12:00'
+                    
+                    try {
+                      const eventDate = new Date(dateInput + 'T' + time)
+                      if (isNaN(eventDate.getTime())) {
+                        alert('Invalid date format. Please use YYYY-MM-DD format.')
+                        return
+                      }
+                      
+                      // Add event to database
+                      addCalendarEvent({
+                        title,
+                        description,
+                        date: eventDate.toISOString(),
+                        time,
+                        location,
+                        address,
+                        category,
+                        source: 'Local',
+                        upvotes: 0,
+                        downvotes: 0
+                      })
+                    } catch (error) {
+                      alert('Error adding event: ' + error)
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  + Add Single Event
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const csvData = prompt(`Paste CSV data here (one event per line):
+Format: Title,Date,Time,Location,Address,Category,Description
+Example: Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,Weekly market`)?.trim()
+                    
+                    if (!csvData) return
+                    
+                    try {
+                      const lines = csvData.split('\n')
+                      const events = []
+                      
+                      for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim()
+                        if (!line) continue
+                        
+                        const [title, date, time, location, address, category, description] = line.split(',')
+                        
+                        if (!title || !date) {
+                          alert(`Invalid data on line ${i + 1}: ${line}`)
+                          return
+                        }
+                        
+                        const eventDate = new Date(date + 'T' + (time || '12:00'))
+                        if (isNaN(eventDate.getTime())) {
+                          alert(`Invalid date on line ${i + 1}: ${date}`)
+                          return
+                        }
+                        
+                        events.push({
+                          title: title.trim(),
+                          description: (description || '').trim(),
+                          date: eventDate.toISOString(),
+                          time: (time || '12:00').trim(),
+                          location: (location || '').trim(),
+                          address: (address || '').trim(),
+                          category: (category || 'Community').trim(),
+                          source: 'Local',
+                          upvotes: 0,
+                          downvotes: 0
+                        })
+                      }
+                      
+                      if (events.length === 0) {
+                        alert('No valid events found in CSV data')
+                        return
+                      }
+                      
+                      if (confirm(`Add ${events.length} events to calendar?`)) {
+                        addMultipleEvents(events)
+                      }
+                    } catch (error) {
+                      alert('Error parsing CSV data: ' + error)
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  📥 Bulk Import CSV
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (confirm('Clear all existing events and add sample Bonita events?')) {
+                      addSampleBonitaEvents()
+                    }
+                  }}
+                  className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  🏘️ Add Bonita Events
+                </button>
+              </div>
+              
+              <div className="text-xs text-neutral-500">
+                <strong>Bulk Import:</strong> Use CSV format: Title,Date,Time,Location,Address,Category,Description<br/>
+                <strong>Sample:</strong> Farmers Market,2024-01-15,09:00,Bonita Park,3215 Bonita Rd,Community,Weekly market
               </div>
             </div>
           </div>

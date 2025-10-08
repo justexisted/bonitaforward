@@ -18,6 +18,8 @@ import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
 import PricingPage from './pages/Pricing'
 import JobsPage from './pages/Jobs'
+import CalendarPage, { fetchCalendarEvents, type CalendarEvent } from './pages/Calendar'
+import Calendar from './components/Calendar'
 import NotFoundPage from './pages/NotFound'
 import SplitText from './components/SplitText'
 import GlareHover from './components/GlareHover'
@@ -622,6 +624,7 @@ function Navbar() {
           { label: "Home", href: "/", ariaLabel: "Home Page" },
           { label: "About", href: "/about", ariaLabel: "About Bonita Forward" },
           { label: "Community", href: "/community", ariaLabel: "Community Posts" },
+          { label: "Calendar", href: "/calendar", ariaLabel: "Bonita Events Calendar" },
           { label: "Jobs", href: "/jobs", ariaLabel: "Job Listings" }
         ]
       },
@@ -1500,6 +1503,41 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
   )
 }
 
+function CalendarSection() {
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const calendarEvents = await fetchCalendarEvents()
+        setEvents(calendarEvents)
+      } catch (error) {
+        console.error('Error loading calendar events:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadEvents()
+  }, [])
+
+  if (loading) {
+    return (
+      <section className="py-16 bg-gradient-to-b from-neutral-50 to-white">
+        <div className="container-px mx-auto max-w-6xl">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
+            <p className="mt-4 text-neutral-600">Loading calendar events...</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  return <Calendar events={events} />
+}
+
 function CommunitySection() {
   const cards = [
     { category_key: 'restaurants-cafes', title: 'Top 5 Restaurants This Month', excerpt: 'Discover trending dining spots loved by Bonita locals.' },
@@ -1632,6 +1670,7 @@ function HomePage() {
           </div>
         </Container>
       </section>
+      <CalendarSection />
       <CommunitySection />
     </>
   )
@@ -4116,6 +4155,7 @@ export default function App() {
             <Route path="community" element={<CommunityIndex />} />
             <Route path="community/:category" element={<CommunityPost />} />
             <Route path="jobs" element={<JobsPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
             <Route path="admin" element={<AdminPage />} />
             <Route path="owner" element={
               <ProtectedRoute allowedRoles={['business']}>

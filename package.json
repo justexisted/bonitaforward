@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "seed:providers": "tsx scripts/seed-providers.ts",
-    "seed:realty": "tsx scripts/seed-realty-report.ts"
+    "seed:realty": "tsx scripts/seed-realty-report.ts",
+    "seed:calendar": "tsx scripts/seed-calendar-events.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
