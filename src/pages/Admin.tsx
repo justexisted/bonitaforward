@@ -227,16 +227,16 @@ export default function AdminPage() {
           inQuotes = !inQuotes
         }
       } else if (char === ',' && !inQuotes) {
-        // Field separator
-        result.push(current.trim())
+        // Field separator - clean the field thoroughly
+        result.push(current.trim().replace(/^"|"$/g, '').trim())
         current = ''
       } else {
         current += char
       }
     }
     
-    // Push last field
-    result.push(current.trim())
+    // Push last field - clean it thoroughly
+    result.push(current.trim().replace(/^"|"$/g, '').trim())
     return result
   }
   
@@ -258,52 +258,102 @@ export default function AdminPage() {
         
         // Parse CSV line properly handling quoted fields
         const fields = parseCSVLine(line)
-        const [title, date, time, location, address, category, description] = fields
+        let [title, dateRaw, time, location, address, category, description] = fields
         
-        if (!title || !date) {
+        // Clean all fields thoroughly
+        const cleanField = (field: string) => field?.trim().replace(/^["'\s]+|["'\s]+$/g, '') || ''
+        title = cleanField(title)
+        dateRaw = cleanField(dateRaw)
+        time = cleanField(time)
+        location = cleanField(location)
+        address = cleanField(address)
+        category = cleanField(category)
+        description = cleanField(description)
+        
+        if (!title || !dateRaw) {
           console.warn(`Skipping line ${i + 1}: Missing title or date. Fields:`, fields)
           continue
         }
         
+        // Check for special recurring/annual events
+        const dateClean = dateRaw.toLowerCase().trim()
+        const isAnnual = dateClean.includes('annual') || dateClean.includes('yearly')
+        const isSeasonal = /spring|summer|fall|autumn|winter/.test(dateClean)
+        const isRecurring = isAnnual || isSeasonal || dateClean.includes('ongoing') || dateClean.includes('recurring')
+        
         // Parse date - handle multiple formats
         let eventDate: Date
-        try {
-          // Try YYYY-MM-DD format first
-          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            eventDate = new Date(date + 'T' + (time || '12:00') + ':00')
-          } 
-          // Try MM/DD/YYYY format
-          else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) {
-            const [month, day, year] = date.split('/')
-            eventDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${time || '12:00'}:00`)
+        let eventCategory = category || 'Community'
+        
+        if (isRecurring) {
+          // For recurring events, use a far future date and mark with special source
+          eventDate = new Date('2099-12-31T12:00:00')
+          eventCategory = 'Recurring' // Special category for filtering
+          console.log(`📅 Recurring event detected on line ${i + 1}: ${title} (${dateRaw})`)
+        } else {
+          try {
+            // Clean date string - remove any non-standard characters
+            const dateStr = dateRaw.replace(/[^\d\-\/]/g, '').trim()
+            
+            console.log(`Parsing date on line ${i + 1}: "${dateRaw}" -> cleaned: "${dateStr}"`)
+            
+            // Try YYYY-MM-DD format first
+            if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(dateStr)) {
+              const parts = dateStr.split('-')
+              const year = parts[0]
+              const month = parts[1].padStart(2, '0')
+              const day = parts[2].padStart(2, '0')
+              eventDate = new Date(`${year}-${month}-${day}T${time || '12:00'}:00`)
+              console.log(`  ✓ Parsed as YYYY-MM-DD: ${eventDate.toISOString()}`)
+            } 
+            // Try MM/DD/YYYY format
+            else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+              const [month, day, year] = dateStr.split('/')
+              eventDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${time || '12:00'}:00`)
+              console.log(`  ✓ Parsed as MM/DD/YYYY: ${eventDate.toISOString()}`)
+            }
+            // Try M/D/YYYY format
+            else if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dateStr)) {
+              const [month, day, year] = dateStr.split('/')
+              const fullYear = year.length === 2 ? '20' + year : year
+              eventDate = new Date(`${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${time || '12:00'}:00`)
+              console.log(`  ✓ Parsed as M/D/YYYY: ${eventDate.toISOString()}`)
+            }
+            // Try parsing as-is
+            else {
+              eventDate = new Date(dateStr + (time ? 'T' + time : ''))
+              console.log(`  ✓ Parsed as-is: ${eventDate.toISOString()}`)
+            }
+            
+            if (isNaN(eventDate.getTime())) {
+              throw new Error('Invalid date')
+            }
+          } catch (err) {
+            console.warn(`Skipping line ${i + 1} with invalid date: "${dateRaw}" (cleaned: "${dateRaw.replace(/[^\d\-\/]/g, '')}"). Expected format: YYYY-MM-DD or MM/DD/YYYY`)
+            continue
           }
-          // Try parsing as-is
-          else {
-            eventDate = new Date(date + (time ? 'T' + time : ''))
-          }
-          
-          if (isNaN(eventDate.getTime())) {
-            throw new Error('Invalid date')
-          }
-        } catch (err) {
-          console.warn(`Skipping line ${i + 1} with invalid date: "${date}". Expected format: YYYY-MM-DD or MM/DD/YYYY`)
-          continue
+        }
+        
+        // Add description note for recurring events
+        let finalDescription = description
+        if (isRecurring) {
+          finalDescription = `[${dateRaw}] ${description || ''}`.trim()
         }
         
         events.push({
-          title: title.replace(/^"|"$/g, ''), // Remove surrounding quotes if any
-          description: (description || '').replace(/^"|"$/g, ''),
+          title,
+          description: finalDescription,
           date: eventDate.toISOString(),
           time: time || '12:00',
-          location: (location || '').replace(/^"|"$/g, ''),
-          address: (address || '').replace(/^"|"$/g, ''),
-          category: (category || 'Community').replace(/^"|"$/g, ''),
-          source: 'Local',
+          location,
+          address,
+          category: eventCategory,
+          source: isRecurring ? 'Recurring' : 'Local',
           upvotes: 0,
           downvotes: 0
         })
         
-        console.log(`✓ Parsed line ${i + 1}: ${title}`)
+        console.log(`✓ Parsed line ${i + 1}: ${title}${isRecurring ? ' (Recurring)' : ''}`)
       }
       
       console.log(`Successfully parsed ${events.length} events`)

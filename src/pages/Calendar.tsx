@@ -291,8 +291,12 @@ export default function CalendarPage() {
     }
   }
 
-  // Sort events by vote score (upvotes - downvotes) and date
-  const sortedEvents = [...events].sort((a, b) => {
+  // Separate recurring/annual events from regular events
+  const recurringEvents = events.filter(e => e.source === 'Recurring' || e.category === 'Recurring')
+  const regularEvents = events.filter(e => e.source !== 'Recurring' && e.category !== 'Recurring')
+  
+  // Sort regular events by vote score (upvotes - downvotes) and date
+  const sortedEvents = [...regularEvents].sort((a, b) => {
     const scoreA = a.upvotes - a.downvotes
     const scoreB = b.upvotes - b.downvotes
     
@@ -302,6 +306,9 @@ export default function CalendarPage() {
     
     return new Date(a.date).getTime() - new Date(b.date).getTime()
   })
+  
+  // Sort recurring events by title
+  const sortedRecurringEvents = [...recurringEvents].sort((a, b) => a.title.localeCompare(b.title))
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -340,8 +347,88 @@ export default function CalendarPage() {
 
         {!loading && !error && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedEvents.map((event) => (
+            {/* Regular Events Section */}
+            {sortedEvents.length > 0 && (
+              <>
+                <h2 className="text-2xl font-semibold tracking-tight font-display mb-6">
+                  Upcoming Events
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                  {sortedEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="bg-white rounded-2xl border border-neutral-100 p-6 hover:shadow-lg transition-shadow"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg text-neutral-900 mb-2 line-clamp-2">
+                            {event.title}
+                          </h3>
+                          <div className="flex items-center text-sm text-neutral-500 mb-2">
+                            <Calendar className="w-4 h-4 mr-2" />
+                            {formatDate(event.date)}
+                          </div>
+                          {event.time && (
+                            <div className="flex items-center text-sm text-neutral-500 mb-2">
+                              <Clock className="w-4 h-4 mr-2" />
+                              {event.time}
+                            </div>
+                          )}
+                          {event.location && (
+                            <div className="flex items-start text-sm text-neutral-500 mb-3">
+                              <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                              <span className="line-clamp-2">{event.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {event.description && (
+                        <p className="text-sm text-neutral-600 mb-4 line-clamp-3">
+                          {event.description}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => voteOnEvent(event.id, 'up')}
+                            className="flex items-center space-x-1 px-3 py-1 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
+                            disabled={!auth.isAuthed}
+                          >
+                            <ChevronUp className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-600">{event.upvotes}</span>
+                          </button>
+                          <button
+                            onClick={() => voteOnEvent(event.id, 'down')}
+                            className="flex items-center space-x-1 px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+                            disabled={!auth.isAuthed}
+                          >
+                            <ChevronDown className="w-4 h-4 text-red-600" />
+                            <span className="text-sm font-medium text-red-600">{event.downvotes}</span>
+                          </button>
+                        </div>
+                        <span className="text-xs text-neutral-400 bg-neutral-100 px-2 py-1 rounded-full">
+                          {event.source}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            
+            {/* Recurring/Annual Events Section */}
+            {sortedRecurringEvents.length > 0 && (
+              <>
+                <h2 className="text-2xl font-semibold tracking-tight font-display mb-4">
+                  Annual & Recurring Events
+                </h2>
+                <p className="text-sm text-neutral-600 mb-6">
+                  These events happen regularly throughout the year. Check with organizers for specific dates.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {sortedRecurringEvents.map((event) => (
                 <div
                   key={event.id}
                   className="bg-white rounded-2xl border border-neutral-100 p-6 hover:shadow-lg transition-shadow"
@@ -401,7 +488,9 @@ export default function CalendarPage() {
                   </div>
                 </div>
               ))}
-            </div>
+                </div>
+              </>
+            )}
 
             {events.length === 0 && (
               <div className="text-center py-12">
