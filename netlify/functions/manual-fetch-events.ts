@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import ICAL from 'ical.js'
 
 // Supabase configuration
-const supabaseUrl = process.env.VITE_SUPABASE_URL!
+const supabaseUrl = process.env.SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
