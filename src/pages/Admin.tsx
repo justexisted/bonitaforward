@@ -121,6 +121,8 @@ export default function AdminPage() {
   const [showAddEventForm, setShowAddEventForm] = useState(false)
   const [showBulkImportForm, setShowBulkImportForm] = useState(false)
   const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
 
   // Function to add a new calendar event
   const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at'>) => {
@@ -173,6 +175,80 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error deleting calendar event:', error)
       alert('Failed to delete event: ' + error)
+    }
+  }
+
+  // Function to start editing a calendar event
+  const startEditingEvent = (event: CalendarEvent) => {
+    setEditingEventId(event.id)
+    setEditingEvent({ ...event })
+  }
+
+  // Function to cancel editing
+  const cancelEditingEvent = () => {
+    setEditingEventId(null)
+    setEditingEvent(null)
+  }
+
+  // Function to save edited calendar event
+  const saveCalendarEvent = async () => {
+    if (!editingEvent) return
+    
+    try {
+      // Parse the date and time to create proper ISO string
+      const dateInput = editingEvent.date.split('T')[0] // Get just the date part
+      const timeInput = editingEvent.time || '12:00'
+      
+      // Convert time to 24-hour format if needed
+      let timeStr = timeInput.trim()
+      const ampmMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+      if (ampmMatch) {
+        let hours = parseInt(ampmMatch[1])
+        const minutes = ampmMatch[2]
+        const ampm = ampmMatch[3].toUpperCase()
+        
+        if (ampm === 'PM' && hours !== 12) {
+          hours += 12
+        } else if (ampm === 'AM' && hours === 12) {
+          hours = 0
+        }
+        
+        timeStr = `${hours.toString().padStart(2, '0')}:${minutes}`
+      }
+      
+      const isoDate = new Date(`${dateInput}T${timeStr}:00`).toISOString()
+      
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({
+          title: editingEvent.title,
+          description: editingEvent.description,
+          date: isoDate,
+          time: timeStr,
+          location: editingEvent.location,
+          address: editingEvent.address,
+          category: editingEvent.category,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingEvent.id)
+      
+      if (error) {
+        console.error('Error updating calendar event:', error)
+        alert('Failed to update event: ' + error.message)
+        return
+      }
+      
+      // Refresh calendar events
+      const { fetchCalendarEvents } = await import('./Calendar')
+      const events = await fetchCalendarEvents()
+      setCalendarEvents(events)
+      
+      setMessage('Event updated successfully!')
+      setEditingEventId(null)
+      setEditingEvent(null)
+    } catch (error) {
+      console.error('Error updating calendar event:', error)
+      alert('Failed to update event: ' + error)
     }
   }
 
@@ -3960,62 +4036,161 @@ export default function AdminPage() {
                 ) : (
                   calendarEvents.map((event) => (
                     <div key={event.id} className="rounded-lg border border-neutral-200 p-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{event.title}</div>
-                          <div className="text-xs text-neutral-500 mt-1">
-                            {new Date(event.date).toLocaleDateString()} at {event.time || 'TBD'}
+                      {editingEventId === event.id && editingEvent ? (
+                        // Edit mode
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-xs font-medium text-neutral-700">Title</label>
+                            <input
+                              type="text"
+                              value={editingEvent.title}
+                              onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
+                            />
                           </div>
-                          <div className="text-xs text-neutral-600 mt-1">
-                            {event.location && <span>📍 {event.location}</span>}
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              event.source.includes('San Diego') ? 'bg-blue-100 text-blue-800' :
-                              event.source.includes('Library') ? 'bg-green-100 text-green-800' :
-                              event.source.includes('Parks') ? 'bg-emerald-100 text-emerald-800' :
-                              event.source.includes('CNN') ? 'bg-red-100 text-red-800' :
-                              event.source === 'Local' ? 'bg-neutral-100 text-neutral-800' :
-                              'bg-neutral-100 text-neutral-800'
-                            }`}>
-                              {event.source}
-                            </span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              event.category === 'Community' ? 'bg-green-100 text-green-700' :
-                              event.category === 'Family' ? 'bg-blue-100 text-blue-700' :
-                              event.category === 'Business' ? 'bg-purple-100 text-purple-700' :
-                              event.category === 'Health & Wellness' ? 'bg-pink-100 text-pink-700' :
-                              event.category === 'Food & Entertainment' ? 'bg-orange-100 text-orange-700' :
-                              event.category === 'Community Service' ? 'bg-red-100 text-red-700' :
-                              event.category === 'Senior Activities' ? 'bg-indigo-100 text-indigo-700' :
-                              event.category === 'Arts & Crafts' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-neutral-100 text-neutral-700'
-                            }`}>
-                              {event.category}
-                            </span>
-                            <div className="flex items-center gap-1 text-xs text-neutral-500">
-                              <span>👍 {event.upvotes}</span>
-                              <span>👎 {event.downvotes}</span>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs font-medium text-neutral-700">Date</label>
+                              <input
+                                type="date"
+                                value={editingEvent.date.split('T')[0]}
+                                onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value + 'T12:00:00' })}
+                                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-neutral-700">Time</label>
+                              <input
+                                type="time"
+                                value={editingEvent.time || '12:00'}
+                                onChange={(e) => setEditingEvent({ ...editingEvent, time: e.target.value })}
+                                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
+                              />
                             </div>
                           </div>
+                          
+                          <div>
+                            <label className="text-xs font-medium text-neutral-700">Location</label>
+                            <input
+                              type="text"
+                              value={editingEvent.location || ''}
+                              onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs font-medium text-neutral-700">Address</label>
+                            <input
+                              type="text"
+                              value={editingEvent.address || ''}
+                              onChange={(e) => setEditingEvent({ ...editingEvent, address: e.target.value })}
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs font-medium text-neutral-700">Category</label>
+                            <input
+                              type="text"
+                              value={editingEvent.category}
+                              onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs font-medium text-neutral-700">Description</label>
+                            <textarea
+                              value={editingEvent.description || ''}
+                              onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
+                              rows={3}
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm"
+                            />
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            <button
+                              onClick={saveCalendarEvent}
+                              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                            >
+                              Save Changes
+                            </button>
+                            <button
+                              onClick={cancelEditingEvent}
+                              className="px-4 py-2 bg-neutral-200 text-neutral-800 text-sm rounded-lg hover:bg-neutral-300"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 ml-2">
-                          <button
-                            onClick={() => {
-                              if (confirm(`Are you sure you want to delete "${event.title}"?`)) {
-                                deleteCalendarEvent(event.id)
-                              }
-                            }}
-                            className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                      {event.description && (
-                        <div className="mt-2 text-xs text-neutral-600 line-clamp-2">
-                          {event.description}
-                        </div>
+                      ) : (
+                        // View mode
+                        <>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">{event.title}</div>
+                              <div className="text-xs text-neutral-500 mt-1">
+                                {new Date(event.date).toLocaleDateString()} at {event.time || 'TBD'}
+                              </div>
+                              <div className="text-xs text-neutral-600 mt-1">
+                                {event.location && <span>📍 {event.location}</span>}
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                  event.source.includes('San Diego') ? 'bg-blue-100 text-blue-800' :
+                                  event.source.includes('Library') ? 'bg-green-100 text-green-800' :
+                                  event.source.includes('Parks') ? 'bg-emerald-100 text-emerald-800' :
+                                  event.source.includes('Museum') ? 'bg-purple-100 text-purple-800' :
+                                  event.source === 'Local' ? 'bg-neutral-100 text-neutral-800' :
+                                  event.source === 'Recurring' ? 'bg-orange-100 text-orange-800' :
+                                  'bg-neutral-100 text-neutral-800'
+                                }`}>
+                                  {event.source}
+                                </span>
+                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                  event.category === 'Community' ? 'bg-green-100 text-green-700' :
+                                  event.category === 'Family' ? 'bg-blue-100 text-blue-700' :
+                                  event.category === 'Business' ? 'bg-purple-100 text-purple-700' :
+                                  event.category === 'Culture' ? 'bg-indigo-100 text-indigo-700' :
+                                  event.category === 'Education' ? 'bg-cyan-100 text-cyan-700' :
+                                  event.category === 'Recurring' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-neutral-100 text-neutral-700'
+                                }`}>
+                                  {event.category}
+                                </span>
+                                <div className="flex items-center gap-1 text-xs text-neutral-500">
+                                  <span>👍 {event.upvotes}</span>
+                                  <span>👎 {event.downvotes}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 ml-2">
+                              <button
+                                onClick={() => startEditingEvent(event)}
+                                className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete "${event.title}"?`)) {
+                                    deleteCalendarEvent(event.id)
+                                  }
+                                }}
+                                className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                          {event.description && (
+                            <div className="mt-2 text-xs text-neutral-600 line-clamp-2">
+                              {event.description}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ))
