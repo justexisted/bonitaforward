@@ -580,11 +580,25 @@ export default function MyBusinessPage() {
     try {
       setMessage('Requesting featured upgrade...')
       
+      // DEFENSIVE CHECK: Verify auth data exists before creating request
+      console.log('[MyBusiness] Creating featured request with auth data:', {
+        userId: auth.userId,
+        email: auth.email,
+        name: auth.name,
+        hasUserId: !!auth.userId
+      })
+      
+      if (!auth.userId) {
+        throw new Error('User ID not available - please sign in again')
+      }
+      
       // Determine provider_id - use provided listingId or first available listing
       let providerId = listingId
       if (!providerId && listings.length > 0) {
         providerId = listings[0].id // Use first listing if none specified
       }
+      
+      console.log('[MyBusiness] Submitting request for provider:', providerId)
       
       if (providerId) {
         // User has existing listing - create provider_change_request

@@ -924,15 +924,55 @@ export default function AdminPage() {
             providerInfo = providerData
           }
           
-          // Load profile information
+          // Load profile information with fallback to auth.users
           let profileInfo = null
           if (request.owner_user_id) {
-            const { data: profileData } = await supabase
+            console.log(`[Admin] Looking up profile for owner_user_id: ${request.owner_user_id}`)
+            
+            const { data: profileData, error: profileError } = await supabase
               .from('profiles')
               .select('id, email, name')
               .eq('id', request.owner_user_id)
               .maybeSingle()
-            profileInfo = profileData
+            
+            if (profileError) {
+              console.error(`[Admin] Error fetching profile for ${request.owner_user_id}:`, profileError)
+            } else if (!profileData) {
+              console.warn(`[Admin] No profile found in profiles table for owner_user_id: ${request.owner_user_id}`)
+              
+              // FALLBACK: Try to get user from auth.users table using Service Role Key
+              try {
+                // Call Netlify function to get user from auth table (requires service role)
+                const { data: { session } } = await supabase.auth.getSession()
+                if (session?.access_token) {
+                  const response = await fetch('/.netlify/functions/admin-get-user', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${session.access_token}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ user_id: request.owner_user_id })
+                  })
+                  
+                  if (response.ok) {
+                    const userData = await response.json()
+                    if (userData.user) {
+                      profileInfo = {
+                        id: userData.user.id,
+                        email: userData.user.email || 'No email',
+                        name: userData.user.user_metadata?.name || userData.user.user_metadata?.full_name || null
+                      }
+                      console.log(`[Admin] Found user in auth table via Netlify function:`, profileInfo)
+                    }
+                  }
+                }
+              } catch (authError) {
+                console.error(`[Admin] Error fetching from auth.users:`, authError)
+              }
+            } else {
+              profileInfo = profileData
+              console.log(`[Admin] Found profile in profiles table:`, profileInfo)
+            }
           }
           
           return {
@@ -3871,9 +3911,24 @@ export default function AdminPage() {
                   
                   <div className="text-xs text-neutral-600 mt-1">
                     <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
-                    <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Unknown Owner'}</div>
-                    <div><strong>Owner Email:</strong> {r.profiles?.email || 'Unknown Email'}</div>
+                    <div><strong>Owner:</strong> {
+                      r.profiles?.name || 
+                      r.profiles?.email || 
+                      (r.owner_user_id ? `(Profile Missing - ID: ${r.owner_user_id.substring(0, 8)}...)` : 'Unknown Owner')
+                    }</div>
+                    <div><strong>Owner Email:</strong> {
+                      r.profiles?.email || 
+                      (r.owner_user_id ? '(Profile not found in database)' : 'Unknown Email')
+                    }</div>
                     <div><strong>Provider ID:</strong> {r.provider_id}</div>
+                    
+                    {/* Show warning if profile is missing */}
+                    {r.owner_user_id && !r.profiles?.email && (
+                      <div className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
+                        ⚠️ Owner profile not found. The user may have signed up but their profile wasn't created properly.
+                        Reload the page to attempt fetching from auth system.
+                      </div>
+                    )}
                   </div>
                   {r.reason && <div className="text-xs text-neutral-600 mt-1">Reason: {r.reason}</div>}
                   
