@@ -110,10 +110,10 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
   const days = getDaysInMonth(currentDate)
 
   return (
-    <section className={`py-16 bg-gradient-to-b from-neutral-50 to-white ${className}`}>
+    <section className={`py-16 ${className}`}>
       <div className="container-px mx-auto max-w-6xl relative">
         {/* Header */}
-        <div className={`text-center mb-8 md:mb-12 ${showInfoCard ? 'blur-sm' : ''}`}>
+        <div className="text-center mb-8 md:mb-12">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight font-display mb-2">
             SAN DIEGO BONITA
           </h2>
@@ -266,7 +266,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
         )}
 
         {/* Call to Action */}
-        <div className={`text-center mt-8 ${showInfoCard ? 'blur-sm' : ''}`}>
+        <div className="text-center mt-8">
           <Link
             to="/calendar"
             className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-colors shadow-lg hover:shadow-xl text-sm md:text-base"
@@ -277,7 +277,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
         </div>
 
         {/* Legend */}
-        <div className={`mt-8 space-y-4 ${showInfoCard ? 'blur-sm' : ''}`}>
+        <div className="mt-8 space-y-4">
           <h4 className="text-center text-xs md:text-sm font-semibold text-neutral-700">Event Sources</h4>
           <div className="flex flex-wrap justify-center gap-2 md:gap-4 text-xs">
             <div className="flex items-center space-x-2">
