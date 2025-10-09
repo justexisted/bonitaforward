@@ -2077,12 +2077,38 @@ export default function AdminPage() {
     setMessage(null)
     setDeletingUserId(userId)
     try {
-      const { error } = await supabase.functions.invoke('admin-delete-user', { body: { user_id: userId } })
-      if (error) throw new Error((error as any)?.message || String(error))
+      // Get current session to pass auth token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+      
+      // Call Netlify function (not Supabase Edge Function)
+      const response = await fetch('/.netlify/functions/admin-delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ user_id: userId })
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `HTTP ${response.status}`)
+      }
+      
+      const result = await response.json()
+      if (!result.ok) {
+        throw new Error('Delete failed')
+      }
+      
       // Remove from local list
       setProfiles((arr) => arr.filter((p) => p.id !== userId))
       setMessage('User deleted')
     } catch (err: any) {
+      console.error('Delete user error:', err)
       setError(err?.message || 'Failed to delete user')
     } finally {
       setDeletingUserId(null)
@@ -2093,6 +2119,13 @@ export default function AdminPage() {
     setMessage(null)
     setDeletingCustomerEmail(email)
     try {
+      // Get current session to pass auth token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+      
       // Remove funnel responses and bookings for this email
       try { await supabase.from('funnel_responses').delete().eq('user_email', email) } catch {}
       try { await supabase.from('bookings').delete().eq('user_email', email) } catch {}
@@ -2102,8 +2135,19 @@ export default function AdminPage() {
         const pid = (prof as any)?.id as string | undefined
         const role = (prof as any)?.role as string | undefined
         if (pid && role !== 'business') {
-          await supabase.functions.invoke('admin-delete-user', { body: { user_id: pid } })
-          setProfiles((arr) => arr.filter((p) => p.id !== pid))
+          // Call Netlify function (not Supabase Edge Function)
+          const response = await fetch('/.netlify/functions/admin-delete-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ user_id: pid })
+          })
+          
+          if (response.ok) {
+            setProfiles((arr) => arr.filter((p) => p.id !== pid))
+          }
         }
       } catch {}
       // Update local UI lists
