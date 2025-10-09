@@ -1,4 +1,4 @@
-import { Handler, schedule } from '@netlify/functions'
+import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
 // Supabase configuration
@@ -151,9 +151,10 @@ const transformEvent = (event: VosdEvent) => {
 }
 
 /**
- * Scheduled function to fetch Voice of San Diego events
+ * Function to fetch Voice of San Diego events
+ * Can be triggered manually or run on schedule
  */
-const scheduledHandler: Handler = async (event, context) => {
+export const handler: Handler = async (event, context) => {
   console.log('Starting Voice of San Diego event fetch...')
   
   try {
@@ -243,10 +244,4 @@ const scheduledHandler: Handler = async (event, context) => {
     }
   }
 }
-
-// Export both scheduled and manual handlers
-export const handler = scheduledHandler
-
-// For scheduled runs
-export { scheduledHandler as schedule }
 
