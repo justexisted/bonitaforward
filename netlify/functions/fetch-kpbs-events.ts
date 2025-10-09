@@ -336,16 +336,24 @@ const scrapeKpbsEventLinks = async (): Promise<string[]> => {
     const html = await response.text()
     const $ = cheerio.load(html)
     
-    // Find all event links using the selector from the plan
+    // Find all event links - KPBS uses h3 > a[href*="/events/"] structure
+    // This captures both dated events (/events/2025/...) and ongoing events (/events/ongoing/...)
     const eventLinks: string[] = []
-    $('h3.event-story__title a').each((_, element) => {
+    const seenUrls = new Set<string>() // Prevent duplicates
+    
+    $('h3 a[href*="/events/"]').each((_, element) => {
       const href = $(element).attr('href')
       if (href) {
         // Convert relative URLs to absolute
         const absoluteUrl = href.startsWith('http') 
           ? href 
           : `https://www.kpbs.org${href}`
-        eventLinks.push(absoluteUrl)
+        
+        // Only add unique URLs
+        if (!seenUrls.has(absoluteUrl)) {
+          seenUrls.add(absoluteUrl)
+          eventLinks.push(absoluteUrl)
+        }
       }
     })
     
@@ -359,9 +367,10 @@ const scrapeKpbsEventLinks = async (): Promise<string[]> => {
 }
 
 /**
- * Fetch the ICS file URL from an individual event detail page
+ * Extract event data from the KPBS event page
+ * KPBS uses a custom web component <ps-ics-file-link> with data attributes
  */
-const fetchIcsFileUrl = async (eventPageUrl: string): Promise<string | null> => {
+const extractEventData = async (eventPageUrl: string): Promise<ICalEvent | null> => {
   try {
     const response = await fetch(eventPageUrl, {
       method: 'GET',
@@ -379,48 +388,79 @@ const fetchIcsFileUrl = async (eventPageUrl: string): Promise<string | null> => 
     const html = await response.text()
     const $ = cheerio.load(html)
     
-    // Find the "Download ICS file" link
-    const icsLink = $('a:contains("Download ICS file")').first()
-    const href = icsLink.attr('href')
+    // Find the ps-ics-file-link element which contains event data
+    const icsElement = $('ps-ics-file-link').first()
     
-    if (!href) {
-      console.warn(`No ICS download link found on ${eventPageUrl}`)
+    if (!icsElement.length) {
+      console.warn(`No event data found on ${eventPageUrl}`)
       return null
     }
     
-    // Convert to absolute URL if necessary
-    const absoluteUrl = href.startsWith('http') 
-      ? href 
-      : `https://www.kpbs.org${href}`
+    // Extract data attributes
+    const title = decodeURIComponent(icsElement.attr('data-title') || '')
+    const startTime = icsElement.attr('data-start-time') || ''
+    const endTime = icsElement.attr('data-end-time') || ''
+    const description = decodeURIComponent(icsElement.attr('data-description') || '')
+    const location = decodeURIComponent(icsElement.attr('data-location') || '')
     
-    console.log(`Found ICS file URL: ${absoluteUrl}`)
-    return absoluteUrl
+    if (!title || !startTime) {
+      console.warn(`Missing required event data on ${eventPageUrl}`)
+      return null
+    }
+    
+    // Parse dates (format: 20251010T000000Z)
+    const parseICalDate = (dateStr: string): Date => {
+      // Format: YYYYMMDDTHHMMSSZ
+      const year = parseInt(dateStr.substring(0, 4))
+      const month = parseInt(dateStr.substring(4, 6)) - 1 // JS months are 0-indexed
+      const day = parseInt(dateStr.substring(6, 8))
+      const hour = parseInt(dateStr.substring(9, 11))
+      const minute = parseInt(dateStr.substring(11, 13))
+      const second = parseInt(dateStr.substring(13, 15))
+      return new Date(Date.UTC(year, month, day, hour, minute, second))
+    }
+    
+    const startDate = parseICalDate(startTime)
+    const endDate = endTime ? parseICalDate(endTime) : undefined
+    
+    // Create unique ID from URL
+    const uid = `kpbs-${eventPageUrl.split('/').pop()}-${startTime}`
+    
+    console.log(`Extracted event: "${title}" on ${startDate.toISOString()}`)
+    
+    return {
+      id: uid,
+      title: title,
+      description: description,
+      startDate: startDate,
+      endDate: endDate,
+      location: location,
+      source: SOURCE_NAME,
+      category: CATEGORY,
+      allDay: false // KPBS events have specific times
+    }
     
   } catch (error) {
-    console.error(`Error fetching ICS URL from ${eventPageUrl}:`, error)
+    console.error(`Error extracting event data from ${eventPageUrl}:`, error)
     return null
   }
 }
 
 /**
- * Process a single KPBS event: fetch ICS file and parse it
+ * Process a single KPBS event: extract event data from the page
  */
 const processKpbsEvent = async (eventPageUrl: string): Promise<ICalEvent[]> => {
   try {
     console.log(`Processing event page: ${eventPageUrl}`)
     
-    // Get the ICS file URL from the event page
-    const icsUrl = await fetchIcsFileUrl(eventPageUrl)
-    if (!icsUrl) {
-      console.warn(`Skipping ${eventPageUrl} - no ICS file found`)
+    // Extract event data directly from the page
+    const event = await extractEventData(eventPageUrl)
+    if (!event) {
+      console.warn(`Skipping ${eventPageUrl} - no event data found`)
       return []
     }
     
-    // Fetch and parse the ICS content
-    const icsContent = await fetchICalContent(icsUrl)
-    const events = parseICalContent(icsContent, SOURCE_NAME, CATEGORY)
-    
-    return events
+    return [event]
     
   } catch (error) {
     console.error(`Error processing KPBS event ${eventPageUrl}:`, error)
