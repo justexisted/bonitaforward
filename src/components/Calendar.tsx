@@ -93,7 +93,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
     }
   }
 
-  const handleDayClick = (day: number, dayEvents: CalendarEvent[]) => {
+  const handleDayClick = (_day: number, dayEvents: CalendarEvent[]) => {
     // On mobile or when there are multiple events, show all day events
     if (dayEvents.length > 0) {
       const isMobile = window.innerWidth < 768
