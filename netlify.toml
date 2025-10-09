@@ -8,7 +8,13 @@
   to = "/index.html"
   status = 200
 
-# Scheduled function for Voice of San Diego events (daily at 10 AM)
+# Scheduled function for Voice of San Diego events (daily at 10 AM UTC)
 [[schedule]]
   expression = "0 10 * * *"
   function = "fetch-vosd-events"
+
+# Scheduled function for KPBS events (daily at 10 AM Pacific Time)
+# Note: Use "0 17 * * *" for PST (Nov-Mar) or "0 18 * * *" for PDT (Mar-Nov)
+[[schedule]]
+  expression = "0 17 * * *"
+  function = "fetch-kpbs-events"

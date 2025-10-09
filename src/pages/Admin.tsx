@@ -646,6 +646,30 @@ export default function AdminPage() {
       setError('Failed to fetch Voice of San Diego events: ' + error)
     }
   }
+
+  // Function to refresh KPBS events using server-side Netlify function
+  const refreshKpbsEvents = async () => {
+    try {
+      setMessage('Fetching KPBS events...')
+      
+      const response = await fetch('/.netlify/functions/fetch-kpbs-events')
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        setMessage(`Successfully fetched ${result.totalEvents} events from KPBS (${result.processedPages} pages)!`)
+        
+        // Refresh the calendar events list
+        const { fetchCalendarEvents } = await import('./Calendar')
+        const events = await fetchCalendarEvents()
+        setCalendarEvents(events)
+      } else {
+        setError(`Server returned error: ${result.message || result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error calling fetch-kpbs-events:', error)
+      setError('Failed to fetch KPBS events: ' + error)
+    }
+  }
   
   // Old client-side refresh kept as fallback (CORS issues make this unreliable)
   // Use refreshICalFeedsServer() instead
@@ -4303,6 +4327,17 @@ export default function AdminPage() {
                   className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
                 >
                   📰 Fetch Voice of SD Events
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (confirm('Fetch events from KPBS? This will scrape and import their latest community events.')) {
+                      refreshKpbsEvents()
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  📺 Fetch KPBS Events
                 </button>
               </div>
               
