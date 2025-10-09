@@ -266,6 +266,15 @@ const fetchICalContent = async (url: string): Promise<string> => {
 
     const content = await response.text()
     
+    // Check if content is valid iCalendar format
+    if (!content.trim().startsWith('BEGIN:VCALENDAR')) {
+      // Check if it's HTML
+      if (content.trim().startsWith('<!DOCTYPE html>') || content.trim().startsWith('<html')) {
+        throw new Error('Feed returned HTML instead of iCalendar data - URL may be incorrect or feed may be unavailable')
+      }
+      throw new Error('Invalid iCalendar format - content does not start with BEGIN:VCALENDAR')
+    }
+    
     if (!content || content.length < 100) {
       throw new Error('Invalid or empty iCalendar content')
     }
