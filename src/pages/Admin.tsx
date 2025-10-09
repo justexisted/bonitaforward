@@ -894,110 +894,35 @@ export default function AdminPage() {
    */
   const loadChangeRequests = async () => {
     try {
-      console.log('[Admin] Loading change requests via loadChangeRequests function...')
+      console.log('[Admin] Loading change requests via Netlify function with service role...')
       
-      // First, load change requests without joins to avoid foreign key issues
-      const { data, error } = await supabase
-        .from('provider_change_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('[Admin] Error loading change requests:', error)
-        setError(`Failed to load change requests: ${error.message}`)
+      // Get auth session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        setError('Not authenticated')
         return
       }
 
-      console.log('[Admin] Change requests loaded successfully:', data?.length || 0, 'requests')
+      // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
+      const response = await fetch('/.netlify/functions/admin-list-change-requests', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[Admin] Error from admin-list-change-requests:', errorText)
+        setError(`Failed to load change requests: ${errorText}`)
+        return
+      }
+
+      const result = await response.json()
+      console.log('[Admin] Change requests loaded successfully:', result.requests?.length || 0, 'requests')
       
-      // Now enrich the data with provider and profile information
-      const enrichedChangeRequests = await Promise.all(
-        (data || []).map(async (request) => {
-          // Load provider information
-          let providerInfo = null
-          if (request.provider_id) {
-            const { data: providerData } = await supabase
-              .from('providers')
-              .select('id, name, email')
-              .eq('id', request.provider_id)
-              .maybeSingle()
-            providerInfo = providerData
-          }
-          
-          // Load profile information with fallback to auth.users
-          let profileInfo = null
-          if (request.owner_user_id) {
-            console.log(`[Admin] Looking up profile for owner_user_id: ${request.owner_user_id}`)
-            
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('id, email, name')
-              .eq('id', request.owner_user_id)
-              .maybeSingle()
-            
-            if (profileError) {
-              console.error(`[Admin] Error fetching profile for ${request.owner_user_id}:`, profileError)
-            } else if (!profileData) {
-              console.warn(`[Admin] No profile found in profiles table for owner_user_id: ${request.owner_user_id}`)
-              
-              // FALLBACK: Try to get user from auth.users table using Service Role Key
-              try {
-                // Call Netlify function to get user from auth table (requires service role)
-                const { data: { session } } = await supabase.auth.getSession()
-                if (session?.access_token) {
-                  console.log(`[Admin] Attempting fallback to auth.users for user ${request.owner_user_id}`)
-                  
-                  const response = await fetch('/.netlify/functions/admin-get-user', {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${session.access_token}`,
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ user_id: request.owner_user_id })
-                  })
-                  
-                  console.log(`[Admin] admin-get-user response status: ${response.status}`)
-                  
-                  if (response.ok) {
-                    const userData = await response.json()
-                    console.log(`[Admin] admin-get-user response data:`, userData)
-                    
-                    if (userData.user) {
-                      profileInfo = {
-                        id: userData.user.id,
-                        email: userData.user.email || 'No email',
-                        name: userData.user.user_metadata?.name || userData.user.user_metadata?.full_name || null
-                      }
-                      console.log(`[Admin] ✓ Found user in auth table via Netlify function:`, profileInfo)
-                    } else {
-                      console.warn(`[Admin] admin-get-user returned OK but no user data`)
-                    }
-                  } else {
-                    const errorText = await response.text()
-                    console.error(`[Admin] admin-get-user failed with ${response.status}:`, errorText)
-                  }
-                } else {
-                  console.warn(`[Admin] No session token available for fallback auth lookup`)
-                }
-              } catch (authError) {
-                console.error(`[Admin] Error fetching from auth.users:`, authError)
-              }
-            } else {
-              profileInfo = profileData
-              console.log(`[Admin] Found profile in profiles table:`, profileInfo)
-            }
-          }
-          
-          return {
-            ...request,
-            providers: providerInfo,
-            profiles: profileInfo
-          }
-        })
-      )
-      
-      console.log('[Admin] Enriched change requests via loadChangeRequests:', enrichedChangeRequests.length)
-      setChangeRequests(enrichedChangeRequests)
+      setChangeRequests(result.requests || [])
       
     } catch (error: any) {
       console.error('[Admin] Error loading change requests:', error)
@@ -3924,59 +3849,9 @@ export default function AdminPage() {
                   
                   <div className="text-xs text-neutral-600 mt-1">
                     <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
-                    <div><strong>Owner:</strong> {
-                      r.profiles?.name || 
-                      r.profiles?.email || 
-                      (r.owner_user_id ? `(Profile Missing - ID: ${r.owner_user_id.substring(0, 8)}...)` : 'Unknown Owner')
-                    }</div>
-                    <div><strong>Owner Email:</strong> {
-                      r.profiles?.email || 
-                      (r.owner_user_id ? '(Profile not found in database)' : 'Unknown Email')
-                    }</div>
+                    <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
+                    <div><strong>Owner Email:</strong> {r.profiles?.email || 'Loading...'}</div>
                     <div><strong>Provider ID:</strong> {r.provider_id}</div>
-                    
-                    {/* Show warning if profile is missing */}
-                    {r.owner_user_id && !r.profiles?.email && (
-                      <div className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
-                        <div className="mb-2">
-                          ⚠️ Owner profile not found. The user may have signed up but their profile wasn't created properly.
-                        </div>
-                        <button
-                          onClick={async () => {
-                            setMessage('Attempting to sync profile...')
-                            try {
-                              const { data: { session } } = await supabase.auth.getSession()
-                              if (!session?.access_token) {
-                                setError('Not authenticated')
-                                return
-                              }
-                              
-                              const response = await fetch('/.netlify/functions/admin-sync-profile', {
-                                method: 'POST',
-                                headers: {
-                                  'Authorization': `Bearer ${session.access_token}`,
-                                  'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({ user_id: r.owner_user_id })
-                              })
-                              
-                              if (response.ok) {
-                                setMessage('Profile synced! Reloading...')
-                                await loadChangeRequests()
-                              } else {
-                                const errorText = await response.text()
-                                setError(`Failed to sync profile: ${errorText}`)
-                              }
-                            } catch (error: any) {
-                              setError(`Error syncing profile: ${error.message}`)
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-lg text-xs font-medium transition-colors"
-                        >
-                          Create Missing Profile
-                        </button>
-                      </div>
-                    )}
                   </div>
                   {r.reason && <div className="text-xs text-neutral-600 mt-1">Reason: {r.reason}</div>}
                   
