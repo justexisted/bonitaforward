@@ -111,46 +111,19 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
 
   return (
     <section className={`py-16 bg-gradient-to-b from-neutral-50 to-white ${className}`}>
-      <div className="container-px mx-auto max-w-6xl">
+      <div className="container-px mx-auto max-w-6xl relative">
         {/* Header */}
-        <div className="text-center mb-8 md:mb-12">
+        <div className={`text-center mb-8 md:mb-12 ${showInfoCard ? 'blur-sm' : ''}`}>
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight font-display mb-2">
             SAN DIEGO BONITA
           </h2>
           <p className="text-lg md:text-xl lg:text-2xl font-medium text-blue-600 font-display">
-            CALENDAR {currentDate.getFullYear()}
+            CALENDAR EVENTS {currentDate.getFullYear()}
           </p>
         </div>
 
-        {/* Info Card */}
-        {showInfoCard && (
-          <div className="mb-6 md:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-4 md:p-6 relative">
-            <button
-              onClick={dismissInfoCard}
-              className="absolute top-3 right-3 bg-blue-200 hover:bg-blue-300 rounded-full p-1.5 transition-colors"
-              aria-label="Dismiss info card"
-            >
-              <X className="w-4 h-4 text-blue-800" />
-            </button>
-            <div className="flex items-start space-x-3 pr-8">
-              <div className="flex-shrink-0">
-                <CalendarIcon className="w-5 h-5 md:w-6 md:h-6 text-blue-600 mt-0.5" />
-              </div>
-              <div>
-                <h3 className="text-base md:text-lg font-semibold text-blue-900 mb-2">How the Calendar Works</h3>
-                <div className="text-sm md:text-base text-blue-800 space-y-1">
-                  <p>• <strong>Click on any event</strong> to see full details including time, location, and description</p>
-                  <p className="md:hidden">• <strong>Tap a day</strong> to see all events for that date</p>
-                  <p className="hidden md:block">• <strong>Hover over events</strong> to see their titles</p>
-                  <p>• All events are within 20 minutes of Chula Vista and curated for Bonita</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Calendar Grid */}
-        <div className="bg-white rounded-2xl shadow-lg border border-neutral-200 overflow-hidden">
+        <div className={`bg-white rounded-2xl shadow-lg border border-neutral-200 overflow-hidden relative ${showInfoCard ? 'blur-sm' : ''}`}>
           {/* Month Navigation */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <button
@@ -263,8 +236,37 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
           </div>
         </div>
 
+        {/* Info Card Overlay */}
+        {showInfoCard && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-2xl p-6 md:p-8 relative max-w-2xl w-full shadow-2xl">
+              <button
+                onClick={dismissInfoCard}
+                className="absolute top-4 right-4 bg-blue-200 hover:bg-blue-300 rounded-full p-2 transition-colors"
+                aria-label="Dismiss info card"
+              >
+                <X className="w-5 h-5 text-blue-800" />
+              </button>
+              <div className="flex items-start space-x-4 pr-10">
+                <div className="flex-shrink-0">
+                  <CalendarIcon className="w-8 h-8 md:w-10 md:h-10 text-blue-600 mt-0.5" />
+                </div>
+                <div>
+                  <h3 className="text-xl md:text-2xl font-bold text-blue-900 mb-4">How the Calendar Works</h3>
+                  <div className="text-sm md:text-base text-blue-800 space-y-2.5">
+                    <p>• <strong>Click on any event</strong> to see full details including time, location, and description</p>
+                    <p className="md:hidden">• <strong>Tap a day</strong> to see all events for that date</p>
+                    <p className="hidden md:block">• <strong>Hover over events</strong> to see their titles</p>
+                    <p>• All events are within 20 minutes of Chula Vista and curated for Bonita</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Call to Action */}
-        <div className="text-center mt-8">
+        <div className={`text-center mt-8 ${showInfoCard ? 'blur-sm' : ''}`}>
           <Link
             to="/calendar"
             className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2 md:py-3 rounded-full font-semibold transition-colors shadow-lg hover:shadow-xl text-sm md:text-base"
@@ -275,7 +277,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
         </div>
 
         {/* Legend */}
-        <div className="mt-8 space-y-4">
+        <div className={`mt-8 space-y-4 ${showInfoCard ? 'blur-sm' : ''}`}>
           <h4 className="text-center text-xs md:text-sm font-semibold text-neutral-700">Event Sources</h4>
           <div className="flex flex-wrap justify-center gap-2 md:gap-4 text-xs">
             <div className="flex items-center space-x-2">
