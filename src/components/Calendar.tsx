@@ -12,6 +12,16 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalendarEvent[]>>({})
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [selectedDayEvents, setSelectedDayEvents] = useState<CalendarEvent[] | null>(null)
+  const [showInfoCard, setShowInfoCard] = useState(() => {
+    // Check if user has dismissed the info card before
+    try {
+      return localStorage.getItem('bf-calendar-info-dismissed') !== 'true'
+    } catch {
+      return true
+    }
+  })
+  const [hoveredEvent, setHoveredEvent] = useState<CalendarEvent | null>(null)
 
   // Group events by date
   useEffect(() => {
@@ -74,6 +84,29 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
     })
   }
 
+  const dismissInfoCard = () => {
+    setShowInfoCard(false)
+    try {
+      localStorage.setItem('bf-calendar-info-dismissed', 'true')
+    } catch {
+      // localStorage not available
+    }
+  }
+
+  const handleDayClick = (day: number, dayEvents: CalendarEvent[]) => {
+    // On mobile or when there are multiple events, show all day events
+    if (dayEvents.length > 0) {
+      const isMobile = window.innerWidth < 768
+      if (isMobile) {
+        setSelectedDayEvents(dayEvents)
+      } else if (dayEvents.length === 1) {
+        setSelectedEvent(dayEvents[0])
+      } else {
+        setSelectedDayEvents(dayEvents)
+      }
+    }
+  }
+
   const days = getDaysInMonth(currentDate)
 
   return (
@@ -88,6 +121,33 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
             CALENDAR {currentDate.getFullYear()}
           </p>
         </div>
+
+        {/* Info Card */}
+        {showInfoCard && (
+          <div className="mb-6 md:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-4 md:p-6 relative">
+            <button
+              onClick={dismissInfoCard}
+              className="absolute top-3 right-3 bg-blue-200 hover:bg-blue-300 rounded-full p-1.5 transition-colors"
+              aria-label="Dismiss info card"
+            >
+              <X className="w-4 h-4 text-blue-800" />
+            </button>
+            <div className="flex items-start space-x-3 pr-8">
+              <div className="flex-shrink-0">
+                <CalendarIcon className="w-5 h-5 md:w-6 md:h-6 text-blue-600 mt-0.5" />
+              </div>
+              <div>
+                <h3 className="text-base md:text-lg font-semibold text-blue-900 mb-2">How the Calendar Works</h3>
+                <div className="text-sm md:text-base text-blue-800 space-y-1">
+                  <p>• <strong>Click on any event</strong> to see full details including time, location, and description</p>
+                  <p className="md:hidden">• <strong>Tap a day</strong> to see all events for that date</p>
+                  <p className="hidden md:block">• <strong>Hover over events</strong> to see their titles</p>
+                  <p>• All events are within 20 minutes of Chula Vista and curated for Bonita</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Calendar Grid */}
         <div className="bg-white rounded-2xl shadow-lg border border-neutral-200 overflow-hidden">
@@ -131,8 +191,9 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
               return (
                 <div
                   key={index}
+                  onClick={() => day && handleDayClick(day, dayEvents)}
                   className={`min-h-[60px] md:min-h-[80px] p-1 md:p-2 border-r border-b border-neutral-200 last:border-r-0 relative ${
-                    day ? 'bg-white hover:bg-blue-50' : 'bg-neutral-50'
+                    day ? hasEvents ? 'bg-white hover:bg-blue-50 cursor-pointer md:cursor-default' : 'bg-white' : 'bg-neutral-50'
                   }`}
                 >
                   {day && (
@@ -143,35 +204,50 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                         {day}
                       </div>
                       
-                      {/* Event indicators - clickable */}
+                      {/* Event indicators - clickable with hover tooltip */}
                       {hasEvents && (
                         <div className="space-y-1">
                           {dayEvents.slice(0, 2).map((event, eventIndex) => (
-                            <button
-                              key={eventIndex}
-                              onClick={() => setSelectedEvent(event)}
-                              className={`w-full text-left text-xs px-2 py-1 rounded-full truncate cursor-pointer hover:opacity-80 transition-opacity ${
-                                 event.source.includes('San Diego') || event.source.includes('Museum') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                 event.source.includes('Library') ? 'bg-green-100 text-green-800 border border-green-200' :
-                                 event.source.includes('Parks') ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                                 event.source.includes('CNN') ? 'bg-red-100 text-red-800 border border-red-200' :
-                                 event.source === 'Local' ? 'bg-neutral-100 text-neutral-800 border border-neutral-200' :
-                                 event.source === 'Recurring' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
-                                 event.category === 'Community' ? 'bg-green-100 text-green-700' :
-                                 event.category === 'Family' ? 'bg-blue-100 text-blue-700' :
-                                 event.category === 'Business' ? 'bg-purple-100 text-purple-700' :
-                                 event.category === 'Culture' ? 'bg-indigo-100 text-indigo-700' :
-                                 event.category === 'Education' ? 'bg-cyan-100 text-cyan-700' :
-                                 'bg-neutral-100 text-neutral-700'
-                               }`}
-                              title={event.title}
-                            >
-                              {event.title.length > 12 ? event.title.substring(0, 12) + '...' : event.title}
-                            </button>
+                            <div key={eventIndex} className="relative group">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedEvent(event)
+                                }}
+                                onMouseEnter={() => setHoveredEvent(event)}
+                                onMouseLeave={() => setHoveredEvent(null)}
+                                className={`w-full text-left text-xs px-2 py-1 rounded-full truncate cursor-pointer hover:opacity-80 transition-opacity ${
+                                   event.source.includes('San Diego') || event.source.includes('Museum') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                   event.source.includes('Library') ? 'bg-green-100 text-green-800 border border-green-200' :
+                                   event.source.includes('Parks') ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                                   event.source.includes('CNN') ? 'bg-red-100 text-red-800 border border-red-200' :
+                                   event.source === 'Local' ? 'bg-neutral-100 text-neutral-800 border border-neutral-200' :
+                                   event.source === 'Recurring' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                                   event.category === 'Community' ? 'bg-green-100 text-green-700' :
+                                   event.category === 'Family' ? 'bg-blue-100 text-blue-700' :
+                                   event.category === 'Business' ? 'bg-purple-100 text-purple-700' :
+                                   event.category === 'Culture' ? 'bg-indigo-100 text-indigo-700' :
+                                   event.category === 'Education' ? 'bg-cyan-100 text-cyan-700' :
+                                   'bg-neutral-100 text-neutral-700'
+                                 }`}
+                              >
+                                {event.title.length > 12 ? event.title.substring(0, 12) + '...' : event.title}
+                              </button>
+                              {/* Hover tooltip for desktop */}
+                              {hoveredEvent === event && (
+                                <div className="hidden md:block absolute z-10 bg-neutral-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap bottom-full left-0 mb-1 max-w-xs">
+                                  {event.title}
+                                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-neutral-900"></div>
+                                </div>
+                              )}
+                            </div>
                           ))}
                           {dayEvents.length > 2 && (
                             <button
-                              onClick={() => setSelectedEvent(dayEvents[2])}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedDayEvents(dayEvents)
+                              }}
                               className="text-xs text-neutral-500 font-medium hover:text-neutral-700 transition-colors"
                             >
                               +{dayEvents.length - 2} more
@@ -233,6 +309,68 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
           </div>
         </div>
       </div>
+
+      {/* Day Events Modal (Mobile/Multiple Events) */}
+      {selectedDayEvents && (
+        <div 
+          className="fixed inset-0 bg-white/30 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedDayEvents(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-neutral-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 px-4 md:px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <h3 className="text-lg md:text-xl font-bold text-white font-display">
+                Events on {new Date(currentDate.getFullYear(), currentDate.getMonth(), new Date(selectedDayEvents[0].date).getDate()).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+              </h3>
+              <button
+                onClick={() => setSelectedDayEvents(null)}
+                className="bg-blue-800 hover:bg-blue-900 rounded-full p-2 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              </button>
+            </div>
+
+            {/* Events List */}
+            <div className="p-4 md:p-6 space-y-3">
+              {selectedDayEvents.map((event, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setSelectedDayEvents(null)
+                    setSelectedEvent(event)
+                  }}
+                  className="w-full text-left bg-neutral-50 hover:bg-blue-50 border border-neutral-200 hover:border-blue-300 rounded-xl p-4 transition-all group"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-semibold text-neutral-900 group-hover:text-blue-600 transition-colors pr-2">
+                      {event.title}
+                    </h4>
+                    <span className="text-xs px-2 py-1 bg-neutral-200 text-neutral-700 rounded-full flex-shrink-0">
+                      {event.source}
+                    </span>
+                  </div>
+                  {event.time && (
+                    <div className="flex items-center text-sm text-neutral-600 mb-2">
+                      <Clock className="w-4 h-4 mr-2" />
+                      {event.time}
+                    </div>
+                  )}
+                  {event.location && (
+                    <div className="flex items-center text-sm text-neutral-600">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      {event.location}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Event Detail Modal */}
       {selectedEvent && (

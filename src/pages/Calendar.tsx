@@ -430,22 +430,6 @@ export default function CalendarPage() {
 
         {!loading && !error && (
           <>
-            {/* Info Card */}
-            <div className="mb-6 md:mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-4 md:p-6">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <Calendar className="w-5 h-5 md:w-6 md:h-6 text-blue-600 mt-0.5" />
-                </div>
-                <div>
-                  <h3 className="text-base md:text-lg font-semibold text-blue-900 mb-2">Welcome to Bonita's Event Calendar</h3>
-                  <p className="text-sm md:text-base text-blue-800">
-                    Click on any event card to see full details. Use the category filters below to find events that interest you. 
-                    All events are within 20 minutes of Chula Vista and have been curated for the Bonita community.
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* Category Filters */}
             <div className="mb-6 md:mb-8">
               <div className="flex flex-wrap gap-2 md:gap-3">
