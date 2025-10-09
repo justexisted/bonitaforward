@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import ICAL from 'ical.js'
+import { filterEventsByZipCode } from './utils/zipCodeFilter'
 
 // Supabase configuration
 const supabaseUrl = process.env.SUPABASE_URL!
@@ -471,6 +472,24 @@ export const handler: Handler = async (event, context) => {
     
     console.log(`Found ${allEvents.length} total events, ${uniqueEvents.length} unique events (removed ${allEvents.length - uniqueEvents.length} duplicates)`)
     
+    // Filter by allowed zip codes (Chula Vista area ~20 min radius)
+    const filteredEvents = filterEventsByZipCode(uniqueEvents, 'iCalendar Feeds')
+    
+    if (filteredEvents.length === 0) {
+      console.log('No events remaining after zip code filtering')
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          message: 'No events in allowed geographic area',
+          processedFeeds: results.length,
+          totalEvents: 0,
+          filteredOut: uniqueEvents.length,
+          timestamp: new Date().toISOString()
+        })
+      }
+    }
+    
     // Clear existing iCalendar events (those from external sources)
     const icalSources = enabledFeeds.map(feed => feed.source)
     const { error: deleteError } = await supabase
@@ -504,7 +523,7 @@ export const handler: Handler = async (event, context) => {
     if (existingEvents && existingEvents.length > 0) {
       const duplicateIds: string[] = []
       
-      for (const newEvent of uniqueEvents) {
+      for (const newEvent of filteredEvents) {
         for (const existing of existingEvents) {
           const normalizeTitle = (title: string) => title.toLowerCase().trim().replace(/[^\w\s]/g, '')
           const title1 = normalizeTitle(newEvent.title)
@@ -533,7 +552,7 @@ export const handler: Handler = async (event, context) => {
     // Insert new events
     const { error: insertError } = await supabase
       .from('calendar_events')
-      .insert(uniqueEvents)
+      .insert(filteredEvents)
     
     if (insertError) {
       console.error('Error inserting new events:', insertError)
@@ -549,7 +568,7 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
-    console.log(`Successfully processed ${uniqueEvents.length} events from ${enabledFeeds.length} feeds`)
+    console.log(`Successfully processed ${filteredEvents.length} events from ${enabledFeeds.length} feeds`)
     
     return {
       statusCode: 200,

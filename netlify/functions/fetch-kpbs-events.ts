@@ -2,6 +2,7 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import * as cheerio from 'cheerio'
 import ICAL from 'ical.js'
+import { filterEventsByZipCode } from './utils/zipCodeFilter'
 
 // Supabase configuration
 const supabaseUrl = process.env.SUPABASE_URL!
@@ -555,7 +556,28 @@ export const handler: Handler = async (event, context) => {
     
     console.log(`Found ${dbEvents.length} total events, ${uniqueEvents.length} unique events (removed ${dbEvents.length - uniqueEvents.length} duplicates)`)
     
-    // Step 6: Delete existing KPBS events from database
+    // Step 6: Filter by allowed zip codes (Chula Vista area ~20 min radius)
+    const filteredEvents = filterEventsByZipCode(uniqueEvents, SOURCE_NAME)
+    
+    if (filteredEvents.length === 0) {
+      console.log('No events remaining after zip code filtering')
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          success: true,
+          message: 'No events in allowed geographic area',
+          source: SOURCE_NAME,
+          processedPages: eventUrls.length,
+          totalEvents: 0,
+          filteredOut: uniqueEvents.length
+        })
+      }
+    }
+    
+    // Step 7: Delete existing KPBS events from database
     const { error: deleteError } = await supabase
       .from('calendar_events')
       .delete()
@@ -568,12 +590,12 @@ export const handler: Handler = async (event, context) => {
     
     console.log(`Deleted old ${SOURCE_NAME} events`)
     
-    // Step 7: Insert new events in batches
+    // Step 8: Insert new events in batches
     const batchSize = 100
     let insertedCount = 0
     
-    for (let i = 0; i < uniqueEvents.length; i += batchSize) {
-      const batch = uniqueEvents.slice(i, i + batchSize)
+    for (let i = 0; i < filteredEvents.length; i += batchSize) {
+      const batch = filteredEvents.slice(i, i + batchSize)
       
       const { error: insertError } = await supabase
         .from('calendar_events')

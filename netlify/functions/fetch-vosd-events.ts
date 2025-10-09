@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
+import { filterEventsByZipCode } from './utils/zipCodeFilter'
 
 // Supabase configuration
 const supabaseUrl = process.env.SUPABASE_URL!
@@ -179,6 +180,27 @@ export const handler: Handler = async (event, context) => {
     
     console.log(`Transformed ${dbEvents.length} events for database insertion`)
     
+    // Filter by allowed zip codes (Chula Vista area ~20 min radius)
+    const filteredEvents = filterEventsByZipCode(dbEvents, SOURCE_NAME)
+    
+    if (filteredEvents.length === 0) {
+      console.log('No events remaining after zip code filtering')
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          success: true,
+          message: 'No events in allowed geographic area',
+          source: SOURCE_NAME,
+          totalEvents: 0,
+          filteredOut: dbEvents.length,
+          timestamp: new Date().toISOString()
+        })
+      }
+    }
+    
     // Delete existing Voice of San Diego events to avoid duplicates
     const { error: deleteError } = await supabase
       .from('calendar_events')
@@ -196,8 +218,8 @@ export const handler: Handler = async (event, context) => {
     const batchSize = 100
     let insertedCount = 0
     
-    for (let i = 0; i < dbEvents.length; i += batchSize) {
-      const batch = dbEvents.slice(i, i + batchSize)
+    for (let i = 0; i < filteredEvents.length; i += batchSize) {
+      const batch = filteredEvents.slice(i, i + batchSize)
       
       const { data, error } = await supabase
         .from('calendar_events')

@@ -1,6 +1,7 @@
 import { Handler, schedule } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import ICAL from 'ical.js'
+import { filterEventsByZipCode } from './utils/zipCodeFilter'
 
 // Supabase configuration
 const supabaseUrl = process.env.SUPABASE_URL!
@@ -429,6 +430,23 @@ const scheduledHandler: Handler = async (event, context) => {
     
     console.log(`Found ${allEvents.length} total events, ${uniqueEvents.length} unique events (removed ${allEvents.length - uniqueEvents.length} duplicates)`)
     
+    // Filter by allowed zip codes (Chula Vista area ~20 min radius)
+    const filteredEvents = filterEventsByZipCode(uniqueEvents, 'iCalendar Feeds')
+    
+    if (filteredEvents.length === 0) {
+      console.log('No events remaining after zip code filtering')
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          message: 'No events in allowed geographic area',
+          processedFeeds: enabledFeeds.length,
+          totalEvents: 0,
+          filteredOut: uniqueEvents.length,
+          timestamp: new Date().toISOString()
+        })
+      }
+    }
+    
     // Clear existing iCalendar events (those from external sources)
     const icalSources = enabledFeeds.map(feed => feed.source)
     const { error: deleteError } = await supabase
@@ -452,7 +470,7 @@ const scheduledHandler: Handler = async (event, context) => {
     if (existingEvents && existingEvents.length > 0) {
       const duplicateIds: string[] = []
       
-      for (const newEvent of uniqueEvents) {
+      for (const newEvent of filteredEvents) {
         for (const existing of existingEvents) {
           const normalizeTitle = (title: string) => title.toLowerCase().trim().replace(/[^\w\s]/g, '')
           const title1 = normalizeTitle(newEvent.title)
@@ -482,8 +500,8 @@ const scheduledHandler: Handler = async (event, context) => {
     const batchSize = 100
     let insertedCount = 0
     
-    for (let i = 0; i < uniqueEvents.length; i += batchSize) {
-      const batch = uniqueEvents.slice(i, i + batchSize)
+    for (let i = 0; i < filteredEvents.length; i += batchSize) {
+      const batch = filteredEvents.slice(i, i + batchSize)
       
       const { error: insertError } = await supabase
         .from('calendar_events')
