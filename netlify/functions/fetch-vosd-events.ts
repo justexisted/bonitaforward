@@ -74,8 +74,9 @@ const extractTime = (datetime: string): string | null => {
  */
 const fetchVosdEvents = async (page: number = 1, perPage: number = 50): Promise<VosdEvent[]> => {
   const now = new Date()
-  const startDate = now.toISOString().split('T')[0] // Today
-  const endDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0] // 1 year from now
+  // Look back 6 months to catch recent past events, and forward 1 year for future events
+  const startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()).toISOString().split('T')[0]
+  const endDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0]
   
   const url = `${VOSD_API_BASE}?per_page=${perPage}&page=${page}&start_date=${startDate}&end_date=${endDate}&status=publish`
   
