@@ -87,6 +87,97 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, headers, body: 'Cannot delete your own account' }
     }
 
+    // ============================================================
+    // STEP 1: Gather all data to archive before deletion
+    // ============================================================
+    console.log(`[Delete User] Gathering data for user ${user_id}...`)
+    
+    // Get user profile
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('*')
+      .eq('id', user_id)
+      .maybeSingle()
+    
+    // Get all provider listings owned by this user
+    const { data: providers } = await sb
+      .from('providers')
+      .select('*')
+      .eq('owner_user_id', user_id)
+    
+    // Get change requests
+    const { data: changeRequests } = await sb
+      .from('provider_change_requests')
+      .select('*')
+      .eq('user_id', user_id)
+    
+    // Get job posts for all their providers
+    let jobPosts = null
+    if (providers && providers.length > 0) {
+      const providerIds = providers.map(p => p.id)
+      const { data: jobs } = await sb
+        .from('provider_job_posts')
+        .select('*')
+        .in('provider_id', providerIds)
+      jobPosts = jobs
+    }
+    
+    console.log(`[Delete User] Found: ${providers?.length || 0} providers, ${changeRequests?.length || 0} change requests, ${jobPosts?.length || 0} job posts`)
+    
+    // ============================================================
+    // STEP 2: Archive all data to deleted_business_accounts table
+    // ============================================================
+    try {
+      await sb.from('deleted_business_accounts').insert({
+        original_user_id: user_id,
+        original_email: profile?.email || 'unknown',
+        original_name: profile?.name,
+        original_role: profile?.role,
+        provider_data: providers || [],
+        change_requests: changeRequests || [],
+        job_posts: jobPosts || [],
+        profile_data: profile,
+        deleted_by_admin_id: adminUserId,
+        deleted_by_admin_email: adminEmail,
+        ip_address: event.headers['x-forwarded-for'] || event.headers['x-real-ip'] || 'unknown'
+      })
+      console.log(`[Delete User] Data archived successfully`)
+    } catch (archiveError: any) {
+      console.error('[Delete User] Failed to archive data:', archiveError)
+      // Continue with deletion even if archive fails (table might not exist yet)
+    }
+
+    // ============================================================
+    // STEP 3: Delete all related data from active tables
+    // ============================================================
+    
+    // Delete provider job posts first (foreign key dependency)
+    if (providers && providers.length > 0) {
+      const providerIds = providers.map(p => p.id)
+      await sb.from('provider_job_posts').delete().in('provider_id', providerIds)
+      console.log(`[Delete User] Deleted job posts for ${providerIds.length} providers`)
+    }
+    
+    // Delete provider change requests
+    await sb.from('provider_change_requests').delete().eq('user_id', user_id)
+    console.log(`[Delete User] Deleted change requests`)
+    
+    // Delete provider listings
+    const { error: providerDeleteError } = await sb
+      .from('providers')
+      .delete()
+      .eq('owner_user_id', user_id)
+    
+    if (providerDeleteError) {
+      console.error('[Delete User] Error deleting providers:', providerDeleteError)
+    } else {
+      console.log(`[Delete User] Deleted ${providers?.length || 0} provider listings`)
+    }
+    
+    // Delete profile
+    await sb.from('profiles').delete().eq('id', user_id)
+    console.log(`[Delete User] Deleted profile`)
+    
     // Log admin action for audit trail
     try {
       await sb.from('admin_audit_log').insert({
@@ -101,9 +192,16 @@ export const handler: Handler = async (event) => {
       // audit log table doesn't exist yet, that's okay for now
     }
 
+    // ============================================================
+    // STEP 4: Finally delete the auth user (last step)
+    // ============================================================
     const { error } = await (sb as any).auth.admin.deleteUser(user_id)
-    if (error) return { statusCode: 400, headers, body: error.message }
+    if (error) {
+      console.error('[Delete User] Error deleting auth user:', error)
+      return { statusCode: 400, headers, body: error.message }
+    }
     
+    console.log(`[Delete User] Successfully deleted user ${user_id} and all associated data`)
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
   } catch (err: any) {
     return { statusCode: 500, headers, body: err?.message || 'Server error' }

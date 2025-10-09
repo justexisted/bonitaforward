@@ -669,7 +669,7 @@ function Navbar() {
         textColor: "#fff",
         links: [
           { label: "Sign In", href: "/signin", ariaLabel: "Sign In" },
-          { label: "Sign Up", href: "/signin", ariaLabel: "Sign Up" }
+          { label: "Sign Up", href: "/signin?mode=signup", ariaLabel: "Sign Up" }
         ]
       })
     }

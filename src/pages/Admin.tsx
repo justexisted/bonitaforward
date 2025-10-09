@@ -2750,14 +2750,28 @@ export default function AdminPage() {
                         )}
                       {deletingUserId === p.id ? (
                         <>
-                          <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Confirm</button>
-                          <button onClick={() => setDeletingUserId(null)} className="text-xs underline">Cancel</button>
+                          <button onClick={() => deleteUser(p.id)} className="rounded-full bg-red-600 text-white px-3 py-1.5 border border-red-700 text-xs hover:bg-red-700 font-medium">Confirm Delete</button>
+                          <button onClick={() => setDeletingUserId(null)} className="text-xs underline text-neutral-600 hover:text-neutral-900">Cancel</button>
                         </>
                       ) : (
                         <button onClick={() => setDeletingUserId(p.id)} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 border border-neutral-200 text-xs">Delete</button>
                       )}
                       </div>
                     </div>
+                    
+                    {/* Warning message when delete is initiated */}
+                    {deletingUserId === p.id && (
+                      <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-300 rounded-lg p-3">
+                        <div className="font-bold mb-1">⚠️ Warning: Permanent Data Loss</div>
+                        <div className="space-y-1 text-red-600">
+                          <p>• All business listings and provider data will be permanently deleted</p>
+                          <p>• Business images, change requests, and job posts will be removed</p>
+                          <p>• User will need to create a completely new account if they sign up again</p>
+                          <p>• Data will be archived for admin reference only</p>
+                        </div>
+                        <div className="mt-2 font-medium">Click "Confirm Delete" above to proceed or "Cancel" to abort.</div>
+                      </div>
+                    )}
                     
                     {/* Expanded Business Details */}
                     {expandedBusinessDetails[p.id] && (
