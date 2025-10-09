@@ -945,6 +945,8 @@ export default function AdminPage() {
                 // Call Netlify function to get user from auth table (requires service role)
                 const { data: { session } } = await supabase.auth.getSession()
                 if (session?.access_token) {
+                  console.log(`[Admin] Attempting fallback to auth.users for user ${request.owner_user_id}`)
+                  
                   const response = await fetch('/.netlify/functions/admin-get-user', {
                     method: 'POST',
                     headers: {
@@ -954,17 +956,28 @@ export default function AdminPage() {
                     body: JSON.stringify({ user_id: request.owner_user_id })
                   })
                   
+                  console.log(`[Admin] admin-get-user response status: ${response.status}`)
+                  
                   if (response.ok) {
                     const userData = await response.json()
+                    console.log(`[Admin] admin-get-user response data:`, userData)
+                    
                     if (userData.user) {
                       profileInfo = {
                         id: userData.user.id,
                         email: userData.user.email || 'No email',
                         name: userData.user.user_metadata?.name || userData.user.user_metadata?.full_name || null
                       }
-                      console.log(`[Admin] Found user in auth table via Netlify function:`, profileInfo)
+                      console.log(`[Admin] ✓ Found user in auth table via Netlify function:`, profileInfo)
+                    } else {
+                      console.warn(`[Admin] admin-get-user returned OK but no user data`)
                     }
+                  } else {
+                    const errorText = await response.text()
+                    console.error(`[Admin] admin-get-user failed with ${response.status}:`, errorText)
                   }
+                } else {
+                  console.warn(`[Admin] No session token available for fallback auth lookup`)
                 }
               } catch (authError) {
                 console.error(`[Admin] Error fetching from auth.users:`, authError)
@@ -3925,8 +3938,43 @@ export default function AdminPage() {
                     {/* Show warning if profile is missing */}
                     {r.owner_user_id && !r.profiles?.email && (
                       <div className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
-                        ⚠️ Owner profile not found. The user may have signed up but their profile wasn't created properly.
-                        Reload the page to attempt fetching from auth system.
+                        <div className="mb-2">
+                          ⚠️ Owner profile not found. The user may have signed up but their profile wasn't created properly.
+                        </div>
+                        <button
+                          onClick={async () => {
+                            setMessage('Attempting to sync profile...')
+                            try {
+                              const { data: { session } } = await supabase.auth.getSession()
+                              if (!session?.access_token) {
+                                setError('Not authenticated')
+                                return
+                              }
+                              
+                              const response = await fetch('/.netlify/functions/admin-sync-profile', {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${session.access_token}`,
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ user_id: r.owner_user_id })
+                              })
+                              
+                              if (response.ok) {
+                                setMessage('Profile synced! Reloading...')
+                                await loadChangeRequests()
+                              } else {
+                                const errorText = await response.text()
+                                setError(`Failed to sync profile: ${errorText}`)
+                              }
+                            } catch (error: any) {
+                              setError(`Error syncing profile: ${error.message}`)
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          Create Missing Profile
+                        </button>
                       </div>
                     )}
                   </div>
