@@ -17,12 +17,24 @@ function requireEnv(name: string): string {
 }
 
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
+  // CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  }
+  
+  // Handle preflight request
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' }
+  }
+  
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' }
   try {
     // Verify admin authorization first
     const authHeader = event.headers['authorization'] || event.headers['Authorization']
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
-    if (!token) return { statusCode: 401, body: 'Unauthorized' }
+    if (!token) return { statusCode: 401, headers, body: 'Unauthorized' }
 
     const SUPABASE_URL = requireEnv('SUPABASE_URL')
     const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE')
@@ -31,7 +43,7 @@ export const handler: Handler = async (event) => {
     // Verify the JWT token and get admin user info
     const { data: adminUserData, error: getAdminErr } = await (sb as any).auth.getUser(token)
     if (getAdminErr || !adminUserData?.user?.id) {
-      return { statusCode: 401, body: 'Invalid token' }
+      return { statusCode: 401, headers, body: 'Invalid token' }
     }
 
     const adminUserId = adminUserData.user.id
@@ -63,16 +75,16 @@ export const handler: Handler = async (event) => {
     }
 
     if (!isEmailAdmin && !isDatabaseAdmin) {
-      return { statusCode: 403, body: 'Admin access required' }
+      return { statusCode: 403, headers, body: 'Admin access required' }
     }
 
     const body = JSON.parse(event.body || '{}') as { user_id?: string }
     const user_id = body.user_id
-    if (!user_id) return { statusCode: 400, body: 'Missing user_id' }
+    if (!user_id) return { statusCode: 400, headers, body: 'Missing user_id' }
 
     // Prevent admins from deleting themselves
     if (user_id === adminUserId) {
-      return { statusCode: 400, body: 'Cannot delete your own account' }
+      return { statusCode: 400, headers, body: 'Cannot delete your own account' }
     }
 
     // Log admin action for audit trail
@@ -90,11 +102,11 @@ export const handler: Handler = async (event) => {
     }
 
     const { error } = await (sb as any).auth.admin.deleteUser(user_id)
-    if (error) return { statusCode: 400, body: error.message }
+    if (error) return { statusCode: 400, headers, body: error.message }
     
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) }
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
   } catch (err: any) {
-    return { statusCode: 500, body: err?.message || 'Server error' }
+    return { statusCode: 500, headers, body: err?.message || 'Server error' }
   }
 }
 

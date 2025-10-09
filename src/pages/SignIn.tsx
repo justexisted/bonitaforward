@@ -361,9 +361,14 @@ export default function SignInPage() {
         <div className="rounded-2xl border border-neutral-100 p-6 bg-white elevate">
           <h1 className="text-xl font-semibold tracking-tight text-center">
             {mode === 'signin' && 'Sign in to Bonita Forward'}
-            {mode === 'signup' && 'Create your account'}
+            {mode === 'signup' && 'Sign up for Bonita Forward'}
             {mode === 'reset' && 'Reset your password'}
           </h1>
+          {mode === 'signup' && (
+            <p className="text-sm text-neutral-600 text-center mt-2">
+              Create your free account to vote on events, save businesses, and connect with the Bonita community
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="mt-4 space-y-3">
             {mode === 'signup' && (
@@ -444,7 +449,7 @@ export default function SignInPage() {
                 type="submit"
                 className="w-full rounded-full bg-neutral-900 text-white py-2.5 elevate"
               >
-                {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+                {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Sign Up' : 'Send Reset Link'}
               </button>
             )}
           </form>
@@ -477,12 +482,12 @@ export default function SignInPage() {
               <>
                 <button onClick={handleResetPassword} className="underline">Forgot password?</button>
                 <span className="mx-2">·</span>
-                <button onClick={() => setMode('signup')} className="underline">Create account</button>
+                <button onClick={() => setMode('signup')} className="underline">Sign up</button>
               </>
             )}
             {mode === 'signup' && (
               <>
-                <button onClick={() => setMode('signin')} className="underline">Back to sign in</button>
+                <button onClick={() => setMode('signin')} className="underline">Already have an account? Sign in</button>
               </>
             )}
             {mode === 'reset' && (
