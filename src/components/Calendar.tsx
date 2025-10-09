@@ -237,11 +237,11 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
       {/* Event Detail Modal */}
       {selectedEvent && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-white/30 backdrop-blur-md z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedEvent(null)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-neutral-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -251,17 +251,18 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                   {selectedEvent.title}
                 </h3>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <span className="text-xs md:text-sm px-2 md:px-3 py-1 bg-white bg-opacity-20 text-white rounded-full">
+                  <span className="text-xs md:text-sm px-2 md:px-3 py-1 bg-blue-800 text-white rounded-full border border-blue-900">
                     {selectedEvent.source}
                   </span>
-                  <span className="text-xs md:text-sm px-2 md:px-3 py-1 bg-white bg-opacity-20 text-white rounded-full">
+                  <span className="text-xs md:text-sm px-2 md:px-3 py-1 bg-blue-800 text-white rounded-full border border-blue-900">
                     {selectedEvent.category}
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedEvent(null)}
-                className="flex-shrink-0 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full p-2 transition-colors"
+                className="flex-shrink-0 bg-blue-800 hover:bg-blue-900 rounded-full p-2 transition-colors"
+                aria-label="Close"
               >
                 <X className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </button>
