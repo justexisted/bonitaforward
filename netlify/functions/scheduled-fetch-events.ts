@@ -84,7 +84,7 @@ const extractTimeFromDescription = (description: string, eventTitle?: string): s
   // Extract first 500 chars (times are usually at the beginning)
   const text = description.substring(0, 500)
   
-  // Comprehensive time patterns
+  // Comprehensive time patterns - handle ranges and multiple times
   const timePatterns = [
     // "10:00 a.m." or "10:00 AM" or "10:00am" or "10:00 a.m" (with or without dots/spaces)
     /(\d{1,2}):(\d{2})\s*([ap]\.?\s*m\.?)/gi,
@@ -92,7 +92,7 @@ const extractTimeFromDescription = (description: string, eventTitle?: string): s
     /(\d{1,2})\s*([ap]\.?\s*m\.?)/gi,
   ]
   
-  const times: { time: string, index: number, hours24: number, original: string }[] = []
+  const times: { time: string, index: number, hours24: number, minutes: number, original: string }[] = []
   
   for (let i = 0; i < timePatterns.length; i++) {
     const pattern = timePatterns[i]
@@ -103,7 +103,7 @@ const extractTimeFromDescription = (description: string, eventTitle?: string): s
     
     while ((match = regex.exec(text)) !== null) {
       const hours = parseInt(match[1])
-      const minutes = match[2] || '00'
+      const minutes = parseInt(match[2] || '0')
       const ampmRaw = match[match.length - 1]
       const ampm = ampmRaw.replace(/[\.\s]/g, '').toUpperCase()
       
@@ -131,19 +131,26 @@ const extractTimeFromDescription = (description: string, eventTitle?: string): s
         time: timeStr, 
         index: match.index,
         hours24: hours24,
+        minutes: minutes,
         original: match[0]
       })
     }
   }
   
-  // Return the earliest time found (based on index position in description)
+  // Return the earliest time found (sorted by actual time value, not text position)
   if (times.length > 0) {
-    times.sort((a, b) => a.index - b.index)
+    // Sort by actual time value (hours then minutes)
+    times.sort((a, b) => {
+      if (a.hours24 !== b.hours24) {
+        return a.hours24 - b.hours24
+      }
+      return a.minutes - b.minutes
+    })
     console.log(`[Time Extract] FOUND ${times.length} total times:`)
     times.forEach((t, i) => {
-      console.log(`[Time Extract]   ${i + 1}. "${t.original}" → ${t.time} (index: ${t.index})`)
+      console.log(`[Time Extract]   ${i + 1}. "${t.original}" → ${t.time} (${t.hours24}:${t.minutes.toString().padStart(2, '0')}) at text position ${t.index}`)
     })
-    console.log(`[Time Extract] ✓ USING EARLIEST: ${times[0].time}`)
+    console.log(`[Time Extract] ✓ USING EARLIEST TIME: ${times[0].time} from "${times[0].original}"`)
     return times[0].time
   }
   
