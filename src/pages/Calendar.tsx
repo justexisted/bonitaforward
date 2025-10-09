@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
-import { ChevronUp, ChevronDown, MapPin, Calendar, Clock } from 'lucide-react'
+import { ChevronUp, ChevronDown, MapPin, Calendar, Clock, X } from 'lucide-react'
 import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 
 export type CalendarEvent = {
@@ -188,6 +188,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const auth = useAuth()
 
 
@@ -350,33 +351,34 @@ export default function CalendarPage() {
             {/* Regular Events Section */}
             {sortedEvents.length > 0 && (
               <>
-                <h2 className="text-2xl font-semibold tracking-tight font-display mb-6">
+                <h2 className="text-xl md:text-2xl font-semibold tracking-tight font-display mb-4 md:mb-6">
                   Upcoming Events
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12">
                   {sortedEvents.map((event) => (
-                    <div
+                    <button
                       key={event.id}
-                      className="bg-white rounded-2xl border border-neutral-100 p-6 hover:shadow-lg transition-shadow"
+                      onClick={() => setSelectedEvent(event)}
+                      className="bg-white rounded-2xl border border-neutral-100 p-4 md:p-6 hover:shadow-lg transition-all cursor-pointer text-left hover:border-blue-200 group"
                     >
-                      <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-start justify-between mb-3 md:mb-4">
                         <div className="flex-1">
-                          <h3 className="font-semibold text-lg text-neutral-900 mb-2 line-clamp-2">
+                          <h3 className="font-semibold text-base md:text-lg text-neutral-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
                             {event.title}
                           </h3>
-                          <div className="flex items-center text-sm text-neutral-500 mb-2">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            {formatDate(event.date)}
+                          <div className="flex items-center text-xs md:text-sm text-neutral-500 mb-2">
+                            <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                            <span className="text-xs md:text-sm">{formatDate(event.date)}</span>
                           </div>
                           {event.time && (
-                            <div className="flex items-center text-sm text-neutral-500 mb-2">
-                              <Clock className="w-4 h-4 mr-2" />
+                            <div className="flex items-center text-xs md:text-sm text-neutral-500 mb-2">
+                              <Clock className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                               {event.time}
                             </div>
                           )}
                           {event.location && (
-                            <div className="flex items-start text-sm text-neutral-500 mb-3">
-                              <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                            <div className="flex items-start text-xs md:text-sm text-neutral-500 mb-2 md:mb-3">
+                              <MapPin className="w-3 h-3 md:w-4 md:h-4 mr-2 mt-0.5 flex-shrink-0" />
                               <span className="line-clamp-2">{event.location}</span>
                             </div>
                           )}
@@ -384,35 +386,41 @@ export default function CalendarPage() {
                       </div>
 
                       {event.description && (
-                        <p className="text-sm text-neutral-600 mb-4 line-clamp-3">
+                        <p className="text-xs md:text-sm text-neutral-600 mb-3 md:mb-4 line-clamp-3">
                           {event.description}
                         </p>
                       )}
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1 md:space-x-2">
                           <button
-                            onClick={() => voteOnEvent(event.id, 'up')}
-                            className="flex items-center space-x-1 px-3 py-1 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              voteOnEvent(event.id, 'up')
+                            }}
+                            className="flex items-center space-x-1 px-2 md:px-3 py-1 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
                             disabled={!auth.isAuthed}
                           >
-                            <ChevronUp className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-600">{event.upvotes}</span>
+                            <ChevronUp className="w-3 h-3 md:w-4 md:h-4 text-green-600" />
+                            <span className="text-xs md:text-sm font-medium text-green-600">{event.upvotes}</span>
                           </button>
                           <button
-                            onClick={() => voteOnEvent(event.id, 'down')}
-                            className="flex items-center space-x-1 px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              voteOnEvent(event.id, 'down')
+                            }}
+                            className="flex items-center space-x-1 px-2 md:px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
                             disabled={!auth.isAuthed}
                           >
-                            <ChevronDown className="w-4 h-4 text-red-600" />
-                            <span className="text-sm font-medium text-red-600">{event.downvotes}</span>
+                            <ChevronDown className="w-3 h-3 md:w-4 md:h-4 text-red-600" />
+                            <span className="text-xs md:text-sm font-medium text-red-600">{event.downvotes}</span>
                           </button>
                         </div>
-                        <span className="text-xs text-neutral-400 bg-neutral-100 px-2 py-1 rounded-full">
+                        <span className="text-[10px] md:text-xs text-neutral-400 bg-neutral-100 px-2 py-1 rounded-full">
                           {event.source}
                         </span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </>
@@ -421,36 +429,37 @@ export default function CalendarPage() {
             {/* Recurring/Annual Events Section */}
             {sortedRecurringEvents.length > 0 && (
               <>
-                <h2 className="text-2xl font-semibold tracking-tight font-display mb-4">
+                <h2 className="text-xl md:text-2xl font-semibold tracking-tight font-display mb-3 md:mb-4">
                   Annual & Recurring Events
                 </h2>
-                <p className="text-sm text-neutral-600 mb-6">
+                <p className="text-xs md:text-sm text-neutral-600 mb-4 md:mb-6">
                   These events happen regularly throughout the year. Check with organizers for specific dates.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {sortedRecurringEvents.map((event) => (
-                <div
+                <button
                   key={event.id}
-                  className="bg-white rounded-2xl border border-neutral-100 p-6 hover:shadow-lg transition-shadow"
+                  onClick={() => setSelectedEvent(event)}
+                  className="bg-white rounded-2xl border border-neutral-100 p-4 md:p-6 hover:shadow-lg transition-all cursor-pointer text-left hover:border-blue-200 group"
                 >
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between mb-3 md:mb-4">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-lg text-neutral-900 mb-2 line-clamp-2">
+                      <h3 className="font-semibold text-base md:text-lg text-neutral-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
                         {event.title}
                       </h3>
-                      <div className="flex items-center text-sm text-neutral-500 mb-2">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        {formatDate(event.date)}
+                      <div className="flex items-center text-xs md:text-sm text-neutral-500 mb-2">
+                        <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                        <span className="text-xs md:text-sm">{formatDate(event.date)}</span>
                       </div>
                       {event.time && (
-                        <div className="flex items-center text-sm text-neutral-500 mb-2">
-                          <Clock className="w-4 h-4 mr-2" />
+                        <div className="flex items-center text-xs md:text-sm text-neutral-500 mb-2">
+                          <Clock className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                           {event.time}
                         </div>
                       )}
                       {event.location && (
-                        <div className="flex items-start text-sm text-neutral-500 mb-3">
-                          <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                        <div className="flex items-start text-xs md:text-sm text-neutral-500 mb-2 md:mb-3">
+                          <MapPin className="w-3 h-3 md:w-4 md:h-4 mr-2 mt-0.5 flex-shrink-0" />
                           <span className="line-clamp-2">{event.location}</span>
                         </div>
                       )}
@@ -458,35 +467,41 @@ export default function CalendarPage() {
                   </div>
 
                   {event.description && (
-                    <p className="text-sm text-neutral-600 mb-4 line-clamp-3">
+                    <p className="text-xs md:text-sm text-neutral-600 mb-3 md:mb-4 line-clamp-3">
                       {event.description}
                     </p>
                   )}
 
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 md:space-x-2">
                       <button
-                        onClick={() => voteOnEvent(event.id, 'up')}
-                        className="flex items-center space-x-1 px-3 py-1 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          voteOnEvent(event.id, 'up')
+                        }}
+                        className="flex items-center space-x-1 px-2 md:px-3 py-1 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
                         disabled={!auth.isAuthed}
                       >
-                        <ChevronUp className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-600">{event.upvotes}</span>
+                        <ChevronUp className="w-3 h-3 md:w-4 md:h-4 text-green-600" />
+                        <span className="text-xs md:text-sm font-medium text-green-600">{event.upvotes}</span>
                       </button>
                       <button
-                        onClick={() => voteOnEvent(event.id, 'down')}
-                        className="flex items-center space-x-1 px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          voteOnEvent(event.id, 'down')
+                        }}
+                        className="flex items-center space-x-1 px-2 md:px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
                         disabled={!auth.isAuthed}
                       >
-                        <ChevronDown className="w-4 h-4 text-red-600" />
-                        <span className="text-sm font-medium text-red-600">{event.downvotes}</span>
+                        <ChevronDown className="w-3 h-3 md:w-4 md:h-4 text-red-600" />
+                        <span className="text-xs md:text-sm font-medium text-red-600">{event.downvotes}</span>
                       </button>
                     </div>
-                    <span className="text-xs text-neutral-400 bg-neutral-100 px-2 py-1 rounded-full">
+                    <span className="text-[10px] md:text-xs text-neutral-400 bg-neutral-100 px-2 py-1 rounded-full">
                       {event.source}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
                 </div>
               </>
@@ -527,6 +542,127 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      {/* Event Detail Modal */}
+      {selectedEvent && (
+        <div 
+          className="fixed inset-0 bg-white/30 backdrop-blur-md z-50 flex items-center justify-center p-4 md:p-6"
+          onClick={() => setSelectedEvent(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-neutral-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with gradient background matching landing page */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 md:p-6 rounded-t-2xl relative">
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="absolute top-3 right-3 md:top-4 md:right-4 bg-blue-800 hover:bg-blue-900 text-white rounded-full p-2 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              
+              <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 pr-8 md:pr-10">
+                {selectedEvent.title}
+              </h2>
+              
+              <div className="flex flex-wrap gap-2">
+                {selectedEvent.source && (
+                  <span className="inline-block bg-blue-800 text-white text-xs px-3 py-1 rounded-full border border-blue-700">
+                    {selectedEvent.source}
+                  </span>
+                )}
+                {selectedEvent.category && (
+                  <span className="inline-block bg-blue-800 text-white text-xs px-3 py-1 rounded-full border border-blue-700">
+                    {selectedEvent.category}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+              {/* Date & Time */}
+              <div className="space-y-2 md:space-y-3">
+                <div className="flex items-start">
+                  <Calendar className="w-4 h-4 md:w-5 md:h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs md:text-sm text-neutral-500 mb-1">Date</p>
+                    <p className="text-sm md:text-base font-medium text-neutral-900">{formatDate(selectedEvent.date)}</p>
+                  </div>
+                </div>
+                
+                {selectedEvent.time && (
+                  <div className="flex items-start">
+                    <Clock className="w-4 h-4 md:w-5 md:h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs md:text-sm text-neutral-500 mb-1">Time</p>
+                      <p className="text-sm md:text-base font-medium text-neutral-900">{selectedEvent.time}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Location */}
+              {selectedEvent.location && (
+                <div className="flex items-start">
+                  <MapPin className="w-4 h-4 md:w-5 md:h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs md:text-sm text-neutral-500 mb-1">Location</p>
+                    <p className="text-sm md:text-base font-medium text-neutral-900">{selectedEvent.location}</p>
+                    {selectedEvent.address && (
+                      <p className="text-xs md:text-sm text-neutral-600 mt-1">{selectedEvent.address}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedEvent.description && (
+                <div>
+                  <p className="text-xs md:text-sm text-neutral-500 mb-2">Description</p>
+                  <p className="text-sm md:text-base text-neutral-700 leading-relaxed whitespace-pre-wrap">
+                    {selectedEvent.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Voting */}
+              <div className="pt-4 border-t border-neutral-200">
+                <p className="text-xs md:text-sm text-neutral-500 mb-3">Community Feedback</p>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      voteOnEvent(selectedEvent.id, 'up')
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
+                    disabled={!auth.isAuthed}
+                  >
+                    <ChevronUp className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
+                    <span className="text-sm md:text-base font-medium text-green-600">{selectedEvent.upvotes}</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      voteOnEvent(selectedEvent.id, 'down')
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+                    disabled={!auth.isAuthed}
+                  >
+                    <ChevronDown className="w-4 h-4 md:w-5 md:h-5 text-red-600" />
+                    <span className="text-sm md:text-base font-medium text-red-600">{selectedEvent.downvotes}</span>
+                  </button>
+                </div>
+                {!auth.isAuthed && (
+                  <p className="text-xs text-neutral-500 mt-3">Sign in to vote on events</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
