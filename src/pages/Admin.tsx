@@ -622,6 +622,30 @@ export default function AdminPage() {
       setError('Failed to trigger server fetch: ' + error)
     }
   }
+
+  // Function to refresh Voice of San Diego events using server-side Netlify function
+  const refreshVosdEvents = async () => {
+    try {
+      setMessage('Fetching Voice of San Diego events...')
+      
+      const response = await fetch('/.netlify/functions/fetch-vosd-events')
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        setMessage(`Successfully fetched ${result.totalEvents} events from Voice of San Diego!`)
+        
+        // Refresh the calendar events list
+        const { fetchCalendarEvents } = await import('./Calendar')
+        const events = await fetchCalendarEvents()
+        setCalendarEvents(events)
+      } else {
+        setError(`Server returned error: ${result.message || result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error calling fetch-vosd-events:', error)
+      setError('Failed to fetch Voice of San Diego events: ' + error)
+    }
+  }
   
   // Old client-side refresh kept as fallback (CORS issues make this unreliable)
   // Use refreshICalFeedsServer() instead
@@ -4268,6 +4292,17 @@ export default function AdminPage() {
                   className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
                 >
                   🔄 Refresh iCal Feeds (Server)
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (confirm('Fetch events from Voice of San Diego? This will import their latest community events.')) {
+                      refreshVosdEvents()
+                    }
+                  }}
+                  className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+                >
+                  📰 Fetch Voice of SD Events
                 </button>
               </div>
               
