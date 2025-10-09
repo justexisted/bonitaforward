@@ -189,6 +189,8 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [showPastEvents, setShowPastEvents] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const auth = useAuth()
 
 
@@ -292,24 +294,104 @@ export default function CalendarPage() {
     }
   }
 
+  // Get today's start of day for comparison
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  // Helper function to categorize events
+  const categorizeEvent = (event: CalendarEvent): string => {
+    const title = event.title.toLowerCase()
+    const desc = (event.description || '').toLowerCase()
+    const category = event.category.toLowerCase()
+    
+    // Museum events
+    if (title.includes('museum') || desc.includes('museum') || category.includes('museum')) {
+      return 'museum'
+    }
+    
+    // Art events (film, music, art)
+    if (
+      title.includes('art') || title.includes('film') || title.includes('music') || 
+      title.includes('concert') || title.includes('gallery') || title.includes('theater') ||
+      title.includes('theatre') || title.includes('performance') || title.includes('cinema') ||
+      desc.includes('art') || desc.includes('film') || desc.includes('music') ||
+      category.includes('art') || category.includes('culture') || category.includes('music')
+    ) {
+      return 'art'
+    }
+    
+    // Kids events
+    if (
+      title.includes('kids') || title.includes('children') || title.includes('family') ||
+      title.includes('storytime') || title.includes('playground') ||
+      desc.includes('kids') || desc.includes('children') || desc.includes('family') ||
+      category.includes('kids') || category.includes('family') || category.includes('children')
+    ) {
+      return 'kids'
+    }
+    
+    // Fundraiser events
+    if (
+      title.includes('fundrais') || title.includes('donation') || title.includes('charity') ||
+      title.includes('benefit') || desc.includes('fundrais') || desc.includes('charity')
+    ) {
+      return 'fundraiser'
+    }
+    
+    return 'other'
+  }
+  
   // Separate recurring/annual events from regular events
   const recurringEvents = events.filter(e => e.source === 'Recurring' || e.category === 'Recurring')
   const regularEvents = events.filter(e => e.source !== 'Recurring' && e.category !== 'Recurring')
   
-  // Sort regular events by vote score (upvotes - downvotes) and date
-  const sortedEvents = [...regularEvents].sort((a, b) => {
-    const scoreA = a.upvotes - a.downvotes
-    const scoreB = b.upvotes - b.downvotes
+  // Filter by date (past vs. upcoming)
+  const upcomingEvents = regularEvents.filter(e => {
+    const eventDate = new Date(e.date)
+    eventDate.setHours(0, 0, 0, 0)
+    return eventDate >= today
+  })
+  
+  const pastEvents = regularEvents.filter(e => {
+    const eventDate = new Date(e.date)
+    eventDate.setHours(0, 0, 0, 0)
+    return eventDate < today
+  })
+  
+  // Filter by category
+  const filterEventsByCategory = (events: CalendarEvent[]) => {
+    if (categoryFilter === 'all') return events
+    return events.filter(e => categorizeEvent(e) === categoryFilter)
+  }
+  
+  // Apply category filter and sort
+  const filteredUpcomingEvents = filterEventsByCategory(upcomingEvents).sort((a, b) => {
+    // Sort by date first (earliest first)
+    const dateA = new Date(a.date).getTime()
+    const dateB = new Date(b.date).getTime()
     
-    if (scoreA !== scoreB) {
-      return scoreB - scoreA // Higher score first
+    if (dateA !== dateB) {
+      return dateA - dateB
     }
     
-    return new Date(a.date).getTime() - new Date(b.date).getTime()
+    // Then by vote score
+    const scoreA = a.upvotes - a.downvotes
+    const scoreB = b.upvotes - b.downvotes
+    return scoreB - scoreA
+  })
+  
+  const filteredPastEvents = filterEventsByCategory(pastEvents).sort((a, b) => {
+    // Sort past events by date (most recent first)
+    return new Date(b.date).getTime() - new Date(a.date).getTime()
   })
   
   // Sort recurring events by title
   const sortedRecurringEvents = [...recurringEvents].sort((a, b) => a.title.localeCompare(b.title))
+  
+  // Determine which events to display
+  const displayEvents = showPastEvents 
+    ? [...filteredUpcomingEvents, ...filteredPastEvents]
+    : filteredUpcomingEvents
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -348,14 +430,95 @@ export default function CalendarPage() {
 
         {!loading && !error && (
           <>
+            {/* Category Filters */}
+            <div className="mb-6 md:mb-8">
+              <div className="flex flex-wrap gap-2 md:gap-3">
+                <button
+                  onClick={() => setCategoryFilter('all')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categoryFilter === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  }`}
+                >
+                  All Events
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('museum')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categoryFilter === 'museum'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  }`}
+                >
+                  Museum
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('art')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categoryFilter === 'art'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  }`}
+                >
+                  Art & Culture
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('kids')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categoryFilter === 'kids'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  }`}
+                >
+                  Kids & Family
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('fundraiser')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categoryFilter === 'fundraiser'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  }`}
+                >
+                  Fundraisers
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('other')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categoryFilter === 'other'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  }`}
+                >
+                  Other
+                </button>
+              </div>
+            </div>
+
             {/* Regular Events Section */}
-            {sortedEvents.length > 0 && (
+            {displayEvents.length > 0 && (
               <>
-                <h2 className="text-xl md:text-2xl font-semibold tracking-tight font-display mb-4 md:mb-6">
-                  Upcoming Events
-                </h2>
+                <div className="flex items-center justify-between mb-4 md:mb-6">
+                  <h2 className="text-xl md:text-2xl font-semibold tracking-tight font-display">
+                    {showPastEvents ? 'All Events' : 'Upcoming Events'}
+                  </h2>
+                  {pastEvents.length > 0 && (
+                    <button
+                      onClick={() => setShowPastEvents(!showPastEvents)}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1"
+                    >
+                      <span>{showPastEvents ? 'Hide' : 'Show'} Past Events</span>
+                      {showPastEvents ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12">
-                  {sortedEvents.map((event) => (
+                  {displayEvents.map((event) => (
                     <button
                       key={event.id}
                       onClick={() => setSelectedEvent(event)}
@@ -507,9 +670,24 @@ export default function CalendarPage() {
               </>
             )}
 
+            {displayEvents.length === 0 && events.length > 0 && (
+              <div className="text-center py-12">
+                <p className="text-neutral-600">
+                  {categoryFilter !== 'all' 
+                    ? `No ${categoryFilter} events found.`
+                    : showPastEvents
+                      ? 'No events found.'
+                      : 'No upcoming events found.'}
+                </p>
+                <p className="text-sm text-neutral-500 mt-2">
+                  Try selecting a different category or {!showPastEvents && 'show past events.'}
+                </p>
+              </div>
+            )}
+            
             {events.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-neutral-600">No events found for Bonita (91902) at this time.</p>
+                <p className="text-neutral-600">No events found for Bonita area at this time.</p>
                 <p className="text-sm text-neutral-500 mt-2">Be the first to add an event to our community calendar!</p>
               </div>
             )}
