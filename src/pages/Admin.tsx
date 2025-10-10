@@ -894,17 +894,31 @@ export default function AdminPage() {
    */
   const loadChangeRequests = async () => {
     try {
-      console.log('[Admin] Loading change requests via Netlify function with service role...')
+      console.log('========================================')
+      console.log('[Admin] STARTING loadChangeRequests')
+      console.log('========================================')
       
       // Get auth session
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('[Admin] Session check:', {
+        hasSession: !!session,
+        hasToken: !!session?.access_token,
+        tokenLength: session?.access_token?.length
+      })
+      
       if (!session?.access_token) {
+        console.error('[Admin] ❌ No auth token available')
         setError('Not authenticated')
         return
       }
 
+      console.log('[Admin] ✓ Auth token acquired, calling Netlify function...')
+
       // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
-      const response = await fetch('/.netlify/functions/admin-list-change-requests', {
+      const url = '/.netlify/functions/admin-list-change-requests'
+      console.log('[Admin] Fetching from:', url)
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -912,20 +926,49 @@ export default function AdminPage() {
         }
       })
 
+      console.log('[Admin] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      })
+
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('[Admin] Error from admin-list-change-requests:', errorText)
-        setError(`Failed to load change requests: ${errorText}`)
+        console.error('[Admin] ❌ Error response body:', errorText)
+        setError(`Failed to load change requests (HTTP ${response.status}): ${errorText}`)
         return
       }
 
       const result = await response.json()
-      console.log('[Admin] Change requests loaded successfully:', result.requests?.length || 0, 'requests')
+      console.log('[Admin] ✓ JSON parsed successfully')
+      console.log('[Admin] Result structure:', {
+        hasRequests: !!result.requests,
+        requestCount: result.requests?.length || 0,
+        firstRequest: result.requests?.[0] ? {
+          id: result.requests[0].id,
+          type: result.requests[0].type,
+          hasProfiles: !!result.requests[0].profiles,
+          profileEmail: result.requests[0].profiles?.email,
+          profileName: result.requests[0].profiles?.name
+        } : 'No requests'
+      })
       
-      setChangeRequests(result.requests || [])
+      if (!result.requests) {
+        console.error('[Admin] ❌ Result has no requests property:', result)
+        setError('Invalid response from server')
+        return
+      }
+      
+      console.log('[Admin] ✓ Setting changeRequests state with', result.requests.length, 'items')
+      setChangeRequests(result.requests)
+      console.log('[Admin] ✓ State updated successfully')
+      console.log('========================================')
       
     } catch (error: any) {
-      console.error('[Admin] Error loading change requests:', error)
+      console.error('========================================')
+      console.error('[Admin] ❌ EXCEPTION in loadChangeRequests:', error)
+      console.error('[Admin] Error stack:', error.stack)
+      console.error('========================================')
       setError(`Failed to load change requests: ${error.message}`)
     }
   }

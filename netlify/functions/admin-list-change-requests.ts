@@ -72,7 +72,10 @@ export const handler: Handler = async (event) => {
       return { statusCode: 403, headers, body: 'Admin access required' }
     }
 
-    console.log('[admin-list-change-requests] Fetching change requests with service role...')
+    console.log('========================================')
+    console.log('[admin-list-change-requests] Starting function')
+    console.log('[admin-list-change-requests] Admin user:', adminEmail)
+    console.log('========================================')
 
     // Fetch change requests using service role (bypasses RLS)
     const { data: requests, error: requestsError } = await sb
@@ -81,7 +84,7 @@ export const handler: Handler = async (event) => {
       .order('created_at', { ascending: false })
 
     if (requestsError) {
-      console.error('[admin-list-change-requests] Error fetching requests:', requestsError)
+      console.error('[admin-list-change-requests] ❌ Error fetching requests:', requestsError)
       return {
         statusCode: 500,
         headers,
@@ -89,25 +92,38 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    console.log(`[admin-list-change-requests] Found ${requests?.length || 0} requests`)
+    console.log(`[admin-list-change-requests] ✓ Found ${requests?.length || 0} requests in database`)
 
     // Enrich with provider and profile data
     const enrichedRequests = await Promise.all(
-      (requests || []).map(async (request) => {
+      (requests || []).map(async (request, index) => {
+        console.log(`\n[admin-list-change-requests] Processing request ${index + 1}/${requests.length}`)
+        console.log(`[admin-list-change-requests]   ID: ${request.id}`)
+        console.log(`[admin-list-change-requests]   Type: ${request.type}`)
+        console.log(`[admin-list-change-requests]   Owner User ID: ${request.owner_user_id}`)
+        
         // Fetch provider info
         let providerInfo = null
         if (request.provider_id) {
-          const { data: provider } = await sb
+          const { data: provider, error: provError } = await sb
             .from('providers')
             .select('id, name, email')
             .eq('id', request.provider_id)
             .maybeSingle()
-          providerInfo = provider
+          
+          if (provError) {
+            console.error(`[admin-list-change-requests]   ❌ Provider fetch error:`, provError)
+          } else {
+            console.log(`[admin-list-change-requests]   ✓ Provider:`, provider?.name)
+            providerInfo = provider
+          }
         }
 
         // Fetch profile info - using service role bypasses RLS
         let profileInfo = null
         if (request.owner_user_id) {
+          console.log(`[admin-list-change-requests]   Looking up profile for: ${request.owner_user_id}`)
+          
           const { data: profile, error: profileError } = await sb
             .from('profiles')
             .select('id, email, name')
@@ -115,15 +131,22 @@ export const handler: Handler = async (event) => {
             .maybeSingle()
 
           if (profileError) {
-            console.error(`[admin-list-change-requests] Error fetching profile for ${request.owner_user_id}:`, profileError)
+            console.error(`[admin-list-change-requests]   ❌ Profile fetch error:`, profileError)
           } else if (!profile) {
-            console.warn(`[admin-list-change-requests] No profile in profiles table for ${request.owner_user_id}, checking auth.users...`)
+            console.warn(`[admin-list-change-requests]   ⚠️ No profile in profiles table, checking auth.users...`)
             
             // Profile doesn't exist - get from auth.users and create it
             const { data: { user }, error: authError } = await (sb as any).auth.admin.getUserById(request.owner_user_id)
             
+            console.log(`[admin-list-change-requests]   Auth lookup result:`, {
+              hasUser: !!user,
+              email: user?.email,
+              name: user?.user_metadata?.name,
+              error: authError?.message
+            })
+            
             if (user && !authError) {
-              console.log(`[admin-list-change-requests] Found in auth.users, creating profile...`)
+              console.log(`[admin-list-change-requests]   ✓ Found in auth.users, creating profile...`)
               
               // Create the missing profile
               const { error: createError } = await sb
@@ -138,9 +161,9 @@ export const handler: Handler = async (event) => {
                 })
               
               if (createError) {
-                console.error(`[admin-list-change-requests] Error creating profile:`, createError)
+                console.error(`[admin-list-change-requests]   ❌ Error creating profile:`, createError)
               } else {
-                console.log(`[admin-list-change-requests] ✓ Created missing profile for ${user.email}`)
+                console.log(`[admin-list-change-requests]   ✓ Profile created for ${user.email}`)
               }
               
               // Use the auth data as profile info
@@ -149,21 +172,38 @@ export const handler: Handler = async (event) => {
                 email: user.email || null,
                 name: user.user_metadata?.name || user.user_metadata?.full_name || null
               }
+              console.log(`[admin-list-change-requests]   ✓ Profile info set:`, profileInfo)
             } else {
-              console.error(`[admin-list-change-requests] User not found in auth.users either:`, authError)
+              console.error(`[admin-list-change-requests]   ❌ User not found in auth.users:`, authError)
             }
           } else {
+            console.log(`[admin-list-change-requests]   ✓ Found profile:`, {
+              email: profile.email,
+              name: profile.name
+            })
             profileInfo = profile
           }
         }
 
-        return {
+        const enriched = {
           ...request,
           providers: providerInfo,
           profiles: profileInfo
         }
+        
+        console.log(`[admin-list-change-requests]   Final enriched data:`, {
+          hasProviders: !!enriched.providers,
+          hasProfiles: !!enriched.profiles,
+          profileEmail: enriched.profiles?.email
+        })
+        
+        return enriched
       })
     )
+
+    console.log('========================================')
+    console.log(`[admin-list-change-requests] ✓ Returning ${enrichedRequests.length} enriched requests`)
+    console.log('========================================')
 
     return {
       statusCode: 200,
