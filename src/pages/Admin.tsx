@@ -1359,62 +1359,9 @@ export default function AdminPage() {
           }
         } catch {}
         try {
-          // Load change requests with provider and owner information
-          // This should load for all users, not just admins, so they can see their own requests
-          console.log('[Admin] Loading change requests...')
-          
-          // First, load change requests without joins to avoid foreign key issues
-          const { data: crData, error: crError } = await supabase
-            .from('provider_change_requests')
-            .select('*')
-            .order('created_at', { ascending: false })
-          
-          if (crError) {
-            console.error('[Admin] Change requests loading error:', crError)
-            setError((prev) => prev ?? `Failed to load change requests: ${crError.message}`)
-          } else {
-            console.log('[Admin] Change requests loaded successfully:', crData?.length || 0, 'requests')
-            
-            // Now enrich the data with provider and profile information
-            const enrichedChangeRequests = await Promise.all(
-              (crData || []).map(async (request) => {
-                // Load provider information
-                let providerInfo = null
-                if (request.provider_id) {
-                  const { data: providerData } = await supabase
-                    .from('providers')
-                    .select('id, name, email')
-                    .eq('id', request.provider_id)
-                    .maybeSingle()
-                  providerInfo = providerData
-                }
-                
-                // Load profile information
-                let profileInfo = null
-                if (request.owner_user_id) {
-                  const { data: profileData } = await supabase
-                    .from('profiles')
-                    .select('id, email, name')
-                    .eq('id', request.owner_user_id)
-                    .maybeSingle()
-                  profileInfo = profileData
-                }
-                
-                return {
-                  ...request,
-                  providers: providerInfo,
-                  profiles: profileInfo
-                }
-              })
-            )
-            
-            console.log('[Admin] Enriched change requests:', enrichedChangeRequests.length)
-            setChangeRequests(enrichedChangeRequests)
-          }
-        } catch (err) {
-          console.error('[Admin] Change requests loading exception:', err)
-          setError((prev) => prev ?? `Failed to load change requests: ${err}`)
-        }
+          // Load change requests using Netlify function (bypasses RLS with SERVICE_ROLE_KEY)
+          await loadChangeRequests()
+        } catch {}
         try {
           console.log('[Admin] Loading job posts...')
           
@@ -2098,6 +2045,8 @@ export default function AdminPage() {
     setMessage(null)
     setDeletingUserId(userId)
     try {
+      console.log('[Admin] Deleting user:', userId)
+      
       // Get current session to pass auth token
       const { data: { session } } = await supabase.auth.getSession()
       
@@ -2115,21 +2064,49 @@ export default function AdminPage() {
         body: JSON.stringify({ user_id: userId })
       })
       
+      console.log('[Admin] Delete response status:', response.status)
+      
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || `HTTP ${response.status}`)
+        // Try to parse as JSON first for detailed error
+        let errorMessage = `HTTP ${response.status}`
+        try {
+          const errorData = await response.json()
+          console.error('[Admin] Delete error details:', errorData)
+          
+          if (errorData.error) {
+            errorMessage = errorData.error
+            if (errorData.details) {
+              errorMessage += `: ${errorData.details}`
+            }
+            if (errorData.hint) {
+              errorMessage += ` (${errorData.hint})`
+            }
+            if (errorData.code) {
+              console.error('[Admin] Error code:', errorData.code)
+            }
+          }
+        } catch (parseErr) {
+          // Fallback to text if JSON parsing fails
+          const errorText = await response.text()
+          console.error('[Admin] Delete error text:', errorText)
+          errorMessage = errorText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
       
       const result = await response.json()
+      console.log('[Admin] Delete result:', result)
+      
       if (!result.ok) {
         throw new Error('Delete failed')
       }
       
       // Remove from local list
       setProfiles((arr) => arr.filter((p) => p.id !== userId))
-      setMessage('User deleted')
+      setMessage('User deleted successfully')
+      console.log('[Admin] User deleted successfully')
     } catch (err: any) {
-      console.error('Delete user error:', err)
+      console.error('[Admin] Delete user error:', err)
       setError(err?.message || 'Failed to delete user')
     } finally {
       setDeletingUserId(null)

@@ -490,7 +490,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
    * - User exists: Returns error without creating duplicate
    */
   const signUpWithEmail = async (email: string, password: string, name?: string, role?: 'business' | 'community') => {
-    console.log('[Auth] signUpWithEmail called:', { email, hasPassword: !!password, name, role })
+    console.log('[Auth] ========================================')
+    console.log('[Auth] signUpWithEmail called:', { 
+      email, 
+      hasPassword: !!password, 
+      passwordLength: password?.length,
+      name, 
+      role 
+    })
     
     const { data, error } = await supabase.auth.signUp({ 
       email, 
@@ -500,13 +507,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       } 
     })
     
-    console.log('[Auth] signUpWithEmail response:', {
-      error: error?.message,
-      errorCode: (error as any)?.code,
-      hasSession: !!data?.session,
-      hasUser: !!data?.user,
-      userConfirmed: data?.user?.email_confirmed_at ? 'confirmed' : 'unconfirmed'
-    })
+    console.log('[Auth] Supabase signUp() raw response:')
+    console.log('[Auth]   Error:', error)
+    console.log('[Auth]   Error message:', error?.message)
+    console.log('[Auth]   Error code:', (error as any)?.code)
+    console.log('[Auth]   Error status:', (error as any)?.status)
+    console.log('[Auth]   Has session:', !!data?.session)
+    console.log('[Auth]   Has user:', !!data?.user)
+    console.log('[Auth]   User ID:', data?.user?.id)
+    console.log('[Auth]   User email:', data?.user?.email)
+    console.log('[Auth]   Email confirmed:', data?.user?.email_confirmed_at ? 'YES' : 'NO')
+    console.log('[Auth] ========================================')
     
     return { error: error?.message, session: data?.session ?? null }
   }

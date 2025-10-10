@@ -93,32 +93,88 @@ export const handler: Handler = async (event) => {
     console.log(`[Delete User] Gathering data for user ${user_id}...`)
     
     // Get user profile
-    const { data: profile } = await sb
+    const { data: profile, error: profileError } = await sb
       .from('profiles')
       .select('*')
       .eq('id', user_id)
       .maybeSingle()
     
+    if (profileError) {
+      console.error('[Delete User] Error fetching profile:', profileError)
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Database error fetching user profile',
+          details: profileError.message,
+          code: profileError.code,
+          hint: profileError.hint
+        })
+      }
+    }
+    
     // Get all provider listings owned by this user
-    const { data: providers } = await sb
+    const { data: providers, error: providersError } = await sb
       .from('providers')
       .select('*')
       .eq('owner_user_id', user_id)
     
-    // Get change requests
-    const { data: changeRequests } = await sb
+    if (providersError) {
+      console.error('[Delete User] Error fetching providers:', providersError)
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Database error fetching user providers',
+          details: providersError.message,
+          code: providersError.code,
+          hint: providersError.hint
+        })
+      }
+    }
+    
+    // Get change requests - FIXED: using correct field name 'owner_user_id'
+    const { data: changeRequests, error: changeRequestsError } = await sb
       .from('provider_change_requests')
       .select('*')
-      .eq('user_id', user_id)
+      .eq('owner_user_id', user_id)
+    
+    if (changeRequestsError) {
+      console.error('[Delete User] Error fetching change requests:', changeRequestsError)
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Database error fetching user change requests',
+          details: changeRequestsError.message,
+          code: changeRequestsError.code,
+          hint: changeRequestsError.hint
+        })
+      }
+    }
     
     // Get job posts for all their providers
     let jobPosts = null
     if (providers && providers.length > 0) {
       const providerIds = providers.map(p => p.id)
-      const { data: jobs } = await sb
+      const { data: jobs, error: jobsError } = await sb
         .from('provider_job_posts')
         .select('*')
         .in('provider_id', providerIds)
+      
+      if (jobsError) {
+        console.error('[Delete User] Error fetching job posts:', jobsError)
+        return { 
+          statusCode: 400, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'Database error fetching user job posts',
+            details: jobsError.message,
+            code: jobsError.code,
+            hint: jobsError.hint
+          })
+        }
+      }
       jobPosts = jobs
     }
     
@@ -154,12 +210,46 @@ export const handler: Handler = async (event) => {
     // Delete provider job posts first (foreign key dependency)
     if (providers && providers.length > 0) {
       const providerIds = providers.map(p => p.id)
-      await sb.from('provider_job_posts').delete().in('provider_id', providerIds)
+      const { error: jobPostDeleteError } = await sb
+        .from('provider_job_posts')
+        .delete()
+        .in('provider_id', providerIds)
+      
+      if (jobPostDeleteError) {
+        console.error('[Delete User] Error deleting job posts:', jobPostDeleteError)
+        return { 
+          statusCode: 400, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'Database error deleting user job posts',
+            details: jobPostDeleteError.message,
+            code: jobPostDeleteError.code,
+            hint: jobPostDeleteError.hint
+          })
+        }
+      }
       console.log(`[Delete User] Deleted job posts for ${providerIds.length} providers`)
     }
     
-    // Delete provider change requests
-    await sb.from('provider_change_requests').delete().eq('user_id', user_id)
+    // Delete provider change requests - FIXED: using correct field name 'owner_user_id'
+    const { error: changeRequestDeleteError } = await sb
+      .from('provider_change_requests')
+      .delete()
+      .eq('owner_user_id', user_id)
+    
+    if (changeRequestDeleteError) {
+      console.error('[Delete User] Error deleting change requests:', changeRequestDeleteError)
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Database error deleting user change requests',
+          details: changeRequestDeleteError.message,
+          code: changeRequestDeleteError.code,
+          hint: changeRequestDeleteError.hint
+        })
+      }
+    }
     console.log(`[Delete User] Deleted change requests`)
     
     // Delete provider listings
@@ -170,12 +260,38 @@ export const handler: Handler = async (event) => {
     
     if (providerDeleteError) {
       console.error('[Delete User] Error deleting providers:', providerDeleteError)
-    } else {
-      console.log(`[Delete User] Deleted ${providers?.length || 0} provider listings`)
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Database error deleting user providers',
+          details: providerDeleteError.message,
+          code: providerDeleteError.code,
+          hint: providerDeleteError.hint
+        })
+      }
     }
+    console.log(`[Delete User] Deleted ${providers?.length || 0} provider listings`)
     
     // Delete profile
-    await sb.from('profiles').delete().eq('id', user_id)
+    const { error: profileDeleteError } = await sb
+      .from('profiles')
+      .delete()
+      .eq('id', user_id)
+    
+    if (profileDeleteError) {
+      console.error('[Delete User] Error deleting profile:', profileDeleteError)
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Database error deleting user profile',
+          details: profileDeleteError.message,
+          code: profileDeleteError.code,
+          hint: profileDeleteError.hint
+        })
+      }
+    }
     console.log(`[Delete User] Deleted profile`)
     
     // Log admin action for audit trail
@@ -195,16 +311,34 @@ export const handler: Handler = async (event) => {
     // ============================================================
     // STEP 4: Finally delete the auth user (last step)
     // ============================================================
-    const { error } = await (sb as any).auth.admin.deleteUser(user_id)
-    if (error) {
-      console.error('[Delete User] Error deleting auth user:', error)
-      return { statusCode: 400, headers, body: error.message }
+    const { error: authDeleteError } = await (sb as any).auth.admin.deleteUser(user_id)
+    if (authDeleteError) {
+      console.error('[Delete User] Error deleting auth user:', authDeleteError)
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Database error deleting auth user',
+          details: authDeleteError.message,
+          code: authDeleteError.code || 'AUTH_DELETE_ERROR',
+          hint: 'The user data has been archived but auth deletion failed'
+        })
+      }
     }
     
     console.log(`[Delete User] Successfully deleted user ${user_id} and all associated data`)
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
   } catch (err: any) {
-    return { statusCode: 500, headers, body: err?.message || 'Server error' }
+    console.error('[Delete User] Unexpected error:', err)
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ 
+        error: 'Server error',
+        details: err?.message || 'Unknown server error',
+        stack: process.env.NODE_ENV === 'development' ? err?.stack : undefined
+      })
+    }
   }
 }
 

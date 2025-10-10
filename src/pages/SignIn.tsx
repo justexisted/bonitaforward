@@ -271,43 +271,75 @@ export default function SignInPage() {
             /**
              * COMPREHENSIVE ERROR HANDLING: Handle all Supabase sign-up scenarios
              * 
-             * Supabase can return different errors:
-             * 1. "user_already_exists" - Email is taken (confirmed user)
-             * 2. "signup_disabled" - Sign-ups are disabled
-             * 3. "email_not_confirmed" - User exists but unconfirmed
-             * 4. Validation errors - Weak password, invalid email, etc.
+             * Supabase can return MANY variations of "email already in use":
+             * - "user_already_exists"
+             * - "user already exists"  
+             * - "user already registered" ← ADDED
+             * - "already registered" ← ADDED
+             * - "email already in use" ← ADDED
+             * - "email is already registered" ← ADDED
+             * - And potentially more...
              * 
-             * The "bullshit" behavior you're seeing is likely due to email confirmation
-             * being enabled in Supabase, causing users to exist in unconfirmed state.
+             * The previous code only checked for 2 variations, so "user already registered"
+             * fell through to "unknown error" and showed the raw Supabase message.
+             * 
+             * FIX: Use comprehensive pattern matching to catch ALL variations.
              */
             
-            // Check for specific user already exists scenarios
-            if (emsg.includes('user_already_exists') || emsg.includes('user already exists')) {
-              console.log('[SignIn] Definitive user already exists error')
-              setMessage('An account with this email already exists. Please sign in instead.')
+            console.log('[SignIn] ========================================')
+            console.log('[SignIn] Sign-up error received from Supabase:')
+            console.log('[SignIn] Error message:', error)
+            console.log('[SignIn] Lowercase message:', emsg)
+            console.log('[SignIn] ========================================')
+            
+            // Check for ANY variation of "user/email already exists/registered/in use"
+            const isEmailTaken = 
+              emsg.includes('already') && (
+                emsg.includes('exist') || 
+                emsg.includes('register') || 
+                emsg.includes('in use') ||
+                emsg.includes('taken')
+              )
+            
+            if (isEmailTaken) {
+              console.log('[SignIn] ✓ Detected: Email already in use (registered/exists/taken)')
+              console.log('[SignIn] This could be:')
+              console.log('[SignIn]   1. A fully registered confirmed account')
+              console.log('[SignIn]   2. An unconfirmed account from a previous signup')
+              console.log('[SignIn] Advising user to try signing in or check email for confirmation')
+              
+              setMessage('An account with this email already exists. Try signing in, or check your email for a confirmation link from a previous signup attempt.')
               setMode('signin')
             } 
-            else if (emsg.includes('email_not_confirmed') || emsg.includes('not confirmed')) {
-              console.log('[SignIn] User exists but email not confirmed')
+            else if (emsg.includes('email_not_confirmed') || emsg.includes('not confirmed') || emsg.includes('confirm')) {
+              console.log('[SignIn] ✓ Detected: Email not confirmed')
               setMessage('Please check your email and click the confirmation link, then try signing in.')
               setMode('signin')
             }
-            else if (emsg.includes('signup_disabled')) {
-              console.log('[SignIn] Sign-ups are disabled')
+            else if (emsg.includes('signup_disabled') || emsg.includes('disabled')) {
+              console.log('[SignIn] ✓ Detected: Signups disabled')
               setMessage('Account creation is currently disabled. Please contact support.')
             }
-            else if (emsg.includes('password')) {
-              console.log('[SignIn] Password-related error')
-              setMessage(error) // Show specific password error
+            else if (emsg.includes('password') && !emsg.includes('reset')) {
+              console.log('[SignIn] ✓ Detected: Password validation error')
+              setMessage(error) // Show specific password error (e.g., "password must be at least 6 characters")
             }
-            else if (emsg.includes('email')) {
-              console.log('[SignIn] Email-related error')
-              setMessage(error) // Show specific email error
+            else if (emsg.includes('email') && emsg.includes('invalid')) {
+              console.log('[SignIn] ✓ Detected: Invalid email format')
+              setMessage('Please enter a valid email address.')
+            }
+            else if (emsg.includes('rate limit')) {
+              console.log('[SignIn] ✓ Detected: Rate limit')
+              setMessage('Too many signup attempts. Please wait a few minutes and try again.')
             }
             else {
-              // For unknown errors, show the actual error
-              console.log('[SignIn] Unknown sign-up error:', error)
-              setMessage(`Sign-up failed: ${error}`)
+              // For truly unknown errors, show comprehensive info
+              console.error('[SignIn] ❌ UNHANDLED SIGN-UP ERROR')
+              console.error('[SignIn] Please report this error:')
+              console.error('[SignIn] Raw error:', error)
+              console.error('[SignIn] Error type:', typeof error)
+              
+              setMessage(`Sign-up error: ${error}. If this persists, please contact support.`)
             }
           }
         }
