@@ -358,18 +358,48 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* BUSINESS ACCOUNT REDIRECT SECTION
+          {/* BUSINESS ACCOUNT MANAGEMENT SECTION
               
-              For business users, we redirect them to the dedicated My Business page
-              instead of showing business management features directly on the account page.
-              
-              This keeps the account page clean and gives business users a dedicated
-              space to manage their listings, applications, and analytics.
+              For business users, show their pending applications status
+              and provide link to full My Business page for complete management.
           */}
           {auth.role === 'business' && (
             <div className="mt-6 border-t border-neutral-100 pt-4">
-              <div className="text-sm font-medium">Business Management</div>
-              <div className="mt-2">
+              <div className="text-sm font-medium mb-3">Business Management</div>
+              
+              {/* Show pending business applications with status */}
+              {pendingApps.length > 0 && (
+                <div className="space-y-3 mb-4">
+                  {pendingApps.map((app) => (
+                    <div key={app.id} className="rounded-xl border border-neutral-200 p-4 bg-neutral-50">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-medium text-sm">{app.business_name || 'Business Listing'}</h3>
+                          <p className="text-xs text-neutral-600 mt-1">
+                            Submitted: {new Date(app.created_at).toLocaleDateString()}
+                          </p>
+                          <div className="mt-2">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              Pending Review
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-neutral-600 mt-3">
+                        Your business listing is under review. We'll notify you once it's approved and live on Bonita Forward.
+                      </p>
+                      <a 
+                        href="mailto:support@bonitaforward.com?subject=Business Listing Support"
+                        className="inline-block mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Contact Support
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="mt-3">
                 <p className="text-sm text-neutral-600 mb-3">
                   Manage your business listings, applications, and analytics.
                 </p>

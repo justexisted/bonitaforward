@@ -3731,8 +3731,8 @@ function BusinessPage() {
               </>
             ) : (
               <>
-                <h2 className="text-xl font-semibold tracking-tight">Create Your Business</h2>
-                <p className="mt-2 text-sm text-neutral-700">You’re signed in as a business. Share your details below to add your business.</p>
+                <h2 className="text-xl font-semibold tracking-tight">Get My Business Listed</h2>
+                <p className="mt-2 text-sm text-neutral-700">You're signed in as a business. Share your business details below to get listed on Bonita Forward.</p>
                 <CreateBusinessForm />
               </>
             )}
