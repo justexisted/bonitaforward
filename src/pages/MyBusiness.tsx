@@ -873,6 +873,29 @@ export default function MyBusinessPage() {
     try {
       setMessage('Deleting business listing...')
       
+      console.log('[MyBusiness] Attempting to delete listing:', listingId)
+      console.log('[MyBusiness] User:', { userId: auth.userId, email: auth.email })
+      
+      // CRITICAL FIX: Verify the user owns this listing before deleting
+      const { data: listing, error: fetchError } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('id', listingId)
+        .single()
+      
+      if (fetchError || !listing) {
+        throw new Error('Could not find listing to delete')
+      }
+      
+      console.log('[MyBusiness] Found listing to delete:', listing)
+      
+      // Check ownership: user must own via owner_user_id OR email
+      const isOwner = listing.owner_user_id === auth.userId || listing.email === auth.email
+      
+      if (!isOwner) {
+        throw new Error('You do not have permission to delete this listing')
+      }
+      
       // First, delete all related records that have foreign key constraints
       // Delete provider change requests
       const { error: changeRequestsError } = await supabase
@@ -881,7 +904,7 @@ export default function MyBusinessPage() {
         .eq('provider_id', listingId)
 
       if (changeRequestsError) {
-        console.warn('Error deleting provider change requests:', changeRequestsError)
+        console.warn('[MyBusiness] Error deleting provider change requests:', changeRequestsError)
         // Continue with deletion even if this fails
       }
 
@@ -892,25 +915,70 @@ export default function MyBusinessPage() {
         .eq('provider_id', listingId)
 
       if (jobPostsError) {
-        console.warn('Error deleting provider job posts:', jobPostsError)
+        console.warn('[MyBusiness] Error deleting provider job posts:', jobPostsError)
         // Continue with deletion even if this fails
       }
 
-      // Delete any other related records that might exist
-      // (Add more related tables here if they exist)
-
-      // Finally, delete the main provider record
-      const { error } = await supabase
-        .from('providers')
+      // Delete any other related records
+      // Delete from saved_providers (users who saved this business)
+      const { error: savedProvidersError } = await supabase
+        .from('saved_providers')
         .delete()
+        .eq('provider_id', listingId)
+      
+      if (savedProvidersError) {
+        console.warn('[MyBusiness] Error deleting saved_providers:', savedProvidersError)
+      }
+      
+      // Delete from coupon_redemptions
+      const { error: couponsError } = await supabase
+        .from('coupon_redemptions')
+        .delete()
+        .eq('provider_id', listingId)
+      
+      if (couponsError) {
+        console.warn('[MyBusiness] Error deleting coupon_redemptions:', couponsError)
+      }
+      
+      // Update bookings to remove provider reference (set to null instead of delete)
+      const { error: bookingsError } = await supabase
+        .from('bookings')
+        .update({ provider_id: null })
+        .eq('provider_id', listingId)
+      
+      if (bookingsError) {
+        console.warn('[MyBusiness] Error updating bookings:', bookingsError)
+      }
+
+      // Finally, delete the main provider record (no owner_user_id filter needed - already verified ownership)
+      const { error, count } = await supabase
+        .from('providers')
+        .delete({ count: 'exact' })
         .eq('id', listingId)
-        .eq('owner_user_id', auth.userId) // Ensure user owns this listing
 
-      if (error) throw error
+      console.log('[MyBusiness] Delete result:', { error, count })
 
+      if (error) {
+        console.error('[MyBusiness] Delete failed:', error)
+        throw error
+      }
+      
+      if (count === 0) {
+        throw new Error('Failed to delete listing - no rows affected. The listing may have already been deleted.')
+      }
+
+      console.log('[MyBusiness] Successfully deleted listing, refreshing data...')
       setMessage('Business listing deleted successfully!')
-      loadBusinessData() // Refresh data to remove deleted listing
+      
+      // Wait a moment for the database to process the delete
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Refresh data to remove deleted listing
+      await loadBusinessData()
+      
+      console.log('[MyBusiness] Data refreshed after deletion')
     } catch (error: any) {
+      console.error('[MyBusiness] Error deleting listing:', error)
       setMessage(`Error deleting listing: ${error.message}`)
     }
   }
