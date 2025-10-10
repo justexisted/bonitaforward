@@ -113,6 +113,9 @@ export const handler: Handler = async (event) => {
       }
     }
     
+    const userEmail = profile?.email
+    console.log(`[Delete User] User email: ${userEmail}`)
+    
     // Get all provider listings owned by this user
     const { data: providers, error: providersError } = await sb
       .from('providers')
@@ -178,7 +181,101 @@ export const handler: Handler = async (event) => {
       jobPosts = jobs
     }
     
-    console.log(`[Delete User] Found: ${providers?.length || 0} providers, ${changeRequests?.length || 0} change requests, ${jobPosts?.length || 0} job posts`)
+    // CRITICAL FIX: Get funnel responses by email
+    let funnelResponses = null
+    if (userEmail) {
+      const { data: funnels, error: funnelsError } = await sb
+        .from('funnel_responses')
+        .select('*')
+        .eq('user_email', userEmail)
+      
+      if (funnelsError) {
+        console.error('[Delete User] Error fetching funnel responses:', funnelsError)
+        return { 
+          statusCode: 400, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'Database error fetching funnel responses',
+            details: funnelsError.message,
+            code: funnelsError.code,
+            hint: funnelsError.hint
+          })
+        }
+      }
+      funnelResponses = funnels
+    }
+    
+    // CRITICAL FIX: Get bookings by email
+    let bookings = null
+    if (userEmail) {
+      const { data: bookingsData, error: bookingsError } = await sb
+        .from('bookings')
+        .select('*')
+        .eq('user_email', userEmail)
+      
+      if (bookingsError) {
+        console.error('[Delete User] Error fetching bookings:', bookingsError)
+        return { 
+          statusCode: 400, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'Database error fetching bookings',
+            details: bookingsError.message,
+            code: bookingsError.code,
+            hint: bookingsError.hint
+          })
+        }
+      }
+      bookings = bookingsData
+    }
+    
+    // Get business applications by email
+    let businessApplications = null
+    if (userEmail) {
+      const { data: apps, error: appsError } = await sb
+        .from('business_applications')
+        .select('*')
+        .eq('email', userEmail)
+      
+      if (appsError) {
+        console.error('[Delete User] Error fetching business applications:', appsError)
+        // Don't fail on this, just log it
+      } else {
+        businessApplications = apps
+      }
+    }
+    
+    // Get contact leads by email
+    let contactLeads = null
+    if (userEmail) {
+      const { data: leads, error: leadsError } = await sb
+        .from('contact_leads')
+        .select('*')
+        .eq('contact_email', userEmail)
+      
+      if (leadsError) {
+        console.error('[Delete User] Error fetching contact leads:', leadsError)
+        // Don't fail on this, just log it
+      } else {
+        contactLeads = leads
+      }
+    }
+    
+    // Get user notifications
+    const { data: notifications } = await sb
+      .from('user_notifications')
+      .select('*')
+      .eq('user_id', user_id)
+    
+    console.log(`[Delete User] Data summary:`)
+    console.log(`[Delete User]   - Providers: ${providers?.length || 0}`)
+    console.log(`[Delete User]   - Change requests: ${changeRequests?.length || 0}`)
+    console.log(`[Delete User]   - Job posts: ${jobPosts?.length || 0}`)
+    console.log(`[Delete User]   - Funnel responses: ${funnelResponses?.length || 0}`)
+    console.log(`[Delete User]   - Bookings: ${bookings?.length || 0}`)
+    console.log(`[Delete User]   - Business applications: ${businessApplications?.length || 0}`)
+    console.log(`[Delete User]   - Contact leads: ${contactLeads?.length || 0}`)
+    console.log(`[Delete User]   - Notifications: ${notifications?.length || 0}`)
     
     // ============================================================
     // STEP 2: Archive all data to deleted_business_accounts table
@@ -186,12 +283,17 @@ export const handler: Handler = async (event) => {
     try {
       await sb.from('deleted_business_accounts').insert({
         original_user_id: user_id,
-        original_email: profile?.email || 'unknown',
+        original_email: userEmail || 'unknown',
         original_name: profile?.name,
         original_role: profile?.role,
         provider_data: providers || [],
         change_requests: changeRequests || [],
         job_posts: jobPosts || [],
+        funnel_responses: funnelResponses || [],
+        bookings: bookings || [],
+        business_applications: businessApplications || [],
+        contact_leads: contactLeads || [],
+        notifications: notifications || [],
         profile_data: profile,
         deleted_by_admin_id: adminUserId,
         deleted_by_admin_email: adminEmail,
@@ -207,7 +309,96 @@ export const handler: Handler = async (event) => {
     // STEP 3: Delete all related data from active tables
     // ============================================================
     
-    // Delete provider job posts first (foreign key dependency)
+    // CRITICAL FIX: Delete funnel responses by email
+    if (userEmail) {
+      const { error: funnelDeleteError } = await sb
+        .from('funnel_responses')
+        .delete()
+        .eq('user_email', userEmail)
+      
+      if (funnelDeleteError) {
+        console.error('[Delete User] Error deleting funnel responses:', funnelDeleteError)
+        return { 
+          statusCode: 400, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'Database error deleting funnel responses',
+            details: funnelDeleteError.message,
+            code: funnelDeleteError.code,
+            hint: funnelDeleteError.hint
+          })
+        }
+      }
+      console.log(`[Delete User] Deleted ${funnelResponses?.length || 0} funnel responses`)
+    }
+    
+    // CRITICAL FIX: Delete bookings by email
+    if (userEmail) {
+      const { error: bookingsDeleteError } = await sb
+        .from('bookings')
+        .delete()
+        .eq('user_email', userEmail)
+      
+      if (bookingsDeleteError) {
+        console.error('[Delete User] Error deleting bookings:', bookingsDeleteError)
+        return { 
+          statusCode: 400, 
+          headers, 
+          body: JSON.stringify({ 
+            error: 'Database error deleting bookings',
+            details: bookingsDeleteError.message,
+            code: bookingsDeleteError.code,
+            hint: bookingsDeleteError.hint
+          })
+        }
+      }
+      console.log(`[Delete User] Deleted ${bookings?.length || 0} bookings`)
+    }
+    
+    // Delete business applications by email
+    if (userEmail) {
+      const { error: appsDeleteError } = await sb
+        .from('business_applications')
+        .delete()
+        .eq('email', userEmail)
+      
+      if (appsDeleteError) {
+        console.error('[Delete User] Error deleting business applications:', appsDeleteError)
+        // Don't fail on this, just log it
+      } else {
+        console.log(`[Delete User] Deleted ${businessApplications?.length || 0} business applications`)
+      }
+    }
+    
+    // Delete contact leads by email
+    if (userEmail) {
+      const { error: leadsDeleteError } = await sb
+        .from('contact_leads')
+        .delete()
+        .eq('contact_email', userEmail)
+      
+      if (leadsDeleteError) {
+        console.error('[Delete User] Error deleting contact leads:', leadsDeleteError)
+        // Don't fail on this, just log it
+      } else {
+        console.log(`[Delete User] Deleted ${contactLeads?.length || 0} contact leads`)
+      }
+    }
+    
+    // Delete user notifications
+    const { error: notificationsDeleteError } = await sb
+      .from('user_notifications')
+      .delete()
+      .eq('user_id', user_id)
+    
+    if (notificationsDeleteError) {
+      console.error('[Delete User] Error deleting notifications:', notificationsDeleteError)
+      // Don't fail on this, just log it
+    } else {
+      console.log(`[Delete User] Deleted ${notifications?.length || 0} notifications`)
+    }
+    
+    // Delete provider job posts (foreign key dependency)
     if (providers && providers.length > 0) {
       const providerIds = providers.map(p => p.id)
       const { error: jobPostDeleteError } = await sb

@@ -2101,9 +2101,30 @@ export default function AdminPage() {
         throw new Error('Delete failed')
       }
       
-      // Remove from local list
+      // Remove from local lists - get the user's email first
+      const deletedProfile = profiles.find(p => p.id === userId)
+      const deletedEmail = deletedProfile?.email?.toLowerCase().trim()
+      
+      console.log('[Admin] Removing deleted user from local state:', { userId, email: deletedEmail })
+      
+      // Remove profile from profiles list
       setProfiles((arr) => arr.filter((p) => p.id !== userId))
-      setMessage('User deleted successfully')
+      
+      // CRITICAL FIX: Remove funnel responses and bookings by email
+      // This ensures the "All users" dropdown updates immediately
+      if (deletedEmail) {
+        setFunnels((arr) => arr.filter((f) => {
+          const funnelEmail = f.user_email?.toLowerCase().trim()
+          return funnelEmail !== deletedEmail
+        }))
+        setBookings((arr) => arr.filter((b) => {
+          const bookingEmail = b.user_email?.toLowerCase().trim()
+          return bookingEmail !== deletedEmail
+        }))
+        console.log('[Admin] Removed funnel responses and bookings for:', deletedEmail)
+      }
+      
+      setMessage('User deleted successfully - all associated data removed')
       console.log('[Admin] User deleted successfully')
     } catch (err: any) {
       console.error('[Admin] Delete user error:', err)
