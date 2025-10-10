@@ -3550,7 +3550,7 @@ function BusinessPage() {
               <h3>Step 3: Growth</h3>
               <p>You receive local repeat-customers weekly.</p>
               <div className="stack-img-container">
-                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 2a10 10 0 0 1 8.66 5" />
                   <path d="M20 2v5h-5" />
                   <path d="M22 12a10 10 0 0 1-5 8.66" />
@@ -3570,7 +3570,7 @@ function BusinessPage() {
             <ScrollStackItem>
               <h3>Bonita's Economy Grows</h3>
               <div className="stack-img-container">
-                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 2 L6 10 H9 L4 16 H10 L2 22 H22 L14 16 H20 L15 10 H18 Z" />
                   <path d="M12 22 V16" />
                 </svg>
@@ -3643,6 +3643,126 @@ function BusinessPage() {
                 </div>
               ))}
             </div>
+            
+            {/* Details Below Toggle */}
+            <details className="mt-6 rounded-2xl border border-neutral-200 bg-white overflow-hidden">
+              <summary className="cursor-pointer select-none p-4 hover:bg-neutral-50 transition-colors flex items-center justify-between">
+                <span className="text-sm font-medium text-neutral-700">See plan details below</span>
+                <svg className="w-5 h-5 text-neutral-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              
+              {/* Plan Comparison Details */}
+              <div className="p-6 border-t border-neutral-200">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-6 text-center">Compare Plans</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Free Account Section */}
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h4 className="text-lg font-semibold text-neutral-900 flex items-center justify-center">
+                        <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
+                        Free Account
+                      </h4>
+                      <p className="text-2xl font-bold text-green-600 mt-2">$0/month</p>
+                    </div>
+                    <ul className="text-sm text-neutral-700 space-y-2">
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Business name, category, phone, email
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Website and address
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Basic business description (up to 200 characters)
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Basic tags and specialties
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        1 business image
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  {/* Featured Account Section */}
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h4 className="text-lg font-semibold text-neutral-900 flex items-center justify-center">
+                        <span className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></span>
+                        Featured Account
+                      </h4>
+                      <p className="text-2xl font-bold text-yellow-600 mt-2">$97/year</p>
+                    </div>
+                    <ul className="text-sm text-neutral-700 space-y-2">
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Everything in Free, plus:</strong>
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Priority placement</strong> - appears at top of search results
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Enhanced description</strong> - up to 500 characters
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Social media links</strong> - Facebook, Instagram, etc.
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Google Maps integration</strong> - interactive location
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Multiple images</strong> - showcase your business
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Booking system</strong> - direct appointment scheduling
+                      </li>
+                      <li className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Analytics</strong> - view customer interactions
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
 
           <div id="apply" className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
@@ -3738,7 +3858,7 @@ function BusinessPage() {
             )}
           </div>
 
-          <div className="mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-5 text-center">
+          <div className="mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-15 text-center">
             <h3 className="text-lg font-semibold">Bonita Residents Are Searching. Will They Find You?</h3>
             <a href="#apply" className="inline-block mt-3 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Started Today</a>
           </div>

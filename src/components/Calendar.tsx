@@ -167,7 +167,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                   onClick={() => day && handleDayClick(day, dayEvents)}
                   className={`min-h-[60px] md:min-h-[80px] p-1 md:p-2 border-r border-b border-neutral-200 last:border-r-0 relative ${
                     day ? hasEvents ? 'bg-white hover:bg-blue-50 cursor-pointer md:cursor-default' : 'bg-white' : 'bg-neutral-50'
-                  }`}
+                  } ${isToday ? 'ring-2 ring-neutral-400 ring-inset bg-yellow-50' : 'bg-neutral-100'}`}
                 >
                   {day && (
                     <>
