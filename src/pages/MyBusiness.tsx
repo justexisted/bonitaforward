@@ -863,7 +863,7 @@ export default function MyBusinessPage() {
    * DELETE BUSINESS LISTING
    * 
    * This function allows business owners to delete their business listings.
-   * It removes the provider entry from the database.
+   * Uses Netlify function with SERVICE_ROLE_KEY to bypass RLS policies.
    */
   const deleteBusinessListing = async (listingId: string) => {
     if (!confirm('Are you sure you want to delete this business listing? This action cannot be undone.')) {
@@ -876,95 +876,50 @@ export default function MyBusinessPage() {
       console.log('[MyBusiness] Attempting to delete listing:', listingId)
       console.log('[MyBusiness] User:', { userId: auth.userId, email: auth.email })
       
-      // CRITICAL FIX: Verify the user owns this listing before deleting
-      const { data: listing, error: fetchError } = await supabase
-        .from('providers')
-        .select('*')
-        .eq('id', listingId)
-        .single()
+      // Get auth session
+      const { data: { session } } = await supabase.auth.getSession()
       
-      if (fetchError || !listing) {
-        throw new Error('Could not find listing to delete')
-      }
-      
-      console.log('[MyBusiness] Found listing to delete:', listing)
-      
-      // Check ownership: user must own via owner_user_id OR email
-      const isOwner = listing.owner_user_id === auth.userId || listing.email === auth.email
-      
-      if (!isOwner) {
-        throw new Error('You do not have permission to delete this listing')
-      }
-      
-      // First, delete all related records that have foreign key constraints
-      // Delete provider change requests
-      const { error: changeRequestsError } = await supabase
-        .from('provider_change_requests')
-        .delete()
-        .eq('provider_id', listingId)
-
-      if (changeRequestsError) {
-        console.warn('[MyBusiness] Error deleting provider change requests:', changeRequestsError)
-        // Continue with deletion even if this fails
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
       }
 
-      // Delete provider job posts
-      const { error: jobPostsError } = await supabase
-        .from('provider_job_posts')
-        .delete()
-        .eq('provider_id', listingId)
+      console.log('[MyBusiness] Calling Netlify function to delete listing...')
 
-      if (jobPostsError) {
-        console.warn('[MyBusiness] Error deleting provider job posts:', jobPostsError)
-        // Continue with deletion even if this fails
+      // Call Netlify function to delete (bypasses RLS with SERVICE_ROLE_KEY)
+      const response = await fetch('/.netlify/functions/delete-business-listing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ listing_id: listingId })
+      })
+
+      console.log('[MyBusiness] Delete response status:', response.status)
+
+      if (!response.ok) {
+        // Try to parse error details
+        let errorMessage = `HTTP ${response.status}`
+        try {
+          const errorData = await response.json()
+          console.error('[MyBusiness] Delete error details:', errorData)
+          errorMessage = errorData.error || errorMessage
+          if (errorData.details) {
+            errorMessage += `: ${errorData.details}`
+          }
+        } catch (parseErr) {
+          const errorText = await response.text()
+          console.error('[MyBusiness] Delete error text:', errorText)
+          errorMessage = errorText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
 
-      // Delete any other related records
-      // Delete from saved_providers (users who saved this business)
-      const { error: savedProvidersError } = await supabase
-        .from('saved_providers')
-        .delete()
-        .eq('provider_id', listingId)
-      
-      if (savedProvidersError) {
-        console.warn('[MyBusiness] Error deleting saved_providers:', savedProvidersError)
-      }
-      
-      // Delete from coupon_redemptions
-      const { error: couponsError } = await supabase
-        .from('coupon_redemptions')
-        .delete()
-        .eq('provider_id', listingId)
-      
-      if (couponsError) {
-        console.warn('[MyBusiness] Error deleting coupon_redemptions:', couponsError)
-      }
-      
-      // Update bookings to remove provider reference (set to null instead of delete)
-      const { error: bookingsError } = await supabase
-        .from('bookings')
-        .update({ provider_id: null })
-        .eq('provider_id', listingId)
-      
-      if (bookingsError) {
-        console.warn('[MyBusiness] Error updating bookings:', bookingsError)
-      }
+      const result = await response.json()
+      console.log('[MyBusiness] Delete result:', result)
 
-      // Finally, delete the main provider record (no owner_user_id filter needed - already verified ownership)
-      const { error, count } = await supabase
-        .from('providers')
-        .delete({ count: 'exact' })
-        .eq('id', listingId)
-
-      console.log('[MyBusiness] Delete result:', { error, count })
-
-      if (error) {
-        console.error('[MyBusiness] Delete failed:', error)
-        throw error
-      }
-      
-      if (count === 0) {
-        throw new Error('Failed to delete listing - no rows affected. The listing may have already been deleted.')
+      if (!result.success) {
+        throw new Error(result.error || 'Delete failed')
       }
 
       console.log('[MyBusiness] Successfully deleted listing, refreshing data...')
