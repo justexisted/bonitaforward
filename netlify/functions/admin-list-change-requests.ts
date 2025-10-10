@@ -103,7 +103,7 @@ export const handler: Handler = async (event) => {
         console.log(`[admin-list-change-requests]   Owner User ID: ${request.owner_user_id}`)
         
         // Fetch provider info
-        let providerInfo = null
+        let providerInfo: { id: string; name: string; email: string | null } | null = null
         if (request.provider_id) {
           const { data: provider, error: provError } = await sb
             .from('providers')
@@ -120,7 +120,7 @@ export const handler: Handler = async (event) => {
         }
 
         // Fetch profile info - using service role bypasses RLS
-        let profileInfo = null
+        let profileInfo: { id: string; email: string; name: string | null } | null = null
         if (request.owner_user_id) {
           console.log(`[admin-list-change-requests]   Looking up profile for: ${request.owner_user_id}`)
           
