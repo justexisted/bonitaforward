@@ -123,7 +123,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
         </div>
 
         {/* Calendar Grid */}
-        <div className={`bg-white rounded-2xl shadow-lg border border-neutral-200 overflow-hidden relative ${showInfoCard ? 'blur-sm' : ''}`}>
+        <div className={`bg-white rounded-2xl shadow-lg border border-neutral-200 relative ${showInfoCard ? 'blur-sm' : ''}`}>
           {/* Month Navigation */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <button
@@ -208,7 +208,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                               </button>
                               {/* Hover tooltip for desktop */}
                               {hoveredEvent === event && (
-                                <div className="hidden md:block absolute z-10 bg-neutral-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap bottom-full left-0 mb-1 max-w-xs">
+                                <div className="hidden md:block absolute z-50 bg-neutral-900 text-white text-xs px-3 py-2 rounded-lg shadow-xl whitespace-normal break-words bottom-full left-0 mb-1 max-w-xs min-w-[120px]">
                                   {event.title}
                                   <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-neutral-900"></div>
                                 </div>
