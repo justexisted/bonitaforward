@@ -2184,12 +2184,12 @@ export default function AdminPage() {
    * FETCH BUSINESS DETAILS
    * 
    * This function fetches business details for a specific business account user.
-   * It looks up providers owned by the user and returns business information.
+   * It uses a Netlify function to bypass RLS policies and fetch provider data.
    * 
    * How it works:
    * 1. Sets loading state for the specific user
-   * 2. Uses existing profile data to get user email (avoids RLS issues)
-   * 3. Queries providers table for businesses owned by the user
+   * 2. Uses existing profile data to get user email and name
+   * 3. Calls Netlify function with SERVICE_ROLE_KEY to bypass RLS
    * 4. Returns business name, phone, and other relevant details
    * 5. Updates expandedBusinessDetails state with the fetched data
    */
@@ -2198,68 +2198,53 @@ export default function AdminPage() {
     setLoadingBusinessDetails(prev => ({ ...prev, [userId]: true }))
     
     try {
-      // Get the user's email and name from the existing profiles data (avoids RLS issues)
+      // Get the user's email and name from the existing profiles data
       const userProfile = profiles.find(p => p.id === userId)
       const userEmail = userProfile?.email
       const userName = userProfile?.name
 
       console.log('[Admin] User profile data from existing data:', { email: userEmail, name: userName })
-      console.log('[Admin] Available profiles data:', profiles.map(p => ({ id: p.id, email: p.email, name: p.name, role: p.role })))
 
-      // Fetch providers owned by this user (by owner_user_id)
-      const { data: businessDataByOwner, error: ownerError } = await supabase
-        .from('providers')
-        .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at')
-        .eq('owner_user_id', userId)
-        .order('created_at', { ascending: false })
+      // Get auth session for the request
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
 
-      console.log('[Admin] Business data by owner_user_id:', businessDataByOwner)
-
-      // Also try to find businesses by email (in case owner_user_id doesn't match)
-      let businessDataByEmail: any[] = []
-      if (userEmail) {
-        const { data: emailData, error: emailError } = await supabase
-          .from('providers')
-          .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at')
-          .eq('email', userEmail)
-          .order('created_at', { ascending: false })
-        
-        console.log('[Admin] Business data by email:', emailData)
-        if (emailError) {
-          console.warn('[Admin] Error fetching business details by email:', emailError)
-        }
-        businessDataByEmail = emailData || []
+      if (!token) {
+        throw new Error('No authentication token available')
       }
 
-      // Also try to find businesses by name (in case business name matches user name)
-      let businessDataByName: any[] = []
-      if (userName) {
-        const { data: nameData, error: nameError } = await supabase
-          .from('providers')
-          .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at')
-          .ilike('name', `%${userName}%`)
-          .order('created_at', { ascending: false })
-        
-        console.log('[Admin] Business data by name search:', nameData)
-        if (nameError) {
-          console.warn('[Admin] Error fetching business details by name:', nameError)
-        }
-        businessDataByName = nameData || []
+      // Call Netlify function to fetch business details (bypasses RLS)
+      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
+        (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+      const url = fnBase ? `${fnBase}/.netlify/functions/admin-get-business-details` : '/.netlify/functions/admin-get-business-details'
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          userEmail,
+          userName
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`)
       }
 
-      // Combine all results and remove duplicates
-      const allBusinessData = [...(businessDataByOwner || []), ...businessDataByEmail, ...businessDataByName]
-      const uniqueBusinessData = allBusinessData.filter((business, index, self) => 
-        index === self.findIndex(b => b.id === business.id)
-      )
+      const result = await response.json()
+      console.log('[Admin] Business details response:', result)
 
-      console.log('[Admin] Combined unique business data:', uniqueBusinessData)
-
-      if (ownerError) {
-        console.error('[Admin] Error fetching business details by owner:', ownerError)
-        setError(`Failed to fetch business details: ${ownerError.message}`)
-        return
+      if (!result.success) {
+        throw new Error(result.details || result.error || 'Failed to fetch business details')
       }
+
+      const uniqueBusinessData = result.businessData || []
+      console.log('[Admin] Combined unique business data:', uniqueBusinessData.length, 'records')
 
       // Update expanded details with the fetched business data
       setExpandedBusinessDetails(prev => ({
@@ -2987,6 +2972,113 @@ export default function AdminPage() {
           </div>
           )}
         </div>
+
+        {/* Main Business Applications Section */}
+        {isAdmin && section === 'business-applications' && (
+          <div className="mt-4 rounded-2xl border border-neutral-100 p-6 bg-white hover-gradient interactive-card">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-neutral-900">Business Applications</h2>
+                <p className="text-sm text-neutral-600 mt-1">
+                  Review and approve new business listing requests from community members.
+                </p>
+              </div>
+              <div className="text-sm text-neutral-500">
+                {bizApps.length} pending application{bizApps.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+
+            {bizApps.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-neutral-400 text-lg mb-2">📋</div>
+                <div className="text-neutral-500">No business applications yet.</div>
+                <div className="text-xs text-neutral-400 mt-1">
+                  Applications will appear here when users submit business listing requests.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {bizApps.map((app) => (
+                  <div key={app.id} className="rounded-xl border border-neutral-200 p-4 bg-neutral-50">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-medium text-neutral-900 text-lg">
+                          {app.business_name || 'Unnamed Business'}
+                        </div>
+                        <div className="text-sm text-neutral-600 mt-1">
+                          Submitted by: {app.full_name || 'Unknown'} • {app.email}
+                        </div>
+                        {app.phone && (
+                          <div className="text-sm text-neutral-600">Phone: {app.phone}</div>
+                        )}
+                      </div>
+                      <div className="text-xs text-neutral-500 text-right">
+                        {new Date(app.created_at).toLocaleDateString()}
+                        <br />
+                        {new Date(app.created_at).toLocaleTimeString()}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-700 mb-1">
+                          Business Category
+                        </label>
+                        <select
+                          value={(appEdits[app.id]?.category) || app.category_key || 'professional-services'}
+                          onChange={(e) => setAppEdits((m) => ({ ...m, [app.id]: { category: e.target.value, tagsInput: m[app.id]?.tagsInput || '' } }))}
+                          className="w-full rounded-lg border border-neutral-200 px-3 py-2 bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          {catOptions.map((opt) => (
+                            <option key={opt.key} value={opt.key}>{opt.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-700 mb-1">
+                          Tags (comma separated)
+                        </label>
+                        <input
+                          placeholder="e.g. local, family-owned, certified"
+                          value={appEdits[app.id]?.tagsInput || ''}
+                          onChange={(e) => setAppEdits((m) => ({ ...m, [app.id]: { category: m[app.id]?.category || 'professional-services', tagsInput: e.target.value } }))}
+                          className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    {app.challenge && (
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-neutral-700 mb-1">
+                          Additional Information
+                        </label>
+                        <div className="text-sm text-neutral-600 bg-white rounded-lg border border-neutral-200 px-3 py-2">
+                          {app.challenge}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => approveApplication(app.id)} 
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-medium text-sm transition-colors"
+                      >
+                        ✓ Approve & Create Provider
+                      </button>
+                      <button 
+                        onClick={() => deleteApplication(app.id)} 
+                        className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 border border-red-200 font-medium text-sm transition-colors"
+                      >
+                        ✗ Delete Application
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {isAdmin && section === 'providers' && (
           <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="flex items-center justify-between">
