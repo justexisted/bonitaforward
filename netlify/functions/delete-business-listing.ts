@@ -40,11 +40,16 @@ export const handler: Handler = async (event) => {
 
     const SUPABASE_URL = requireEnv('SUPABASE_URL')
     const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+    const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY')
+    
+    // Create two clients: one for auth verification (anon), one for data operations (service role)
+    const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
 
-    // Verify user token
-    const { data: userData, error: getUserErr } = await (sb as any).auth.getUser(token)
+    // Verify user token using ANON key (service role can't verify user tokens)
+    const { data: userData, error: getUserErr } = await (sbAnon as any).auth.getUser(token)
     if (getUserErr || !userData?.user?.id) {
+      console.error('[delete-business-listing] Token verification failed:', getUserErr)
       return { statusCode: 401, headers, body: 'Invalid token' }
     }
 

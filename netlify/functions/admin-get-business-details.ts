@@ -16,16 +16,54 @@ const supabase = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY!, {
 })
 
 export const handler: Handler = async (event) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json'
+  }
+
+  // Handle preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' }
+  }
+
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ error: 'Method not allowed' })
     }
   }
 
   try {
+    // Verify admin authorization
+    const authHeader = event.headers['authorization'] || event.headers['Authorization']
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
+    if (!token) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
+
+    const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
+    if (!SUPABASE_ANON_KEY || !SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Missing environment variables' })
+      }
+    }
+
+    // Create two clients: one for auth verification (anon), one for data operations (service role)
+    const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
+    
+    // Verify token using ANON key (service role can't verify user tokens)
+    const { data: userData, error: getUserErr } = await (sbAnon as any).auth.getUser(token)
+    if (getUserErr || !userData?.user?.id) {
+      console.error('[admin-get-business-details] Token verification failed:', getUserErr)
+      return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid token' }) }
+    }
+
+    console.log('[Admin Business Details] Authenticated user:', userData.user.email)
+
     // Parse the request body
     const { userId, userEmail, userName } = JSON.parse(event.body || '{}')
 

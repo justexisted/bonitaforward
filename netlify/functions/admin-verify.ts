@@ -23,11 +23,16 @@ export const handler: Handler = async (event) => {
 
     const SUPABASE_URL = requireEnv('SUPABASE_URL')
     const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE')
+    const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY')
+    
+    // Create two clients: one for auth verification (anon), one for data operations (service role)
+    const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
 
-    // Verify the JWT token
-    const { data: userData, error: getUserErr } = await (adminClient as any).auth.getUser(token)
+    // Verify the JWT token using ANON key (service role can't verify user tokens)
+    const { data: userData, error: getUserErr } = await (sbAnon as any).auth.getUser(token)
     if (getUserErr || !userData?.user?.id) {
+      console.error('[admin-verify] Token verification failed:', getUserErr)
       return { statusCode: 401, body: 'Invalid token' }
     }
 

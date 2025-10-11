@@ -51,11 +51,18 @@ export const handler: Handler = async (event) => {
 
     const SUPABASE_URL = getEnv(['SUPABASE_URL', 'VITE_SUPABASE_URL'])
     const SUPABASE_SERVICE_ROLE = getEnv(['SUPABASE_SERVICE_ROLE', 'SUPABASE_SERVICE_ROLE_KEY'])
-
+    const SUPABASE_ANON_KEY = getEnv(['VITE_SUPABASE_ANON_KEY'])
+    
+    // Create two clients: one for auth verification (anon), one for data operations (service role)
+    const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
-    // Verify the JWT to identify the caller
-    const { data: userData, error: getUserErr } = await (adminClient as any).auth.getUser(token)
-    if (getUserErr || !userData?.user?.id) return { statusCode: 401, headers: corsHeaders, body: 'Invalid token' }
+    
+    // Verify the JWT using ANON key (service role can't verify user tokens)
+    const { data: userData, error: getUserErr } = await (sbAnon as any).auth.getUser(token)
+    if (getUserErr || !userData?.user?.id) {
+      console.error('[user-delete] Token verification failed:', getUserErr)
+      return { statusCode: 401, headers: corsHeaders, body: 'Invalid token' }
+    }
     const userId: string = userData.user.id
     const userEmail: string | null = userData.user.email || null
 
