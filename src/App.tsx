@@ -1486,7 +1486,7 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
       background="#ffffff"
       glareColor="#999999"
       glareOpacity={0.3}
-      glareAngle={-30}
+      glareAngle={-33}
       glareSize={300}
       transitionDuration={800}
       playOnce={false}
