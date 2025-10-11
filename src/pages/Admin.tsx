@@ -86,9 +86,11 @@ type BusinessApplicationRow = {
   business_name: string | null
   email: string | null
   phone: string | null
-  category_key: string | null
-  challenge: string | null
+  category: string | null          // ⚠️ Database uses 'category' NOT 'category_key'
+  challenge: string | null         // Contains JSON string with all business details
   created_at: string
+  tier_requested: string | null    // 'free' or 'featured'
+  status: string | null            // 'pending', 'approved', or 'rejected'
 }
 
 type ContactLeadRow = {
@@ -604,7 +606,13 @@ export default function AdminPage() {
     try {
       setMessage('Triggering server-side iCalendar refresh...')
       
-      const response = await fetch('/.netlify/functions/manual-fetch-events')
+      // For local dev: use http://localhost:8888 (Netlify Dev port)
+      // For production: use relative URL (/.netlify/functions/...)
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/manual-fetch-events` : '/.netlify/functions/manual-fetch-events'
+      
+      const response = await fetch(url)
       const result = await response.json()
       
       if (response.ok && result.success) {
@@ -628,7 +636,13 @@ export default function AdminPage() {
     try {
       setMessage('Fetching Voice of San Diego events...')
       
-      const response = await fetch('/.netlify/functions/fetch-vosd-events')
+      // For local dev: use http://localhost:8888 (Netlify Dev port)
+      // For production: use relative URL (/.netlify/functions/...)
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/fetch-vosd-events` : '/.netlify/functions/fetch-vosd-events'
+      
+      const response = await fetch(url)
       const result = await response.json()
       
       if (response.ok && result.success) {
@@ -652,7 +666,13 @@ export default function AdminPage() {
     try {
       setMessage('Fetching KPBS events...')
       
-      const response = await fetch('/.netlify/functions/fetch-kpbs-events')
+      // For local dev: use http://localhost:8888 (Netlify Dev port)
+      // For production: use relative URL (/.netlify/functions/...)
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/fetch-kpbs-events` : '/.netlify/functions/fetch-kpbs-events'
+      
+      const response = await fetch(url)
       const result = await response.json()
       
       if (response.ok && result.success) {
@@ -915,7 +935,12 @@ export default function AdminPage() {
       console.log('[Admin] ✓ Auth token acquired, calling Netlify function...')
 
       // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
-      const url = '/.netlify/functions/admin-list-change-requests'
+      // For local dev: use http://localhost:8888 (Netlify Dev port)
+      // For production: use relative URL (/.netlify/functions/...)
+      // VITE_FN_BASE_URL should NOT include /.netlify/functions - just the base URL
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-change-requests` : '/.netlify/functions/admin-list-change-requests'
       console.log('[Admin] Fetching from:', url)
       
       const response = await fetch(url, {
@@ -1202,12 +1227,11 @@ export default function AdminPage() {
           return
         }
 
-        let url: string
-        if (window.location.hostname === 'localhost') {
-          url = 'http://localhost:8888/.netlify/functions/admin-verify'
-        } else {
-          url = `${window.location.origin}/.netlify/functions/admin-verify`
-        }
+        // For local dev: use http://localhost:8888 (Netlify Dev port)
+        // For production: use relative URL (/.netlify/functions/...)
+        const isLocal = window.location.hostname === 'localhost'
+        const fnBase = isLocal ? 'http://localhost:8888' : ''
+        const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
         
         console.log('[Admin] Making server verification request to:', url)
         
@@ -1337,14 +1361,13 @@ export default function AdminPage() {
             const { data: session } = await supabase.auth.getSession()
             const token = session.session?.access_token
             
-            if (token) {
-              let url: string
-              if (window.location.hostname === 'localhost') {
-                url = 'http://localhost:8888/.netlify/functions/admin-list-profiles'
-              } else {
-                url = `${window.location.origin}/.netlify/functions/admin-list-profiles`
-              }
-              const res = await fetch(url, { 
+          if (token) {
+            // For local dev: use http://localhost:8888 (Netlify Dev port)
+            // For production: use relative URL (/.netlify/functions/...)
+            const isLocal = window.location.hostname === 'localhost'
+            const fnBase = isLocal ? 'http://localhost:8888' : ''
+            const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-profiles` : '/.netlify/functions/admin-list-profiles'
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${token}`,
@@ -1463,6 +1486,33 @@ export default function AdminPage() {
   // Inline helpers for admin edits
   const [appEdits, setAppEdits] = useState<Record<string, { category: string; tagsInput: string }>>({})
 
+  // Auto-populate tags from challenge data when applications load
+  useEffect(() => {
+    if (bizApps.length > 0) {
+      const newEdits: Record<string, { category: string; tagsInput: string }> = {}
+      bizApps.forEach(app => {
+        if (!appEdits[app.id]) {  // Only initialize if not already edited
+          try {
+            const challengeData = app.challenge ? JSON.parse(app.challenge) : {}
+            const tags = Array.isArray(challengeData.tags) ? challengeData.tags : []
+            newEdits[app.id] = {
+              category: app.category || 'professional-services',
+              tagsInput: tags.join(', ')  // Pre-populate with tags from application
+            }
+          } catch {
+            newEdits[app.id] = {
+              category: app.category || 'professional-services',
+              tagsInput: ''
+            }
+          }
+        }
+      })
+      if (Object.keys(newEdits).length > 0) {
+        setAppEdits(prev => ({ ...prev, ...newEdits }))
+      }
+    }
+  }, [bizApps])
+
   const catOptions: { key: string; name: string }[] = [
     { key: 'real-estate', name: 'Real Estate' },
     { key: 'home-services', name: 'Home Services' },
@@ -1475,8 +1525,25 @@ export default function AdminPage() {
     setMessage(null)
     const app = bizApps.find((b) => b.id === appId)
     if (!app) return
-    const draft = appEdits[appId] || { category: 'professional-services', tagsInput: '' }
-    const tags = draft.tagsInput.split(',').map((s) => s.trim()).filter(Boolean)
+    
+    // Parse the challenge field which contains all the business details as JSON
+    let challengeData: any = {}
+    try {
+      if (app.challenge) {
+        challengeData = JSON.parse(app.challenge)
+      }
+    } catch (err) {
+      console.error('[Admin] Error parsing challenge data:', err)
+    }
+    
+    // Get admin-edited category and tags, or fall back to application's category
+    const draft = appEdits[appId] || { category: app.category || 'professional-services', tagsInput: '' }
+    const adminTags = draft.tagsInput.split(',').map((s) => s.trim()).filter(Boolean)
+    
+    // Combine tags from challenge data and admin input
+    const challengeTags = Array.isArray(challengeData.tags) ? challengeData.tags : []
+    const allTags = [...new Set([...challengeTags, ...adminTags])]  // Remove duplicates
+    
     // Attempt to find a profile/user by the application's email so we can assign ownership to the applicant
     let ownerUserId: string | null = null
     try {
@@ -1489,17 +1556,31 @@ export default function AdminPage() {
         ownerUserId = ((profRows as any[])?.[0]?.id as string | undefined) || null
       }
     } catch {}
+    
+    // Create provider with ALL data from the application
     const payload: Partial<ProviderRow> = {
       name: (app.business_name || 'Unnamed Business') as any,
       category_key: draft.category as any,
-      tags: tags as any,
+      tags: allTags as any,
       phone: (app.phone || null) as any,
       email: (app.email || null) as any,
-      website: null as any,
-      address: null as any,
-      images: [] as any,
+      website: (challengeData.website || null) as any,
+      address: (challengeData.address || null) as any,
+      description: (challengeData.description || null) as any,
+      images: (Array.isArray(challengeData.images) ? challengeData.images : []) as any,
+      specialties: (Array.isArray(challengeData.specialties) ? challengeData.specialties : []) as any,
+      social_links: (challengeData.social_links || {}) as any,
+      business_hours: (challengeData.business_hours || {}) as any,
+      service_areas: (Array.isArray(challengeData.service_areas) ? challengeData.service_areas : []) as any,
+      google_maps_url: (challengeData.google_maps_url || null) as any,
+      bonita_resident_discount: (challengeData.bonita_resident_discount || null) as any,
       owner_user_id: (ownerUserId || null) as any,
+      published: false,  // Keep unpublished until admin manually publishes
+      is_member: false   // Default to free tier
     }
+    
+    console.log('[Admin] Approving application with payload:', payload)
+    
     const { error } = await supabase.from('providers').insert([payload as any])
     if (error) {
       setError(error.message)
@@ -1903,52 +1984,68 @@ export default function AdminPage() {
   async function deleteProvider(providerId: string) {
     setMessage(null)
     setConfirmDeleteProviderId(null)
-    const res = await supabase.from('providers').delete().eq('id', providerId).select('id')
-    if (res.error) {
-      setError(res.error.message)
-      return
-    }
-    const deletedCount = Array.isArray(res.data) ? res.data.length : 0
-    if (deletedCount === 0) {
-      // Fallback: soft-delete by tagging as 'deleted' if hard delete is not permitted
-      try {
-        const { data: row, error: selErr } = await supabase.from('providers').select('badges').eq('id', providerId).single()
-        if (selErr) {
-          setError('Delete failed and could not load row for archive. Check permissions.')
-          return
-        }
-        const badges = Array.isArray(row?.badges) ? row?.badges as string[] : []
-        const next = Array.from(new Set([...(badges || []), 'deleted']))
-        const { error: updErr } = await supabase.from('providers').update({ badges: next as any }).eq('id', providerId)
-        if (updErr) {
-          setError('Delete failed and archive failed. Check permissions.')
-          return
-        }
-        setMessage('Provider archived (soft-deleted)')
-      } catch {
-        setError('Delete failed and archive failed. Check permissions.')
-        return
-      }
-    }
-    else {
-      setMessage(`Provider deleted (${deletedCount})`)
-    }
-
-    // In both cases (hard/soft), refresh the providers list from DB with enhanced fields
+    
     try {
-      const { data: pData, error: pErr } = await supabase
-        .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
-        .order('name', { ascending: true })
-      if (pErr) {
-        setProviders((arr) => arr.filter((p) => p.id !== providerId))
-      } else {
-        setProviders((pData as ProviderRow[]) || [])
+      console.log('[Admin] Deleting provider:', providerId)
+      
+      // Get auth session for Netlify function
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
       }
-    } catch {
+      
+      // Use Netlify function to delete provider (handles all FK constraints and related data)
+      // For local dev: use http://localhost:8888 (Netlify Dev port)
+      // For production: use relative URL (/.netlify/functions/...)
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/delete-business-listing` : '/.netlify/functions/delete-business-listing'
+      
+      console.log('[Admin] Calling delete function:', url)
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ listing_id: providerId })  // Function expects 'listing_id' not 'listingId'
+      })
+      
+      console.log('[Admin] Delete response status:', response.status)
+      
+      if (!response.ok) {
+        // Try to parse detailed error
+        const errorData = await response.json().catch(() => ({}))
+        const errorMsg = errorData.details || errorData.error || `HTTP ${response.status}`
+        throw new Error(errorMsg)
+      }
+      
+      const result = await response.json()
+      
+      if (!result.success) {
+        throw new Error(result.details || result.error || 'Delete failed')
+      }
+      
+      setMessage('Provider deleted successfully')
       setProviders((arr) => arr.filter((p) => p.id !== providerId))
+      
+      // Refresh providers list
+      try {
+        const { data: pData, error: pErr } = await supabase
+          .from('providers')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .order('name', { ascending: true })
+        if (!pErr) setProviders((pData as ProviderRow[]) || [])
+      } catch {}
+      
+      try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
+      
+    } catch (err: any) {
+      console.error('[Admin] Error deleting provider:', err)
+      setError(`Failed to delete provider: ${err.message}`)
     }
-    try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
   }
 
   async function notifyUser(user_id: string | null | undefined, subject: string, body?: string, data?: any) {
@@ -2055,7 +2152,13 @@ export default function AdminPage() {
       }
       
       // Call Netlify function (not Supabase Edge Function)
-      const response = await fetch('/.netlify/functions/admin-delete-user', {
+      // For local dev: use http://localhost:8888 (Netlify Dev port)
+      // For production: use relative URL (/.netlify/functions/...)
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/admin-delete-user` : '/.netlify/functions/admin-delete-user'
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2155,7 +2258,13 @@ export default function AdminPage() {
         const role = (prof as any)?.role as string | undefined
         if (pid && role !== 'business') {
           // Call Netlify function (not Supabase Edge Function)
-          const response = await fetch('/.netlify/functions/admin-delete-user', {
+          // For local dev: use http://localhost:8888 (Netlify Dev port)
+          // For production: use relative URL (/.netlify/functions/...)
+          const isLocal = window.location.hostname === 'localhost'
+          const fnBase = isLocal ? 'http://localhost:8888' : ''
+          const url = fnBase ? `${fnBase}/.netlify/functions/admin-delete-user` : '/.netlify/functions/admin-delete-user'
+          
+          const response = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -2214,8 +2323,10 @@ export default function AdminPage() {
       }
 
       // Call Netlify function to fetch business details (bypasses RLS)
-      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
-        (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+      // For local dev: use http://localhost:8888 (Netlify Dev port)
+      // For production: use relative URL (/.netlify/functions/...)
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
       const url = fnBase ? `${fnBase}/.netlify/functions/admin-get-business-details` : '/.netlify/functions/admin-get-business-details'
 
       const response = await fetch(url, {
@@ -2519,47 +2630,6 @@ export default function AdminPage() {
         )}
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {isAdmin && section === 'business-applications' && (
-            <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
-              <div className="font-medium">Business Applications</div>
-              <div className="mt-2 space-y-2 text-sm">
-                {bizApps.length === 0 && <div className="text-neutral-500">No applications yet.</div>}
-                {bizApps.map((row) => (
-                  <div key={row.id} className="rounded-xl border border-neutral-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{row.business_name || '-'}</div>
-                      <div className="text-xs text-neutral-500">{new Date(row.created_at).toLocaleString()}</div>
-                    </div>
-                    <div className="text-xs text-neutral-600 mt-1">Contact: {row.full_name || '-'} • {row.email || '-'} • {row.phone || '-'}</div>
-                    <div className="text-xs text-neutral-600 mt-1">Category (requested): {row.category_key || '-'}</div>
-                    <div className="text-xs text-neutral-600 mt-1">Challenge: {row.challenge || '-'}</div>
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <select
-                        value={(appEdits[row.id]?.category) || 'professional-services'}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: e.target.value, tagsInput: m[row.id]?.tagsInput || '' } }))}
-                        className="rounded-xl border border-neutral-200 px-3 py-2 bg-white text-xs"
-                      >
-                        {catOptions.map((opt) => (
-                          <option key={opt.key} value={opt.key}>{opt.name}</option>
-                        ))}
-                      </select>
-                      <input
-                        placeholder="tags (comma separated)"
-                        value={appEdits[row.id]?.tagsInput || ''}
-                        onChange={(e) => setAppEdits((m) => ({ ...m, [row.id]: { category: m[row.id]?.category || 'professional-services', tagsInput: e.target.value } }))}
-                        className="rounded-xl border border-neutral-200 px-3 py-2 text-xs sm:col-span-2"
-                      />
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <button onClick={() => approveApplication(row.id)} className="btn btn-primary text-xs">Approve & Create Provider</button>
-                      <button onClick={() => deleteApplication(row.id)} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {isAdmin && section === 'contact-leads' && (
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
               <div className="font-medium">Featured Provider Management</div>
@@ -3022,10 +3092,13 @@ export default function AdminPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-xs font-medium text-neutral-700 mb-1">
-                          Business Category
+                          Category (requested): {app.category || '-'}
+                        </label>
+                        <label className="block text-xs font-medium text-neutral-700 mb-1 mt-2">
+                          Edit Business Category
                         </label>
                         <select
-                          value={(appEdits[app.id]?.category) || app.category_key || 'professional-services'}
+                          value={(appEdits[app.id]?.category) || app.category || 'professional-services'}
                           onChange={(e) => setAppEdits((m) => ({ ...m, [app.id]: { category: e.target.value, tagsInput: m[app.id]?.tagsInput || '' } }))}
                           className="w-full rounded-lg border border-neutral-200 px-3 py-2 bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >

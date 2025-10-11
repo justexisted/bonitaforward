@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } fr
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
-import { Building2, Home, HeartPulse, Utensils, Briefcase, ArrowRight, X, ArrowLeft, ArrowRight as ArrowRightIcon, User, BookOpen } from 'lucide-react'
+import { Home, ArrowRight, X, ArrowLeft, ArrowRight as ArrowRightIcon, User, BookOpen } from 'lucide-react'
 import CreateBusinessForm from './pages/CreateBusinessForm'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
@@ -37,37 +37,37 @@ const categories: {
   key: CategoryKey
   name: string
   description: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: string
 }[] = [
   {
     key: 'restaurants-cafes',
     name: 'Restaurants & Cafés',
     description: 'Local dining spots and trending food experiences around Bonita.',
-    icon: Utensils,
+    icon: '/images/categories/Utensils.png',
   },
   {
     key: 'home-services',
     name: 'Home Services',
     description: 'Landscaping, solar, cleaning, and remodeling by trusted local pros.',
-    icon: Home,
+    icon: '/images/categories/Home.png',
   },
   {
     key: 'health-wellness',
     name: 'Health & Wellness',
     description: 'Chiropractors, gyms, salons, and med spas to keep Bonita thriving.',
-    icon: HeartPulse,
+    icon: '/images/categories/HeartPulse.png',
   },
   {
     key: 'real-estate',
     name: 'Real Estate',
     description: 'Agents, brokerages, and property managers helping Bonita residents move forward.',
-    icon: Building2,
+    icon: '/images/categories/Building2.png',
   },
   {
     key: 'professional-services',
     name: 'Professional Services',
     description: 'Attorneys, accountants, and consultants serving the community.',
-    icon: Briefcase,
+    icon: '/images/categories/Briefcase.png',
   },
 ]
 
@@ -1479,13 +1479,6 @@ function ProviderPage() {
 }
 
 function CategoryCard({ cat }: { cat: typeof categories[number] }) {
-  const emojiMap: Record<CategoryKey, string> = {
-    'real-estate': '🏠',
-    'home-services': '🛠️',
-    'health-wellness': '🧘',
-    'restaurants-cafes': '🍽️',
-    'professional-services': '💼',
-  }
   return (
     <GlareHover
       width="auto"
@@ -1500,8 +1493,12 @@ function CategoryCard({ cat }: { cat: typeof categories[number] }) {
     >
     <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50">
-          <span style={{ fontSize: '2.5rem' }} aria-hidden>{emojiMap[cat.key]}</span>
+        <span className="inline-flex h-20 w-25 items-center justify-center rounded-2xl bg-neutral-50">
+          <img 
+            src={cat.icon} 
+            alt={`${cat.name} icon`}
+            className="h-20 w-25 object-contain"
+          />
         </span>
       <div>
           <div className="font-medium text-neutral-900">{cat.name}</div>
@@ -3059,8 +3056,12 @@ function CategoryFilters({
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-50">
-          {React.createElement(category.icon, { className: "h-6 w-6 text-neutral-700" })}
+        <span className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral-50">
+          <img 
+            src={category.icon} 
+            alt={`${category.name} icon`}
+            className="h-20 w-20 object-contain"
+          />
         </span>
         <h3 className="text-xl font-semibold text-neutral-900 mb-2">
           Refine Your {category.name} Search

@@ -376,8 +376,9 @@ export default function MyBusinessPage() {
       let userActivityData: UserActivity[] = []
       
       if (ownedBusinessIds.length > 0) {
+        // Fetch user notifications (previously named user_activity in old schema)
         const { data: activityData, error: activityError } = await supabase
-          .from('user_activity')
+          .from('user_notifications')
           .select(`
             *,
             providers!inner(name)
@@ -678,44 +679,44 @@ export default function MyBusinessPage() {
    */
   const createBusinessListing = async (listingData: Partial<BusinessListing>) => {
     try {
-      setMessage('Creating business listing...')
+      setMessage('Submitting business application...')
       
-      const { error } = await supabase
-        .from('providers')
-        .insert([{
-          // Core business fields
-          name: listingData.name,
-          category_key: listingData.category_key,
-          phone: listingData.phone,
-          email: listingData.email || auth.email,
+      // Create a business application (NOT a provider directly)
+      // This requires admin approval before becoming a live listing
+      // IMPORTANT: business_applications table uses 'category' NOT 'category_key'
+      const applicationData = {
+        business_name: listingData.name,
+        full_name: auth.name || 'Business Owner',
+        email: listingData.email || auth.email,
+        phone: listingData.phone || '',
+        category: listingData.category_key || 'professional-services',  // Note: 'category' not 'category_key'
+        // Store additional details as JSON string in the challenge field
+        challenge: JSON.stringify({
           website: listingData.website,
           address: listingData.address,
-          tags: listingData.tags || [],
-          images: listingData.images || [],
-          rating: listingData.rating || null,
-          badges: listingData.badges || [],
-          owner_user_id: auth.userId,
-          published: false, // Requires admin approval
-          is_member: false, // Free tier by default
-          
-          // Enhanced business management fields (now stored in providers table)
-          description: listingData.description || null,
-          specialties: listingData.specialties || [],
-          social_links: listingData.social_links || {},
-          business_hours: listingData.business_hours || {},
-          service_areas: listingData.service_areas || [],
-          google_maps_url: listingData.google_maps_url || null,
-          bonita_resident_discount: listingData.bonita_resident_discount || null
-          // created_at and updated_at are automatically handled by the database
-        }])
+          description: listingData.description,
+          tags: listingData.tags,
+          specialties: listingData.specialties,
+          social_links: listingData.social_links,
+          business_hours: listingData.business_hours,
+          service_areas: listingData.service_areas,
+          google_maps_url: listingData.google_maps_url,
+          bonita_resident_discount: listingData.bonita_resident_discount,
+          images: listingData.images
+        })
+      }
+      
+      const { error } = await supabase
+        .from('business_applications')
+        .insert([applicationData])
 
       if (error) throw error
 
-      setMessage('Business listing created! It will be reviewed by our admin team.')
-      loadBusinessData() // Refresh data to show new listing
+      setMessage('Success! Your business application has been submitted and is pending admin approval.')
+      loadBusinessData() // Refresh data to show new application in pending state
       setShowCreateForm(false)
     } catch (error: any) {
-      setMessage(`Error creating listing: ${error.message}`)
+      setMessage(`Error submitting application: ${error.message}`)
     }
   }
 
@@ -2059,11 +2060,50 @@ function BusinessListingForm({
     bonita_resident_discount: listing?.bonita_resident_discount || ''
   })
 
+  // Restaurant tag options
+  const restaurantTagOptions = {
+    cuisine: [
+      'American', 'Italian', 'Mexican', 'Asian', 'Mediterranean', 'French', 'Indian', 
+      'Chinese', 'Japanese', 'Thai', 'Vietnamese', 'Korean', 'Middle Eastern', 'Latin American',
+      'Seafood', 'Steakhouse', 'Vegetarian', 'Vegan', 'Fusion', 'Other'
+    ],
+    occasion: [
+      'Casual', 'Family', 'Date', 'Business', 'Celebration', 'Quick Bite', 'Fine Dining',
+      'Takeout', 'Delivery', 'Outdoor Seating', 'Group Friendly'
+    ],
+    priceRange: ['$', '$$', '$$$', '$$$$'],
+    diningType: [
+      'Dine-in', 'Takeout', 'Delivery', 'Drive-through', 'Counter Service', 
+      'Full Service', 'Buffet', 'Café', 'Bar & Grill', 'Food Truck'
+    ]
+  }
+
+  // Initialize restaurant tags when listing changes or when editing existing listing
+  useEffect(() => {
+    if (listing?.tags && formData.category_key === 'restaurants-cafes') {
+      const tags = listing.tags
+      setRestaurantTags({
+        cuisine: tags.find(tag => restaurantTagOptions.cuisine.includes(tag)) || '',
+        occasion: tags.find(tag => restaurantTagOptions.occasion.includes(tag)) || '',
+        priceRange: tags.find(tag => restaurantTagOptions.priceRange.includes(tag)) || '',
+        diningType: tags.find(tag => restaurantTagOptions.diningType.includes(tag)) || ''
+      })
+    }
+  }, [listing, formData.category_key])
+
   const [newTag, setNewTag] = useState('')
   const [newSpecialty, setNewSpecialty] = useState('')
   const [newServiceArea, setNewServiceArea] = useState('')
   const [newSocialPlatform, setNewSocialPlatform] = useState('')
   const [newSocialUrl, setNewSocialUrl] = useState('')
+  
+  // Restaurant-specific tag selections
+  const [restaurantTags, setRestaurantTags] = useState({
+    cuisine: '',
+    occasion: '',
+    priceRange: '',
+    diningType: ''
+  })
   
   // Image upload state management
   const [uploadingImages, setUploadingImages] = useState(false)
@@ -2139,6 +2179,32 @@ function BusinessListingForm({
       ...prev,
       service_areas: prev.service_areas?.filter(area => area !== areaToRemove) || []
     }))
+  }
+
+  // Handle restaurant tag updates
+  const updateRestaurantTag = (type: keyof typeof restaurantTags, value: string) => {
+    const oldValue = restaurantTags[type]
+    
+    setRestaurantTags(prev => ({
+      ...prev,
+      [type]: value
+    }))
+
+    // Remove old tag if it exists
+    if (oldValue) {
+      setFormData(prev => ({
+        ...prev,
+        tags: prev.tags?.filter(tag => tag !== oldValue) || []
+      }))
+    }
+
+    // Add new tag if value is not empty
+    if (value && !formData.tags?.includes(value)) {
+      setFormData(prev => ({
+        ...prev,
+        tags: [...(prev.tags || []), value]
+      }))
+    }
   }
 
   const addSocialLink = () => {
@@ -2691,13 +2757,98 @@ function BusinessListingForm({
               <label className="block text-sm font-medium text-neutral-700 mb-1">
                 Tags
               </label>
+              
+              {/* Conditional restaurant tag guidance */}
+              {formData.category_key === 'restaurants-cafes' && (
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-medium text-blue-900 mb-3">
+                    🍽️ Restaurant Tags - Help customers find you!
+                  </h4>
+                  <p className="text-xs text-blue-700 mb-4">
+                    Select your restaurant characteristics below. These will be automatically added as tags to help customers discover your business.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Cuisine Type */}
+                    <div>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">
+                        Cuisine Type *
+                      </label>
+                      <select
+                        value={restaurantTags.cuisine}
+                        onChange={(e) => updateRestaurantTag('cuisine', e.target.value)}
+                        className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select cuisine type</option>
+                        {restaurantTagOptions.cuisine.map(cuisine => (
+                          <option key={cuisine} value={cuisine}>{cuisine}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Occasion */}
+                    <div>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">
+                        Best For *
+                      </label>
+                      <select
+                        value={restaurantTags.occasion}
+                        onChange={(e) => updateRestaurantTag('occasion', e.target.value)}
+                        className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select occasion</option>
+                        {restaurantTagOptions.occasion.map(occasion => (
+                          <option key={occasion} value={occasion}>{occasion}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Price Range */}
+                    <div>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">
+                        Price Range *
+                      </label>
+                      <select
+                        value={restaurantTags.priceRange}
+                        onChange={(e) => updateRestaurantTag('priceRange', e.target.value)}
+                        className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select price range</option>
+                        {restaurantTagOptions.priceRange.map(price => (
+                          <option key={price} value={price}>
+                            {price} {price === '$' ? 'Budget-friendly' : price === '$$' ? 'Moderate' : price === '$$$' ? 'Upscale' : 'Fine dining'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Dining Type */}
+                    <div>
+                      <label className="block text-xs font-medium text-blue-800 mb-1">
+                        Dining Type *
+                      </label>
+                      <select
+                        value={restaurantTags.diningType}
+                        onChange={(e) => updateRestaurantTag('diningType', e.target.value)}
+                        className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select dining type</option>
+                        {restaurantTagOptions.diningType.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 mb-2">
                 <input
                   type="text"
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
                   className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
-                  placeholder="Add a tag..."
+                  placeholder={formData.category_key === 'restaurants-cafes' ? "Add additional tags..." : "Add a tag..."}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                 />
                 <button
