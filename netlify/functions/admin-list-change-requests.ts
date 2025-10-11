@@ -40,7 +40,9 @@ export const handler: Handler = async (event) => {
 
     const SUPABASE_URL = requireEnv('SUPABASE_URL')
     const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-    const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY')
+    // Try both VITE_ and non-VITE_ versions (Netlify backend might not have VITE_ vars)
+    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+    if (!SUPABASE_ANON_KEY) throw new Error('Missing SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY')
     
     // Create two clients: one for auth verification (anon), one for data operations (service role)
     const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
@@ -50,7 +52,17 @@ export const handler: Handler = async (event) => {
     const { data: adminUserData, error: getAdminErr } = await (sbAnon as any).auth.getUser(token)
     if (getAdminErr || !adminUserData?.user?.id) {
       console.error('[admin-list-change-requests] Token verification failed:', getAdminErr)
-      return { statusCode: 401, headers, body: 'Invalid token' }
+      console.error('[admin-list-change-requests] Has ANON key?', !!SUPABASE_ANON_KEY)
+      console.error('[admin-list-change-requests] Token length:', token?.length)
+      return { 
+        statusCode: 401, 
+        headers, 
+        body: JSON.stringify({ 
+          error: 'Invalid token',
+          details: getAdminErr?.message || 'No user data',
+          hasAnonKey: !!SUPABASE_ANON_KEY
+        })
+      }
     }
 
     const adminEmail = adminUserData.user.email?.toLowerCase()
