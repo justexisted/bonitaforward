@@ -1681,8 +1681,8 @@ export default function MyBusinessPage() {
                       {listing.description && (
                         <div className="mt-4 pt-4 border-t border-neutral-200">
                           <div className="flex items-start">
-                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0">Description</span>
-                            <p className="text-sm text-neutral-700 leading-relaxed">{listing.description}</p>
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide w-20 flex-shrink-0 mr-4">Description</span>
+                            <br /><p className="text-sm text-neutral-700 leading-relaxed">{listing.description}</p>
                           </div>
                         </div>
                       )}
