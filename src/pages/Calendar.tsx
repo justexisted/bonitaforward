@@ -192,7 +192,35 @@ export default function CalendarPage() {
   const [showPastEvents, setShowPastEvents] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const auth = useAuth()
+  
+  // State for create event feature
+  const [showCreateEvent, setShowCreateEvent] = useState(false)
+  const [showTermsModal, setShowTermsModal] = useState(false)
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [submittingEvent, setSubmittingEvent] = useState(false)
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    description: '',
+    date: '',
+    time: '',
+    location: '',
+    address: '',
+    category: 'Community'
+  })
 
+
+  // Check if user has accepted terms
+  useEffect(() => {
+    if (auth.userId) {
+      try {
+        const accepted = localStorage.getItem(`bf-event-terms-${auth.userId}`) === 'true'
+        setHasAcceptedTerms(accepted)
+      } catch {
+        setHasAcceptedTerms(false)
+      }
+    }
+  }, [auth.userId])
 
   // Load events from database
   useEffect(() => {
@@ -213,6 +241,93 @@ export default function CalendarPage() {
     
     loadEvents()
   }, [])
+
+  // Handle create event button click
+  const handleCreateEventClick = () => {
+    if (!auth.isAuthed) {
+      alert('Please sign in to create an event')
+      return
+    }
+    
+    if (!hasAcceptedTerms) {
+      setShowTermsModal(true)
+    } else {
+      setShowCreateEvent(true)
+    }
+  }
+
+  // Handle terms acceptance
+  const handleAcceptTerms = () => {
+    if (!termsAccepted) {
+      alert('Please check the box to accept the terms')
+      return
+    }
+    
+    try {
+      localStorage.setItem(`bf-event-terms-${auth.userId}`, 'true')
+      setHasAcceptedTerms(true)
+      setShowTermsModal(false)
+      setShowCreateEvent(true)
+    } catch (error) {
+      console.error('Error saving terms acceptance:', error)
+      alert('Failed to save terms acceptance')
+    }
+  }
+
+  // Handle event submission
+  const handleSubmitEvent = async () => {
+    // Validation
+    if (!newEvent.title || !newEvent.date) {
+      alert('Please fill in at least the title and date')
+      return
+    }
+
+    setSubmittingEvent(true)
+
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .insert([{
+          title: newEvent.title,
+          description: newEvent.description || null,
+          date: new Date(newEvent.date + 'T' + (newEvent.time || '12:00')).toISOString(),
+          time: newEvent.time || null,
+          location: newEvent.location || null,
+          address: newEvent.address || null,
+          category: newEvent.category,
+          source: 'Local',
+          upvotes: 0,
+          downvotes: 0,
+          created_at: new Date().toISOString()
+        }])
+
+      if (error) throw error
+
+      alert('Event created successfully! It will appear on the calendar shortly.')
+      
+      // Reset form
+      setNewEvent({
+        title: '',
+        description: '',
+        date: '',
+        time: '',
+        location: '',
+        address: '',
+        category: 'Community'
+      })
+      setShowCreateEvent(false)
+
+      // Reload events
+      const allEvents = await fetchCalendarEvents()
+      setEvents(allEvents)
+
+    } catch (error: any) {
+      console.error('Error creating event:', error)
+      alert('Failed to create event: ' + error.message)
+    } finally {
+      setSubmittingEvent(false)
+    }
+  }
 
   // Vote on an event
   const voteOnEvent = async (eventId: string, voteType: 'up' | 'down') => {
@@ -410,9 +525,20 @@ export default function CalendarPage() {
           <h1 className="text-3xl md:text-4xl font-semibold tracking-tight font-display mb-4">
             Bonita Calendar
           </h1>
-          <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
+          <p className="text-lg text-neutral-600 max-w-2xl mx-auto mb-6">
             Discover local events in Bonita (91902). Currently featuring community events with plans to integrate additional sources. Help your community decide what matters most.
           </p>
+          
+          {/* Create Event Button */}
+          <button
+            onClick={handleCreateEventClick}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Community Event
+          </button>
         </div>
 
         {loading && (
@@ -852,6 +978,284 @@ export default function CalendarPage() {
                 {!auth.isAuthed && (
                   <p className="text-xs text-neutral-500 mt-3">Sign in to vote on events</p>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms Acceptance Modal */}
+      {showTermsModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowTermsModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl">
+              <h2 className="text-2xl font-bold">Event Posting Terms & Conditions</h2>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <p className="font-semibold text-yellow-900 mb-2">⚠️ Important Notice</p>
+                <p className="text-sm text-yellow-800">
+                  By creating an event on Bonita Forward, you agree to post only appropriate, 
+                  community-friendly content. You are fully responsible for the information you submit.
+                </p>
+              </div>
+
+              <div className="space-y-3 text-sm text-neutral-700">
+                <h3 className="font-semibold text-neutral-900 text-base">Terms of Use:</h3>
+                
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">•</span>
+                    <p><strong>Appropriate Content Only:</strong> All events must be appropriate for a general community audience. No offensive, discriminatory, or inappropriate content.</p>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">•</span>
+                    <p><strong>Accurate Information:</strong> Ensure all event details (date, time, location) are accurate and up-to-date.</p>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">•</span>
+                    <p><strong>Local Events:</strong> Events should be relevant to the Bonita/Chula Vista community and within a reasonable distance (~20 minutes).</p>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">•</span>
+                    <p><strong>Your Responsibility:</strong> You are solely responsible for any legal or ethical consequences arising from your event posting.</p>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">•</span>
+                    <p><strong>Moderation Rights:</strong> Bonita Forward reserves the right to remove any event that violates these terms or is deemed inappropriate.</p>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 font-bold">•</span>
+                    <p><strong>No Spam:</strong> Do not post duplicate events or use the calendar for spam or commercial advertising without prior approval.</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="font-semibold text-red-900 mb-2">Violations & Consequences:</p>
+                  <p className="text-red-800 text-sm">
+                    Posting offensive, inappropriate, or misleading content may result in:
+                  </p>
+                  <ul className="text-red-800 text-sm mt-2 ml-4 space-y-1">
+                    <li>• Immediate removal of your event</li>
+                    <li>• Suspension or termination of your account</li>
+                    <li>• Legal action if your content violates laws or causes harm</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Acceptance Checkbox */}
+              <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 text-blue-600 rounded border-neutral-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-neutral-900">
+                    I have read and agree to these terms. I understand that I am responsible for the content I post 
+                    and any consequences that may arise from inappropriate or offensive content.
+                  </span>
+                </label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className="flex-1 px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAcceptTerms}
+                  disabled={!termsAccepted}
+                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
+                    termsAccepted
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                  }`}
+                >
+                  Accept & Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Event Form Modal */}
+      {showCreateEvent && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowCreateEvent(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl relative">
+              <button
+                onClick={() => setShowCreateEvent(false)}
+                className="absolute top-4 right-4 bg-blue-800 hover:bg-blue-900 rounded-full p-2 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h2 className="text-2xl font-bold pr-10">Create Community Event</h2>
+              <p className="text-blue-100 mt-2 text-sm">Share your event with the Bonita community</p>
+            </div>
+
+            {/* Form Body */}
+            <div className="p-6 space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2">
+                  Event Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  placeholder="e.g., Bonita Farmers Market"
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  maxLength={100}
+                />
+              </div>
+
+              {/* Date and Time */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-900 mb-2">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={newEvent.date}
+                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-900 mb-2">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={newEvent.time}
+                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2">
+                  Location Name
+                </label>
+                <input
+                  type="text"
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  placeholder="e.g., Bonita Community Center"
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  value={newEvent.address}
+                  onChange={(e) => setNewEvent({ ...newEvent, address: e.target.value })}
+                  placeholder="e.g., 123 Main St, Bonita, CA 91902"
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2">
+                  Category
+                </label>
+                <select
+                  value={newEvent.category}
+                  onChange={(e) => setNewEvent({ ...newEvent, category: e.target.value })}
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="Community">Community</option>
+                  <option value="Family">Family</option>
+                  <option value="Business">Business</option>
+                  <option value="Culture">Culture</option>
+                  <option value="Education">Education</option>
+                  <option value="Sports">Sports</option>
+                  <option value="Food">Food</option>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  placeholder="Tell us more about your event..."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  maxLength={500}
+                />
+                <p className="text-xs text-neutral-500 mt-1">{newEvent.description.length}/500 characters</p>
+              </div>
+
+              {/* Reminder */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Reminder:</strong> Make sure your event information is accurate. 
+                  You've agreed to post only appropriate, community-friendly content.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowCreateEvent(false)}
+                  className="flex-1 px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 font-medium transition-colors"
+                  disabled={submittingEvent}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitEvent}
+                  disabled={submittingEvent || !newEvent.title || !newEvent.date}
+                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
+                    submittingEvent || !newEvent.title || !newEvent.date
+                      ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  {submittingEvent ? 'Creating...' : 'Create Event'}
+                </button>
               </div>
             </div>
           </div>
