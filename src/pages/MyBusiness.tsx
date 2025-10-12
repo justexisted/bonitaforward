@@ -1267,7 +1267,7 @@ export default function MyBusinessPage() {
                                 req.type
                               } approved!
                               <div className="text-green-600 mt-1">
-                                Approved {new Date(req.decided_at).toLocaleDateString()}
+                                Approved {req.decided_at ? new Date(req.decided_at).toLocaleDateString() : 'recently'}
                               </div>
                             </li>
                           )
@@ -1304,7 +1304,7 @@ export default function MyBusinessPage() {
                                 req.type
                               } was rejected
                               <div className="text-red-600 mt-1">
-                                {req.reason ? `Reason: ${req.reason}` : `Rejected ${new Date(req.decided_at).toLocaleDateString()}`}
+                                {req.reason ? `Reason: ${req.reason}` : req.decided_at ? `Rejected ${new Date(req.decided_at).toLocaleDateString()}` : 'Rejected'}
                               </div>
                             </li>
                           )

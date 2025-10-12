@@ -271,7 +271,7 @@ export default function AccountPage() {
   }
 
   // Remove saved business
-  const handleRemoveSavedBusiness = async (savedId: string | undefined, providerId: string, providerName: string | null) => {
+  const handleRemoveSavedBusiness = async (savedId: string | undefined, providerName: string | null) => {
     if (!confirm(`Remove "${providerName || 'this business'}" from saved list?`)) return
 
     try {
@@ -612,7 +612,7 @@ export default function AccountPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => handleRemoveSavedBusiness(business.id, business.provider_id, business.provider_name)}
+                        onClick={() => handleRemoveSavedBusiness(business.id, business.provider_name || null)}
                         className="flex-shrink-0 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
                         title="Remove from saved"
                       >
