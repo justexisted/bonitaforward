@@ -208,6 +208,13 @@ export default function CalendarPage() {
     address: '',
     category: 'Community'
   })
+  
+  // State for flag/report feature
+  const [showFlagModal, setShowFlagModal] = useState(false)
+  const [eventToFlag, setEventToFlag] = useState<CalendarEvent | null>(null)
+  const [flagReason, setFlagReason] = useState('')
+  const [flagDetails, setFlagDetails] = useState('')
+  const [submittingFlag, setSubmittingFlag] = useState(false)
 
 
   // Check if user has accepted terms
@@ -326,6 +333,74 @@ export default function CalendarPage() {
       alert('Failed to create event: ' + error.message)
     } finally {
       setSubmittingEvent(false)
+    }
+  }
+
+  // Handle flag event click
+  const handleFlagEventClick = (event: CalendarEvent) => {
+    if (!auth.isAuthed) {
+      alert('Please sign in to report events')
+      return
+    }
+    setEventToFlag(event)
+    setFlagReason('')
+    setFlagDetails('')
+    setShowFlagModal(true)
+  }
+
+  // Handle flag submission
+  const handleSubmitFlag = async () => {
+    if (!flagReason) {
+      alert('Please select a reason for reporting this event')
+      return
+    }
+
+    if (!eventToFlag || !auth.userId) return
+
+    setSubmittingFlag(true)
+
+    try {
+      // Check if user already flagged this event
+      const { data: existing } = await supabase
+        .from('event_flags')
+        .select('id')
+        .eq('event_id', eventToFlag.id)
+        .eq('user_id', auth.userId)
+        .maybeSingle()
+
+      if (existing) {
+        alert('You have already reported this event. Our admin team will review it.')
+        setShowFlagModal(false)
+        setEventToFlag(null)
+        return
+      }
+
+      // Insert flag
+      const { error } = await supabase
+        .from('event_flags')
+        .insert([{
+          event_id: eventToFlag.id,
+          user_id: auth.userId,
+          reason: flagReason,
+          details: flagDetails || null,
+          created_at: new Date().toISOString()
+        }])
+
+      if (error) throw error
+
+      alert('Thank you for reporting this event. Our admin team has been notified and will review it shortly.')
+      
+      // Reset and close
+      setShowFlagModal(false)
+      setEventToFlag(null)
+      setFlagReason('')
+      setFlagDetails('')
+
+    } catch (error: any) {
+      console.error('Error flagging event:', error)
+      alert('Failed to submit report: ' + error.message)
+    } finally {
+      setSubmittingFlag(false)
     }
   }
 
@@ -951,28 +1026,46 @@ export default function CalendarPage() {
               {/* Voting */}
               <div className="pt-4 border-t border-neutral-200">
                 <p className="text-xs md:text-sm text-neutral-500 mb-3">Community Feedback</p>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        voteOnEvent(selectedEvent.id, 'up')
+                      }}
+                      className="flex items-center space-x-2 px-4 py-2 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
+                      disabled={!auth.isAuthed}
+                    >
+                      <ChevronUp className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
+                      <span className="text-sm md:text-base font-medium text-green-600">{selectedEvent.upvotes}</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        voteOnEvent(selectedEvent.id, 'down')
+                      }}
+                      className="flex items-center space-x-2 px-4 py-2 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
+                      disabled={!auth.isAuthed}
+                    >
+                      <ChevronDown className="w-4 h-4 md:w-5 md:h-5 text-red-600" />
+                      <span className="text-sm md:text-base font-medium text-red-600">{selectedEvent.downvotes}</span>
+                    </button>
+                  </div>
+                  
+                  {/* Flag/Report Button */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      voteOnEvent(selectedEvent.id, 'up')
+                      setSelectedEvent(null)
+                      handleFlagEventClick(selectedEvent)
                     }}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-full bg-green-50 hover:bg-green-100 transition-colors"
-                    disabled={!auth.isAuthed}
+                    className="flex items-center space-x-2 px-3 py-2 rounded-lg text-neutral-600 hover:bg-neutral-100 transition-colors text-sm"
+                    title="Report this event"
                   >
-                    <ChevronUp className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
-                    <span className="text-sm md:text-base font-medium text-green-600">{selectedEvent.upvotes}</span>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      voteOnEvent(selectedEvent.id, 'down')
-                    }}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-full bg-red-50 hover:bg-red-100 transition-colors"
-                    disabled={!auth.isAuthed}
-                  >
-                    <ChevronDown className="w-4 h-4 md:w-5 md:h-5 text-red-600" />
-                    <span className="text-sm md:text-base font-medium text-red-600">{selectedEvent.downvotes}</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                    </svg>
+                    <span>Report</span>
                   </button>
                 </div>
                 {!auth.isAuthed && (
@@ -1255,6 +1348,118 @@ export default function CalendarPage() {
                   }`}
                 >
                   {submittingEvent ? 'Creating...' : 'Create Event'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Flag/Report Event Modal */}
+      {showFlagModal && eventToFlag && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowFlagModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-6 rounded-t-2xl relative">
+              <button
+                onClick={() => setShowFlagModal(false)}
+                className="absolute top-4 right-4 bg-red-800 hover:bg-red-900 rounded-full p-2 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h2 className="text-2xl font-bold pr-10">Report Event</h2>
+              <p className="text-red-100 mt-2 text-sm">Help us keep Bonita's calendar clean</p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Event Info */}
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                <h3 className="font-semibold text-neutral-900 mb-1">{eventToFlag.title}</h3>
+                <p className="text-sm text-neutral-600">
+                  {new Date(eventToFlag.date).toLocaleDateString()} • {eventToFlag.source}
+                </p>
+              </div>
+
+              {/* Warning */}
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <p className="text-sm text-yellow-900">
+                  <strong>⚠️ Important:</strong> Only report events that violate our community guidelines. 
+                  False reports may result in action on your account.
+                </p>
+              </div>
+
+              {/* Reason Selection */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2">
+                  Why are you reporting this event? <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="spam">Spam or Commercial Advertisement</option>
+                  <option value="inappropriate">Inappropriate or Offensive Content</option>
+                  <option value="misleading">Misleading or False Information</option>
+                  <option value="duplicate">Duplicate Event</option>
+                  <option value="wrong-location">Event Not in Bonita Area</option>
+                  <option value="cancelled">Event Has Been Cancelled</option>
+                  <option value="other">Other Violation</option>
+                </select>
+              </div>
+
+              {/* Additional Details */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2">
+                  Additional Details (Optional)
+                </label>
+                <textarea
+                  value={flagDetails}
+                  onChange={(e) => setFlagDetails(e.target.value)}
+                  placeholder="Provide more context to help us understand the issue..."
+                  rows={3}
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                  maxLength={300}
+                />
+                <p className="text-xs text-neutral-500 mt-1">{flagDetails.length}/300 characters</p>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-900">
+                  <strong>What happens next:</strong> Our admin team will review this report and take appropriate action. 
+                  You'll only be notified if we need more information.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowFlagModal(false)}
+                  className="flex-1 px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 font-medium transition-colors"
+                  disabled={submittingFlag}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitFlag}
+                  disabled={submittingFlag || !flagReason}
+                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
+                    submittingFlag || !flagReason
+                      ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                >
+                  {submittingFlag ? 'Submitting...' : 'Submit Report'}
                 </button>
               </div>
             </div>

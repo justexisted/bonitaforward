@@ -132,6 +132,16 @@ export default function AdminPage() {
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [providers, setProviders] = useState<ProviderRow[]>([])
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
+  const [flaggedEvents, setFlaggedEvents] = useState<Array<{
+    id: string
+    event_id: string
+    user_id: string
+    reason: string
+    details: string | null
+    created_at: string
+    event?: CalendarEvent
+    reporter_email?: string
+  }>>([])
   const [loading, setLoading] = useState(true)
   
   // Form states for calendar events
@@ -944,7 +954,7 @@ export default function AdminPage() {
     booking_url: null
   })
   // State for selected section
-  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog' | 'calendar-events'>('providers')
+  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'blog' | 'calendar-events' | 'flagged-events'>('providers')
 
   // Filtered providers based on featured status filter
   // This allows admins to easily view all providers, only featured ones, or only non-featured ones
@@ -1512,6 +1522,38 @@ export default function AdminPage() {
             setCalendarEvents(events)
           }
         } catch {}
+        try {
+          // Load flagged events for admin panel (always load for pending approvals notification)
+          if (isAdmin) {
+            const { data: flags, error: flagsError } = await supabase
+              .from('event_flags')
+              .select('*, calendar_events(*), profiles(email)')
+              .order('created_at', { ascending: false })
+            
+            if (flagsError) {
+              // Table might not exist yet or foreign key issue - log detailed error
+              console.warn('[Admin] Could not load flagged events (table may not exist yet):', flagsError.message, flagsError.code)
+              // Set empty array so the UI doesn't break
+              setFlaggedEvents([])
+            } else {
+              // Transform the data to include event and reporter info
+              const transformedFlags = (flags || []).map((flag: any) => ({
+                id: flag.id,
+                event_id: flag.event_id,
+                user_id: flag.user_id,
+                reason: flag.reason,
+                details: flag.details,
+                created_at: flag.created_at,
+                event: flag.calendar_events,
+                reporter_email: flag.profiles?.email || 'Unknown'
+              }))
+              setFlaggedEvents(transformedFlags)
+            }
+          }
+        } catch (err) {
+          console.warn('[Admin] Exception loading flagged events:', err)
+          setFlaggedEvents([])
+        }
         try {
           if (isAdmin) {
             const { data: session } = await supabase.auth.getSession()
@@ -2664,6 +2706,7 @@ export default function AdminPage() {
                   <option value="bookings">Bookings</option>
                   <option value="blog">Blog Manager</option>
                   <option value="calendar-events">Calendar Events</option>
+                  <option value="flagged-events">Flagged Events</option>
                 </select>
               </>
             )}
@@ -2775,6 +2818,28 @@ export default function AdminPage() {
                             ))}
                             {contactLeads.length > 2 && <div className="text-amber-500">+{contactLeads.length - 2} more</div>}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Flagged Calendar Events */}
+                      {flaggedEvents.length > 0 && (
+                        <div className="bg-white rounded-lg p-3 border border-red-300">
+                          <div className="font-medium text-red-800">Flagged Events</div>
+                          <div className="text-xs text-red-600 mt-1">{flaggedEvents.length} flagged</div>
+                          <div className="text-xs text-red-700 mt-2">
+                            {flaggedEvents.slice(0, 2).map(flag => (
+                              <div key={flag.id} className="truncate">
+                                {flag.event?.title || 'Event deleted'} ({flag.reason})
+                              </div>
+                            ))}
+                            {flaggedEvents.length > 2 && <div className="text-red-500">+{flaggedEvents.length - 2} more</div>}
+                          </div>
+                          <button
+                            onClick={() => setSection('flagged-events')}
+                            className="mt-3 w-full px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors"
+                          >
+                            Review Flagged Events
+                          </button>
                         </div>
                       )}
                     </div>
@@ -5252,6 +5317,181 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Flagged Events Section */}
+        {isAdmin && section === 'flagged-events' && (
+          <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="font-medium text-lg">Flagged Events</div>
+                <div className="mt-1 text-sm text-neutral-600">
+                  Review community-reported events and take appropriate action
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  flaggedEvents.length > 0
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-green-100 text-green-800'
+                }`}>
+                  {flaggedEvents.length} Flagged Event{flaggedEvents.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+
+            {flaggedEvents.length === 0 ? (
+              <div className="text-center py-12 bg-neutral-50 rounded-lg">
+                <div className="text-4xl mb-3">✓</div>
+                <div className="text-lg font-medium text-neutral-700">No Flagged Events</div>
+                <div className="text-sm text-neutral-500 mt-1">
+                  All events are looking good! Flagged events will appear here.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {flaggedEvents.map((flag) => (
+                  <div
+                    key={flag.id}
+                    className="border-2 border-red-200 rounded-xl p-4 bg-red-50"
+                  >
+                    {/* Flag Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-full uppercase">
+                            {flag.reason.replace(/-/g, ' ')}
+                          </span>
+                          <span className="text-xs text-neutral-500">
+                            Reported {new Date(flag.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="text-xs text-neutral-600">
+                          Reporter: {flag.reporter_email}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Event Info */}
+                    {flag.event ? (
+                      <div className="bg-white rounded-lg p-4 border border-neutral-200 mb-3">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="font-semibold text-neutral-900">{flag.event.title}</h3>
+                          <span className="text-xs bg-neutral-100 text-neutral-600 px-2 py-1 rounded-full">
+                            {flag.event.source}
+                          </span>
+                        </div>
+                        <div className="space-y-1 text-sm text-neutral-600">
+                          <div>📅 {new Date(flag.event.date).toLocaleDateString()} {flag.event.time && `at ${flag.event.time}`}</div>
+                          {flag.event.location && <div>📍 {flag.event.location}</div>}
+                          {flag.event.address && <div>🏠 {flag.event.address}</div>}
+                          <div>🏷️ {flag.event.category}</div>
+                        </div>
+                        {flag.event.description && (
+                          <div className="mt-2 pt-2 border-t border-neutral-200">
+                            <div className="text-xs font-medium text-neutral-500 mb-1">Description:</div>
+                            <div className="text-sm text-neutral-700">{flag.event.description}</div>
+                          </div>
+                        )}
+                        <div className="mt-2 pt-2 border-t border-neutral-200 flex items-center gap-4 text-xs text-neutral-500">
+                          <span>👍 {flag.event.upvotes} upvotes</span>
+                          <span>👎 {flag.event.downvotes} downvotes</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-neutral-100 rounded-lg p-4 mb-3 text-center text-sm text-neutral-500">
+                        Event has been deleted
+                      </div>
+                    )}
+
+                    {/* Flag Details */}
+                    {flag.details && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                        <div className="text-xs font-medium text-yellow-900 mb-1">Reporter's Comments:</div>
+                        <div className="text-sm text-yellow-800">{flag.details}</div>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-neutral-500">
+                        Event ID: {flag.event_id.substring(0, 8)}...
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Dismiss this flag? The event will remain on the calendar.')) return
+                            try {
+                              const { error } = await supabase
+                                .from('event_flags')
+                                .delete()
+                                .eq('id', flag.id)
+                              
+                              if (error) throw error
+                              
+                              // Refresh flagged events
+                              setFlaggedEvents(prev => prev.filter(f => f.id !== flag.id))
+                              alert('Flag dismissed successfully')
+                            } catch (error: any) {
+                              console.error('Error dismissing flag:', error)
+                              alert('Failed to dismiss flag: ' + error.message)
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          ✓ Dismiss Flag
+                        </button>
+                        {flag.event && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete event "${flag.event?.title}"? This cannot be undone.`)) return
+                              try {
+                                // Delete the event
+                                const { error: eventError } = await supabase
+                                  .from('calendar_events')
+                                  .delete()
+                                  .eq('id', flag.event_id)
+                                
+                                if (eventError) throw eventError
+
+                                // Delete all flags for this event
+                                const { error: flagError } = await supabase
+                                  .from('event_flags')
+                                  .delete()
+                                  .eq('event_id', flag.event_id)
+                                
+                                if (flagError) console.warn('Error deleting flags:', flagError)
+                                
+                                // Refresh flagged events
+                                setFlaggedEvents(prev => prev.filter(f => f.event_id !== flag.event_id))
+                                
+                                // Refresh calendar events in case admin switches tabs
+                                try {
+                                  const { fetchCalendarEvents } = await import('./Calendar')
+                                  const events = await fetchCalendarEvents()
+                                  setCalendarEvents(events)
+                                } catch (refreshError) {
+                                  console.warn('Could not refresh calendar events:', refreshError)
+                                }
+                                
+                                alert('Event deleted successfully')
+                              } catch (error: any) {
+                                console.error('Error deleting event:', error)
+                                alert('Failed to delete event: ' + error.message)
+                              }
+                            }}
+                            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            🗑️ Delete Event
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
