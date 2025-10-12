@@ -762,7 +762,8 @@ function Navbar() {
     const handleCtaClick = () => {
       if (!auth.isAuthed) {
         saveReturnUrl()
-        window.location.href = '/signin'
+        // Redirect to sign up page instead of sign in
+        window.location.href = '/signin?mode=signup'
       } else {
         window.location.href = '/account'
       }
