@@ -22,6 +22,20 @@ type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
   }
 }
 
+// Extended type for job posts with provider information
+type ProviderJobPostWithDetails = ProviderJobPost & {
+  provider?: {
+    id: string
+    name: string
+    email: string | null
+  }
+  owner?: {
+    id: string
+    email: string
+    name: string | null
+  }
+}
+
 type ProviderRow = {
   id: string
   name: string
@@ -734,7 +748,7 @@ export default function AdminPage() {
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiQuery, setEmojiQuery] = useState('')
   const [changeRequests, setChangeRequests] = useState<ProviderChangeRequestWithDetails[]>([])
-  const [jobPosts, setJobPosts] = useState<ProviderJobPost[]>([])
+  const [jobPosts, setJobPosts] = useState<ProviderJobPostWithDetails[]>([])
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
@@ -1386,9 +1400,9 @@ export default function AdminPage() {
           await loadChangeRequests()
         } catch {}
         try {
-          console.log('[Admin] Loading job posts...')
+          console.log('[Admin] Loading job posts with provider details...')
           
-          // Try the main query first
+          // Load job posts
           const { data: jpData, error: jpError } = await supabase
             .from('provider_job_posts')
             .select('*')
@@ -1398,8 +1412,45 @@ export default function AdminPage() {
           
           if (jpError) {
             console.error('[Admin] Job posts query error:', jpError)
+            setError(`Failed to load job posts: ${jpError.message}`)
+          } else if (jpData && jpData.length > 0) {
+            // Get unique provider IDs and owner IDs
+            const providerIds = [...new Set(jpData.map(j => j.provider_id).filter(Boolean))]
+            const ownerIds = [...new Set(jpData.map(j => j.owner_user_id).filter(Boolean))]
             
-            // Try a simpler query as fallback
+            // Fetch provider details
+            const { data: providersData } = await supabase
+              .from('providers')
+              .select('id, name, email')
+              .in('id', providerIds)
+            
+            // Fetch owner (user) details
+            const { data: ownersData } = await supabase
+              .from('profiles')
+              .select('id, email, name')
+              .in('id', ownerIds)
+            
+            // Combine data
+            const jobsWithDetails: ProviderJobPostWithDetails[] = jpData.map(job => {
+              const provider = providersData?.find(p => p.id === job.provider_id)
+              const owner = ownersData?.find(o => o.id === job.owner_user_id)
+              return {
+                ...job,
+                provider: provider || undefined,
+                owner: owner || undefined
+              }
+            })
+            
+            setJobPosts(jobsWithDetails)
+            console.log('[Admin] Loaded', jobsWithDetails.length, 'job posts with provider details')
+          } else {
+            setJobPosts([])
+          }
+        } catch (err) {
+          console.error('[Admin] Error loading job posts:', err)
+          setError('Failed to load job posts')
+          // Try a simpler fallback query
+          try {
             console.log('[Admin] Trying fallback query...')
             const { data: fallbackData, error: fallbackError } = await supabase
               .from('provider_job_posts')
@@ -1408,27 +1459,26 @@ export default function AdminPage() {
             
             console.log('[Admin] Fallback query result:', { error: fallbackError, data: fallbackData })
             
-            if (fallbackError) {
-              setError(`Failed to load job posts: ${jpError.message} (Fallback also failed: ${fallbackError.message})`)
-            } else {
+            if (!fallbackError && fallbackData) {
               // Use fallback data with minimal fields
-              const minimalJobs = (fallbackData || []).map(job => ({
+              const minimalJobs: ProviderJobPostWithDetails[] = (fallbackData || []).map(job => ({
                 ...job,
                 description: null,
                 apply_url: null,
                 salary_range: null,
-                decided_at: null
-              })) as ProviderJobPost[]
+                decided_at: null,
+                provider: undefined,
+                owner: undefined
+              }))
               setJobPosts(minimalJobs)
               console.log('[Admin] Using fallback job data:', minimalJobs)
+            } else {
+              setJobPosts([])
             }
-          } else {
-            setJobPosts((jpData as ProviderJobPost[]) || [])
-            console.log('[Admin] Job posts loaded successfully:', (jpData as ProviderJobPost[]) || [])
+          } catch (fallbackErr) {
+            console.error('[Admin] Fallback query also failed:', fallbackErr)
+            setJobPosts([])
           }
-        } catch (err: any) {
-          console.error('[Admin] Job posts loading exception:', err)
-          setError(`Failed to load job posts: ${err.message}`)
         }
       } catch (err: any) {
         console.error('[Admin] unexpected failure', err)
@@ -3319,6 +3369,32 @@ export default function AdminPage() {
                               </div>
                             </div>
 
+                            {/* Specialties */}
+                            <div>
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">
+                                  Specialties
+                                  <span className="text-xs text-green-600 ml-2">
+                                    (Comma-separated)
+                                  </span>
+                                </label>
+                                <input 
+                                  defaultValue={(newProviderForm.specialties || []).join(', ')} 
+                                  onBlur={(e) => {
+                                    setNewProviderForm(prev => ({ 
+                                      ...prev, 
+                                      specialties: e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                                    }))
+                                  }} 
+                                  className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
+                                  placeholder="e.g., Kitchen Remodeling, Solar Installation, Wedding Photography, Tax Planning"
+                                />
+                                <p className="text-xs text-green-600 mt-1">
+                                  Type freely. Changes save when you leave the field.
+                                </p>
+                              </div>
+                            </div>
+
                             {/* Plan Selection */}
                             <div>
                               <h4 className="text-md font-medium text-green-800 mb-4">Plan Type</h4>
@@ -3633,6 +3709,30 @@ export default function AdminPage() {
                           </div>
                         </div>
 
+                        {/* Specialties */}
+                        <div>
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-1">
+                              Specialties
+                              <span className="text-xs text-neutral-500 ml-2">
+                                (Comma-separated)
+                              </span>
+                            </label>
+                            <input 
+                              defaultValue={(editingProvider.specialties || []).join(', ')} 
+                              key={`specialties-${editingProvider.id}`}
+                              onBlur={(e) => setProviders((arr) => arr.map(p => 
+                                p.id === editingProvider.id ? { ...p, specialties: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
+                              ))} 
+                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
+                              placeholder="e.g., Kitchen Remodeling, Solar Installation, Wedding Photography, Tax Planning"
+                            />
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Type freely and press Tab or click outside to save. Changes apply when you leave the field.
+                            </p>
+                          </div>
+                        </div>
+
                         {/* Service Areas */}
                         <div>
                           <div>
@@ -3640,13 +3740,17 @@ export default function AdminPage() {
                               Areas You Serve
                             </label>
                             <input 
-                              value={(editingProvider.service_areas || []).join(', ')} 
-                              onChange={(e) => setProviders((arr) => arr.map(p => 
+                              defaultValue={(editingProvider.service_areas || []).join(', ')} 
+                              key={`service-areas-${editingProvider.id}`}
+                              onBlur={(e) => setProviders((arr) => arr.map(p => 
                                 p.id === editingProvider.id ? { ...p, service_areas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
                               ))} 
                               className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                               placeholder="Bonita, Chula Vista, San Diego, National City"
                             />
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Type comma-separated areas. Changes save when you leave the field.
+                            </p>
                           </div>
                         </div>
 
@@ -3902,13 +4006,17 @@ export default function AdminPage() {
                           <div>
                             <label className="block text-sm font-medium text-neutral-700 mb-1">Tags</label>
                             <input 
-                              value={(editingProvider.tags || []).join(', ')} 
-                              onChange={(e) => setProviders((arr) => arr.map(p => 
+                              defaultValue={(editingProvider.tags || []).join(', ')} 
+                              key={`tags-${editingProvider.id}`}
+                              onBlur={(e) => setProviders((arr) => arr.map(p => 
                                 p.id === editingProvider.id ? { ...p, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
                               ))} 
                               className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
                               placeholder="professional, reliable, local, certified"
                             />
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Type comma-separated values. Changes save when you click outside the field.
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -4825,7 +4933,7 @@ function JobCard({
   onReject, 
   onDelete 
 }: { 
-  job: ProviderJobPost
+  job: ProviderJobPostWithDetails
   onApprove: () => void
   onReject: () => void
   onDelete: () => void
@@ -4906,11 +5014,69 @@ function JobCard({
           </div>
         </div>
 
-        <div className="text-sm">
-          <span className="font-medium">Provider ID:</span> {job.provider_id}
-        </div>
-        <div className="text-sm">
-          <span className="font-medium">Owner ID:</span> {job.owner_user_id}
+        {/* Provider Information */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div>
+            <div className="text-xs font-medium text-blue-800 mb-1">Business Information</div>
+            <div className="space-y-1 text-sm">
+              {job.provider ? (
+                <>
+                  <div>
+                    <span className="font-medium">Business Name:</span>
+                    <span className="ml-2 text-blue-900">{job.provider.name}</span>
+                  </div>
+                  {job.provider.email && (
+                    <div>
+                      <span className="font-medium">Email:</span>
+                      <a href={`mailto:${job.provider.email}`} className="ml-2 text-blue-600 hover:underline">
+                        {job.provider.email}
+                      </a>
+                    </div>
+                  )}
+                  <div className="text-xs text-blue-700">
+                    <span className="font-medium">Provider ID:</span>
+                    <span className="ml-1 font-mono">{job.provider_id}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-neutral-600">
+                  Provider ID: {job.provider_id}
+                  <div className="text-xs text-neutral-500 mt-1">(Details not available)</div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <div className="text-xs font-medium text-blue-800 mb-1">Posted By (Owner)</div>
+            <div className="space-y-1 text-sm">
+              {job.owner ? (
+                <>
+                  {job.owner.name && (
+                    <div>
+                      <span className="font-medium">Name:</span>
+                      <span className="ml-2 text-blue-900">{job.owner.name}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-medium">Email:</span>
+                    <a href={`mailto:${job.owner.email}`} className="ml-2 text-blue-600 hover:underline">
+                      {job.owner.email}
+                    </a>
+                  </div>
+                  <div className="text-xs text-blue-700">
+                    <span className="font-medium">User ID:</span>
+                    <span className="ml-1 font-mono">{job.owner_user_id}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-neutral-600">
+                  Owner ID: {job.owner_user_id}
+                  <div className="text-xs text-neutral-500 mt-1">(Details not available)</div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

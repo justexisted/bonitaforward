@@ -224,6 +224,21 @@ export default function MyBusinessPage() {
   }, [auth.userId, auth.role, auth.isAuthed])
 
   /**
+   * AUTO-SELECT TAB FROM URL HASH
+   * 
+   * This effect handles automatic tab selection when URL has a hash (e.g., #jobs).
+   * Used when redirecting from Jobs page "Post a Job" button.
+   */
+  useEffect(() => {
+    const hash = window.location.hash.slice(1) // Remove the '#'
+    if (hash === 'jobs' || hash === 'listings' || hash === 'applications' || hash === 'change-requests' || hash === 'user-activity' || hash === 'analytics') {
+      setActiveTab(hash as typeof activeTab)
+      // Clear the hash after setting the tab so it doesn't persist on refresh
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
+
+  /**
    * AUTO-SELECT PLAN FROM PRICING PAGE
    * 
    * This effect handles automatic plan selection when redirected from the pricing page.
@@ -1685,14 +1700,29 @@ export default function MyBusinessPage() {
 
             {listings.length === 0 ? (
               <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-                <h3 className="text-lg font-medium text-neutral-900">Create a Business Listing First</h3>
-                <p className="mt-2 text-neutral-600">You need to create a business listing before you can post jobs.</p>
+                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Ready to Post Jobs?</h3>
+                <p className="text-neutral-600 mb-2">First, you'll need to create a business listing.</p>
+                <p className="text-sm text-neutral-500 mb-6">Job postings are linked to your business listings so candidates can learn more about your company.</p>
                 <button
-                  onClick={() => setShowCreateForm(true)}
-                  className="mt-4 inline-block rounded-full bg-neutral-900 text-white px-6 py-2"
+                  onClick={() => {
+                    setShowCreateForm(true)
+                    setActiveTab('listings')
+                  }}
+                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                 >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
                   Create Business Listing
                 </button>
+                <p className="text-xs text-neutral-500 mt-4">
+                  After creating your listing, you can return here to post jobs
+                </p>
               </div>
             ) : jobPosts.length === 0 ? (
               <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">

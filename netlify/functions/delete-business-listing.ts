@@ -86,11 +86,19 @@ export const handler: Handler = async (event) => {
 
     console.log('[Delete Listing] Found listing:', listing)
 
-    // Verify ownership
+    // Check if user is admin
+    const adminEmails = (process.env.VITE_ADMIN_EMAILS || '')
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(Boolean)
+    const adminList = adminEmails.length > 0 ? adminEmails : ['justexisted@gmail.com']
+    const isAdmin = userEmail && adminList.includes(userEmail.toLowerCase())
+
+    // Verify ownership or admin status
     const isOwner = listing.owner_user_id === userId || listing.email === userEmail
     
-    if (!isOwner) {
-      console.error('[Delete Listing] User does not own listing')
+    if (!isOwner && !isAdmin) {
+      console.error('[Delete Listing] User does not own listing and is not admin')
       return { 
         statusCode: 403, 
         headers, 
@@ -98,7 +106,11 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    console.log('[Delete Listing] Ownership verified, proceeding with deletion')
+    if (isAdmin) {
+      console.log('[Delete Listing] Admin override - proceeding with deletion')
+    } else {
+      console.log('[Delete Listing] Ownership verified, proceeding with deletion')
+    }
 
     // Delete related records first (using service role bypasses RLS)
     console.log('[Delete Listing] Deleting related records...')
