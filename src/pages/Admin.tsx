@@ -142,6 +142,13 @@ export default function AdminPage() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set())
   const [filteringByZipCode, setFilteringByZipCode] = useState(false)
+  // State for zip code filter modal
+  const [showZipFilterModal, setShowZipFilterModal] = useState(false)
+  const [eventsToFilter, setEventsToFilter] = useState<{
+    toDelete: Array<CalendarEvent & { zip: string | null, reason: string }>
+    toKeep: Array<CalendarEvent & { zip: string | null }>
+  }>({ toDelete: [], toKeep: [] })
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set())
 
   // Function to add a new calendar event
   const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at'>) => {
@@ -223,15 +230,24 @@ export default function AdminPage() {
   }
 
   /**
-   * Function to filter calendar events by allowed zip codes
+   * Helper function to extract zip code from a string
+   */
+  const extractZipCode = (locationString: string | null | undefined): string | null => {
+    if (!locationString) return null
+    const zipMatch = locationString.match(/\b(\d{5})(?:-\d{4})?\b/)
+    return zipMatch ? zipMatch[1] : null
+  }
+
+  /**
+   * Function to analyze and show filter modal for calendar events by zip codes
    * 
    * This function:
    * 1. Extracts zip codes from event locations/addresses
    * 2. Compares against allowed zip codes (within ~20 min of Chula Vista)
-   * 3. Deletes events that don't match the allowed zip codes
-   * 4. Shows a summary of what was filtered
+   * 3. Shows a modal with checkboxes to select events for deletion
+   * 4. Allows reading descriptions before making decisions
    */
-  const filterEventsByZipCode = async () => {
+  const openZipFilterModal = () => {
     // Allowed zip codes within ~20 min of Chula Vista
     const ALLOWED_ZIP_CODES = new Set([
       '91909', '91910', '91911', '91912', '91913', '91914', '91915', '91921',
@@ -240,19 +256,42 @@ export default function AdminPage() {
       '92118'
     ])
 
-    // Helper function to extract zip code from a string
-    const extractZipCode = (locationString: string | null | undefined): string | null => {
-      if (!locationString) return null
-      const zipMatch = locationString.match(/\b(\d{5})(?:-\d{4})?\b/)
-      return zipMatch ? zipMatch[1] : null
+    // Analyze events and categorize them
+    const toDelete: Array<CalendarEvent & { zip: string | null, reason: string }> = []
+    const toKeep: Array<CalendarEvent & { zip: string | null }> = []
+
+    calendarEvents.forEach(event => {
+      const locationZip = extractZipCode(event.location)
+      const addressZip = extractZipCode(event.address)
+      const zip = locationZip || addressZip
+
+      if (!zip) {
+        toDelete.push({ ...event, zip: null, reason: 'No zip code found' })
+      } else if (!ALLOWED_ZIP_CODES.has(zip)) {
+        toDelete.push({ ...event, zip, reason: `Zip ${zip} outside allowed area` })
+      } else {
+        toKeep.push({ ...event, zip })
+      }
+    })
+
+    setEventsToFilter({ toDelete, toKeep })
+    // Pre-select all events for deletion
+    setSelectedEventIds(new Set(toDelete.map(e => e.id)))
+    setShowZipFilterModal(true)
+  }
+
+  /**
+   * Function to execute the deletion of selected events
+   */
+  const executeZipFilterDeletion = async () => {
+    if (selectedEventIds.size === 0) {
+      alert('No events selected for deletion.')
+      return
     }
 
     const confirmed = confirm(
-      `This will filter calendar events by allowed zip codes (within ~20 minutes of Chula Vista).\n\n` +
-      `Events WITHOUT a valid zip code in their location or address will be DELETED.\n` +
-      `Events OUTSIDE the allowed area will be DELETED.\n\n` +
-      `Current events: ${calendarEvents.length}\n\n` +
-      `Are you sure you want to continue?`
+      `Are you sure you want to delete ${selectedEventIds.size} selected event(s)?\n\n` +
+      `This action cannot be undone.`
     )
 
     if (!confirmed) return
@@ -260,54 +299,15 @@ export default function AdminPage() {
     setFilteringByZipCode(true)
 
     try {
-      // Analyze events and categorize them
-      const eventsToDelete: CalendarEvent[] = []
-      const eventsToKeep: CalendarEvent[] = []
-      const eventsSummary: string[] = []
-
-      calendarEvents.forEach(event => {
-        const locationZip = extractZipCode(event.location)
-        const addressZip = extractZipCode(event.address)
-        const zip = locationZip || addressZip
-
-        if (!zip) {
-          eventsToDelete.push(event)
-          eventsSummary.push(`❌ "${event.title}" - No zip code found`)
-        } else if (!ALLOWED_ZIP_CODES.has(zip)) {
-          eventsToDelete.push(event)
-          eventsSummary.push(`❌ "${event.title}" - Zip ${zip} outside allowed area`)
-        } else {
-          eventsToKeep.push(event)
-          eventsSummary.push(`✓ "${event.title}" - Zip ${zip} is allowed`)
-        }
-      })
-
-      // Show summary and get final confirmation
-      const summaryText = 
-        `Filter Results:\n\n` +
-        `✓ Events to KEEP: ${eventsToKeep.length}\n` +
-        `❌ Events to DELETE: ${eventsToDelete.length}\n\n` +
-        `Details:\n${eventsSummary.slice(0, 20).join('\n')}` +
-        (eventsSummary.length > 20 ? `\n... and ${eventsSummary.length - 20} more` : '') +
-        `\n\nProceed with deletion?`
-
-      const finalConfirm = confirm(summaryText)
-
-      if (!finalConfirm) {
-        setFilteringByZipCode(false)
-        return
-      }
-
-      // Delete events that don't match
       let deletedCount = 0
-      for (const event of eventsToDelete) {
+      for (const eventId of selectedEventIds) {
         const { error } = await supabase
           .from('calendar_events')
           .delete()
-          .eq('id', event.id)
+          .eq('id', eventId)
 
         if (error) {
-          console.error(`Error deleting event "${event.title}":`, error)
+          console.error(`Error deleting event:`, error)
         } else {
           deletedCount++
         }
@@ -320,16 +320,46 @@ export default function AdminPage() {
 
       alert(
         `Zip Code Filtering Complete!\n\n` +
-        `✓ Kept: ${eventsToKeep.length} events\n` +
         `❌ Deleted: ${deletedCount} events\n` +
         `Remaining: ${events.length} events`
       )
+
+      // Close modal and reset
+      setShowZipFilterModal(false)
+      setSelectedEventIds(new Set())
+      setEventsToFilter({ toDelete: [], toKeep: [] })
 
     } catch (error) {
       console.error('Error filtering events by zip code:', error)
       alert('Failed to filter events: ' + error)
     } finally {
       setFilteringByZipCode(false)
+    }
+  }
+
+  /**
+   * Toggle event selection for deletion
+   */
+  const toggleEventSelection = (eventId: string) => {
+    setSelectedEventIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId)
+      } else {
+        newSet.add(eventId)
+      }
+      return newSet
+    })
+  }
+
+  /**
+   * Select/deselect all events
+   */
+  const toggleAllEventSelection = () => {
+    if (selectedEventIds.size === eventsToFilter.toDelete.length) {
+      setSelectedEventIds(new Set())
+    } else {
+      setSelectedEventIds(new Set(eventsToFilter.toDelete.map(e => e.id)))
     }
   }
 
@@ -4563,18 +4593,187 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <button
-                  onClick={filterEventsByZipCode}
-                  disabled={filteringByZipCode || calendarEvents.length === 0}
+                  onClick={openZipFilterModal}
+                  disabled={calendarEvents.length === 0}
                   className={`ml-4 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                    filteringByZipCode || calendarEvents.length === 0
+                    calendarEvents.length === 0
                       ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  {filteringByZipCode ? 'Filtering...' : 'Filter by Zip Code'}
+                  Filter by Zip Code
                 </button>
               </div>
             </div>
+
+            {/* Zip Code Filter Modal */}
+            {showZipFilterModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col">
+                  {/* Modal Header */}
+                  <div className="p-6 border-b border-neutral-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h2 className="text-xl font-semibold text-neutral-900">Filter Events by Zip Code</h2>
+                        <div className="mt-2 text-sm text-neutral-600">
+                          Review and select events to delete. Events are pre-selected based on zip code filtering.
+                        </div>
+                        <div className="mt-3 flex gap-4 text-sm">
+                          <div className="px-3 py-1 bg-red-100 text-red-800 rounded-full font-medium">
+                            {eventsToFilter.toDelete.length} events to review
+                          </div>
+                          <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium">
+                            {eventsToFilter.toKeep.length} events will be kept
+                          </div>
+                          <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">
+                            {selectedEventIds.size} selected for deletion
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowZipFilterModal(false)}
+                        className="text-neutral-400 hover:text-neutral-600 text-2xl font-bold leading-none"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modal Body - Scrollable Events List */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {/* Select All Checkbox */}
+                    <div className="mb-4 pb-4 border-b border-neutral-200">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedEventIds.size === eventsToFilter.toDelete.length && eventsToFilter.toDelete.length > 0}
+                          onChange={toggleAllEventSelection}
+                          className="w-5 h-5 text-blue-600 rounded border-neutral-300 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="font-medium text-neutral-900">
+                          {selectedEventIds.size === eventsToFilter.toDelete.length && eventsToFilter.toDelete.length > 0
+                            ? 'Deselect All'
+                            : 'Select All'}
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Events List */}
+                    <div className="space-y-4">
+                      {eventsToFilter.toDelete.map((event) => (
+                        <div
+                          key={event.id}
+                          className={`border rounded-lg p-4 transition-colors ${
+                            selectedEventIds.has(event.id)
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-neutral-200 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start gap-4">
+                            {/* Checkbox */}
+                            <div className="flex-shrink-0 pt-1">
+                              <input
+                                type="checkbox"
+                                checked={selectedEventIds.has(event.id)}
+                                onChange={() => toggleEventSelection(event.id)}
+                                className="w-5 h-5 text-red-600 rounded border-neutral-300 focus:ring-2 focus:ring-red-500 cursor-pointer"
+                              />
+                            </div>
+
+                            {/* Event Details */}
+                            <div className="flex-1 min-w-0">
+                              {/* Title and Reason */}
+                              <div className="flex items-start justify-between gap-3">
+                                <h3 className="font-medium text-neutral-900">{event.title}</h3>
+                                <span className="flex-shrink-0 px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
+                                  {event.reason}
+                                </span>
+                              </div>
+
+                              {/* Date, Time, Location */}
+                              <div className="mt-2 space-y-1 text-sm text-neutral-600">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">📅</span>
+                                  <span>{new Date(event.date).toLocaleDateString()} {event.time && `at ${event.time}`}</span>
+                                </div>
+                                {event.location && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">📍</span>
+                                    <span>{event.location}</span>
+                                  </div>
+                                )}
+                                {event.address && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">🏠</span>
+                                    <span>{event.address}</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">🏷️</span>
+                                  <span>{event.category} • {event.source}</span>
+                                </div>
+                              </div>
+
+                              {/* Description - Selectable */}
+                              {event.description && (
+                                <div className="mt-3 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                                  <div className="text-xs font-medium text-neutral-500 mb-1">Description (selectable):</div>
+                                  <div className="text-sm text-neutral-700 select-text">
+                                    {event.description}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {eventsToFilter.toDelete.length === 0 && (
+                        <div className="text-center py-12 text-neutral-500">
+                          <div className="text-4xl mb-2">✓</div>
+                          <div className="text-lg font-medium">All events are in allowed zip codes!</div>
+                          <div className="text-sm mt-1">No events need to be filtered.</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-6 border-t border-neutral-200 bg-neutral-50">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-neutral-600">
+                        {selectedEventIds.size > 0 ? (
+                          <span className="font-medium text-red-600">
+                            {selectedEventIds.size} event{selectedEventIds.size !== 1 ? 's' : ''} will be deleted
+                          </span>
+                        ) : (
+                          <span>No events selected</span>
+                        )}
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowZipFilterModal(false)}
+                          className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-100 font-medium"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={executeZipFilterDeletion}
+                          disabled={filteringByZipCode || selectedEventIds.size === 0}
+                          className={`px-6 py-2 rounded-lg font-medium ${
+                            filteringByZipCode || selectedEventIds.size === 0
+                              ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                              : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
+                        >
+                          {filteringByZipCode ? 'Deleting...' : `Delete Selected (${selectedEventIds.size})`}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Calendar Events List */}
             <div className="mt-4">
