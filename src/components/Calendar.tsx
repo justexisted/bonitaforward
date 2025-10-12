@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, MapPin, Clock } from 'lucide-react'
 import { type CalendarEvent } from '../pages/Calendar'
+import { useAuth } from '../App'
+import { supabase } from '../lib/supabase'
 
 interface CalendarProps {
   events: CalendarEvent[]
@@ -9,6 +11,7 @@ interface CalendarProps {
 }
 
 export default function Calendar({ events, className = '' }: CalendarProps) {
+  const auth = useAuth()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [eventsByDate, setEventsByDate] = useState<Record<string, CalendarEvent[]>>({})
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -22,6 +25,13 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
     }
   })
   const [hoveredEvent, setHoveredEvent] = useState<CalendarEvent | null>(null)
+  
+  // State for flag/report feature
+  const [showFlagModal, setShowFlagModal] = useState(false)
+  const [eventToFlag, setEventToFlag] = useState<CalendarEvent | null>(null)
+  const [flagReason, setFlagReason] = useState('')
+  const [flagDetails, setFlagDetails] = useState('')
+  const [submittingFlag, setSubmittingFlag] = useState(false)
 
   // Group events by date
   useEffect(() => {
@@ -90,6 +100,74 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
       localStorage.setItem('bf-calendar-info-dismissed', 'true')
     } catch {
       // localStorage not available
+    }
+  }
+
+  // Handle flag event click
+  const handleFlagEventClick = (event: CalendarEvent) => {
+    if (!auth.isAuthed) {
+      alert('Please sign in to report events')
+      return
+    }
+    setEventToFlag(event)
+    setFlagReason('')
+    setFlagDetails('')
+    setShowFlagModal(true)
+  }
+
+  // Handle flag submission
+  const handleSubmitFlag = async () => {
+    if (!flagReason) {
+      alert('Please select a reason for reporting this event')
+      return
+    }
+
+    if (!eventToFlag || !auth.userId) return
+
+    setSubmittingFlag(true)
+
+    try {
+      // Check if user already flagged this event
+      const { data: existing } = await supabase
+        .from('event_flags')
+        .select('id')
+        .eq('event_id', eventToFlag.id)
+        .eq('user_id', auth.userId)
+        .maybeSingle()
+
+      if (existing) {
+        alert('You have already reported this event. Our admin team will review it.')
+        setShowFlagModal(false)
+        setEventToFlag(null)
+        return
+      }
+
+      // Insert flag
+      const { error } = await supabase
+        .from('event_flags')
+        .insert([{
+          event_id: eventToFlag.id,
+          user_id: auth.userId,
+          reason: flagReason,
+          details: flagDetails || null,
+          created_at: new Date().toISOString()
+        }])
+
+      if (error) throw error
+
+      alert('Thank you for reporting this event. Our admin team has been notified and will review it shortly.')
+      
+      // Reset and close
+      setShowFlagModal(false)
+      setEventToFlag(null)
+      setFlagReason('')
+      setFlagDetails('')
+
+    } catch (error: any) {
+      console.error('Error flagging event:', error)
+      alert('Failed to submit report: ' + error.message)
+    } finally {
+      setSubmittingFlag(false)
     }
   }
 
@@ -460,13 +538,29 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                 </div>
               )}
 
-              {/* Vote counts */}
-              <div className="flex items-center gap-4 border-t border-neutral-200 pt-4">
+              {/* Vote counts and Report Button */}
+              <div className="flex items-center justify-between gap-4 border-t border-neutral-200 pt-4">
                 <div className="flex items-center gap-2 text-sm md:text-base">
                   <span className="text-green-600 font-medium">👍 {selectedEvent.upvotes}</span>
                   <span className="text-neutral-400">|</span>
                   <span className="text-red-600 font-medium">👎 {selectedEvent.downvotes}</span>
                 </div>
+                
+                {/* Report Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedEvent(null)
+                    handleFlagEventClick(selectedEvent)
+                  }}
+                  className="flex items-center space-x-2 px-3 py-1.5 rounded-lg text-neutral-600 hover:bg-neutral-100 transition-colors text-xs md:text-sm"
+                  title="Report this event"
+                >
+                  <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                  </svg>
+                  <span>Report</span>
+                </button>
               </div>
 
               {/* Action Button */}
@@ -479,6 +573,118 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                   <CalendarIcon className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                   <span>View Full Calendar & Vote</span>
                 </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Flag/Report Event Modal */}
+      {showFlagModal && eventToFlag && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+          onClick={() => setShowFlagModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-4 md:p-6 rounded-t-2xl relative">
+              <button
+                onClick={() => setShowFlagModal(false)}
+                className="absolute top-4 right-4 bg-red-800 hover:bg-red-900 rounded-full p-2 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              <h2 className="text-xl md:text-2xl font-bold pr-10">Report Event</h2>
+              <p className="text-red-100 mt-2 text-xs md:text-sm">Help us keep Bonita's calendar clean</p>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 md:p-6 space-y-4">
+              {/* Event Info */}
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3 md:p-4">
+                <h3 className="font-semibold text-neutral-900 text-sm md:text-base mb-1">{eventToFlag.title}</h3>
+                <p className="text-xs md:text-sm text-neutral-600">
+                  {new Date(eventToFlag.date).toLocaleDateString()} • {eventToFlag.source}
+                </p>
+              </div>
+
+              {/* Warning */}
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 md:p-4 rounded">
+                <p className="text-xs md:text-sm text-yellow-900">
+                  <strong>⚠️ Important:</strong> Only report events that violate our community guidelines. 
+                  False reports may result in action on your account.
+                </p>
+              </div>
+
+              {/* Reason Selection */}
+              <div>
+                <label className="block text-xs md:text-sm font-medium text-neutral-900 mb-2">
+                  Why are you reporting this event? <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  className="w-full px-3 md:px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="spam">Spam or Commercial Advertisement</option>
+                  <option value="inappropriate">Inappropriate or Offensive Content</option>
+                  <option value="misleading">Misleading or False Information</option>
+                  <option value="duplicate">Duplicate Event</option>
+                  <option value="wrong-location">Event Not in Bonita Area</option>
+                  <option value="cancelled">Event Has Been Cancelled</option>
+                  <option value="other">Other Violation</option>
+                </select>
+              </div>
+
+              {/* Additional Details */}
+              <div>
+                <label className="block text-xs md:text-sm font-medium text-neutral-900 mb-2">
+                  Additional Details (Optional)
+                </label>
+                <textarea
+                  value={flagDetails}
+                  onChange={(e) => setFlagDetails(e.target.value)}
+                  placeholder="Provide more context to help us understand the issue..."
+                  rows={3}
+                  className="w-full px-3 md:px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none text-sm"
+                  maxLength={300}
+                />
+                <p className="text-xs text-neutral-500 mt-1">{flagDetails.length}/300 characters</p>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+                <p className="text-xs md:text-sm text-blue-900">
+                  <strong>What happens next:</strong> Our admin team will review this report and take appropriate action. 
+                  You'll only be notified if we need more information.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 md:gap-3 pt-4">
+                <button
+                  onClick={() => setShowFlagModal(false)}
+                  className="flex-1 px-4 md:px-6 py-2 md:py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 font-medium transition-colors text-sm"
+                  disabled={submittingFlag}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitFlag}
+                  disabled={submittingFlag || !flagReason}
+                  className={`flex-1 px-4 md:px-6 py-2 md:py-3 rounded-lg font-medium transition-colors text-sm ${
+                    submittingFlag || !flagReason
+                      ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                >
+                  {submittingFlag ? 'Submitting...' : 'Submit Report'}
+                </button>
               </div>
             </div>
           </div>

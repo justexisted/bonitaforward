@@ -80,6 +80,11 @@ type BusinessListing = {
   service_areas: string[] | null
   google_maps_url: string | null
   bonita_resident_discount: string | null  // Discount offer for Bonita residents
+  // Coupon fields
+  coupon_code: string | null
+  coupon_discount: string | null
+  coupon_description: string | null
+  coupon_expires_at: string | null
 }
 
 // Type definition for business applications in the business_applications table
@@ -790,6 +795,12 @@ export default function MyBusinessPage() {
       if (updates.google_maps_url !== undefined) changesData.google_maps_url = updates.google_maps_url
       if (updates.bonita_resident_discount !== undefined) changesData.bonita_resident_discount = updates.bonita_resident_discount
       
+      // Coupon fields
+      if (updates.coupon_code !== undefined) changesData.coupon_code = updates.coupon_code
+      if (updates.coupon_discount !== undefined) changesData.coupon_discount = updates.coupon_discount
+      if (updates.coupon_description !== undefined) changesData.coupon_description = updates.coupon_description
+      if (updates.coupon_expires_at !== undefined) changesData.coupon_expires_at = updates.coupon_expires_at
+      
       console.log('[MyBusiness] Final changes data for request:', changesData)
       
       // Create a change request instead of directly updating the database
@@ -816,6 +827,7 @@ export default function MyBusinessPage() {
       if (updates.email) updatedFields.push('email')
       if (updates.address) updatedFields.push('address')
       if (updates.bonita_resident_discount) updatedFields.push('Bonita residents discount')
+      if (updates.coupon_code || updates.coupon_discount) updatedFields.push('coupon settings')
       
       const fieldText = updatedFields.length > 0 ? ` (${updatedFields.join(', ')})` : ''
       setMessage(`✅ Change request submitted successfully! Your changes${fieldText} will be reviewed by our admin team before going live. You will receive an email notification once approved.`)
@@ -1189,39 +1201,120 @@ export default function MyBusinessPage() {
           </div>
         )}
 
-        {/* Admin Approval Status Section */}
-        {listings.some(listing => !listing.published) && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-amber-800">Pending Admin Approval</h3>
-                <div className="mt-2 text-sm text-amber-700">
-                  <p>You have business listings that are pending admin approval. These changes will not be visible to the public until approved.</p>
-                  <ul className="mt-2 list-disc list-inside">
-                    {listings.filter(listing => !listing.published).map(listing => {
-                      const pendingChanges = []
-                      if (listing.website) pendingChanges.push(`Website: ${listing.website}`)
-                      if (listing.description) pendingChanges.push(`Description: ${listing.description.substring(0, 50)}...`)
-                      if (listing.phone) pendingChanges.push(`Phone: ${listing.phone}`)
-                      if (listing.email) pendingChanges.push(`Email: ${listing.email}`)
-                      if (listing.address) pendingChanges.push(`Address: ${listing.address}`)
-                      if (listing.bonita_resident_discount) pendingChanges.push(`Bonita Discount: ${listing.bonita_resident_discount.substring(0, 30)}...`)
-                      
-                      return (
-                        <li key={listing.id}>
-                          <strong>{listing.name}</strong> - {pendingChanges.length > 0 ? pendingChanges.join(', ') : 'Basic listing information'}
-                        </li>
-                      )
-                    })}
-                  </ul>
+        {/* Change Requests Status Section - Shows pending, approved, and rejected requests */}
+        {changeRequests.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {/* Pending Requests */}
+            {changeRequests.filter(req => req.status === 'pending').length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <h3 className="text-sm font-medium text-amber-800">⏳ Pending Admin Review</h3>
+                    <div className="mt-2 text-sm text-amber-700">
+                      <p className="mb-2">You have {changeRequests.filter(req => req.status === 'pending').length} change request(s) waiting for admin approval:</p>
+                      <ul className="mt-2 space-y-1">
+                        {changeRequests.filter(req => req.status === 'pending').map(req => {
+                          const listing = listings.find(l => l.id === req.provider_id)
+                          return (
+                            <li key={req.id} className="text-xs bg-white rounded p-2">
+                              <strong>{listing?.name || 'Business'}</strong> - {
+                                req.type === 'update' ? 'Listing Update' :
+                                req.type === 'feature_request' ? '⭐ Featured Upgrade Request' :
+                                req.type === 'delete' ? 'Deletion Request' :
+                                req.type === 'claim' ? 'Ownership Claim' :
+                                req.type
+                              }
+                              <div className="text-amber-600 mt-1">
+                                Submitted {new Date(req.created_at).toLocaleDateString()}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Recently Approved Requests */}
+            {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+              new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length > 0 && (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <h3 className="text-sm font-medium text-green-800">✅ Recently Approved</h3>
+                    <div className="mt-2 text-sm text-green-700">
+                      <ul className="space-y-1">
+                        {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+                          new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).map(req => {
+                          const listing = listings.find(l => l.id === req.provider_id)
+                          return (
+                            <li key={req.id} className="text-xs bg-white rounded p-2">
+                              <strong>{listing?.name || 'Business'}</strong> - {
+                                req.type === 'update' ? 'Updates' :
+                                req.type === 'feature_request' ? '⭐ Featured Status' :
+                                req.type
+                              } approved!
+                              <div className="text-green-600 mt-1">
+                                Approved {new Date(req.decided_at).toLocaleDateString()}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Recently Rejected Requests */}
+            {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+              new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length > 0 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <h3 className="text-sm font-medium text-red-800">❌ Recently Rejected</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <ul className="space-y-1">
+                        {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+                          new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).map(req => {
+                          const listing = listings.find(l => l.id === req.provider_id)
+                          return (
+                            <li key={req.id} className="text-xs bg-white rounded p-2">
+                              <strong>{listing?.name || 'Business'}</strong> - {
+                                req.type === 'update' ? 'Update' :
+                                req.type === 'feature_request' ? 'Featured Request' :
+                                req.type
+                              } was rejected
+                              <div className="text-red-600 mt-1">
+                                {req.reason ? `Reason: ${req.reason}` : `Rejected ${new Date(req.decided_at).toLocaleDateString()}`}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1358,13 +1451,21 @@ export default function MyBusinessPage() {
                           }`}>
                             {listing.is_member ? '⭐ Featured' : '📋 Free'}
                           </span>
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-                            listing.published 
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {listing.published ? 'Published' : 'Pending Review'}
-                          </span>
+                          {/* Show badge based on actual change requests, not published field */}
+                          {(() => {
+                            const hasPendingChanges = changeRequests.some(
+                              req => req.provider_id === listing.id && req.status === 'pending'
+                            )
+                            return hasPendingChanges ? (
+                              <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800">
+                                ⏳ Changes Pending
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-green-100 text-green-800">
+                                ✓ Live
+                              </span>
+                            )
+                          })()}
                         </div>
                       </div>
                       
@@ -2087,7 +2188,13 @@ function BusinessListingForm({
     business_hours: listing?.business_hours || {},
     service_areas: listing?.service_areas || [],
     google_maps_url: listing?.google_maps_url || '',
-    bonita_resident_discount: listing?.bonita_resident_discount || ''
+    bonita_resident_discount: listing?.bonita_resident_discount || '',
+    
+    // Coupon fields
+    coupon_code: listing?.coupon_code || '',
+    coupon_discount: listing?.coupon_discount || '',
+    coupon_description: listing?.coupon_description || '',
+    coupon_expires_at: listing?.coupon_expires_at || null
   })
 
   // Restaurant tag options
@@ -2596,25 +2703,85 @@ function BusinessListingForm({
               )}
             </div>
 
-            {/* Bonita Residents Discount */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                Bonita Residents Discount
-                <span className="text-xs text-neutral-500 ml-2">
-                  (Optional - Special offer for local residents)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={formData.bonita_resident_discount || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, bonita_resident_discount: e.target.value }))}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
-                placeholder="e.g., 10% off for Bonita residents, Free consultation for locals, etc."
-                maxLength={100}
-              />
-              <p className="text-xs text-neutral-500 mt-1">
-                Let Bonita residents know about any special offers or discounts you provide to the local community.
+            {/* Exclusive Coupon Settings */}
+            <div className="border-2 border-green-200 rounded-xl p-4 bg-green-50">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">🎟️</span>
+                <h3 className="text-sm font-semibold text-green-900">Exclusive Coupon for Bonita Forward Users</h3>
+              </div>
+              <p className="text-xs text-green-800 mb-4">
+                Offer a special coupon that users can save to their account. This appears prominently on your business page!
               </p>
+              
+              <div className="space-y-3">
+                {/* Coupon Code */}
+                <div>
+                  <label className="block text-sm font-medium text-green-900 mb-1">
+                    Coupon Code <span className="text-xs text-green-700">(e.g., BONITA10, COMMUNITY15)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.coupon_code || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, coupon_code: e.target.value.toUpperCase() }))}
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                    placeholder="BONITA10"
+                    maxLength={20}
+                  />
+                </div>
+
+                {/* Coupon Discount */}
+                <div>
+                  <label className="block text-sm font-medium text-green-900 mb-1">
+                    Discount Amount <span className="text-xs text-green-700">(e.g., 10% off, $20 off)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.coupon_discount || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, coupon_discount: e.target.value }))}
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                    placeholder="10% off entire service"
+                    maxLength={50}
+                  />
+                </div>
+
+                {/* Coupon Description */}
+                <div>
+                  <label className="block text-sm font-medium text-green-900 mb-1">
+                    Coupon Details <span className="text-xs text-green-700">(Optional - any terms or conditions)</span>
+                  </label>
+                  <textarea
+                    value={formData.coupon_description || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, coupon_description: e.target.value }))}
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white resize-none"
+                    placeholder="Valid for first-time customers only. Cannot be combined with other offers."
+                    rows={2}
+                    maxLength={200}
+                  />
+                </div>
+
+                {/* Coupon Expiration */}
+                <div>
+                  <label className="block text-sm font-medium text-green-900 mb-1">
+                    Expiration Date <span className="text-xs text-green-700">(Optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.coupon_expires_at ? new Date(formData.coupon_expires_at).toISOString().split('T')[0] : ''}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      coupon_expires_at: e.target.value ? new Date(e.target.value).toISOString() : null 
+                    }))}
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                  />
+                </div>
+
+                <div className="bg-white rounded-lg p-3 border border-green-300">
+                  <p className="text-xs text-green-800">
+                    <strong>💡 Tip:</strong> Set both Coupon Code and Discount Amount to activate the coupon feature. 
+                    Users will see a prominent green banner on your page and can save the coupon to their account!
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Business Images */}

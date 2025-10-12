@@ -13,7 +13,16 @@ export default function AccountPage() {
   const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
   const [role, setRole] = useState<string>('')
   const [bookings, setBookings] = useState<Array<{ id: string; provider_id?: string | null; provider_name?: string | null; time?: string | null; status?: string | null; created_at?: string | null }>>([])
-  const [savedBusinesses, setSavedBusinesses] = useState<Array<{ id?: string; provider_id: string; created_at?: string | null; provider_name?: string | null }>>([])
+  const [savedBusinesses, setSavedBusinesses] = useState<Array<{ 
+    id?: string
+    provider_id: string
+    created_at?: string | null
+    provider_name?: string | null
+    provider_category?: string | null
+    provider_address?: string | null
+    provider_phone?: string | null
+    provider_tags?: string[] | null
+  }>>([])
   const [discounts, setDiscounts] = useState<Array<{ id: string; provider_id?: string | null; code?: string | null; created_at?: string | null; provider_name?: string | null }>>([])
   const [communityLoading, setCommunityLoading] = useState(false)
   const [myEvents, setMyEvents] = useState<CalendarEvent[]>([])
@@ -146,11 +155,11 @@ export default function AccountPage() {
           setBookings([])
         }
 
-        // Saved Businesses
+        // Saved Businesses - Load with provider details
         try {
           const { data, error } = await supabase
             .from('saved_providers')
-            .select('*')
+            .select('id, provider_id, created_at, providers(id, name, category_key, address, phone, tags)')
             .eq('user_id', auth.userId)
             .order('created_at', { ascending: false })
             .limit(100)
@@ -159,10 +168,14 @@ export default function AccountPage() {
             setSavedBusinesses([])
           } else {
             const rows = (data as any[]) || []
-            setSavedBusinesses(rows.map((r) => ({
+            setSavedBusinesses(rows.map((r: any) => ({
               id: r.id,
               provider_id: r.provider_id,
-              provider_name: (r as any).provider_name ?? null,
+              provider_name: r.providers?.name ?? 'Business',
+              provider_category: r.providers?.category_key ?? null,
+              provider_address: r.providers?.address ?? null,
+              provider_phone: r.providers?.phone ?? null,
+              provider_tags: r.providers?.tags ?? null,
               created_at: r.created_at ?? null,
             })))
           }
@@ -254,6 +267,28 @@ export default function AccountPage() {
       else setMessage('Password updated.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Remove saved business
+  const handleRemoveSavedBusiness = async (savedId: string | undefined, providerId: string, providerName: string | null) => {
+    if (!confirm(`Remove "${providerName || 'this business'}" from saved list?`)) return
+
+    try {
+      const { error } = await supabase
+        .from('saved_providers')
+        .delete()
+        .eq('id', savedId || '')
+        .eq('user_id', auth.userId || '')
+
+      if (error) throw error
+
+      // Update local state
+      setSavedBusinesses(prev => prev.filter(b => b.id !== savedId))
+      setMessage('Business removed from saved list')
+    } catch (error: any) {
+      console.error('Error removing saved business:', error)
+      alert('Failed to remove business: ' + error.message)
     }
   }
 
@@ -515,23 +550,80 @@ export default function AccountPage() {
               </div>
             </div>
           )}
-          {String(auth.role || role || '').toLowerCase() === 'community' && (
-            <div className="mt-6 border-t border-neutral-100 pt-4">
+          {/* Saved Businesses - Available to all users */}
+          <div className="mt-6 border-t border-neutral-100 pt-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium">Saved Businesses</div>
-              <div className="mt-2 text-sm">
-                {communityLoading && <div className="text-neutral-500">Loading…</div>}
-                {!communityLoading && savedBusinesses.length === 0 && <div className="text-neutral-600">No saved businesses yet.</div>}
-                <ul className="space-y-1">
-                  {savedBusinesses.map((s, idx) => (
-                    <li key={`${s.id || s.provider_id}-${idx}`} className="flex items-center justify-between">
-                      <span>{s.provider_name || s.provider_id}</span>
-                      <span className="text-xs text-neutral-500">{s.created_at ? new Date(s.created_at).toLocaleString() : ''}</span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="text-xs text-neutral-500">
+                {savedBusinesses.length} saved
               </div>
             </div>
-          )}
+            <div className="mt-2">
+              {communityLoading && <div className="text-sm text-neutral-500">Loading…</div>}
+              {!communityLoading && savedBusinesses.length === 0 && (
+                <div className="text-sm text-neutral-600 bg-neutral-50 rounded-lg p-4 text-center">
+                  No saved businesses yet. <br/>
+                  <span className="text-xs text-neutral-500 mt-1">Click "Save Business" on any provider page to save for later!</span>
+                </div>
+              )}
+              <div className="space-y-2">
+                {savedBusinesses.map((business, idx) => (
+                  <div 
+                    key={`${business.id || business.provider_id}-${idx}`}
+                    className="border border-neutral-200 rounded-lg p-3 hover:border-blue-300 transition-colors group"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <Link 
+                          to={`/provider/${business.provider_id}`}
+                          className="font-medium text-neutral-900 hover:text-blue-600 transition-colors text-sm block truncate"
+                        >
+                          {business.provider_name || 'Business'}
+                        </Link>
+                        {business.provider_category && (
+                          <div className="text-xs text-neutral-500 mt-1">
+                            {business.provider_category.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </div>
+                        )}
+                        {business.provider_address && (
+                          <div className="text-xs text-neutral-600 mt-1 flex items-start">
+                            <span className="mr-1">📍</span>
+                            <span className="line-clamp-1">{business.provider_address}</span>
+                          </div>
+                        )}
+                        {business.provider_phone && (
+                          <div className="text-xs text-neutral-600 mt-1">
+                            <a href={`tel:${business.provider_phone}`} className="hover:text-blue-600">
+                              📞 {business.provider_phone}
+                            </a>
+                          </div>
+                        )}
+                        {business.provider_tags && business.provider_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {business.provider_tags.slice(0, 3).map((tag, i) => (
+                              <span key={i} className="text-xs px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded-full">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="text-xs text-neutral-400 mt-2">
+                          Saved {business.created_at ? new Date(business.created_at).toLocaleDateString() : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveSavedBusiness(business.id, business.provider_id, business.provider_name)}
+                        className="flex-shrink-0 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Remove from saved"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
           {String(auth.role || role || '').toLowerCase() === 'community' && (
             <div className="mt-6 border-t border-neutral-100 pt-4">
               <div className="text-sm font-medium">Discounts Redeemed</div>

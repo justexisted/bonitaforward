@@ -1117,16 +1117,32 @@ function ProviderPage() {
 
   async function saveCoupon() {
     if (!auth.userId || !provider?.id) { setCouponMsg('Please sign in'); return }
-    const code = prompt('Enter coupon code to save (default COMMUNITY):', 'COMMUNITY') || 'COMMUNITY'
+    
+    // Use the provider's coupon code instead of prompting
+    const code = provider.coupon_code || 'COMMUNITY'
+    
     setCouponBusy(true)
     setCouponMsg(null)
     try {
-      // console.log('[Provider] save coupon', { userId: auth.userId, providerId: provider.id, code })
+      // Check if user already saved this coupon
+      const { data: existing } = await supabase
+        .from('coupon_redemptions')
+        .select('id')
+        .eq('user_id', auth.userId)
+        .eq('provider_id', provider.id)
+        .maybeSingle()
+      
+      if (existing) {
+        setCouponMsg('You already saved this coupon!')
+        setCouponBusy(false)
+        return
+      }
+
       const { error } = await supabase
         .from('coupon_redemptions')
         .insert([{ user_id: auth.userId, provider_id: provider.id, code }])
       if (error) setCouponMsg(error.message)
-      else setCouponMsg('Coupon saved to your account.')
+      else setCouponMsg('Coupon saved to your account! View it anytime in your Account page.')
     } finally {
       setCouponBusy(false)
     }
@@ -1156,27 +1172,74 @@ function ProviderPage() {
                   </div>
                 )}
               </div>
-              {String(auth.role || '').toLowerCase() === 'community' && (
+              {/* Save Business button - available to all authenticated users */}
+              {auth.isAuthed && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     onClick={toggleSaveProvider}
                     disabled={saving}
-                    className="rounded-full bg-neutral-900 text-white px-3 py-1.5 text-sm"
+                    className="rounded-full bg-neutral-900 text-white px-3 py-1.5 text-sm hover:bg-neutral-800 transition-colors"
                   >
                     {saving ? 'Please wait…' : isSaved ? 'Saved ✓' : 'Save Business'}
                   </button>
-                  <button
-                    onClick={saveCoupon}
-                    disabled={couponBusy}
-                    className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm border border-neutral-200"
-                  >
-                    {couponBusy ? 'Saving…' : 'Save Coupon'}
-                  </button>
-                  {(saveMsg || couponMsg) && (
-                    <span className="text-xs text-neutral-600">{saveMsg || couponMsg}</span>
+                  {saveMsg && (
+                    <span className="text-xs text-neutral-600">{saveMsg}</span>
                   )}
                 </div>
               )}
+              
+              {/* Exclusive Coupon Display */}
+              {provider.coupon_code && provider.coupon_discount && (
+                <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 shadow-md">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 text-3xl">🎟️</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-green-900">Exclusive Coupon</h3>
+                        {provider.coupon_expires_at && new Date(provider.coupon_expires_at) > new Date() && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                            Expires {new Date(provider.coupon_expires_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-lg font-bold text-green-700 mb-2">{provider.coupon_discount}</div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm text-green-800 font-medium">Code:</span>
+                        <code className="bg-white border border-green-300 px-3 py-1 rounded text-green-900 font-mono font-semibold text-sm">
+                          {provider.coupon_code}
+                        </code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(provider.coupon_code || '')
+                            alert('Coupon code copied to clipboard!')
+                          }}
+                          className="text-xs text-green-700 hover:text-green-900 underline"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      {provider.coupon_description && (
+                        <p className="text-sm text-green-800 mt-2">{provider.coupon_description}</p>
+                      )}
+                      {auth.isAuthed && (
+                        <div>
+                          <button
+                            onClick={saveCoupon}
+                            disabled={couponBusy}
+                            className="mt-3 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium"
+                          >
+                            {couponBusy ? 'Saving…' : '💾 Save to My Account'}
+                          </button>
+                          {couponMsg && (
+                            <p className="text-xs text-green-700 mt-2">{couponMsg}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Business Details Section */}
               <div className="mt-6 space-y-6">
                 {/* Business Description */}
@@ -1969,6 +2032,12 @@ type Provider = {
   booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
   booking_instructions?: string | null
   booking_url?: string | null
+  // Coupon fields
+  coupon_code?: string | null
+  coupon_discount?: string | null
+  coupon_description?: string | null
+  coupon_expires_at?: string | null
+  bonita_resident_discount?: string | null
 }
 function ensureDemoMembers(input: Record<CategoryKey, Provider[]>): Record<CategoryKey, Provider[]> {
   const out: Record<CategoryKey, Provider[]> = {
