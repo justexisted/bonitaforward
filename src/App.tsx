@@ -1,9 +1,8 @@
-import React from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, Outlet, useNavigate, useParams } from 'react-router-dom'
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
-import { Home, ArrowRight, X, ArrowLeft, ArrowRight as ArrowRightIcon, User, BookOpen } from 'lucide-react'
+import { Home, ArrowRight, X, ArrowLeft, User, BookOpen } from 'lucide-react'
 import CreateBusinessForm from './pages/CreateBusinessForm'
 import SupabasePing from './components/SupabasePing'
 import { supabase } from './lib/supabase'
@@ -70,6 +69,116 @@ const categories: {
     icon: '/images/categories/Briefcase.png',
   },
 ]
+
+// ============================================================================
+// UTILITY FUNCTIONS - Extracted from duplicate code for maintainability
+// ============================================================================
+
+/**
+ * Save current URL to localStorage for redirect after authentication
+ */
+function saveReturnUrl(): void {
+  try {
+    const url = window.location.pathname + window.location.search + window.location.hash
+    localStorage.setItem('bf-return-url', url)
+  } catch (e) {
+    console.warn('Failed to save return URL:', e)
+  }
+}
+
+/**
+ * Safely get and parse JSON from localStorage with type safety
+ */
+function getLocalStorageJSON<T>(key: string, defaultValue: T): T {
+  try {
+    const item = localStorage.getItem(key)
+    if (!item) return defaultValue
+    return JSON.parse(item) as T
+  } catch (e) {
+    console.warn(`Failed to parse localStorage key "${key}":`, e)
+    return defaultValue
+  }
+}
+
+/**
+ * Get list of admin emails from environment variable
+ */
+function getAdminList(): string[] {
+  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
+    .split(',')
+    .map((s: string) => s.trim().toLowerCase())
+    .filter(Boolean)
+  return adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
+}
+
+/**
+ * Check if a user email is in the admin list
+ */
+function isUserAdmin(email: string | undefined): boolean {
+  if (!email) return false
+  const adminList = getAdminList()
+  return adminList.includes(email.toLowerCase())
+}
+
+/**
+ * Fetch user role from database
+ */
+async function fetchUserRole(userId: string): Promise<'business' | 'community' | undefined> {
+  try {
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+    const dbRole = String((prof as any)?.role || '').toLowerCase()
+    if (dbRole === 'business' || dbRole === 'community') {
+      return dbRole as 'business' | 'community'
+    }
+    return undefined
+  } catch (error) {
+    console.error('Error fetching user role:', error)
+    return undefined
+  }
+}
+
+/**
+ * Clear auth-related state and localStorage
+ */
+function clearLocalAuthData(): void {
+  try {
+    localStorage.removeItem('bf-auth')
+    localStorage.removeItem('bf-return-url')
+  } catch (e) {
+    console.warn('Error clearing localStorage:', e)
+  }
+}
+
+/**
+ * Get all providers across all categories
+ */
+function getAllProviders(providersByCategory: Record<CategoryKey, Provider[]>): Provider[] {
+  const keys: CategoryKey[] = ['real-estate', 'home-services', 'health-wellness', 'restaurants-cafes', 'professional-services']
+  return keys.flatMap((k) => providersByCategory[k] || [])
+}
+
+/**
+ * Custom hook for listening to provider updates
+ */
+function useProviderUpdates(callback: () => void, deps: React.DependencyList = []) {
+  useEffect(() => {
+    function onUpdate() { callback() }
+    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
+    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
+  }, deps)
+}
+
+/**
+ * Reusable loading spinner component
+ */
+function LoadingSpinner({ message = 'Loading...', className = '' }: { message?: string; className?: string }) {
+  return (
+    <div className={`text-center ${className}`}>
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
+      <p className="mt-4 text-neutral-600">{message}</p>
+    </div>
+  )
+}
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
@@ -231,17 +340,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
            * Fix: Always fetch role from database and ensure profile is complete.
            */
           if (userId) {
-            try {
-              const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
-              const dbRole = String((prof as any)?.role || '').toLowerCase()
-              if (dbRole === 'business' || dbRole === 'community') {
-                role = dbRole as 'business' | 'community'
-                console.log('[Auth] Role fetched from database:', role)
-              } else {
-                console.log('[Auth] No valid role found in database, role is:', prof)
-              }
-            } catch (error) {
-              console.error('[Auth] Error fetching role from database:', error)
+            const fetchedRole = await fetchUserRole(userId)
+            if (fetchedRole) {
+              role = fetchedRole
+              console.log('[Auth] Role fetched from database:', role)
+            } else {
+              console.log('[Auth] No valid role found in database')
             }
           }
 
@@ -328,15 +432,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // CRITICAL FIX: Always fetch role from database for signed in users
         if (userId) {
-          try {
-            const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
-            const dbRole = String((prof as any)?.role || '').toLowerCase()
-            if (dbRole === 'business' || dbRole === 'community') {
-              role = dbRole as 'business' | 'community'
-              console.log('Role fetched from database on sign in:', role)
-            }
-          } catch (error) {
-            console.error('Error fetching role on sign in:', error)
+          const fetchedRole = await fetchUserRole(userId)
+          if (fetchedRole) {
+            role = fetchedRole
+            console.log('Role fetched from database on sign in:', role)
           }
         }
 
@@ -373,13 +472,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
         profileRef.current = null
         // Clear any remaining auth data
-        try {
-          localStorage.removeItem('bf-auth')
-          localStorage.removeItem('bf-return-url')
-          console.log('[Auth] Cleared custom app data, Supabase will handle its own session cleanup')
-        } catch (e) {
-          console.log('Error clearing custom localStorage:', e)
-        }
+        clearLocalAuthData()
+        console.log('[Auth] Cleared custom app data, Supabase will handle its own session cleanup')
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
         // Only update if we have a valid session
@@ -417,10 +511,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     // Save the current location for redirect after OAuth
-    try {
-      const url = window.location.pathname + window.location.search + window.location.hash
-      localStorage.setItem('bf-return-url', url)
-    } catch {}
+    saveReturnUrl()
 
     // Use current origin for redirect to avoid SSL issues
     const redirectTo = `${window.location.origin}/onboarding`
@@ -444,14 +535,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       // CRITICAL FIX: Don't manually clear Supabase tokens - let Supabase handle its own session management
       // Manual clearing interferes with Supabase's built-in session persistence and causes auth issues
       // Only clear our custom app data, not Supabase's internal session management
-      try { 
-        localStorage.removeItem('bf-auth')
-        // Remove only our custom return URL, not Supabase session tokens
-        localStorage.removeItem('bf-return-url')
-        console.log('[Auth] Cleared custom app data, leaving Supabase session management intact')
-      } catch (e) {
-        console.log('Error clearing custom localStorage:', e)
-      }
+      clearLocalAuthData()
+      console.log('[Auth] Cleared custom app data, leaving Supabase session management intact')
 
       // Then call Supabase signOut
       const { error } = await supabase.auth.signOut({ scope: 'global' })
@@ -592,10 +677,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
   if (auth.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
-          <p className="mt-4 text-neutral-600">Loading...</p>
-        </div>
+        <LoadingSpinner message="Loading..." />
       </div>
     )
   }
@@ -609,20 +691,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
 
 function Navbar() {
   const auth = useAuth()
-  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
-    .split(',')
-    .map((s: string) => s.trim().toLowerCase())
-    .filter(Boolean)
-  const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
-  const isAdmin = !!auth.email && adminList.includes(auth.email.toLowerCase())
-
-  // Function to save return URL for redirect after sign in
-  function saveReturnUrl() {
-    try {
-      const url = window.location.pathname + window.location.search + window.location.hash
-      localStorage.setItem('bf-return-url', url)
-    } catch {}
-  }
+  const isAdmin = isUserAdmin(auth.email)
 
   // Create navigation items based on user authentication and role
   const createNavItems = (): CardNavItem[] => {
@@ -711,7 +780,7 @@ function Navbar() {
         ctaButton.removeEventListener('click', handleCtaClick)
       }
     }
-  }, [auth.isAuthed, saveReturnUrl])
+  }, [auth.isAuthed])
 
   // Handle sign out link click
   useEffect(() => {
@@ -783,7 +852,7 @@ function Layout() {
       onClick: () => window.history.back()
     },
     {
-      icon: <ArrowRightIcon className="w-6 h-6 text-white" />,
+      icon: <ArrowRight className="w-6 h-6 text-white" />,
       label: "Forward", 
       onClick: () => window.history.forward()
     },
@@ -828,16 +897,12 @@ function Hero() {
   const [results, setResults] = useState<Provider[]>([])
   const [open, setOpen] = useState<boolean>(false)
 
-  function getAllProviders(): Provider[] {
-    const keys: CategoryKey[] = ['real-estate','home-services','health-wellness','restaurants-cafes','professional-services']
-    return keys.flatMap((k) => providersByCategory[k] || [])
-  }
 
   function recompute(q: string) {
     const text = q.trim().toLowerCase()
     console.log('[Search] Searching for:', text)
     if (!text) { setResults([]); return }
-    const all = getAllProviders()
+    const all = getAllProviders(providersByCategory)
     console.log('[Search] Total providers loaded:', all.length)
     
     // Debug: Show all restaurant providers and their tags
@@ -876,11 +941,7 @@ function Hero() {
     setResults(scored)
   }
 
-  useEffect(() => {
-    function onUpdate() { if (query) recompute(query) }
-    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
-    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
-  }, [query])
+  useProviderUpdates(() => { if (query) recompute(query) }, [query])
 
   return (
     <section className="relative overflow-hidden" style={{ minHeight: '33vh', overflow: 'visible' }}>
@@ -972,8 +1033,7 @@ function Hero() {
 function ProviderPage() {
   const params = useParams()
   const providerIdentifier = params.id as string // Can be either ID or slug
-  const all: Provider[] = (['real-estate','home-services','health-wellness','restaurants-cafes','professional-services'] as CategoryKey[])
-    .flatMap((k) => providersByCategory[k] || [])
+  const all: Provider[] = getAllProviders(providersByCategory)
   
   // CRITICAL FIX: Support both ID and slug lookups for backward compatibility
   // This allows URLs like /provider/flora-cafe (slug) or /provider/uuid (ID)
@@ -1534,10 +1594,7 @@ function CalendarSection() {
     return (
       <section className="py-16 bg-gradient-to-b from-neutral-50 to-white">
         <div className="container-px mx-auto max-w-6xl">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
-            <p className="mt-4 text-neutral-600">Loading calendar events...</p>
-          </div>
+          <LoadingSpinner message="Loading calendar events..." />
         </div>
       </section>
     )
@@ -2874,7 +2931,7 @@ function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, st
 function trackChoice(category: CategoryKey, questionId: string, optionId: string) {
   try {
     const key = `bf-tracking-${category}`
-    const existing = JSON.parse(localStorage.getItem(key) || '{}')
+    const existing = getLocalStorageJSON<Record<string, string>>(key, {})
     existing[questionId] = optionId
     localStorage.setItem(key, JSON.stringify(existing))
     // Optionally POST to backend when available
@@ -2898,7 +2955,7 @@ function Funnel({ category }: { category: typeof categories[number] }) {
     initializedRef.current = true
     try {
       const key = `bf-tracking-${category.key}`
-      const existing = JSON.parse(localStorage.getItem(key) || '{}')
+      const existing = getLocalStorageJSON<Record<string, string>>(key, {})
       if (existing && typeof existing === 'object') {
         setAnswers(existing)
         // fast-forward step to first unanswered question
@@ -3125,7 +3182,7 @@ function CategoryFilters({
                     {details.images && details.images.length > 0 ? (
                       <div className="aspect-video bg-neutral-100">
                         <img
-                          src={details.images[0]}
+                          src={fixImageUrl(details.images[0])}
                           alt={`${provider.name} business photo`}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -3225,17 +3282,14 @@ function CategoryPage() {
   const [, setVersion] = useState(0)
   const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false)
   const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
-  useEffect(() => {
-    function onUpdate() { setVersion((v: number) => v + 1) }
-    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
-    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
-  }, [])
+  
+  useProviderUpdates(() => { setVersion((v: number) => v + 1) }, [])
 
   // Check if user has completed questionnaire for this category
   useEffect(() => {
     try {
       const key = `bf-tracking-${category.key}`
-      const existing = JSON.parse(localStorage.getItem(key) || '{}')
+      const existing = getLocalStorageJSON<Record<string, string>>(key, {})
       if (existing && typeof existing === 'object') {
         const questions = getFunnelQuestions(category.key, existing)
         const isComplete = questions.every((q) => existing[q.id])
@@ -3491,10 +3545,12 @@ function ContactPage() {
 function BusinessPage() {
   const auth = useAuth()
   const [msg, setMsg] = useState<string | null>(null)
+  // Parse URL params once for prefill values
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), [])
   // simple ROI calculator state is kept local via uncontrolled inputs and live compute
   useEffect(() => {
     // If user arrived with #apply or prefill params, scroll to and focus form
-    const hasPrefill = new URLSearchParams(window.location.search).toString().length > 0
+    const hasPrefill = urlParams.toString().length > 0
     if (window.location.hash === '#apply' || hasPrefill) {
       setTimeout(() => {
         const el = document.getElementById('apply')
@@ -3808,13 +3864,13 @@ function BusinessPage() {
                     }
                   }}
                 >
-                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={(new URLSearchParams(window.location.search)).get('full_name') || ''} />
-                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={(new URLSearchParams(window.location.search)).get('business_name') || ''} />
+                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={urlParams.get('full_name') || ''} />
+                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={urlParams.get('business_name') || ''} />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={(new URLSearchParams(window.location.search)).get('email') || ''} />
-                    <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={(new URLSearchParams(window.location.search)).get('phone') || ''} />
+                    <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={urlParams.get('email') || ''} />
+                    <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={urlParams.get('phone') || ''} />
                   </div>
-                  <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={(new URLSearchParams(window.location.search)).get('category') || ''}>
+                  <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={urlParams.get('category') || ''}>
                     <option value="">Select category…</option>
                     <option value="Real Estate">Real Estate</option>
                     <option value="Home Services">Home Services</option>
@@ -3844,7 +3900,7 @@ function BusinessPage() {
                       </label>
                     </div>
                   </div>
-                  <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={(new URLSearchParams(window.location.search)).get('challenge') || ''} />
+                  <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={urlParams.get('challenge') || ''} />
                   <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Submit Application</button>
                 </form>
                 {msg && <p className="mt-2 text-sm text-neutral-700">{msg}</p>}
@@ -3870,6 +3926,25 @@ function BusinessPage() {
   )
 }
 
+// Utility function to fix malformed image URLs
+function fixImageUrl(url: string): string {
+  if (!url) return ''
+  
+  // If URL is already complete with extension, return as-is
+  if (url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+    return url
+  }
+  
+  // If URL ends with a filename but no extension, try common extensions
+  if (url.includes('/business-images/')) {
+    const baseUrl = url
+    // For now, default to .jpg as it's most common
+    return baseUrl + '.jpg'
+  }
+  
+  return url
+}
+
 function BookPage() {
   const params = new URLSearchParams(window.location.search)
   const categoryKey = (params.get('category') as CategoryKey) || 'real-estate'
@@ -3893,15 +3968,10 @@ function BookPage() {
       }
     }
     // Fallback to localStorage answers (from questionnaire)
-    try { return JSON.parse(localStorage.getItem(`bf-tracking-${categoryKey}`) || '{}') } catch { return {} }
+    return getLocalStorageJSON<Record<string, string>>(`bf-tracking-${categoryKey}`, {})
   }, [categoryKey, params.get('filters')])
   const auth = useAuth()
-  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
-    .split(',')
-    .map((s: string) => s.trim().toLowerCase())
-    .filter(Boolean)
-  const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
-  const isAdmin = !!auth.email && adminList.includes(auth.email.toLowerCase())
+  const isAdmin = isUserAdmin(auth.email)
 
   function recompute() {
     const ranked = scoreProviders(categoryKey, answers)
@@ -3914,11 +3984,7 @@ function BookPage() {
     if (auth.isAuthed) setSubmitted(true)
   }, [categoryKey, auth.isAuthed, answers])
 
-  useEffect(() => {
-    function onUpdate() { recompute() }
-    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
-    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
-  }, [categoryKey, answers])
+  useProviderUpdates(() => { recompute() }, [categoryKey, answers])
   return (
     <section className="py-8">
       <Container>
@@ -3937,11 +4003,11 @@ function BookPage() {
                       {d.images && d.images.length > 0 ? (
                         <div className="mb-3">
                           <img 
-                            src={d.images?.[0] || ''} 
+                            src={fixImageUrl(d.images?.[0] || '')} 
                             alt={`${r.name} business photo`} 
                             className="w-full h-32 object-cover rounded-lg border border-neutral-100"
                             onError={(e) => {
-                              console.warn(`[BookPage] Failed to load image for ${r.name}:`, d.images?.[0])
+                              console.warn(`[BookPage] Failed to load image for ${r.name}:`, fixImageUrl(d.images?.[0] || ''))
                               const img = e.currentTarget as HTMLImageElement
                               img.style.display = 'none'
                               img.parentElement!.innerHTML = `
@@ -4076,11 +4142,11 @@ function BookPage() {
                           {d.images && d.images.length > 0 ? (
                             <div className="mb-3">
                               <img 
-                                src={d.images?.[0] || ''} 
+                                src={fixImageUrl(d.images?.[0] || '')} 
                                 alt={`${r.name} business photo`} 
                                 className="w-full h-24 object-cover rounded-lg border border-neutral-100"
                                 onError={(e) => {
-                                  console.warn(`[BookPage] Failed to load image for ${r.name}:`, d.images?.[0])
+                                  console.warn(`[BookPage] Failed to load image for ${r.name}:`, fixImageUrl(d.images?.[0] || ''))
                                   const img = e.currentTarget as HTMLImageElement
                                   img.style.display = 'none'
                                   img.parentElement!.innerHTML = `

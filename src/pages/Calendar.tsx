@@ -228,7 +228,7 @@ export default function CalendarPage() {
         .select('*')
         .eq('event_id', eventId)
         .eq('user_id', auth.userId)
-        .single()
+        .maybeSingle()
 
       if (existingVote) {
         // Update existing vote
@@ -519,10 +519,18 @@ export default function CalendarPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12">
                   {displayEvents.map((event) => (
-                    <button
+                    <div
                       key={event.id}
                       onClick={() => setSelectedEvent(event)}
                       className="bg-white rounded-2xl border border-neutral-100 p-4 md:p-6 hover:shadow-lg transition-all cursor-pointer text-left hover:border-blue-200 group"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setSelectedEvent(event)
+                        }
+                      }}
                     >
                       <div className="flex items-start justify-between mb-3 md:mb-4">
                         <div className="flex-1">
@@ -583,7 +591,7 @@ export default function CalendarPage() {
                           {event.source}
                         </span>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </>
@@ -600,10 +608,18 @@ export default function CalendarPage() {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {sortedRecurringEvents.map((event) => (
-                <button
+                <div
                   key={event.id}
                   onClick={() => setSelectedEvent(event)}
                   className="bg-white rounded-2xl border border-neutral-100 p-4 md:p-6 hover:shadow-lg transition-all cursor-pointer text-left hover:border-blue-200 group"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setSelectedEvent(event)
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between mb-3 md:mb-4">
                     <div className="flex-1">
@@ -664,7 +680,7 @@ export default function CalendarPage() {
                       {event.source}
                     </span>
                   </div>
-                </button>
+                </div>
               ))}
                 </div>
               </>
