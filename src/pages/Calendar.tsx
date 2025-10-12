@@ -305,7 +305,8 @@ export default function CalendarPage() {
           source: 'Local',
           upvotes: 0,
           downvotes: 0,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          created_by_user_id: auth.userId || null
         }])
 
       if (error) throw error

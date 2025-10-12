@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { Link } from 'react-router-dom'
+import { type CalendarEvent } from './Calendar'
 
 export default function AccountPage() {
   const auth = useAuth()
@@ -15,6 +16,9 @@ export default function AccountPage() {
   const [savedBusinesses, setSavedBusinesses] = useState<Array<{ id?: string; provider_id: string; created_at?: string | null; provider_name?: string | null }>>([])
   const [discounts, setDiscounts] = useState<Array<{ id: string; provider_id?: string | null; code?: string | null; created_at?: string | null; provider_name?: string | null }>>([])
   const [communityLoading, setCommunityLoading] = useState(false)
+  const [myEvents, setMyEvents] = useState<CalendarEvent[]>([])
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
 
   /**
    * ACCOUNT DATA INITIALIZATION
@@ -95,6 +99,26 @@ export default function AccountPage() {
       setCommunityLoading(true)
       console.log('[Account] Loading community data for user', auth.userId)
       try {
+        // My Events
+        try {
+          const { data: eventsData, error: eventsError } = await supabase
+            .from('calendar_events')
+            .select('*')
+            .eq('created_by_user_id', auth.userId)
+            .order('date', { ascending: true })
+          
+          if (eventsError) {
+            console.warn('[Account] Error loading events:', eventsError)
+            setMyEvents([])
+          } else {
+            setMyEvents(eventsData || [])
+            console.log('[Account] Loaded events:', eventsData?.length || 0)
+          }
+        } catch (err) {
+          console.error('[Account] Error loading events:', err)
+          setMyEvents([])
+        }
+
         // My Bookings
         try {
           const { data, error } = await supabase
@@ -230,6 +254,68 @@ export default function AccountPage() {
       else setMessage('Password updated.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Event management functions
+  const handleEditEvent = (event: CalendarEvent) => {
+    setEditingEventId(event.id)
+    setEditingEvent({ ...event })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingEventId(null)
+    setEditingEvent(null)
+  }
+
+  const handleSaveEvent = async () => {
+    if (!editingEvent || !editingEventId) return
+
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({
+          title: editingEvent.title,
+          description: editingEvent.description,
+          date: editingEvent.date,
+          time: editingEvent.time,
+          location: editingEvent.location,
+          address: editingEvent.address,
+          category: editingEvent.category,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingEventId)
+
+      if (error) throw error
+
+      // Update local state
+      setMyEvents(prev => prev.map(e => e.id === editingEventId ? editingEvent : e))
+      setEditingEventId(null)
+      setEditingEvent(null)
+      alert('Event updated successfully!')
+    } catch (error: any) {
+      console.error('Error updating event:', error)
+      alert('Failed to update event: ' + error.message)
+    }
+  }
+
+  const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
+    if (!confirm(`Delete event "${eventTitle}"? This cannot be undone.`)) return
+
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('id', eventId)
+
+      if (error) throw error
+
+      // Update local state
+      setMyEvents(prev => prev.filter(e => e.id !== eventId))
+      alert('Event deleted successfully!')
+    } catch (error: any) {
+      console.error('Error deleting event:', error)
+      alert('Failed to delete event: ' + error.message)
     }
   }
 
@@ -463,6 +549,134 @@ export default function AccountPage() {
               </div>
             </div>
           )}
+
+          {/* My Events Section - Available to all users */}
+          <div className="mt-6 border-t border-neutral-100 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">My Events</div>
+              <Link 
+                to="/calendar" 
+                className="text-xs text-blue-600 hover:text-blue-700"
+              >
+                + Create Event
+              </Link>
+            </div>
+            <div className="mt-2 text-sm">
+              {communityLoading && <div className="text-neutral-500">Loading…</div>}
+              {!communityLoading && myEvents.length === 0 && (
+                <div className="text-neutral-600">
+                  No events created yet. <Link to="/calendar" className="text-blue-600 hover:underline">Create your first event!</Link>
+                </div>
+              )}
+              <div className="space-y-3">
+                {myEvents.map((event) => (
+                  <div key={event.id} className="border border-neutral-200 rounded-lg p-3">
+                    {editingEventId === event.id && editingEvent ? (
+                      // Edit Mode
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editingEvent.title}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                          className="w-full px-2 py-1 border border-neutral-300 rounded text-sm"
+                          placeholder="Event title"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="date"
+                            value={editingEvent.date.split('T')[0]}
+                            onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value + 'T12:00:00' })}
+                            className="px-2 py-1 border border-neutral-300 rounded text-xs"
+                          />
+                          <input
+                            type="time"
+                            value={editingEvent.time || ''}
+                            onChange={(e) => setEditingEvent({ ...editingEvent, time: e.target.value })}
+                            className="px-2 py-1 border border-neutral-300 rounded text-xs"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={editingEvent.location || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                          className="w-full px-2 py-1 border border-neutral-300 rounded text-sm"
+                          placeholder="Location"
+                        />
+                        <input
+                          type="text"
+                          value={editingEvent.address || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, address: e.target.value })}
+                          className="w-full px-2 py-1 border border-neutral-300 rounded text-sm"
+                          placeholder="Address"
+                        />
+                        <textarea
+                          value={editingEvent.description || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
+                          className="w-full px-2 py-1 border border-neutral-300 rounded text-sm"
+                          placeholder="Description"
+                          rows={2}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveEvent}
+                            className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="px-3 py-1 bg-neutral-200 text-neutral-800 text-xs rounded hover:bg-neutral-300"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // View Mode
+                      <>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-neutral-900">{event.title}</div>
+                            <div className="text-xs text-neutral-500 mt-1">
+                              📅 {new Date(event.date).toLocaleDateString()} {event.time && `• ${event.time}`}
+                            </div>
+                            {event.location && (
+                              <div className="text-xs text-neutral-600 mt-1">📍 {event.location}</div>
+                            )}
+                            {event.description && (
+                              <div className="text-xs text-neutral-600 mt-2 line-clamp-2">{event.description}</div>
+                            )}
+                          </div>
+                          <div className="flex gap-1 ml-2">
+                            <button
+                              onClick={() => handleEditEvent(event)}
+                              className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
+                              title="Edit event"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEvent(event.id, event.title)}
+                              className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                              title="Delete event"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-neutral-500">
+                          <span className="px-2 py-0.5 bg-neutral-100 rounded-full">{event.category}</span>
+                          <span>👍 {event.upvotes}</span>
+                          <span>👎 {event.downvotes}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {auth.role === 'business' && pendingApps.length > 0 && (
             <div className="mt-6 border-t border-neutral-100 pt-4">
               <div className="text-sm font-medium">Pending Applications</div>
