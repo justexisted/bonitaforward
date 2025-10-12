@@ -358,7 +358,7 @@ export default function AdminPage() {
       // Skip header row if it exists
       const startIndex = lines[0]?.toLowerCase().includes('title') ? 1 : 0
       
-      console.log(`Processing ${lines.length - startIndex} lines from CSV...`)
+      // console.log(`Processing ${lines.length - startIndex} lines from CSV...`)
       
       for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim()
@@ -397,13 +397,13 @@ export default function AdminPage() {
           // For recurring events, use a far future date and mark with special source
           eventDate = new Date('2099-12-31T12:00:00')
           eventCategory = 'Recurring' // Special category for filtering
-          console.log(`📅 Recurring event detected on line ${i + 1}: ${title} (${dateRaw})`)
+          // console.log(`📅 Recurring event detected on line ${i + 1}: ${title} (${dateRaw})`)
         } else {
           try {
             // Clean date string - remove any non-standard characters but keep digits, hyphens, slashes
             const dateStr = dateRaw.replace(/[^\d\-\/]/g, '').trim()
             
-            console.log(`Parsing date on line ${i + 1}: "${dateRaw}" -> cleaned: "${dateStr}"`)
+            // console.log(`Parsing date on line ${i + 1}: "${dateRaw}" -> cleaned: "${dateStr}"`)
             
             // ALWAYS use manual parsing - most reliable across all browsers
             let parsedDate: Date | undefined
@@ -411,15 +411,15 @@ export default function AdminPage() {
             // Try YYYY-MM-DD format first (most common)
             if (dateStr.includes('-')) {
               const parts = dateStr.split('-')
-              console.log(`  Parts:`, parts, `Length: ${parts.length}, First part length: ${parts[0]?.length}`)
+              // console.log(`  Parts:`, parts, `Length: ${parts.length}, First part length: ${parts[0]?.length}`)
               
               if (parts.length === 3 && parts[0].length === 4) {
                 const year = parseInt(parts[0])
                 const month = parseInt(parts[1])
                 const day = parseInt(parts[2])
                 
-                console.log(`  Parsed integers: year=${year}, month=${month}, day=${day}`)
-                console.log(`  Validation: year check=${year >= 2000 && year <= 2100}, month check=${month >= 1 && month <= 12}, day check=${day >= 1 && day <= 31}`)
+                // console.log(`  Parsed integers: year=${year}, month=${month}, day=${day}`)
+                // console.log(`  Validation: year check=${year >= 2000 && year <= 2100}, month check=${month >= 1 && month <= 12}, day check=${day >= 1 && day <= 31}`)
                 
                 // Validate ranges
                 if (year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
@@ -451,13 +451,13 @@ export default function AdminPage() {
                   parsedDate = new Date(dateTimeStr)
                   
                   if (!isNaN(parsedDate.getTime())) {
-                    console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}`)
+                    // console.log(`  ✓ Parsed as YYYY-MM-DD: ${parsedDate.toISOString()}`)
                   }
                 } else {
-                  console.log(`  ✗ Validation failed!`)
+                  // console.log(`  ✗ Validation failed!`)
                 }
               } else {
-                console.log(`  ✗ Parts check failed`)
+                // console.log(`  ✗ Parts check failed`)
               }
             }
             // Try MM/DD/YYYY format
@@ -502,7 +502,7 @@ export default function AdminPage() {
                   parsedDate = new Date(`${yearStr}-${monthStr}-${dayStr}T${timeStr}:00`)
                   
                   if (!isNaN(parsedDate.getTime())) {
-                    console.log(`  ✓ Parsed as MM/DD/YYYY: ${parsedDate.toISOString()}`)
+                    // console.log(`  ✓ Parsed as MM/DD/YYYY: ${parsedDate.toISOString()}`)
                   }
                 }
               }
@@ -538,10 +538,10 @@ export default function AdminPage() {
           downvotes: 0
         })
         
-        console.log(`✓ Parsed line ${i + 1}: ${title}${isRecurring ? ' (Recurring)' : ''}`)
+        // console.log(`✓ Parsed line ${i + 1}: ${title}${isRecurring ? ' (Recurring)' : ''}`)
       }
       
-      console.log(`Successfully parsed ${events.length} events`)
+      // console.log(`Successfully parsed ${events.length} events`)
       
       if (events.length === 0) {
         alert('No valid events found in CSV file.\n\nPlease ensure:\n- File has required columns: Title, Date, Time, Location, Address, Category, Description\n- Date format is YYYY-MM-DD (e.g., 2025-01-15) or MM/DD/YYYY\n- Each row has at least a title and date\n\nCheck the browser console for detailed error messages.')
@@ -709,7 +709,7 @@ export default function AdminPage() {
   // Use refreshICalFeedsServer() instead
   /* const refreshICalFeeds = async () => {
     try {
-      console.log('Refreshing iCalendar feeds (client-side)...')
+      // console.log('Refreshing iCalendar feeds (client-side)...')
       const icalEvents = await parseMultipleICalFeeds(ICAL_FEEDS)
       const calendarEvents = icalEvents.map(convertICalToCalendarEvent)
       
@@ -849,7 +849,7 @@ export default function AdminPage() {
         updateData.featured_since = null
       }
       
-      console.log('[Admin] Toggling featured status:', { providerId, currentStatus, updateData })
+      // console.log('[Admin] Toggling featured status:', { providerId, currentStatus, updateData })
       
       const { error } = await supabase
         .from('providers')
@@ -861,7 +861,7 @@ export default function AdminPage() {
         throw error
       }
 
-      console.log('[Admin] Featured status updated successfully')
+      // console.log('[Admin] Featured status updated successfully')
       setMessage(`Provider ${!currentStatus ? 'featured' : 'unfeatured'} successfully!`)
       
       // Refresh providers data
@@ -928,17 +928,17 @@ export default function AdminPage() {
    */
   const loadChangeRequests = async () => {
     try {
-      console.log('========================================')
-      console.log('[Admin] STARTING loadChangeRequests')
-      console.log('========================================')
+      // console.log('========================================')
+      console.log('[Admin] STARTING loadChangeRequests')  // KEPT: Change request logging
+      // console.log('========================================')
       
       // Get auth session
       const { data: { session } } = await supabase.auth.getSession()
-      console.log('[Admin] Session check:', {
-        hasSession: !!session,
-        hasToken: !!session?.access_token,
-        tokenLength: session?.access_token?.length
-      })
+      // console.log('[Admin] Session check:', {
+      //   hasSession: !!session,
+      //   hasToken: !!session?.access_token,
+      //   tokenLength: session?.access_token?.length
+      // })
       
       if (!session?.access_token) {
         console.error('[Admin] ❌ No auth token available')
@@ -946,7 +946,7 @@ export default function AdminPage() {
         return
       }
 
-      console.log('[Admin] ✓ Auth token acquired, calling Netlify function...')
+      // console.log('[Admin] ✓ Auth token acquired, calling Netlify function...')
 
       // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
       // For local dev: use http://localhost:8888 (Netlify Dev port)
@@ -955,7 +955,7 @@ export default function AdminPage() {
       const isLocal = window.location.hostname === 'localhost'
       const fnBase = isLocal ? 'http://localhost:8888' : ''
       const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-change-requests` : '/.netlify/functions/admin-list-change-requests'
-      console.log('[Admin] Fetching from:', url)
+      // console.log('[Admin] Fetching from:', url)
       
       const response = await fetch(url, {
         method: 'POST',
@@ -964,12 +964,12 @@ export default function AdminPage() {
           'Content-Type': 'application/json'
         }
       })
-
-      console.log('[Admin] Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      })
+      
+      // console.log('[Admin] Response received:', {
+      //   status: response.status,
+      //   statusText: response.statusText,
+      //   ok: response.ok
+      // })
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -979,18 +979,18 @@ export default function AdminPage() {
       }
 
       const result = await response.json()
-      console.log('[Admin] ✓ JSON parsed successfully')
-      console.log('[Admin] Result structure:', {
-        hasRequests: !!result.requests,
-        requestCount: result.requests?.length || 0,
-        firstRequest: result.requests?.[0] ? {
-          id: result.requests[0].id,
-          type: result.requests[0].type,
-          hasProfiles: !!result.requests[0].profiles,
-          profileEmail: result.requests[0].profiles?.email,
-          profileName: result.requests[0].profiles?.name
-        } : 'No requests'
-      })
+      // console.log('[Admin] ✓ JSON parsed successfully')
+      // console.log('[Admin] Result structure:', {
+      //   hasRequests: !!result.requests,
+      //   requestCount: result.requests?.length || 0,
+      //   firstRequest: result.requests?.[0] ? {
+      //     id: result.requests[0].id,
+      //     type: result.requests[0].type,
+      //     hasProfiles: !!result.requests[0].profiles,
+      //     profileEmail: result.requests[0].profiles?.email,
+      //     profileName: result.requests[0].profiles?.name
+      //   } : 'No requests'
+      // })
       
       if (!result.requests) {
         console.error('[Admin] ❌ Result has no requests property:', result)
@@ -998,10 +998,10 @@ export default function AdminPage() {
         return
       }
       
-      console.log('[Admin] ✓ Setting changeRequests state with', result.requests.length, 'items')
+      console.log('[Admin] ✓ Setting changeRequests state with', result.requests.length, 'items')  // KEPT: Change request logging
       setChangeRequests(result.requests)
-      console.log('[Admin] ✓ State updated successfully')
-      console.log('========================================')
+      // console.log('[Admin] ✓ State updated successfully')
+      // console.log('========================================')
       
     } catch (error: any) {
       console.error('========================================')
@@ -1208,27 +1208,27 @@ export default function AdminPage() {
    */
   useEffect(() => {
     async function verifyAdmin() {
-      console.log('[Admin] Admin verification triggered for:', auth.email, 'loading:', auth.loading)
+      // console.log('[Admin] Admin verification triggered for:', auth.email, 'loading:', auth.loading)
       
       if (!auth.email) {
-        console.log('[Admin] No email, setting admin status to false')
+        // console.log('[Admin] No email, setting admin status to false')
         setAdminStatus({ isAdmin: false, loading: false, verified: false })
         return
       }
 
       // CRITICAL: Don't re-verify if already verified for this email
       if (adminStatus.verified && adminStatus.isAdmin && auth.email) {
-        console.log('[Admin] Already verified as admin for this email, skipping re-verification')
+        // console.log('[Admin] Already verified as admin for this email, skipping re-verification')
         return
       }
 
       // CRITICAL: Don't verify during auth loading to prevent race conditions
       if (auth.loading) {
-        console.log('[Admin] Auth still loading, skipping verification')
+        // console.log('[Admin] Auth still loading, skipping verification')
         return
       }
 
-      console.log('[Admin] Starting admin verification for:', auth.email)
+      // console.log('[Admin] Starting admin verification for:', auth.email)
       setAdminStatus(prev => ({ ...prev, loading: true }))
 
       try {
@@ -1236,7 +1236,7 @@ export default function AdminPage() {
         const token = session.session?.access_token
         
         if (!token) {
-          console.log('[Admin] No auth token, using client-side admin check:', isClientAdmin)
+          // console.log('[Admin] No auth token, using client-side admin check:', isClientAdmin)
           setAdminStatus({ isAdmin: isClientAdmin, loading: false, verified: false })
           return
         }
@@ -1245,30 +1245,30 @@ export default function AdminPage() {
         // For production: use relative URL (/.netlify/functions/...)
         const isLocal = window.location.hostname === 'localhost'
         const fnBase = isLocal ? 'http://localhost:8888' : ''
-        const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
-        
-        console.log('[Admin] Making server verification request to:', url)
+      const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
+      
+      // console.log('[Admin] Making server verification request to:', url)
         
         const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
-        })
-
-        console.log('[Admin] Server verification response:', response.status, response.ok)
+        }
+      })
+      
+      // console.log('[Admin] Server verification response:', response.status, response.ok)
 
         if (response.ok) {
           const result = await response.json()
-          console.log('[Admin] Server verification result:', result)
+          // console.log('[Admin] Server verification result:', result)
           setAdminStatus({
             isAdmin: result.isAdmin,
             loading: false,
             verified: true
           })
         } else {
-          console.log('[Admin] Server verification failed, using client-side check:', isClientAdmin)
+          // console.log('[Admin] Server verification failed, using client-side check:', isClientAdmin)
           // Fallback to client-side check if server verification fails
           setAdminStatus({
             isAdmin: isClientAdmin,
@@ -1278,7 +1278,7 @@ export default function AdminPage() {
           })
         }
       } catch (err) {
-        console.log('[Admin] Server verification error, using client-side check:', isClientAdmin, 'Error:', err)
+        // console.log('[Admin] Server verification error, using client-side check:', isClientAdmin, 'Error:', err)
         // Fallback to client-side check on error
         setAdminStatus({
           isAdmin: isClientAdmin,
@@ -1321,7 +1321,7 @@ export default function AdminPage() {
       setLoading(true)
       setError(null)
       try {
-        console.log('[Admin] loading data. isAdmin?', isAdmin, 'selectedUser', selectedUser)
+        // console.log('[Admin] loading data. isAdmin?', isAdmin, 'selectedUser', selectedUser)
         const fQuery = supabase.from('funnel_responses').select('*').order('created_at', { ascending: false })
         const bQuery = supabase.from('bookings').select('*').order('created_at', { ascending: false })
         const fExec = isAdmin ? (selectedUser ? fQuery.eq('user_email', selectedUser) : fQuery) : fQuery.eq('user_email', auth.email!)
@@ -1345,10 +1345,10 @@ export default function AdminPage() {
         if (bErr) { console.error('[Admin] bookings error', bErr); setError((prev) => prev ?? bErr.message) }
         if (bizErr) { console.error('[Admin] business_applications error', bizErr); setError((prev) => prev ?? bizErr.message) }
         if (conErr) { console.error('[Admin] contact_leads error', conErr); setError((prev) => prev ?? conErr.message) }
-        console.log('[Admin] funnels', fData)
-        console.log('[Admin] bookings', bData)
-        console.log('[Admin] business_applications', bizData)
-        console.log('[Admin] contact_leads', conData)
+        // console.log('[Admin] funnels', fData)
+        // console.log('[Admin] bookings', bData)
+        console.log('[Admin] business_applications', bizData)  // KEPT: Business application logging
+        // console.log('[Admin] contact_leads', conData)
         setFunnels((fData as FunnelRow[]) || [])
         setBookings((bData as BookingRow[]) || [])
         setBizApps((bizData as BusinessApplicationRow[]) || [])
@@ -1400,7 +1400,7 @@ export default function AdminPage() {
           await loadChangeRequests()
         } catch {}
         try {
-          console.log('[Admin] Loading job posts with provider details...')
+          // console.log('[Admin] Loading job posts with provider details...')
           
           // Load job posts
           const { data: jpData, error: jpError } = await supabase
@@ -1408,7 +1408,7 @@ export default function AdminPage() {
             .select('*')
             .order('created_at', { ascending: false })
           
-          console.log('[Admin] Job posts query result:', { error: jpError, data: jpData, count: jpData?.length || 0 })
+          // console.log('[Admin] Job posts query result:', { error: jpError, data: jpData, count: jpData?.length || 0 })
           
           if (jpError) {
             console.error('[Admin] Job posts query error:', jpError)
@@ -1442,7 +1442,7 @@ export default function AdminPage() {
             })
             
             setJobPosts(jobsWithDetails)
-            console.log('[Admin] Loaded', jobsWithDetails.length, 'job posts with provider details')
+            // console.log('[Admin] Loaded', jobsWithDetails.length, 'job posts with provider details')
           } else {
             setJobPosts([])
           }
@@ -1451,13 +1451,13 @@ export default function AdminPage() {
           setError('Failed to load job posts')
           // Try a simpler fallback query
           try {
-            console.log('[Admin] Trying fallback query...')
+            // console.log('[Admin] Trying fallback query...')
             const { data: fallbackData, error: fallbackError } = await supabase
               .from('provider_job_posts')
               .select('id, provider_id, owner_user_id, title, status, created_at')
               .order('created_at', { ascending: false })
             
-            console.log('[Admin] Fallback query result:', { error: fallbackError, data: fallbackData })
+            // console.log('[Admin] Fallback query result:', { error: fallbackError, data: fallbackData })
             
             if (!fallbackError && fallbackData) {
               // Use fallback data with minimal fields
@@ -1471,7 +1471,7 @@ export default function AdminPage() {
                 owner: undefined
               }))
               setJobPosts(minimalJobs)
-              console.log('[Admin] Using fallback job data:', minimalJobs)
+              // console.log('[Admin] Using fallback job data:', minimalJobs)
             } else {
               setJobPosts([])
             }
@@ -1629,7 +1629,7 @@ export default function AdminPage() {
       is_member: false   // Default to free tier
     }
     
-    console.log('[Admin] Approving application with payload:', payload)
+    console.log('[Admin] Approving application with payload:', payload)  // KEPT: Business application logging
     
     const { error } = await supabase.from('providers').insert([payload as any])
     if (error) {
@@ -1770,7 +1770,7 @@ export default function AdminPage() {
     }, 15000) // 15 second backup timeout (reduced since we removed connection test) */
     
     try {
-      console.log('[Admin] Saving provider:', p.id, 'with data:', p)
+      // console.log('[Admin] Saving provider:', p.id, 'with data:', p)
       
       // Prepare update data with all enhanced business fields
       const updateData = {
@@ -1813,12 +1813,12 @@ export default function AdminPage() {
         updated_at: new Date().toISOString()
       }
       
-      console.log('[Admin] Update data prepared:', updateData)
+      // console.log('[Admin] Update data prepared:', updateData)
       
       // SIMPLIFIED APPROACH: Direct database update without connection test
       // The connection test was causing timeouts and preventing saves
       // We'll handle errors directly from the update operation
-      console.log('[Admin] Starting database update...')
+      // console.log('[Admin] Starting database update...')
       const startTime = Date.now()
       
       try {
@@ -1829,8 +1829,8 @@ export default function AdminPage() {
           .update(updateData)
           .eq('id', p.id)
         
-        const duration = Date.now() - startTime
-        console.log(`[Admin] Database update completed in ${duration}ms`)
+        // const duration = Date.now() - startTime
+        // console.log(`[Admin] Database update completed in ${duration}ms`)
         
         if (error) {
           console.error('[Admin] Provider save error:', error)
@@ -1852,7 +1852,7 @@ export default function AdminPage() {
           return
         }
         
-        console.log('[Admin] Provider saved successfully')
+        // console.log('[Admin] Provider saved successfully')
         setMessage('Provider updated successfully! Changes have been saved to the database.')
         setRetryProvider(null) // Clear retry state on success
         clearSavedState() // Clear saved state after successful save
@@ -1865,7 +1865,7 @@ export default function AdminPage() {
             .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
             .order('name', { ascending: true })
           setProviders((pData as ProviderRow[]) || [])
-          console.log('[Admin] Provider data refreshed after save')
+          // console.log('[Admin] Provider data refreshed after save')
         } catch (refreshError) {
           console.error('[Admin] Failed to refresh provider data after save:', refreshError)
         }
@@ -1910,7 +1910,7 @@ export default function AdminPage() {
   // This is particularly useful for timeout errors that might be temporary
   const retrySaveProvider = () => {
     if (retryProvider) {
-      console.log('[Admin] Retrying save for provider:', retryProvider.id)
+      // console.log('[Admin] Retrying save for provider:', retryProvider.id)
       saveProvider(retryProvider)
     }
   }
@@ -2036,7 +2036,7 @@ export default function AdminPage() {
     setConfirmDeleteProviderId(null)
     
     try {
-      console.log('[Admin] Deleting provider:', providerId)
+      // console.log('[Admin] Deleting provider:', providerId)
       
       // Get auth session for Netlify function
       const { data: { session } } = await supabase.auth.getSession()
@@ -2052,7 +2052,7 @@ export default function AdminPage() {
       const fnBase = isLocal ? 'http://localhost:8888' : ''
       const url = fnBase ? `${fnBase}/.netlify/functions/delete-business-listing` : '/.netlify/functions/delete-business-listing'
       
-      console.log('[Admin] Calling delete function:', url)
+      // console.log('[Admin] Calling delete function:', url)
       
       const response = await fetch(url, {
         method: 'POST',
@@ -2063,7 +2063,7 @@ export default function AdminPage() {
         body: JSON.stringify({ listing_id: providerId })  // Function expects 'listing_id' not 'listingId'
       })
       
-      console.log('[Admin] Delete response status:', response.status)
+      // console.log('[Admin] Delete response status:', response.status)
       
       if (!response.ok) {
         // Try to parse detailed error
@@ -2192,7 +2192,7 @@ export default function AdminPage() {
     setMessage(null)
     setDeletingUserId(userId)
     try {
-      console.log('[Admin] Deleting user:', userId)
+      // console.log('[Admin] Deleting user:', userId)
       
       // Get current session to pass auth token
       const { data: { session } } = await supabase.auth.getSession()
@@ -2217,7 +2217,7 @@ export default function AdminPage() {
         body: JSON.stringify({ user_id: userId })
       })
       
-      console.log('[Admin] Delete response status:', response.status)
+      // console.log('[Admin] Delete response status:', response.status)
       
       if (!response.ok) {
         // Try to parse as JSON first for detailed error
@@ -2248,7 +2248,7 @@ export default function AdminPage() {
       }
       
       const result = await response.json()
-      console.log('[Admin] Delete result:', result)
+      // console.log('[Admin] Delete result:', result)
       
       if (!result.ok) {
         throw new Error('Delete failed')
@@ -2258,7 +2258,7 @@ export default function AdminPage() {
       const deletedProfile = profiles.find(p => p.id === userId)
       const deletedEmail = deletedProfile?.email?.toLowerCase().trim()
       
-      console.log('[Admin] Removing deleted user from local state:', { userId, email: deletedEmail })
+      // console.log('[Admin] Removing deleted user from local state:', { userId, email: deletedEmail })
       
       // Remove profile from profiles list
       setProfiles((arr) => arr.filter((p) => p.id !== userId))
@@ -2274,11 +2274,11 @@ export default function AdminPage() {
           const bookingEmail = b.user_email?.toLowerCase().trim()
           return bookingEmail !== deletedEmail
         }))
-        console.log('[Admin] Removed funnel responses and bookings for:', deletedEmail)
+        // console.log('[Admin] Removed funnel responses and bookings for:', deletedEmail)
       }
       
       setMessage('User deleted successfully - all associated data removed')
-      console.log('[Admin] User deleted successfully')
+      // console.log('[Admin] User deleted successfully')
     } catch (err: any) {
       console.error('[Admin] Delete user error:', err)
       setError(err?.message || 'Failed to delete user')
@@ -2353,7 +2353,7 @@ export default function AdminPage() {
    * 5. Updates expandedBusinessDetails state with the fetched data
    */
   async function fetchBusinessDetails(userId: string) {
-    console.log('[Admin] Fetching business details for user ID:', userId)
+    // console.log('[Admin] Fetching business details for user ID:', userId)
     setLoadingBusinessDetails(prev => ({ ...prev, [userId]: true }))
     
     try {
@@ -2362,7 +2362,7 @@ export default function AdminPage() {
       const userEmail = userProfile?.email
       const userName = userProfile?.name
 
-      console.log('[Admin] User profile data from existing data:', { email: userEmail, name: userName })
+      // console.log('[Admin] User profile data from existing data:', { email: userEmail, name: userName })
 
       // Get auth session for the request
       const { data: { session } } = await supabase.auth.getSession()
@@ -2398,14 +2398,14 @@ export default function AdminPage() {
       }
 
       const result = await response.json()
-      console.log('[Admin] Business details response:', result)
+      // console.log('[Admin] Business details response:', result)
 
       if (!result.success) {
         throw new Error(result.details || result.error || 'Failed to fetch business details')
       }
 
       const uniqueBusinessData = result.businessData || []
-      console.log('[Admin] Combined unique business data:', uniqueBusinessData.length, 'records')
+      // console.log('[Admin] Combined unique business data:', uniqueBusinessData.length, 'records')
 
       // Update expanded details with the fetched business data
       setExpandedBusinessDetails(prev => ({
@@ -2428,7 +2428,7 @@ export default function AdminPage() {
    * It removes the user's data from the expandedBusinessDetails state.
    */
   function collapseBusinessDetails(userId: string) {
-    console.log('[Admin] Collapsing business details for user ID:', userId)
+    // console.log('[Admin] Collapsing business details for user ID:', userId)
     setExpandedBusinessDetails(prev => {
       const newState = { ...prev }
       delete newState[userId]

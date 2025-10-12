@@ -263,14 +263,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
      */
     const initializeAuth = async () => {
       try {
-        console.log('[Auth] Initializing auth state...')
+        // console.log('[Auth] Initializing auth state...')
         
         // CRITICAL FIX: Don't initialize if user is already signed in
         // This prevents initialization from overriding a successful sign-in
         // NOTE: On refresh, profile state resets to null, so this check won't work
         // We need to rely on the session check below instead
         if (profile?.email) {
-          console.log('[Auth] User already signed in, skipping initialization')
+          // console.log('[Auth] User already signed in, skipping initialization')
           setLoading(false)
           initializationComplete = true
           return
@@ -288,16 +288,16 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        console.log('[Auth] Initial session check:', { 
-          hasSession: !!session, 
-          email: session?.user?.email,
-          userId: session?.user?.id
-        })
+        // console.log('[Auth] Initial session check:', { 
+        //   hasSession: !!session, 
+        //   email: session?.user?.email,
+        //   userId: session?.user?.id
+        // })
         
         // CRITICAL FIX: If no session exists, mark initialization as complete immediately
         // This prevents the auth state change handler from interfering
         if (!session?.user) {
-          console.log('[Auth] No session found during initialization')
+          // console.log('[Auth] No session found during initialization')
           if (mounted) {
             setLoading(false)
             initializationComplete = true
@@ -320,12 +320,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           let role = meta?.role as 'business' | 'community' | undefined
           const userId = session.user.id
 
-          console.log('[Auth] Processing existing session for:', email, 'userId:', userId)
+          // console.log('[Auth] Processing existing session for:', email, 'userId:', userId)
           
           // CRITICAL FIX: Don't override profile if user is already signed in
           // This prevents initialization from clearing a successful sign-in
           if (profile?.email === email) {
-            console.log('[Auth] User already signed in, skipping initialization profile setting')
+            // console.log('[Auth] User already signed in, skipping initialization profile setting')
             setLoading(false)
             initializationComplete = true
             return
@@ -343,45 +343,45 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             const fetchedRole = await fetchUserRole(userId)
             if (fetchedRole) {
               role = fetchedRole
-              console.log('[Auth] Role fetched from database:', role)
+              // console.log('[Auth] Role fetched from database:', role)
             } else {
-              console.log('[Auth] No valid role found in database')
+              // console.log('[Auth] No valid role found in database')
             }
           }
 
-          console.log('[Auth] About to set profile state:', { name, email, userId, role })
+          // console.log('[Auth] About to set profile state:', { name, email, userId, role })
           
           // CRITICAL FIX: Set profile state and immediately verify it was set
           const newProfile = { name, email, userId, role }
           setProfile(newProfile)
           profileRef.current = newProfile
           
-          console.log('[Auth] Profile state set, current auth context will be:', {
-            isAuthed: Boolean(email),
-            name,
-            email,
-            userId,
-            role
-          })
+          // console.log('[Auth] Profile state set, current auth context will be:', {
+          //   isAuthed: Boolean(email),
+          //   name,
+          //   email,
+          //   userId,
+          //   role
+          // })
 
           // Ensure profile exists in database with proper role
           if (userId && email) {
             await ensureProfile(userId, email, name, role)
           }
         } else {
-          console.log('[Auth] No session found during initialization')
+          // console.log('[Auth] No session found during initialization')
         }
       } catch (error) {
         console.error('[Auth] Error initializing auth:', error)
       } finally {
         if (mounted) {
-          console.log('[Auth] Auth initialization complete, setting loading to false')
-          console.log('[Auth] Final profile state before loading=false:', profile)
+          // console.log('[Auth] Auth initialization complete, setting loading to false')
+          // console.log('[Auth] Final profile state before loading=false:', profile)
           setLoading(false)
           
           // CRITICAL: Mark initialization as complete AFTER setting loading to false
           initializationComplete = true
-          console.log('[Auth] Initialization complete, auth events will now be processed')
+          // console.log('[Auth] Initialization complete, auth events will now be processed')
         }
       }
     }
@@ -402,13 +402,13 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'initComplete:', initializationComplete)
+      // console.log('[Auth] State change event:', event, 'email:', session?.user?.email, 'initComplete:', initializationComplete)
       
       // CRITICAL FIX: During initialization, ignore ALL auth events to prevent race conditions
       // The initializeAuth function handles the initial session, and onAuthStateChange
       // should only process events AFTER initialization is complete
       if (!initializationComplete) {
-        console.log('[Auth] Ignoring auth event during initialization:', event, 'session exists:', !!session)
+        // console.log('[Auth] Ignoring auth event during initialization:', event, 'session exists:', !!session)
         return
       }
 
@@ -424,29 +424,29 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         // CRITICAL FIX: Don't process SIGNED_IN if user is already signed in with same email
         // This prevents the auth state reset when switching tabs
         if (profileRef.current?.email === email) {
-          console.log('[Auth] User already signed in with same email, ignoring SIGNED_IN event')
+          // console.log('[Auth] User already signed in with same email, ignoring SIGNED_IN event')
           return
         }
 
-        console.log('User signed in:', { email, userId, metaRole: role })
+        // console.log('User signed in:', { email, userId, metaRole: role })
 
         // CRITICAL FIX: Always fetch role from database for signed in users
         if (userId) {
           const fetchedRole = await fetchUserRole(userId)
           if (fetchedRole) {
             role = fetchedRole
-            console.log('Role fetched from database on sign in:', role)
+            // console.log('Role fetched from database on sign in:', role)
           }
         }
 
-        console.log('[Auth] Setting profile state:', { name, email, userId, role })
+        // console.log('[Auth] Setting profile state:', { name, email, userId, role })
         const newProfile = { name, email, userId, role }
         setProfile(newProfile)
         profileRef.current = newProfile
         
         // CRITICAL FIX: Set loading to false after setting profile
         // This ensures isAuthed becomes true and user gets redirected
-        console.log('[Auth] Setting loading to false after successful sign-in')
+        // console.log('[Auth] Setting loading to false after successful sign-in')
         setLoading(false)
 
         // Ensure profile exists in database
@@ -454,41 +454,41 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           await ensureProfile(userId, email, name, role)
         }
         
-        console.log('[Auth] Sign-in process complete, user should now be authenticated')
+        // console.log('[Auth] Sign-in process complete, user should now be authenticated')
       } else if (event === 'SIGNED_OUT' || !session) {
-        console.log('[Auth] SIGNED_OUT event or no session - checking if this is a false positive')
+        // console.log('[Auth] SIGNED_OUT event or no session - checking if this is a false positive')
         
         // CRITICAL FIX: Double-check session before clearing profile
         // Sometimes Supabase fires SIGNED_OUT during refresh even with valid session
         const { data: { session: currentSession } } = await supabase.auth.getSession()
         
         if (currentSession?.user?.email) {
-          console.log('[Auth] False SIGNED_OUT detected - session still exists, maintaining profile')
+          // console.log('[Auth] False SIGNED_OUT detected - session still exists, maintaining profile')
           // Don't clear profile if session actually exists
           return
         }
         
-        console.log('[Auth] Confirmed SIGNED_OUT - clearing profile')
+        // console.log('[Auth] Confirmed SIGNED_OUT - clearing profile')
         setProfile(null)
         profileRef.current = null
         // Clear any remaining auth data
         clearLocalAuthData()
-        console.log('[Auth] Cleared custom app data, Supabase will handle its own session cleanup')
+        // console.log('[Auth] Cleared custom app data, Supabase will handle its own session cleanup')
       } else if (event === 'TOKEN_REFRESHED') {
-        console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
+        // console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
         // Only update if we have a valid session
         if (session?.user?.email) {
-          console.log('[Auth] Token refreshed with valid session, maintaining profile')
+          // console.log('[Auth] Token refreshed with valid session, maintaining profile')
           const newProfile = profile ? { ...profile } : null
           setProfile(newProfile)
           profileRef.current = newProfile
         } else {
-          console.log('[Auth] Token refresh but no session - this should not happen, clearing profile')
+          // console.log('[Auth] Token refresh but no session - this should not happen, clearing profile')
           setProfile(null)
           profileRef.current = null
         }
       } else {
-        console.log('[Auth] Unhandled auth event:', event, 'session exists:', !!session)
+        // console.log('[Auth] Unhandled auth event:', event, 'session exists:', !!session)
       }
     })
 
@@ -496,7 +496,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     // CRITICAL FIX: Await initialization to ensure it completes before auth events are processed
     // This prevents race conditions where auth events interfere with initialization
     initializeAuth().then(() => {
-      console.log('[Auth] Initialization completed, auth events can now be processed')
+      // console.log('[Auth] Initialization completed, auth events can now be processed')
     }).catch((error) => {
       console.error('[Auth] Initialization failed:', error)
     })
@@ -526,7 +526,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      console.log('Signing out user...')
+      // console.log('Signing out user...')
       
       // Force clear profile state immediately
       setProfile(null)
@@ -536,14 +536,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       // Manual clearing interferes with Supabase's built-in session persistence and causes auth issues
       // Only clear our custom app data, not Supabase's internal session management
       clearLocalAuthData()
-      console.log('[Auth] Cleared custom app data, leaving Supabase session management intact')
+      // console.log('[Auth] Cleared custom app data, leaving Supabase session management intact')
 
       // Then call Supabase signOut
       const { error } = await supabase.auth.signOut({ scope: 'global' })
       if (error) {
         console.error('Sign out error:', error)
       } else {
-        console.log('Sign out successful')
+        // console.log('Sign out successful')
       }
 
       // Force page reload to ensure clean state
@@ -575,14 +575,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
    * - User exists: Returns error without creating duplicate
    */
   const signUpWithEmail = async (email: string, password: string, name?: string, role?: 'business' | 'community') => {
-    console.log('[Auth] ========================================')
-    console.log('[Auth] signUpWithEmail called:', { 
-      email, 
-      hasPassword: !!password, 
-      passwordLength: password?.length,
-      name, 
-      role 
-    })
+    // console.log('[Auth] ========================================')
+    // console.log('[Auth] signUpWithEmail called:', { 
+    //   email, 
+    //   hasPassword: !!password, 
+    //   passwordLength: password?.length,
+    //   name, 
+    //   role 
+    // })
     
     const { data, error } = await supabase.auth.signUp({ 
       email, 
@@ -592,17 +592,17 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       } 
     })
     
-    console.log('[Auth] Supabase signUp() raw response:')
-    console.log('[Auth]   Error:', error)
-    console.log('[Auth]   Error message:', error?.message)
-    console.log('[Auth]   Error code:', (error as any)?.code)
-    console.log('[Auth]   Error status:', (error as any)?.status)
-    console.log('[Auth]   Has session:', !!data?.session)
-    console.log('[Auth]   Has user:', !!data?.user)
-    console.log('[Auth]   User ID:', data?.user?.id)
-    console.log('[Auth]   User email:', data?.user?.email)
-    console.log('[Auth]   Email confirmed:', data?.user?.email_confirmed_at ? 'YES' : 'NO')
-    console.log('[Auth] ========================================')
+    // console.log('[Auth] Supabase signUp() raw response:')
+    // console.log('[Auth]   Error:', error)
+    // console.log('[Auth]   Error message:', error?.message)
+    // console.log('[Auth]   Error code:', (error as any)?.code)
+    // console.log('[Auth]   Error status:', (error as any)?.status)
+    // console.log('[Auth]   Has session:', !!data?.session)
+    // console.log('[Auth]   Has user:', !!data?.user)
+    // console.log('[Auth]   User ID:', data?.user?.id)
+    // console.log('[Auth]   User email:', data?.user?.email)
+    // console.log('[Auth]   Email confirmed:', data?.user?.email_confirmed_at ? 'YES' : 'NO')
+    // console.log('[Auth] ========================================')
     
     return { error: error?.message, session: data?.session ?? null }
   }
@@ -639,13 +639,13 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Debug log the auth context value whenever it changes
-  console.log('[Auth] Context value updated:', {
-    isAuthed: value.isAuthed,
-    loading: value.loading,
-    email: value.email,
-    role: value.role,
-    profileState: profile
-  })
+  // console.log('[Auth] Context value updated:', {
+  //   isAuthed: value.isAuthed,
+  //   loading: value.loading,
+  //   email: value.email,
+  //   role: value.role,
+  //   profileState: profile
+  // })
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
@@ -900,14 +900,14 @@ function Hero() {
 
   function recompute(q: string) {
     const text = q.trim().toLowerCase()
-    console.log('[Search] Searching for:', text)
+    // console.log('[Search] Searching for:', text)
     if (!text) { setResults([]); return }
     const all = getAllProviders(providersByCategory)
-    console.log('[Search] Total providers loaded:', all.length)
+    // console.log('[Search] Total providers loaded:', all.length)
     
     // Debug: Show all restaurant providers and their tags
-    const restaurants = all.filter(p => p.category_key === 'restaurants-cafes')
-    console.log('[Search] Restaurant providers:', restaurants.map(p => ({ name: p.name, tags: p.tags })))
+    // const restaurants = all.filter(p => p.category_key === 'restaurants-cafes')
+    // console.log('[Search] Restaurant providers:', restaurants.map(p => ({ name: p.name, tags: p.tags })))
     
     const scored = all
       .map((p) => {
@@ -920,15 +920,15 @@ function Hero() {
         const match = baseMatch + featuredBonus
         
         // Debug: Log any restaurant matches
-        if (p.category_key === 'restaurants-cafes' && (matchName > 0 || matchTag > 0)) {
-          console.log('[Search] Restaurant match found:', { 
-            name: p.name, 
-            tags: p.tags, 
-            matchName, 
-            matchTag, 
-            totalMatch: match 
-          })
-        }
+        // if (p.category_key === 'restaurants-cafes' && (matchName > 0 || matchTag > 0)) {
+        //   console.log('[Search] Restaurant match found:', { 
+        //     name: p.name, 
+        //     tags: p.tags, 
+        //     matchName, 
+        //     matchTag, 
+        //     totalMatch: match 
+        //   })
+        // }
         
         return { p, match }
       })
@@ -937,7 +937,7 @@ function Hero() {
       .slice(0, 8)
       .map((s) => s.p)
     
-    console.log('[Search] Final results:', scored.map(p => ({ name: p.name, category: p.category_key })))
+    // console.log('[Search] Final results:', scored.map(p => ({ name: p.name, category: p.category_key })))
     setResults(scored)
   }
 
@@ -1066,7 +1066,7 @@ function ProviderPage() {
     async function checkSaved() {
       try {
         if (!auth.userId || !provider?.id) return
-        console.log('[Provider] check saved', { userId: auth.userId, providerId: provider.id })
+        // console.log('[Provider] check saved', { userId: auth.userId, providerId: provider.id })
         const { data, error } = await supabase
           .from('saved_providers')
           .select('id')
@@ -1093,7 +1093,7 @@ function ProviderPage() {
     setSaveMsg(null)
     try {
       if (isSaved) {
-        console.log('[Provider] unsave', { userId: auth.userId, providerId: provider.id })
+        // console.log('[Provider] unsave', { userId: auth.userId, providerId: provider.id })
         const { error } = await supabase
           .from('saved_providers')
           .delete()
@@ -1102,7 +1102,7 @@ function ProviderPage() {
         if (error) setSaveMsg(error.message)
         else setIsSaved(false)
       } else {
-        console.log('[Provider] save', { userId: auth.userId, providerId: provider.id })
+        // console.log('[Provider] save', { userId: auth.userId, providerId: provider.id })
         const { error } = await supabase
           .from('saved_providers')
           .insert([{ user_id: auth.userId, provider_id: provider.id }])
@@ -1120,7 +1120,7 @@ function ProviderPage() {
     setCouponBusy(true)
     setCouponMsg(null)
     try {
-      console.log('[Provider] save coupon', { userId: auth.userId, providerId: provider.id, code })
+      // console.log('[Provider] save coupon', { userId: auth.userId, providerId: provider.id, code })
       const { error } = await supabase
         .from('coupon_redemptions')
         .insert([{ user_id: auth.userId, provider_id: provider.id, code }])
@@ -2070,7 +2070,7 @@ async function loadProvidersFromSheet(): Promise<void> {
       }
     })
     providersByCategory = ensureDemoMembers(grouped)
-    console.log('[Sheets] Providers loaded from Google Sheets', grouped)
+    // console.log('[Sheets] Providers loaded from Google Sheets', grouped)
   } catch (err) {
     console.warn('[Sheets] Failed to load providers from Google Sheets, using defaults', err)
   }
@@ -2114,9 +2114,9 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
     ].flat().map((s) => String(s).trim()).filter(Boolean)))
 
     // Debug: Only log health-wellness providers to avoid spam
-    if (key === 'health-wellness') {
-      console.log(`[Supabase] Loading health-wellness provider: ${r.name} (published: ${r.published})`)
-    }
+    // if (key === 'health-wellness') {
+    //   console.log(`[Supabase] Loading health-wellness provider: ${r.name} (published: ${r.published})`)
+    // }
 
     grouped[key].push({
       id: r.id,
@@ -2152,12 +2152,12 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
   providersByCategory = grouped
   
   // Log summary of loaded providers by category
-  Object.keys(grouped).forEach((category) => {
-    const count = grouped[category as CategoryKey].length
-    console.log(`[Supabase] ${category}: ${count} providers loaded`)
-  })
+  // Object.keys(grouped).forEach((category) => {
+  //   const count = grouped[category as CategoryKey].length
+  //   console.log(`[Supabase] ${category}: ${count} providers loaded`)
+  // })
   
-  console.log('[Supabase] Providers loaded successfully', grouped)
+  // console.log('[Supabase] Providers loaded successfully', grouped)
   try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
   return true
 }
@@ -2400,9 +2400,9 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
     const cuisineSynonyms = cuisine ? getCuisineSynonyms(cuisine) : []
     const allCuisineTerms = new Set([...cuisineSynonyms, ...values])
     
-    console.log('[Restaurant Filter] Answers:', { cuisine, occasion, price, service })
-    console.log('[Restaurant Filter] Cuisine synonyms:', cuisineSynonyms)
-    console.log('[Restaurant Filter] All answer values:', Array.from(values))
+    // console.log('[Restaurant Filter] Answers:', { cuisine, occasion, price, service })
+    // console.log('[Restaurant Filter] Cuisine synonyms:', cuisineSynonyms)
+    // console.log('[Restaurant Filter] All answer values:', Array.from(values))
     
     return providers
       .map((p) => {
@@ -2439,13 +2439,13 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
         })
         
         // Debug: Log scoring for restaurants
-        if (score > 0) {
-          console.log('[Restaurant Filter] Scored:', { 
-            name: p.name, 
-            tags: p.tags, 
-            score: score 
-          })
-        }
+        // if (score > 0) {
+        //   console.log('[Restaurant Filter] Scored:', { 
+        //     name: p.name, 
+        //     tags: p.tags, 
+        //     score: score 
+        //   })
+        // }
         
         return { p, score }
       })
