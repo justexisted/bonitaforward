@@ -141,6 +141,7 @@ export default function AdminPage() {
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set())
+  const [filteringByZipCode, setFilteringByZipCode] = useState(false)
 
   // Function to add a new calendar event
   const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at'>) => {
@@ -219,6 +220,117 @@ export default function AdminPage() {
       }
       return newSet
     })
+  }
+
+  /**
+   * Function to filter calendar events by allowed zip codes
+   * 
+   * This function:
+   * 1. Extracts zip codes from event locations/addresses
+   * 2. Compares against allowed zip codes (within ~20 min of Chula Vista)
+   * 3. Deletes events that don't match the allowed zip codes
+   * 4. Shows a summary of what was filtered
+   */
+  const filterEventsByZipCode = async () => {
+    // Allowed zip codes within ~20 min of Chula Vista
+    const ALLOWED_ZIP_CODES = new Set([
+      '91909', '91910', '91911', '91912', '91913', '91914', '91915', '91921',
+      '91902', '91950', '91951', '91932', '91933', '92173', '92154', '92139',
+      '92113', '92102', '92101', '91945', '91977', '91978', '91941', '91942',
+      '92118'
+    ])
+
+    // Helper function to extract zip code from a string
+    const extractZipCode = (locationString: string | null | undefined): string | null => {
+      if (!locationString) return null
+      const zipMatch = locationString.match(/\b(\d{5})(?:-\d{4})?\b/)
+      return zipMatch ? zipMatch[1] : null
+    }
+
+    const confirmed = confirm(
+      `This will filter calendar events by allowed zip codes (within ~20 minutes of Chula Vista).\n\n` +
+      `Events WITHOUT a valid zip code in their location or address will be DELETED.\n` +
+      `Events OUTSIDE the allowed area will be DELETED.\n\n` +
+      `Current events: ${calendarEvents.length}\n\n` +
+      `Are you sure you want to continue?`
+    )
+
+    if (!confirmed) return
+
+    setFilteringByZipCode(true)
+
+    try {
+      // Analyze events and categorize them
+      const eventsToDelete: CalendarEvent[] = []
+      const eventsToKeep: CalendarEvent[] = []
+      const eventsSummary: string[] = []
+
+      calendarEvents.forEach(event => {
+        const locationZip = extractZipCode(event.location)
+        const addressZip = extractZipCode(event.address)
+        const zip = locationZip || addressZip
+
+        if (!zip) {
+          eventsToDelete.push(event)
+          eventsSummary.push(`❌ "${event.title}" - No zip code found`)
+        } else if (!ALLOWED_ZIP_CODES.has(zip)) {
+          eventsToDelete.push(event)
+          eventsSummary.push(`❌ "${event.title}" - Zip ${zip} outside allowed area`)
+        } else {
+          eventsToKeep.push(event)
+          eventsSummary.push(`✓ "${event.title}" - Zip ${zip} is allowed`)
+        }
+      })
+
+      // Show summary and get final confirmation
+      const summaryText = 
+        `Filter Results:\n\n` +
+        `✓ Events to KEEP: ${eventsToKeep.length}\n` +
+        `❌ Events to DELETE: ${eventsToDelete.length}\n\n` +
+        `Details:\n${eventsSummary.slice(0, 20).join('\n')}` +
+        (eventsSummary.length > 20 ? `\n... and ${eventsSummary.length - 20} more` : '') +
+        `\n\nProceed with deletion?`
+
+      const finalConfirm = confirm(summaryText)
+
+      if (!finalConfirm) {
+        setFilteringByZipCode(false)
+        return
+      }
+
+      // Delete events that don't match
+      let deletedCount = 0
+      for (const event of eventsToDelete) {
+        const { error } = await supabase
+          .from('calendar_events')
+          .delete()
+          .eq('id', event.id)
+
+        if (error) {
+          console.error(`Error deleting event "${event.title}":`, error)
+        } else {
+          deletedCount++
+        }
+      }
+
+      // Refresh calendar events
+      const { fetchCalendarEvents } = await import('./Calendar')
+      const events = await fetchCalendarEvents()
+      setCalendarEvents(events)
+
+      alert(
+        `Zip Code Filtering Complete!\n\n` +
+        `✓ Kept: ${eventsToKeep.length} events\n` +
+        `❌ Deleted: ${deletedCount} events\n` +
+        `Remaining: ${events.length} events`
+      )
+
+    } catch (error) {
+      console.error('Error filtering events by zip code:', error)
+      alert('Failed to filter events: ' + error)
+    } finally {
+      setFilteringByZipCode(false)
+    }
   }
 
   // Function to save edited calendar event
@@ -4438,6 +4550,30 @@ export default function AdminPage() {
             <div className="font-medium">Calendar Events Manager</div>
             <div className="mt-2 text-sm text-neutral-600">
               Manage local events for the Bonita community calendar. Events are automatically fetched from RSS feeds and can be manually curated.
+            </div>
+            
+            {/* Zip Code Filter Button */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-blue-900">Filter Events by Zip Code</div>
+                  <div className="text-xs text-blue-700 mt-1">
+                    Remove events outside the Bonita/Chula Vista area (~20 minute radius). 
+                    This will delete events without zip codes or outside allowed zip codes.
+                  </div>
+                </div>
+                <button
+                  onClick={filterEventsByZipCode}
+                  disabled={filteringByZipCode || calendarEvents.length === 0}
+                  className={`ml-4 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+                    filteringByZipCode || calendarEvents.length === 0
+                      ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  {filteringByZipCode ? 'Filtering...' : 'Filter by Zip Code'}
+                </button>
+              </div>
             </div>
             
             {/* Calendar Events List */}
