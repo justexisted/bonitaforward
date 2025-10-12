@@ -431,14 +431,20 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                 )}
               </div>
 
-              {/* Location */}
-              {selectedEvent.location && (
+              {/* Location - Show address if available, otherwise location. Avoid duplicates. */}
+              {(selectedEvent.location || selectedEvent.address) && (
                 <div className="flex items-start text-neutral-700">
                   <MapPin className="w-4 h-4 md:w-5 md:h-5 mr-2 mt-0.5 text-blue-600 flex-shrink-0" />
                   <div>
-                    <div className="font-medium text-sm md:text-base">{selectedEvent.location}</div>
-                    {selectedEvent.address && (
-                      <div className="text-xs md:text-sm text-neutral-600 mt-1">{selectedEvent.address}</div>
+                    {/* Show address if it exists, otherwise show location */}
+                    {selectedEvent.address ? (
+                      <div className="font-medium text-sm md:text-base">{selectedEvent.address}</div>
+                    ) : selectedEvent.location ? (
+                      <div className="font-medium text-sm md:text-base">{selectedEvent.location}</div>
+                    ) : null}
+                    {/* Only show location as secondary info if it's different from address */}
+                    {selectedEvent.location && selectedEvent.address && selectedEvent.location !== selectedEvent.address && (
+                      <div className="text-xs md:text-sm text-neutral-600 mt-1">{selectedEvent.location}</div>
                     )}
                   </div>
                 </div>
