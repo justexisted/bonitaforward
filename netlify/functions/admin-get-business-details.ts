@@ -81,9 +81,10 @@ export const handler: Handler = async (event) => {
     console.log('[Admin Business Details] Fetching business details for:', { userId, userEmail, userName })
 
     // Fetch providers by owner_user_id (primary method)
+    // Note: Using 'category_key' not 'category' - this is the actual column name in the database
     const { data: businessDataByOwner, error: ownerError } = await supabase
       .from('providers')
-      .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at, owner_user_id')
+      .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at, owner_user_id')
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false })
 
@@ -94,7 +95,7 @@ export const handler: Handler = async (event) => {
     if (userEmail) {
       const { data: emailData, error: emailError } = await supabase
         .from('providers')
-        .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at, owner_user_id')
+        .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at, owner_user_id')
         .eq('email', userEmail)
         .order('created_at', { ascending: false })
       
@@ -111,7 +112,7 @@ export const handler: Handler = async (event) => {
     if (userName) {
       const { data: nameData, error: nameError } = await supabase
         .from('providers')
-        .select('id, name, phone, email, website, address, category, tags, is_member, published, created_at, owner_user_id')
+        .select('id, name, phone, email, website, address, category_key, tags, is_member, published, created_at, owner_user_id')
         .ilike('name', `%${userName}%`)
         .order('created_at', { ascending: false })
       
