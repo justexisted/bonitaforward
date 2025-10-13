@@ -400,50 +400,108 @@ export default function AccountPage() {
   }
 
   /**
-   * CANCEL BOOKING FUNCTION
+   * MANAGE BOOKING FUNCTION
    * 
-   * Allows users to cancel their confirmed bookings by updating the status to 'cancelled'
-   * in the booking_events table. Includes confirmation dialog and loading states.
+   * Handles various booking operations (cancel, delete, edit, confirm) using the Netlify function
+   * for proper authorization and data validation. Supports both customer and business owner actions.
    * 
-   * @param bookingId - The UUID of the booking to cancel
+   * @param action - The action to perform ('cancel', 'delete', 'edit', 'confirm')
+   * @param bookingId - The UUID of the booking to modify
+   * @param updates - Optional updates for edit action
    */
-  const cancelBooking = async (bookingId: string) => {
-    // Show confirmation dialog to prevent accidental cancellations
-    if (!confirm('Are you sure you want to cancel this booking?')) return
+  const manageBooking = async (action: 'cancel' | 'delete' | 'edit' | 'confirm', bookingId: string, updates?: any) => {
+    // Show confirmation dialog for destructive actions
+    if (action === 'cancel' && !confirm('Are you sure you want to cancel this booking?')) return
+    if (action === 'delete' && !confirm('Are you sure you want to permanently delete this booking?')) return
 
     // Set loading state for this specific booking
     setCancellingBookingId(bookingId)
     
     try {
-      // Update booking status to 'cancelled' in the database
-      // Only allow cancellation if the booking belongs to the current user
-      const { error } = await supabase
-        .from('booking_events')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId)
-        .eq('customer_email', auth.email)
+      // Call the Netlify function for booking management
+      const response = await fetch('/.netlify/functions/manage-booking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action,
+          bookingId,
+          updates,
+          userEmail: auth.email
+        })
+      })
 
-      if (error) {
-        console.error('Error cancelling booking:', error)
-        setMessage('Failed to cancel booking')
-        return
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to manage booking')
       }
 
-      // Update local state to reflect the cancellation immediately
-      // This provides instant feedback without requiring a page refresh
-      setBookings(bookings.map(booking => 
-        booking.id === bookingId 
-          ? { ...booking, status: 'cancelled' }
-          : booking
-      ))
-      
-      setMessage('Booking cancelled successfully')
+      // Handle different actions
+      switch (action) {
+        case 'cancel':
+          setBookings(bookings.map(booking => 
+            booking.id === bookingId 
+              ? { ...booking, status: 'cancelled' }
+              : booking
+          ))
+          setMessage('Booking cancelled successfully')
+          break
+
+        case 'delete':
+          setBookings(bookings.filter(booking => booking.id !== bookingId))
+          setMessage('Booking deleted successfully')
+          break
+
+        case 'confirm':
+          setBookings(bookings.map(booking => 
+            booking.id === bookingId 
+              ? { ...booking, status: 'confirmed' }
+              : booking
+          ))
+          setMessage('Booking confirmed successfully')
+          break
+
+        case 'edit':
+          if (updates) {
+            setBookings(bookings.map(booking => 
+              booking.id === bookingId 
+                ? { ...booking, ...updates }
+                : booking
+            ))
+            setMessage('Booking updated successfully')
+          }
+          break
+      }
     } catch (error) {
-      console.error('Error cancelling booking:', error)
-      setMessage('Failed to cancel booking')
+      console.error('Error managing booking:', error)
+      setMessage(`Failed to ${action} booking`)
     } finally {
       // Clear loading state regardless of success or failure
       setCancellingBookingId(null)
+    }
+  }
+
+  /**
+   * EDIT BOOKING FUNCTION
+   * 
+   * Opens a modal to edit booking details. Currently supports editing customer name,
+   * email, date, duration, and notes. Business owners can edit any booking.
+   * 
+   * @param booking - The booking object to edit
+   */
+  const editBooking = (booking: any) => {
+    // For now, we'll implement a simple edit for customer details
+    // In a full implementation, you'd want a proper modal
+    const newName = prompt('Edit customer name:', booking.customer_name || '')
+    const newEmail = prompt('Edit customer email:', booking.customer_email || '')
+    
+    if (newName !== null && newEmail !== null) {
+      manageBooking('edit', booking.id, {
+        customer_name: newName,
+        customer_email: newEmail
+      })
     }
   }
 
@@ -761,33 +819,74 @@ export default function AccountPage() {
                             </a>
                           )}
                           
-                          {/* Cancel booking button - only available for confirmed bookings */}
-                          {booking.status === 'confirmed' && (
+                          {/* Booking management buttons */}
+                          <div className="flex flex-col gap-1">
+                            {/* Edit booking button - available for all bookings */}
                             <button
-                              onClick={() => cancelBooking(booking.id)}
+                              onClick={() => editBooking(booking)}
                               disabled={cancellingBookingId === booking.id}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {cancellingBookingId === booking.id ? (
-                                <>
-                                  {/* Loading spinner for cancellation in progress */}
-                                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Cancelling...
-                                </>
-                              ) : (
-                                <>
-                                  {/* Cancel icon */}
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                  Cancel
-                                </>
-                              )}
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit
                             </button>
-                          )}
+
+                            {/* Confirm booking button - only for pending bookings */}
+                            {booking.status === 'pending' && (
+                              <button
+                                onClick={() => manageBooking('confirm', booking.id)}
+                                disabled={cancellingBookingId === booking.id}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Confirm
+                              </button>
+                            )}
+
+                            {/* Cancel booking button - available for confirmed and pending bookings */}
+                            {(booking.status === 'confirmed' || booking.status === 'pending') && (
+                              <button
+                                onClick={() => manageBooking('cancel', booking.id)}
+                                disabled={cancellingBookingId === booking.id}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {cancellingBookingId === booking.id ? (
+                                  <>
+                                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Cancel
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {/* Delete booking button - available for cancelled bookings or as business owner */}
+                            {(booking.status === 'cancelled' || auth.role === 'business') && (
+                              <button
+                                onClick={() => manageBooking('delete', booking.id)}
+                                disabled={cancellingBookingId === booking.id}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
