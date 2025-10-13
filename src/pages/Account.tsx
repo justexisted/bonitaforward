@@ -143,7 +143,10 @@ export default function AccountPage() {
           setMyEvents([])
         }
 
-        // My Bookings - Load from booking_events table with provider details
+        // BOOKING EVENTS LOADING
+        // Load user's booking history from the booking_events table with full provider details
+        // This includes appointments made through the Google Calendar booking system
+        console.log('[Account] Loading booking events for user:', auth.email)
         try {
           const { data, error } = await supabase
             .from('booking_events')
@@ -162,12 +165,17 @@ export default function AccountPage() {
             .eq('customer_email', auth.email)
             .order('booking_date', { ascending: false })
             .limit(50)
+          
+          console.log('[Account] Booking events query result:', { data: data?.length || 0, error })
+          
           if (error) {
-            console.warn('[Account] booking_events select error', error)
+            console.error('[Account] booking_events select error:', error)
             setBookings([])
           } else {
             const rows = (data as any[]) || []
-            setBookings(rows.map((r) => ({
+            console.log('[Account] Processing booking events:', rows.length, 'bookings found')
+            
+            const processedBookings = rows.map((r) => ({
               id: r.id,
               provider_id: r.provider_id ?? null,
               provider_name: r.providers?.name ?? null,
@@ -181,10 +189,13 @@ export default function AccountPage() {
               provider_category: r.providers?.category_key ?? null,
               provider_address: r.providers?.address ?? null,
               provider_phone: r.providers?.phone ?? null,
-            })))
+            }))
+            
+            console.log('[Account] Setting bookings state:', processedBookings.length, 'processed bookings')
+            setBookings(processedBookings)
           }
         } catch (e) {
-          console.warn('[Account] booking_events load failed', e)
+          console.error('[Account] booking_events load failed:', e)
           setBookings([])
         }
 
@@ -387,11 +398,24 @@ export default function AccountPage() {
     }
   }
 
+  /**
+   * CANCEL BOOKING FUNCTION
+   * 
+   * Allows users to cancel their confirmed bookings by updating the status to 'cancelled'
+   * in the booking_events table. Includes confirmation dialog and loading states.
+   * 
+   * @param bookingId - The UUID of the booking to cancel
+   */
   const cancelBooking = async (bookingId: string) => {
+    // Show confirmation dialog to prevent accidental cancellations
     if (!confirm('Are you sure you want to cancel this booking?')) return
 
+    // Set loading state for this specific booking
     setCancellingBookingId(bookingId)
+    
     try {
+      // Update booking status to 'cancelled' in the database
+      // Only allow cancellation if the booking belongs to the current user
       const { error } = await supabase
         .from('booking_events')
         .update({ status: 'cancelled' })
@@ -404,17 +428,20 @@ export default function AccountPage() {
         return
       }
 
-      // Update local state
+      // Update local state to reflect the cancellation immediately
+      // This provides instant feedback without requiring a page refresh
       setBookings(bookings.map(booking => 
         booking.id === bookingId 
           ? { ...booking, status: 'cancelled' }
           : booking
       ))
+      
       setMessage('Booking cancelled successfully')
     } catch (error) {
       console.error('Error cancelling booking:', error)
       setMessage('Failed to cancel booking')
     } finally {
+      // Clear loading state regardless of success or failure
       setCancellingBookingId(null)
     }
   }
@@ -598,30 +625,39 @@ export default function AccountPage() {
               </div>
             </div>
           )}
-          {String(auth.role || role || '').toLowerCase() === 'community' && (
-            <div className="mt-6 border-t border-neutral-100 pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-medium">My Bookings</div>
-                <div className="text-xs text-neutral-500">
-                  {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
-                </div>
+          {/* BOOKINGS SECTION - Available to all users */}
+          {/* Display user's appointment bookings made through the booking system */}
+          <div className="mt-6 border-t border-neutral-100 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-medium">My Bookings</div>
+              <div className="text-xs text-neutral-500">
+                {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
               </div>
+            </div>
               <div className="mt-2 text-sm">
+                {/* Loading state indicator */}
                 {communityLoading && <div className="text-neutral-500">Loading…</div>}
+                
+                {/* Empty state - shown when no bookings exist */}
                 {!communityLoading && bookings.length === 0 && (
                   <div className="text-neutral-600 p-4 text-center border border-neutral-200 rounded-lg">
                     No bookings found. Book appointments with local businesses to see them here.
                   </div>
                 )}
+                
+                {/* BOOKINGS LIST - Display each booking as a card with full details */}
                 <div className="space-y-3">
                   {bookings.map((booking) => (
                     <div key={booking.id} className="border border-neutral-200 rounded-lg p-4 hover:bg-neutral-50 transition-colors">
                       <div className="flex items-start justify-between">
+                        {/* LEFT SIDE - Booking details and information */}
                         <div className="flex-1">
+                          {/* Business name and status badge */}
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="font-medium text-neutral-900">
                               {booking.provider_name || 'Business'}
                             </h4>
+                            {/* Status badge with color coding */}
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                               booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                               booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -674,7 +710,9 @@ export default function AccountPage() {
                           </div>
                         </div>
                         
+                        {/* RIGHT SIDE - Action buttons for booking management */}
                         <div className="flex flex-col gap-2 ml-4">
+                          {/* Call business button - only show if phone number exists */}
                           {booking.provider_phone && (
                             <a 
                               href={`tel:${booking.provider_phone}`}
@@ -687,6 +725,7 @@ export default function AccountPage() {
                             </a>
                           )}
                           
+                          {/* Cancel booking button - only available for confirmed bookings */}
                           {booking.status === 'confirmed' && (
                             <button
                               onClick={() => cancelBooking(booking.id)}
@@ -695,6 +734,7 @@ export default function AccountPage() {
                             >
                               {cancellingBookingId === booking.id ? (
                                 <>
+                                  {/* Loading spinner for cancellation in progress */}
                                   <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -703,6 +743,7 @@ export default function AccountPage() {
                                 </>
                               ) : (
                                 <>
+                                  {/* Cancel icon */}
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                   </svg>
@@ -718,7 +759,7 @@ export default function AccountPage() {
                 </div>
               </div>
             </div>
-          )}
+          
           {/* Saved Businesses - Available to all users */}
           <div className="mt-6 border-t border-neutral-100 pt-4">
             <div className="flex items-center justify-between mb-2">
