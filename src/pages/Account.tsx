@@ -12,7 +12,21 @@ export default function AccountPage() {
   const [busy, setBusy] = useState(false)
   const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
   const [role, setRole] = useState<string>('')
-  const [bookings, setBookings] = useState<Array<{ id: string; provider_id?: string | null; provider_name?: string | null; time?: string | null; status?: string | null; created_at?: string | null }>>([])
+  const [bookings, setBookings] = useState<Array<{ 
+    id: string; 
+    provider_id?: string | null; 
+    provider_name?: string | null; 
+    time?: string | null; 
+    status?: string | null; 
+    created_at?: string | null;
+    customer_name?: string | null;
+    customer_email?: string | null;
+    booking_duration_minutes?: number | null;
+    booking_notes?: string | null;
+    provider_category?: string | null;
+    provider_address?: string | null;
+    provider_phone?: string | null;
+  }>>([])
   const [savedBusinesses, setSavedBusinesses] = useState<Array<{ 
     id?: string
     provider_id: string
@@ -28,6 +42,7 @@ export default function AccountPage() {
   const [myEvents, setMyEvents] = useState<CalendarEvent[]>([])
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
 
   /**
    * ACCOUNT DATA INITIALIZATION
@@ -128,30 +143,48 @@ export default function AccountPage() {
           setMyEvents([])
         }
 
-        // My Bookings
+        // My Bookings - Load from booking_events table with provider details
         try {
           const { data, error } = await supabase
-            .from('bookings')
-            .select('*')
-            .eq('user_id', auth.userId)
-            .order('created_at', { ascending: false })
+            .from('booking_events')
+            .select(`
+              id,
+              provider_id,
+              customer_email,
+              customer_name,
+              booking_date,
+              booking_duration_minutes,
+              booking_notes,
+              status,
+              created_at,
+              providers!inner(name, category_key, address, phone)
+            `)
+            .eq('customer_email', auth.email)
+            .order('booking_date', { ascending: false })
             .limit(50)
           if (error) {
-            console.warn('[Account] bookings select error', error)
+            console.warn('[Account] booking_events select error', error)
             setBookings([])
           } else {
             const rows = (data as any[]) || []
             setBookings(rows.map((r) => ({
               id: r.id,
               provider_id: r.provider_id ?? null,
-              provider_name: (r as any).provider_name ?? null,
-              time: r.time ?? r.start_time ?? r.created_at ?? null,
+              provider_name: r.providers?.name ?? null,
+              time: r.booking_date ?? null,
               status: r.status ?? null,
               created_at: r.created_at ?? null,
+              customer_name: r.customer_name ?? null,
+              customer_email: r.customer_email ?? null,
+              booking_duration_minutes: r.booking_duration_minutes ?? null,
+              booking_notes: r.booking_notes ?? null,
+              provider_category: r.providers?.category_key ?? null,
+              provider_address: r.providers?.address ?? null,
+              provider_phone: r.providers?.phone ?? null,
             })))
           }
         } catch (e) {
-          console.warn('[Account] bookings load failed', e)
+          console.warn('[Account] booking_events load failed', e)
           setBookings([])
         }
 
@@ -354,6 +387,38 @@ export default function AccountPage() {
     }
   }
 
+  const cancelBooking = async (bookingId: string) => {
+    if (!confirm('Are you sure you want to cancel this booking?')) return
+
+    setCancellingBookingId(bookingId)
+    try {
+      const { error } = await supabase
+        .from('booking_events')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId)
+        .eq('customer_email', auth.email)
+
+      if (error) {
+        console.error('Error cancelling booking:', error)
+        setMessage('Failed to cancel booking')
+        return
+      }
+
+      // Update local state
+      setBookings(bookings.map(booking => 
+        booking.id === bookingId 
+          ? { ...booking, status: 'cancelled' }
+          : booking
+      ))
+      setMessage('Booking cancelled successfully')
+    } catch (error) {
+      console.error('Error cancelling booking:', error)
+      setMessage('Failed to cancel booking')
+    } finally {
+      setCancellingBookingId(null)
+    }
+  }
+
   async function deleteAccount() {
     const confirmation = prompt('Type "DELETE" to confirm account deletion:')
     if (confirmation !== 'DELETE') return
@@ -535,18 +600,122 @@ export default function AccountPage() {
           )}
           {String(auth.role || role || '').toLowerCase() === 'community' && (
             <div className="mt-6 border-t border-neutral-100 pt-4">
-              <div className="text-sm font-medium">My Bookings</div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-medium">My Bookings</div>
+                <div className="text-xs text-neutral-500">
+                  {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
+                </div>
+              </div>
               <div className="mt-2 text-sm">
                 {communityLoading && <div className="text-neutral-500">Loading…</div>}
-                {!communityLoading && bookings.length === 0 && <div className="text-neutral-600">No bookings found.</div>}
-                <ul className="space-y-1">
-                  {bookings.map((b) => (
-                    <li key={b.id} className="flex items-center justify-between">
-                      <span>{b.provider_name || b.provider_id || 'Business'}{b.time ? ` • ${new Date(b.time).toLocaleString()}` : ''}</span>
-                      <span className="text-xs text-neutral-500">{b.status || '—'}</span>
-                    </li>
+                {!communityLoading && bookings.length === 0 && (
+                  <div className="text-neutral-600 p-4 text-center border border-neutral-200 rounded-lg">
+                    No bookings found. Book appointments with local businesses to see them here.
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {bookings.map((booking) => (
+                    <div key={booking.id} className="border border-neutral-200 rounded-lg p-4 hover:bg-neutral-50 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium text-neutral-900">
+                              {booking.provider_name || 'Business'}
+                            </h4>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                              booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {booking.status || 'Unknown'}
+                            </span>
+                          </div>
+                          
+                          {booking.time && (
+                            <div className="text-sm text-neutral-600 mb-2">
+                              <div className="flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {new Date(booking.time).toLocaleDateString()} at {new Date(booking.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {booking.booking_duration_minutes && (
+                                  <span className="text-neutral-500">({booking.booking_duration_minutes} min)</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {booking.provider_address && (
+                            <div className="text-sm text-neutral-600 mb-1">
+                              <div className="flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {booking.provider_address}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {booking.booking_notes && (
+                            <div className="text-sm text-neutral-600 mb-2">
+                              <div className="flex items-start gap-1">
+                                <svg className="w-4 h-4 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                </svg>
+                                <span>{booking.booking_notes}</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="text-xs text-neutral-500">
+                            Booked on {new Date(booking.created_at || '').toLocaleDateString()}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2 ml-4">
+                          {booking.provider_phone && (
+                            <a 
+                              href={`tel:${booking.provider_phone}`}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                              Call
+                            </a>
+                          )}
+                          
+                          {booking.status === 'confirmed' && (
+                            <button
+                              onClick={() => cancelBooking(booking.id)}
+                              disabled={cancellingBookingId === booking.id}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {cancellingBookingId === booking.id ? (
+                                <>
+                                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Cancelling...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                  Cancel
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
           )}

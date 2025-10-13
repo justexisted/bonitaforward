@@ -1041,6 +1041,7 @@ function ProviderPage() {
   // Priority: Try slug first (for new URLs), then fall back to ID (for existing bookmarks)
   const provider = all.find((p) => p.slug === providerIdentifier) || all.find((p) => p.id === providerIdentifier)
   const auth = useAuth()
+  const navigate = useNavigate()
   const [isSaved, setIsSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
@@ -1161,11 +1162,13 @@ function ProviderPage() {
       }
       await res.json()
       setBookingMsg('✅ Booking requested! You will receive a confirmation email if provided.')
-      // Close modal after short delay
+      // Close modal and redirect to account page after short delay
       setTimeout(() => {
         setBookingOpen(false)
         setBookingBusy(false)
         setBookingMsg(null)
+        // Redirect to account page to show the new booking
+        navigate('/account')
       }, 1500)
     } catch (e: any) {
       setBookingMsg(e?.message || 'Failed to create booking')
