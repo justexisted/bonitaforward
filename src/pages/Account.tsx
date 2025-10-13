@@ -43,6 +43,7 @@ export default function AccountPage() {
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null)
+  const [bookingsExpanded, setBookingsExpanded] = useState<boolean>(true) // Default to expanded
 
   /**
    * ACCOUNT DATA INITIALIZATION
@@ -446,6 +447,16 @@ export default function AccountPage() {
     }
   }
 
+  /**
+   * TOGGLE BOOKINGS SECTION
+   * 
+   * Expands or collapses the bookings section to improve page organization
+   * and allow users to hide/show their booking history as needed.
+   */
+  const toggleBookingsExpanded = () => {
+    setBookingsExpanded(!bookingsExpanded)
+  }
+
   async function deleteAccount() {
     const confirmation = prompt('Type "DELETE" to confirm account deletion:')
     if (confirmation !== 'DELETE') return
@@ -628,12 +639,37 @@ export default function AccountPage() {
           {/* BOOKINGS SECTION - Available to all users */}
           {/* Display user's appointment bookings made through the booking system */}
           <div className="mt-6 border-t border-neutral-100 pt-4">
+            {/* BOOKINGS HEADER - Clickable toggle with expand/collapse functionality */}
             <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-medium">My Bookings</div>
+              <button
+                onClick={toggleBookingsExpanded}
+                className="flex items-center gap-2 text-sm font-medium hover:text-blue-600 transition-colors"
+              >
+                <span>My Bookings</span>
+                {/* Expand/collapse chevron icon */}
+                <svg 
+                  className={`w-4 h-4 transition-transform duration-200 ${bookingsExpanded ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
               <div className="text-xs text-neutral-500">
                 {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
               </div>
             </div>
+            {/* COLLAPSIBLE BOOKINGS CONTENT */}
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
+              bookingsExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+            }`}>
+              {/* Collapsed state hint - only show when collapsed and has bookings */}
+              {!bookingsExpanded && bookings.length > 0 && (
+                <div className="mt-2 text-xs text-neutral-500 italic">
+                  Click to view {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
+                </div>
+              )}
               <div className="mt-2 text-sm">
                 {/* Loading state indicator */}
                 {communityLoading && <div className="text-neutral-500">Loading…</div>}
@@ -759,6 +795,7 @@ export default function AccountPage() {
                 </div>
               </div>
             </div>
+            </div> {/* End of collapsible bookings content */}
           
           {/* Saved Businesses - Available to all users */}
           <div className="mt-6 border-t border-neutral-100 pt-4">
