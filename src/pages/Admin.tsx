@@ -1969,13 +1969,15 @@ export default function AdminPage() {
         website: p.website,
         address: p.address,
         images: p.images || [],
-        is_member: p.subscription_type ? p.is_member === true : false,
+        // IMPORTANT: Persist membership/featured flags as explicitly set by admin
+        // Do NOT override based on subscription_type; admins' changes must be permanent
+        is_member: p.is_member === true,
         
         // PLAN TRACKING FIELDS: Handle the new plan system properly
         // This ensures the database reflects the correct plan status and tracking
-        // CRITICAL FIX: When subscription_type is null (free plan), explicitly clear featured status
-        is_featured: p.subscription_type ? p.is_featured === true : false,
-        featured_since: p.subscription_type ? (p.featured_since || null) : null,
+        // Keep featured flags independent from subscription_type as well
+        is_featured: p.is_featured === true,
+        featured_since: p.featured_since || null,
         subscription_type: p.subscription_type || null,
         // REMOVED: tier: p.tier || null, - This field doesn't exist in database
         // REMOVED: paid: p.subscription_type ? p.paid === true : false, - This field doesn't exist in database
@@ -2390,6 +2392,58 @@ export default function AdminPage() {
       }
       return newSet
     })
+  }
+
+  /**
+   * Toggle booking system on/off (Admin quick action)
+   * This function ONLY updates booking_enabled field without touching other fields
+   */
+  async function toggleBookingEnabled(providerId: string, currentlyEnabled: boolean) {
+    setMessage(null)
+    setError(null)
+    
+    try {
+      const { error } = await supabase
+        .from('providers')
+        .update({ 
+          booking_enabled: !currentlyEnabled,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', providerId)
+      
+      if (error) {
+        console.error('[Admin] Error toggling booking:', error)
+        setError(`Failed to toggle booking: ${error.message}`)
+        return
+      }
+      
+      setMessage(`Booking system ${!currentlyEnabled ? 'enabled' : 'disabled'} successfully!`)
+      
+      // Update local state
+      setProviders(prev => prev.map(p => 
+        p.id === providerId 
+          ? { ...p, booking_enabled: !currentlyEnabled } 
+          : p
+      ))
+      
+      // Refresh providers list
+      try {
+        const { data: pData } = await supabase
+          .from('providers')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .order('name', { ascending: true })
+        setProviders((pData as ProviderRow[]) || [])
+      } catch {}
+      
+      // Dispatch refresh event
+      try { 
+        window.dispatchEvent(new CustomEvent('bf-refresh-providers')) 
+      } catch {}
+      
+    } catch (err: any) {
+      console.error('[Admin] Unexpected error toggling booking:', err)
+      setError(`Unexpected error: ${err.message}`)
+    }
   }
 
   async function approveChangeRequest(req: ProviderChangeRequestWithDetails) {
@@ -4208,25 +4262,47 @@ export default function AdminPage() {
                           )}
                           
                           <div className="space-y-4">
-                            {/* Enable Booking Toggle */}
-                            <div>
-                              <label className="flex items-center gap-3">
-                                <input 
-                                  type="checkbox" 
-                                  checked={editingProvider.booking_enabled === true} 
-                                  onChange={(e) => setProviders((arr) => arr.map(p => 
-                                    p.id === editingProvider.id ? { ...p, booking_enabled: e.target.checked } : p
-                                  ))} 
-                                  className="rounded border-neutral-300"
-                                  disabled={!editingProvider.is_member}
+                            {/* Enable Booking Toggle Switch */}
+                            <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-neutral-800">
+                                    Online Booking System
+                                  </span>
+                                  {editingProvider.booking_enabled && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-neutral-600 mt-1">
+                                  {editingProvider.booking_enabled 
+                                    ? 'Customers can book appointments through your listing'
+                                    : 'Enable to allow customers to book appointments or reservations online'
+                                  }
+                                </p>
+                              </div>
+                              
+                              {/* Toggle Switch */}
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!editingProvider.is_member) return
+                                  // Use dedicated toggle function that only updates booking_enabled
+                                  await toggleBookingEnabled(editingProvider.id, editingProvider.booking_enabled === true)
+                                }}
+                                disabled={!editingProvider.is_member}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                  editingProvider.booking_enabled ? 'bg-blue-600' : 'bg-neutral-300'
+                                }`}
+                                aria-label="Toggle booking system"
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    editingProvider.booking_enabled ? 'translate-x-6' : 'translate-x-1'
+                                  }`}
                                 />
-                                <span className="text-sm font-medium text-neutral-700">
-                                  Enable Online Booking
-                                </span>
-                              </label>
-                              <p className="text-xs text-neutral-500 mt-1 ml-6">
-                                Allow customers to book appointments or reservations online
-                              </p>
+                              </button>
                             </div>
 
                             {/* Booking Type */}

@@ -1048,6 +1048,17 @@ function ProviderPage() {
   const [couponMsg, setCouponMsg] = useState<string | null>(null)
   const [jobs, setJobs] = useState<{ id: string; title: string; description?: string | null; apply_url?: string | null; salary_range?: string | null }[]>([])
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  // Booking modal state
+  const [bookingOpen, setBookingOpen] = useState(false)
+  const [bookingDate, setBookingDate] = useState('') // yyyy-mm-dd
+  const [bookingTime, setBookingTime] = useState('') // HH:MM
+  const [bookingDuration, setBookingDuration] = useState(60)
+  const [bookingName, setBookingName] = useState('')
+  const [bookingEmail, setBookingEmail] = useState('')
+  const [bookingNotes, setBookingNotes] = useState('')
+  const [bookingPartySize, setBookingPartySize] = useState<number | ''>('')
+  const [bookingBusy, setBookingBusy] = useState(false)
+  const [bookingMsg, setBookingMsg] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -1112,6 +1123,54 @@ function ProviderPage() {
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function createBooking() {
+    try {
+      setBookingMsg(null)
+      if (!provider?.id) { setBookingMsg('Provider not found.'); return }
+      const name = bookingName || auth.name || 'Customer'
+      const email = bookingEmail || auth.email || ''
+      if (!bookingDate || !bookingTime) { setBookingMsg('Please choose a date and time.'); return }
+      if (!email) { setBookingMsg('Please enter your email.'); return }
+      const startIso = new Date(`${bookingDate}T${bookingTime}:00`).toISOString()
+      // Append party size for restaurant/cafe category
+      const finalNotes = provider.category_key === 'restaurants-cafes' && bookingPartySize
+        ? `${bookingNotes ? bookingNotes + '\n' : ''}Party size: ${bookingPartySize}`
+        : bookingNotes
+      setBookingBusy(true)
+      const isLocal = window.location.hostname === 'localhost'
+      const url = isLocal ? 'http://localhost:8888/.netlify/functions/google-calendar-create-event' : '/.netlify/functions/google-calendar-create-event'
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: provider.id,
+          customer_email: email,
+          customer_name: name,
+          booking_date: startIso,
+          duration_minutes: bookingDuration,
+          notes: finalNotes
+        })
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        setBookingMsg(`Failed to create booking: ${text}`)
+        return
+      }
+      const data = await res.json()
+      setBookingMsg('✅ Booking requested! You will receive a confirmation email if provided.')
+      // Close modal after short delay
+      setTimeout(() => {
+        setBookingOpen(false)
+        setBookingBusy(false)
+        setBookingMsg(null)
+      }, 1500)
+    } catch (e: any) {
+      setBookingMsg(e?.message || 'Failed to create booking')
+    } finally {
+      setBookingBusy(false)
     }
   }
 
@@ -1523,6 +1582,21 @@ function ProviderPage() {
                             )}
                             
                             <div className="flex flex-wrap gap-3">
+                              {/* Primary booking action */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBookingOpen(true)
+                                  // Prefill from auth if available
+                                  setBookingName(auth.name || '')
+                                  setBookingEmail(auth.email || '')
+                                }}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                Book Appointment
+                              </button>
+                              
                               {provider.phone && (
                                 <a
                                   href={`tel:${provider.phone}`}
@@ -1595,6 +1669,61 @@ function ProviderPage() {
             >
               <X className="w-6 h-6 text-black" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Booking Modal */}
+      {bookingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setBookingOpen(false)}></div>
+          <div className="relative bg-white rounded-2xl border border-neutral-200 p-5 w-[90%] max-w-md shadow-xl">
+            <div className="text-lg font-semibold text-neutral-900">Book with {provider?.name}</div>
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-neutral-600 mb-1">Date</label>
+                  <input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-xs text-neutral-600 mb-1">Time</label>
+                  <input type="time" value={bookingTime} onChange={(e) => setBookingTime(e.target.value)} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-neutral-600 mb-1">Your Name</label>
+                  <input value={bookingName} onChange={(e) => setBookingName(e.target.value)} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-xs text-neutral-600 mb-1">Your Email</label>
+                  <input type="email" value={bookingEmail} onChange={(e) => setBookingEmail(e.target.value)} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-neutral-600 mb-1">Duration (minutes)</label>
+                  <input type="number" min={15} step={15} value={bookingDuration} onChange={(e) => setBookingDuration(parseInt(e.target.value || '60'))} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
+                </div>
+              </div>
+              {provider?.category_key === 'restaurants-cafes' && (
+                <div>
+                  <label className="block text-xs text-neutral-600 mb-1">Party Size</label>
+                  <input type="number" min={1} value={bookingPartySize} onChange={(e) => setBookingPartySize(e.target.value ? parseInt(e.target.value) : '')} className="w-full rounded-lg border border-neutral-300 px-3 py-2" placeholder="e.g., 4" />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-neutral-600 mb-1">Notes (optional)</label>
+                <textarea rows={3} value={bookingNotes} onChange={(e) => setBookingNotes(e.target.value)} className="w-full rounded-lg border border-neutral-300 px-3 py-2" placeholder="Anything the business should know before your appointment" />
+              </div>
+              {bookingMsg && <div className="text-xs text-neutral-700">{bookingMsg}</div>}
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <button onClick={() => setBookingOpen(false)} className="px-4 py-2 rounded-lg border border-neutral-300 text-sm">Cancel</button>
+                <button onClick={createBooking} disabled={bookingBusy} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50">
+                  {bookingBusy ? 'Booking…' : 'Confirm Booking'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

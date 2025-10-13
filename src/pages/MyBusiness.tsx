@@ -90,6 +90,10 @@ type BusinessListing = {
   booking_type: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
   booking_instructions: string | null
   booking_url: string | null
+  // Google Calendar integration fields
+  google_calendar_connected: boolean | null
+  google_calendar_id: string | null
+  google_calendar_sync_enabled: boolean | null
 }
 
 // Type definition for business applications in the business_applications table
@@ -126,10 +130,16 @@ type UserActivity = {
   provider_id: string
   user_email: string | null
   user_name: string | null
-  activity_type: 'profile_view' | 'discount_copy' | 'booking_request' | 'question_asked'
+  activity_type?: 'profile_view' | 'discount_copy' | 'booking_request' | 'question_asked'
   activity_details: string | null
   created_at: string
   provider_name: string
+  // New fields for notification types
+  type?: 'booking_received' | 'general'
+  message?: string
+  title?: string
+  booking_id?: string
+  is_read?: boolean
 }
 
 export default function MyBusinessPage() {
@@ -150,6 +160,8 @@ export default function MyBusinessPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   // Dropdown state for mobile-friendly tab navigation
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  // Google Calendar connection state
+  const [connectingCalendar, setConnectingCalendar] = useState(false)
   // State to control subscription card visibility
   const [showSubscriptionCard, setShowSubscriptionCard] = useState(true)
   // State to track user's plan choice and status (used for internal logic)
@@ -157,6 +169,28 @@ export default function MyBusinessPage() {
   
   // Suppress unused warning - this state is used for internal tracking logic
   void userPlanChoice
+
+  /**
+   * DOWNGRADE TO FREE (Owner request)
+   * Creates a change request to set is_member to false
+   */
+  const downgradeToFree = async (listingId: string) => {
+    try {
+      setMessage('Requesting downgrade to Free...')
+      const { error } = await createProviderChangeRequest({
+        provider_id: listingId,
+        owner_user_id: auth.userId!,
+        type: 'update',
+        changes: { is_member: false },
+        reason: 'Downgrade from Featured to Free plan'
+      })
+      if (error) throw new Error(error)
+      setMessage('✅ Downgrade request submitted! An admin will review and apply it shortly.')
+      await loadBusinessData()
+    } catch (err: any) {
+      setMessage(`Failed to request downgrade: ${err.message || err}`)
+    }
+  }
 
   /**
    * TAB CONFIGURATION
@@ -247,6 +281,43 @@ export default function MyBusinessPage() {
       window.history.replaceState(null, '', window.location.pathname)
     }
   }, [])
+
+  /**
+   * HANDLE GOOGLE CALENDAR OAUTH CALLBACK
+   * 
+   * This effect checks for OAuth callback parameters in the URL and displays
+   * appropriate success or error messages.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    
+    // Check for successful connection
+    if (params.get('calendar_connected') === 'true') {
+      setMessage('✅ Google Calendar connected successfully! Your bookings will now sync automatically.')
+      // Clean up URL
+      window.history.replaceState({}, document.title, location.pathname)
+      // Reload data to show updated connection status
+      void loadBusinessData()
+    }
+    
+    // Check for errors
+    const calendarError = params.get('calendar_error')
+    if (calendarError) {
+      const errorMessages: Record<string, string> = {
+        'access_denied': 'You denied access to Google Calendar. Please try again if you want to enable syncing.',
+        'missing_code_or_state': 'OAuth error: Missing authorization code. Please try connecting again.',
+        'configuration_error': 'Google Calendar is not properly configured. Please contact support.',
+        'token_exchange_failed': 'Failed to exchange authorization code. Please try again.',
+        'missing_tokens': 'Failed to obtain access tokens from Google. Please try again.',
+        'storage_failed': 'Failed to save calendar credentials. Please try again.'
+      }
+      
+      const errorMessage = errorMessages[calendarError] || `Error connecting Google Calendar: ${calendarError}`
+      setMessage(`❌ ${errorMessage}`)
+      // Clean up URL
+      window.history.replaceState({}, document.title, location.pathname)
+    }
+  }, [location.search])
 
   /**
    * AUTO-SELECT PLAN FROM PRICING PAGE
@@ -401,23 +472,23 @@ export default function MyBusinessPage() {
       let userActivityData: UserActivity[] = []
       
       if (ownedBusinessIds.length > 0) {
-        // Fetch user notifications (previously named user_activity in old schema)
+        // Fetch notifications without embedded join; enrich with provider names locally
         const { data: activityData, error: activityError } = await supabase
           .from('user_notifications')
-          .select(`
-            *,
-            providers!inner(name)
-          `)
+          .select('*')
           .in('provider_id', ownedBusinessIds)
           .order('created_at', { ascending: false })
           .limit(100) // Limit to recent 100 activities
-        
+
+        // Build a quick lookup of provider id -> name from the listings we already loaded
+        const providerIdToName = new Map<string, string>(allListings.map((l: any) => [l.id, l.name]))
+
         if (activityError) {
           console.warn('[MyBusiness] User activity error (non-critical):', activityError)
         } else {
-          userActivityData = (activityData || []).map(activity => ({
+          userActivityData = (activityData || []).map((activity: any) => ({
             ...activity,
-            provider_name: activity.providers?.name || 'Unknown Business'
+            provider_name: providerIdToName.get(activity.provider_id) || 'Unknown Business'
           })) as UserActivity[]
         }
       }
@@ -899,6 +970,109 @@ export default function MyBusinessPage() {
   }
 
   /**
+   * CONNECT GOOGLE CALENDAR
+   * 
+   * This function initiates the Google Calendar OAuth flow.
+   * It calls a Netlify function that returns the OAuth URL, then redirects the user.
+   */
+  const connectGoogleCalendar = async (providerId: string) => {
+    try {
+      setConnectingCalendar(true)
+      setMessage('Connecting to Google Calendar...')
+      
+      // Get auth session
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      // Call Netlify function to get OAuth URL
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/google-calendar-connect` : '/.netlify/functions/google-calendar-connect'
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ provider_id: providerId })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to connect Google Calendar')
+      }
+
+      const result = await response.json()
+      
+      // Redirect to Google OAuth consent screen
+      window.location.href = result.auth_url
+      
+    } catch (error: any) {
+      console.error('[MyBusiness] Google Calendar connection error:', error)
+      setMessage(`Error connecting Google Calendar: ${error.message}`)
+      setConnectingCalendar(false)
+    }
+  }
+
+  /**
+   * DISCONNECT GOOGLE CALENDAR
+   * 
+   * This function disconnects the business's Google Calendar integration.
+   * It revokes the OAuth tokens and clears the stored credentials.
+   */
+  const disconnectGoogleCalendar = async (providerId: string) => {
+    if (!confirm('Are you sure you want to disconnect your Google Calendar? Future bookings will not be synced to your calendar.')) {
+      return
+    }
+
+    try {
+      setConnectingCalendar(true)
+      setMessage('Disconnecting Google Calendar...')
+      
+      // Get auth session
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      // Call Netlify function to disconnect
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
+      const url = fnBase ? `${fnBase}/.netlify/functions/google-calendar-disconnect` : '/.netlify/functions/google-calendar-disconnect'
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ provider_id: providerId })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to disconnect Google Calendar')
+      }
+
+      setMessage('Google Calendar disconnected successfully')
+      
+      // Refresh business data to update UI
+      await loadBusinessData()
+      
+    } catch (error: any) {
+      console.error('[MyBusiness] Google Calendar disconnection error:', error)
+      setMessage(`Error disconnecting Google Calendar: ${error.message}`)
+    } finally {
+      setConnectingCalendar(false)
+    }
+  }
+
+  /**
    * DELETE BUSINESS LISTING
    * 
    * This function allows business owners to delete their business listings.
@@ -1088,8 +1262,8 @@ export default function MyBusinessPage() {
           </div>
         )}
 
-        {/* Subscription Comparison Section */}
-        {showSubscriptionCard && (
+        {/* Subscription Comparison Section - hidden if any listing is featured */}
+        {showSubscriptionCard && listings.every(l => !l.is_member) && (
           <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-neutral-900 mb-6 text-center">Choose Your Business Plan</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1483,11 +1657,20 @@ export default function MyBusinessPage() {
                       {/* Action Buttons */}
                       <div className="flex flex-col sm:flex-row gap-2">
                         {listing.is_member ? (
-                          <div className="text-center sm:text-right">
-                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 mb-2">
+                          <div className="text-center sm:text-right space-y-2">
+                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800">
                               ⭐ Featured Listing
                             </div>
                             <p className="text-xs text-neutral-500">Priority placement in search results</p>
+                            <button
+                              onClick={() => downgradeToFree(listing.id)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-white text-neutral-700 text-sm font-medium rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-6-6m0 6l6-6" />
+                              </svg>
+                              Downgrade back to Free
+                            </button>
                           </div>
                         ) : (
                           <div className="space-y-2">
@@ -1727,6 +1910,117 @@ export default function MyBusinessPage() {
                               {platform}
                             </a>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Google Calendar Integration - Featured accounts only */}
+                    {listing.is_member && listing.booking_enabled && (
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <h4 className="text-sm font-semibold text-neutral-800">Google Calendar Sync</h4>
+                            </div>
+                            
+                            {listing.google_calendar_connected ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                  <span className="text-sm text-green-700 font-medium">Connected</span>
+                                </div>
+                                <p className="text-xs text-neutral-600">
+                                  Bookings are automatically synced to your Google Calendar{listing.google_calendar_id && ` (${listing.google_calendar_id})`}
+                                </p>
+                                {!listing.google_calendar_sync_enabled && (
+                                  <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span className="text-xs text-amber-700">Sync is paused</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <p className="text-xs text-neutral-600">
+                                  Sync your bookings with Google Calendar to manage appointments seamlessly
+                                </p>
+                                <ul className="text-xs text-neutral-500 space-y-1 ml-4 list-disc">
+                                  <li>Automatic calendar updates</li>
+                                  <li>Real-time availability</li>
+                                  <li>Email reminders</li>
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Action buttons */}
+                        <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                          {listing.google_calendar_connected ? (
+                            <>
+                              <button
+                                onClick={() => disconnectGoogleCalendar(listing.id)}
+                                disabled={connectingCalendar}
+                                className="inline-flex items-center justify-center px-4 py-2 bg-white text-red-600 text-sm font-medium rounded-lg border border-red-300 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {connectingCalendar ? (
+                                  <>
+                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Disconnecting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Disconnect
+                                  </>
+                                )}
+                              </button>
+                              <a
+                                href={`https://calendar.google.com`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                View Calendar
+                              </a>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => connectGoogleCalendar(listing.id)}
+                              disabled={connectingCalendar}
+                              className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {connectingCalendar ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Connecting...
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972-3.332 0-6.033-2.701-6.033-6.032s2.701-6.032 6.033-6.032c1.498 0 2.866.549 3.921 1.453l2.814-2.814C17.503 2.988 15.139 2 12.545 2 7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z" />
+                                  </svg>
+                                  Connect Google Calendar
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2027,6 +2321,7 @@ export default function MyBusinessPage() {
                           activity.activity_type === 'profile_view' ? 'bg-blue-100 text-blue-600' :
                           activity.activity_type === 'discount_copy' ? 'bg-green-100 text-green-600' :
                           activity.activity_type === 'booking_request' ? 'bg-purple-100 text-purple-600' :
+                          activity.type === 'booking_received' ? 'bg-emerald-100 text-emerald-600' :
                           'bg-orange-100 text-orange-600'
                         }`}>
                           {activity.activity_type === 'profile_view' && (
@@ -2050,6 +2345,11 @@ export default function MyBusinessPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           )}
+                          {activity.type === 'booking_received' && (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          )}
                         </div>
                       </div>
                       
@@ -2064,17 +2364,28 @@ export default function MyBusinessPage() {
                         </div>
                         
                         <div className="text-sm text-neutral-600 mb-1">
-                          <span className="font-medium">
-                            {activity.activity_type === 'profile_view' && 'Viewed profile'}
-                            {activity.activity_type === 'discount_copy' && 'Copied discount code'}
-                            {activity.activity_type === 'booking_request' && 'Requested booking'}
-                            {activity.activity_type === 'question_asked' && 'Asked a question'}
-                          </span>
-                          {' for '}
-                          <span className="font-medium text-blue-600">{activity.provider_name}</span>
+                          {activity.type === 'booking_received' ? (
+                            <div>
+                              <span className="font-medium">New Booking Received</span>
+                              <div className="text-xs text-neutral-500 mt-1">
+                                {activity.message || `Booking from ${activity.user_name || activity.user_email || 'Customer'}`}
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="font-medium">
+                                {activity.activity_type === 'profile_view' && 'Viewed profile'}
+                                {activity.activity_type === 'discount_copy' && 'Copied discount code'}
+                                {activity.activity_type === 'booking_request' && 'Requested booking'}
+                                {activity.activity_type === 'question_asked' && 'Asked a question'}
+                              </span>
+                              {' for '}
+                              <span className="font-medium text-blue-600">{activity.provider_name}</span>
+                            </>
+                          )}
                         </div>
                         
-                        {activity.activity_details && (
+                        {activity.activity_details && activity.type !== 'booking_received' && (
                           <div className="text-sm text-neutral-500 bg-neutral-50 p-2 rounded border-l-2 border-neutral-200">
                             {activity.activity_details}
                           </div>
@@ -3241,9 +3552,9 @@ function BusinessListingForm({
               </div>
             </div>
 
-            {/* Booking System */}
+            {/* Booking System - with Toggle Switch */}
             <div className={!formData.is_member ? 'opacity-50 pointer-events-none' : ''}>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
+              <label className="block text-sm font-medium text-neutral-700 mb-3">
                 Booking System
                 {!formData.is_member && (
                   <span className="text-xs text-amber-600 ml-2">
@@ -3269,43 +3580,104 @@ function BusinessListingForm({
                 </div>
               )}
               
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">
-                    Booking URL
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://your-booking-system.com"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
-                    disabled={!formData.is_member}
-                  />
+              {/* Toggle Switch for Enable Booking */}
+              <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg border border-neutral-200 mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-neutral-800">
+                      Online Booking System
+                    </span>
+                    {formData.booking_enabled && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-600 mt-1">
+                    {formData.booking_enabled 
+                      ? 'Customers can book appointments through your listing'
+                      : 'Enable to allow customers to book appointments online'
+                    }
+                  </p>
                 </div>
                 
-                <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">
-                    Booking Instructions
-                  </label>
-                  <textarea
-                    placeholder="Instructions for customers on how to book appointments..."
-                    rows={3}
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500"
-                    disabled={!formData.is_member}
+                {/* Toggle Switch */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!formData.is_member) return
+                    setFormData(prev => ({ ...prev, booking_enabled: !prev.booking_enabled }))
+                  }}
+                  disabled={!formData.is_member}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    formData.booking_enabled ? 'bg-blue-600' : 'bg-neutral-300'
+                  }`}
+                  aria-label="Toggle booking system"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.booking_enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
                   />
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="booking-enabled"
-                    className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
-                    disabled={!formData.is_member}
-                  />
-                  <label htmlFor="booking-enabled" className="ml-2 text-sm text-neutral-700">
-                    Enable booking system for this business
-                  </label>
-                </div>
+                </button>
               </div>
+              
+              {/* Booking fields - only show when enabled */}
+              {formData.booking_enabled && (
+                <div className="space-y-3 mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-700 mb-1">
+                      Booking Type
+                    </label>
+                    <select
+                      value={formData.booking_type || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, booking_type: e.target.value as any || null }))}
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={!formData.is_member}
+                    >
+                      <option value="">Select booking type...</option>
+                      <option value="appointment">Appointment</option>
+                      <option value="reservation">Reservation</option>
+                      <option value="consultation">Consultation</option>
+                      <option value="walk-in">Walk-in Only</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-700 mb-1">
+                      Booking Instructions
+                    </label>
+                    <textarea
+                      value={formData.booking_instructions || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, booking_instructions: e.target.value }))}
+                      placeholder="e.g., Call ahead for same-day appointments, Book at least 24 hours in advance..."
+                      rows={3}
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={!formData.is_member}
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Instructions shown to customers when they try to book
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-700 mb-1">
+                      External Booking URL (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.booking_url || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, booking_url: e.target.value }))}
+                      placeholder="https://calendly.com/yourbusiness"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={!formData.is_member}
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Link to your external booking platform (Calendly, etc.)
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
 
