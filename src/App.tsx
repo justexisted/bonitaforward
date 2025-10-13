@@ -3349,67 +3349,84 @@ function CategoryFilters({
                 return (
                   <Link key={provider.id} to={`/provider/${provider.slug}`} className="block">
                     <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                    {/* Provider Image */}
-                    {details.images && details.images.length > 0 ? (
-                      <div className="aspect-video bg-neutral-100">
-                        <img
-                          src={fixImageUrl(details.images[0])}
-                          alt={`${provider.name} business photo`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const img = e.currentTarget as HTMLImageElement
-                            img.style.display = 'none'
-                            img.parentElement!.innerHTML = `
-                              <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                                <div class="text-center text-neutral-500">
-                                  <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                  </svg>
-                                  <p class="text-xs">No image available</p>
-                                </div>
-                              </div>
-                            `
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="aspect-video bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                        <div className="text-center text-neutral-500">
-                          <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
-                          <p className="text-xs">No image available</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Provider Info */}
-                    <div className="p-4 text-center">
-                      <div className="flex flex-col items-center gap-2 mb-3">
-                        <h3 className="font-semibold text-neutral-900 text-lg">{provider.name}</h3>
-                        <span className="px-3 py-1 text-xs bg-blue-50 text-blue-700 rounded-full">
-                          {provider.category_key.replace('-', ' ')}
-                        </span>
-                      </div>
-                      
-                      {provider.description && (
-                        <p className="text-sm text-neutral-600 mb-3 line-clamp-2">{provider.description}</p>
-                      )}
-                      
-                      {/* Tags - Only visible to admin */}
-                      {auth.isAuthed && provider.tags && provider.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 justify-center mb-3">
-                          {provider.tags.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded-full"
-                            >
-                              {tag}
+                      {/* Provider Image with Overlays */}
+                      <div className="relative">
+                        {details.images && details.images.length > 0 ? (
+                          <div className="aspect-video bg-neutral-100">
+                            <img
+                              src={fixImageUrl(details.images[0])}
+                              alt={`${provider.name} business photo`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement
+                                img.style.display = 'none'
+                                img.parentElement!.innerHTML = `
+                                  <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                                    <div class="text-center text-neutral-500">
+                                      <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                      </svg>
+                                      <p class="text-xs">No image available</p>
+                                    </div>
+                                  </div>
+                                `
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="aspect-video bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                            <div className="text-center text-neutral-500">
+                              <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              <p className="text-xs">No image available</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Featured Badge - Top Right Over Image */}
+                        {isFeaturedProvider(provider) && (
+                          <div className="absolute top-2 right-2">
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] font-medium shadow-sm">
+                              ⭐ Featured
                             </span>
-                          ))}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Category Tag - Positioned between image and title, half on image */}
+                      <div className="relative -mt-6 mb-3">
+                        <div className="flex justify-center">
+                          <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm">
+                            {provider.category_key.replace('-', ' ')}
+                          </span>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                      
+                      {/* Provider Info */}
+                      <div className="p-4 text-center">
+                        <div className="flex flex-col items-center gap-2 mb-3">
+                          <h3 className="font-semibold text-neutral-900 text-lg">{provider.name}</h3>
+                        </div>
+                        
+                        {provider.description && (
+                          <p className="text-sm text-neutral-600 mb-3 line-clamp-2">{provider.description}</p>
+                        )}
+                        
+                        {/* Tags - Only visible to admin */}
+                        {auth.isAuthed && provider.tags && provider.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 justify-center mb-3">
+                            {provider.tags.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded-full"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </Link>
                 )
@@ -4164,9 +4181,9 @@ function BookPage() {
                   const canShowRich = Boolean(r.isMember)
                   return (
                     <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
-                      {/* Business Image */}
-                      {d.images && d.images.length > 0 ? (
-                        <div className="mb-3">
+                      {/* Business Image with Overlays */}
+                      <div className="relative mb-3">
+                        {d.images && d.images.length > 0 ? (
                           <img 
                             src={fixImageUrl(d.images?.[0] || '')} 
                             alt={`${r.name} business photo`} 
@@ -4187,40 +4204,52 @@ function BookPage() {
                               `
                             }}
                           />
-                        </div>
-                      ) : (
-                        <div className="mb-3 h-32 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
-                          <div className="text-center text-neutral-500">
-                            <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            <p className="text-xs">No image available</p>
+                        ) : (
+                          <div className="w-full h-32 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                            <div className="text-center text-neutral-500">
+                              <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              <p className="text-xs">No image available</p>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                        
+                        {/* Featured Badge - Top Right Over Image */}
+                        {isFeaturedProvider(r) && (
+                          <div className="absolute top-2 right-2">
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] font-medium shadow-sm">
+                              ⭐ Featured
+                            </span>
+                          </div>
+                        )}
+                      </div>
                       
+                      {/* Category Tag - Positioned between image and title, half on image */}
+                      <div className="relative -mt-6 mb-3">
+                        <div className="flex justify-start">
+                          <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm">
+                            {r.category_key.replace('-', ' ')}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Business Name and Rating */}
                       <div className="flex items-center justify-between">
-                        <Link to={`/provider/${r.slug}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
-                          <div className="font-medium flex items-center gap-2">
-                            {r.name}
-                            {isFeaturedProvider(r) && (
-                              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
-                            )}
-                          </div>
+                        <Link to={`/provider/${r.slug}`} className="font-medium cursor-pointer hover:underline">
+                          {r.name}
                         </Link>
                         <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                       </div>
-                      {/* Show category and tags */}
-                      <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
-                          {r.category_key.replace('-', ' ')}
-                        </span>
-                        {isAdmin && r.tags && r.tags.length > 0 && (
+                      
+                      {/* Admin Tags */}
+                      {isAdmin && r.tags && r.tags.length > 0 && (
+                        <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
                           <span className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full">
                             {r.tags.slice(0, 2).join(', ')}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       {isAdmin && (r.tags && r.tags.length > 0) && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {r.tags.slice(0, 3).map((t) => (
