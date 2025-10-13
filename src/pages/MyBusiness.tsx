@@ -90,6 +90,10 @@ type BusinessListing = {
   booking_type: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
   booking_instructions: string | null
   booking_url: string | null
+  // Contact method toggles
+  enable_calendar_booking: boolean | null
+  enable_call_contact: boolean | null
+  enable_email_contact: boolean | null
   // Google Calendar integration fields
   google_calendar_connected: boolean | null
   google_calendar_id: string | null
@@ -882,6 +886,10 @@ export default function MyBusinessPage() {
       if (updates.booking_type !== undefined) changesData.booking_type = updates.booking_type
       if (updates.booking_instructions !== undefined) changesData.booking_instructions = updates.booking_instructions
       if (updates.booking_url !== undefined) changesData.booking_url = updates.booking_url
+      // Contact method toggles
+      if (updates.enable_calendar_booking !== undefined) changesData.enable_calendar_booking = updates.enable_calendar_booking
+      if (updates.enable_call_contact !== undefined) changesData.enable_call_contact = updates.enable_call_contact
+      if (updates.enable_email_contact !== undefined) changesData.enable_email_contact = updates.enable_email_contact
       
       console.log('[MyBusiness] Final changes data for request:', changesData)
       
@@ -3675,6 +3683,127 @@ function BusinessListingForm({
                     <p className="text-xs text-neutral-500 mt-1">
                       Link to your external booking platform (Calendly, etc.)
                     </p>
+                  </div>
+
+                  {/* Contact Method Toggles */}
+                  <div className="border-t border-blue-200 pt-3 mt-3">
+                    <h4 className="text-sm font-medium text-neutral-800 mb-3">Contact Methods</h4>
+                    <p className="text-xs text-neutral-600 mb-3">
+                      Choose which contact methods customers can use to reach you
+                    </p>
+                    
+                    <div className="space-y-3">
+                      {/* Calendar Booking Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-neutral-800">
+                              Integrated Calendar Booking
+                            </span>
+                            {formData.enable_calendar_booking && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-neutral-600 mt-1">
+                            Allow customers to book directly through your connected Google Calendar
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!formData.is_member) return
+                            setFormData(prev => ({ ...prev, enable_calendar_booking: !prev.enable_calendar_booking }))
+                          }}
+                          disabled={!formData.is_member}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            formData.enable_calendar_booking ? 'bg-blue-600' : 'bg-neutral-300'
+                          }`}
+                          aria-label="Toggle calendar booking"
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              formData.enable_calendar_booking ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Call Contact Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-neutral-800">
+                              Phone Call Contact
+                            </span>
+                            {formData.enable_call_contact && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-neutral-600 mt-1">
+                            Show your phone number so customers can call you directly
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!formData.is_member) return
+                            setFormData(prev => ({ ...prev, enable_call_contact: !prev.enable_call_contact }))
+                          }}
+                          disabled={!formData.is_member}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            formData.enable_call_contact ? 'bg-blue-600' : 'bg-neutral-300'
+                          }`}
+                          aria-label="Toggle call contact"
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              formData.enable_call_contact ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Email Contact Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-neutral-800">
+                              Email Contact
+                            </span>
+                            {formData.enable_email_contact && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-neutral-600 mt-1">
+                            Show your email address so customers can contact you via email
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!formData.is_member) return
+                            setFormData(prev => ({ ...prev, enable_email_contact: !prev.enable_email_contact }))
+                          }}
+                          disabled={!formData.is_member}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            formData.enable_email_contact ? 'bg-blue-600' : 'bg-neutral-300'
+                          }`}
+                          aria-label="Toggle email contact"
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              formData.enable_email_contact ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

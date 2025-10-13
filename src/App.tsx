@@ -1582,22 +1582,24 @@ function ProviderPage() {
                             )}
                             
                             <div className="flex flex-wrap gap-3">
-                              {/* Primary booking action */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setBookingOpen(true)
-                                  // Prefill from auth if available
-                                  setBookingName(auth.name || '')
-                                  setBookingEmail(auth.email || '')
-                                }}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                Book Appointment
-                              </button>
+                              {/* Primary booking action - only show if calendar booking is enabled */}
+                              {provider.enable_calendar_booking && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBookingOpen(true)
+                                    // Prefill from auth if available
+                                    setBookingName(auth.name || '')
+                                    setBookingEmail(auth.email || '')
+                                  }}
+                                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                  Book Appointment
+                                </button>
+                              )}
                               
-                              {provider.phone && (
+                              {provider.phone && provider.enable_call_contact && (
                                 <a
                                   href={`tel:${provider.phone}`}
                                   className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -1609,7 +1611,7 @@ function ProviderPage() {
                                 </a>
                               )}
                               
-                              {provider.email && (
+                              {provider.email && provider.enable_email_contact && (
                                 <a
                                   href={`mailto:${provider.email}`}
                                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -2161,6 +2163,10 @@ type Provider = {
   booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
   booking_instructions?: string | null
   booking_url?: string | null
+  // Contact method toggles
+  enable_calendar_booking?: boolean | null
+  enable_call_contact?: boolean | null
+  enable_email_contact?: boolean | null
   // Coupon fields
   coupon_code?: string | null
   coupon_discount?: string | null

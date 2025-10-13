@@ -79,22 +79,22 @@ export function CommunityIndex() {
                       img.src = `https://picsum.photos/seed/${ck}/800/400`
                     }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-transparent to-transparent" aria-hidden></div>
-                  <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                    <div className="font-medium text-3xl font-display">{categoryToTitle[ck]}</div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/90 via-neutral-900/20 to-transparent" aria-hidden></div>
+                  <div className="absolute top-0 left-0 right-0 p-4 text-white">
+                    <div className="font-medium text-2xl font-display p-1" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{categoryToTitle[ck]}</div>
                     {loading ? (
-                      <div className="text-sm text-neutral-200 mt-1">Loading posts...</div>
+                      <div className="text-sm text-neutral-200" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>Loading posts...</div>
                     ) : latestPost ? (
-                      <div className="text-sm text-neutral-200 mt-1">
-                        <div className="font-medium text-xl">{latestPost.title}</div>
-                        <div className="text-xs text-neutral-300 mt-1">
+                      <div className="text-sm text-neutral-200">
+                        <div className="font-medium text-medium p-1" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>{latestPost.title}</div>
+                        <div className="text-xs text-neutral-300 p-1" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                           {new Date(latestPost.created_at).toLocaleDateString()}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-neutral-200 mt-1">No posts yet for this category.</div>
+                      <div className="text-sm text-neutral-200 mt-1" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>No posts yet for this category.</div>
                     )}
-                    <span className="mt-2 inline-block text-sm text-white font-medium">Read more →</span>
+                    <span className="mt-2 inline-block text-sm text-white font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>Read more →</span>
                   </div>
                 </div>
 
@@ -110,24 +110,25 @@ export function CommunityIndex() {
                         img.src = `https://picsum.photos/seed/${ck}/800/400`
                       }}
                     />
+                    <div className="absolute inset-0 bg-gradient-to-r from-neutral-900/20 via-transparent to-transparent" aria-hidden></div>
                   </div>
                   <div className="w-1/2 p-6 flex flex-col justify-between">
                     <div>
-                      <div className="font-medium text-3xl font-display">{categoryToTitle[ck]}</div>
+                      <div className="font-medium text-2xl font-display p-1" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>{categoryToTitle[ck]}</div>
                       {loading ? (
-                        <div className="text-sm text-neutral-600 mt-2">Loading posts...</div>
+                        <div className="text-sm text-neutral-600 mt-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>Loading posts...</div>
                       ) : latestPost ? (
                         <div className="text-sm text-neutral-600 mt-2">
-                          <div className="font-medium text-xl">{latestPost.title}</div>
-                          <div className="text-xs text-neutral-500 mt-1">
+                          <div className="font-medium text-xl" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>{latestPost.title}</div>
+                          <div className="text-xs text-neutral-500 mt-1" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
                             {new Date(latestPost.created_at).toLocaleDateString()}
                           </div>
                         </div>
                       ) : (
-                        <div className="text-sm text-neutral-600 mt-2">No posts yet for this category.</div>
+                        <div className="text-sm text-neutral-600 mt-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>No posts yet for this category.</div>
                       )}
                     </div>
-                    <span className="mt-4 inline-block text-sm" style={{ color: '#7070e3' }}>Read more</span>
+                    <span className="mt-4 inline-block text-sm" style={{ color: '#7070e3', textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>Read more</span>
                   </div>
                 </div>
               </Link>
