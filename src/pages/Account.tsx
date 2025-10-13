@@ -483,26 +483,88 @@ export default function AccountPage() {
     }
   }
 
+  // State for edit booking modal
+  const [editingBooking, setEditingBooking] = useState<any>(null)
+  const [editBookingDate, setEditBookingDate] = useState('')
+  const [editBookingTime, setEditBookingTime] = useState('')
+  const [editBookingDuration, setEditBookingDuration] = useState('')
+  const [editBookingNotes, setEditBookingNotes] = useState('')
+  const [sendNotification, setSendNotification] = useState(true)
+
   /**
    * EDIT BOOKING FUNCTION
    * 
-   * Opens a modal to edit booking details. Currently supports editing customer name,
-   * email, date, duration, and notes. Business owners can edit any booking.
+   * Opens a modal to edit booking details. Focuses on date, time, duration, and notes.
+   * Allows business owners to send notifications to customers about changes.
    * 
    * @param booking - The booking object to edit
    */
   const editBooking = (booking: any) => {
-    // For now, we'll implement a simple edit for customer details
-    // In a full implementation, you'd want a proper modal
-    const newName = prompt('Edit customer name:', booking.customer_name || '')
-    const newEmail = prompt('Edit customer email:', booking.customer_email || '')
+    setEditingBooking(booking)
     
-    if (newName !== null && newEmail !== null) {
-      manageBooking('edit', booking.id, {
-        customer_name: newName,
-        customer_email: newEmail
-      })
+    // Pre-populate form with current booking data
+    if (booking.time) {
+      const date = new Date(booking.time)
+      setEditBookingDate(date.toISOString().split('T')[0])
+      setEditBookingTime(date.toTimeString().slice(0, 5))
     }
+    setEditBookingDuration(booking.booking_duration_minutes?.toString() || '60')
+    setEditBookingNotes(booking.booking_notes || '')
+    setSendNotification(true)
+  }
+
+  /**
+   * SAVE EDITED BOOKING FUNCTION
+   * 
+   * Saves the edited booking details and optionally sends notification to customer.
+   */
+  const saveEditedBooking = async () => {
+    if (!editingBooking) return
+
+    try {
+      // Combine date and time into a single datetime
+      const bookingDateTime = new Date(`${editBookingDate}T${editBookingTime}`).toISOString()
+      
+      const updates: any = {
+        booking_date: bookingDateTime,
+        booking_duration_minutes: parseInt(editBookingDuration) || 60,
+        booking_notes: editBookingNotes
+      }
+
+      // Include party size in notes if it's a restaurant booking
+      if (editingBooking.provider_category === 'restaurants-cafes' && editBookingNotes) {
+        // Extract party size from notes or add it
+        const partySizeMatch = editBookingNotes.match(/Party size: (\d+)/)
+        if (!partySizeMatch) {
+          updates.booking_notes = `${editBookingNotes}\nParty size: 1`
+        }
+      }
+
+      // Call the manage booking function with notification option
+      await manageBooking('edit', editingBooking.id, {
+        ...updates,
+        sendNotification
+      })
+
+      // Close the modal
+      setEditingBooking(null)
+    } catch (error) {
+      console.error('Error saving booking edit:', error)
+    }
+  }
+
+  /**
+   * CANCEL EDIT BOOKING FUNCTION
+   * 
+   * Closes the edit booking modal without saving changes.
+   */
+  const cancelEditBooking = () => {
+    setEditingBooking(null)
+    setEditBookingDate('')
+    setEditBookingTime('')
+    setEditBookingDuration('')
+    setEditBookingNotes('')
+    setSendNotification(true)
   }
 
   /**
@@ -696,7 +758,7 @@ export default function AccountPage() {
           )}
           {/* BOOKINGS SECTION - Available to all users */}
           {/* Display user's appointment bookings made through the booking system */}
-          <div className="mt-6 border-t border-neutral-100 pt-4">
+            <div className="mt-6 border-t border-neutral-100 pt-4">
             {/* BOOKINGS HEADER - Clickable toggle with expand/collapse functionality */}
             <div className="flex items-center justify-between mb-3">
               <button
@@ -736,7 +798,7 @@ export default function AccountPage() {
                 {!communityLoading && bookings.length === 0 && (
                   <div className="text-neutral-600 p-4 text-center border border-neutral-200 rounded-lg">
                     No bookings found. Book appointments with local businesses to see them here.
-                  </div>
+              </div>
                 )}
                 
                 {/* BOOKINGS LIST - Display each booking as a card with full details */}
@@ -760,7 +822,7 @@ export default function AccountPage() {
                             }`}>
                               {booking.status || 'Unknown'}
                             </span>
-                          </div>
+            </div>
                           
                           {booking.time && (
                             <div className="text-sm text-neutral-600 mb-2">
@@ -1142,6 +1204,153 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Booking Modal */}
+      {editingBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-neutral-900">
+                  Edit Booking Details
+                </h3>
+                <button
+                  onClick={cancelEditBooking}
+                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Business Info */}
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <div className="text-sm font-medium text-neutral-900">
+                    {editingBooking.provider_name || 'Business'}
+                  </div>
+                  <div className="text-xs text-neutral-600">
+                    {editingBooking.customer_name} • {editingBooking.customer_email}
+                  </div>
+                </div>
+
+                {/* Date and Time */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editBookingDate}
+                      onChange={(e) => setEditBookingDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">
+                      Time
+                    </label>
+                    <input
+                      type="time"
+                      value={editBookingTime}
+                      onChange={(e) => setEditBookingTime(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Duration */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Duration (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="15"
+                    max="480"
+                    step="15"
+                    value={editBookingDuration}
+                    onChange={(e) => setEditBookingDuration(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="60"
+                  />
+                </div>
+
+                {/* Party Size for Restaurants */}
+                {editingBooking.provider_category === 'restaurants-cafes' && (
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">
+                      Party Size
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={editBookingNotes.match(/Party size: (\d+)/)?.[1] || '1'}
+                      onChange={(e) => {
+                        const partySize = e.target.value
+                        const notesWithoutPartySize = editBookingNotes.replace(/Party size: \d+/g, '').trim()
+                        setEditBookingNotes(`${notesWithoutPartySize}\nParty size: ${partySize}`.trim())
+                      }}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={editBookingNotes.replace(/Party size: \d+/g, '').trim()}
+                    onChange={(e) => {
+                      const partySizeMatch = editBookingNotes.match(/Party size: (\d+)/)
+                      const partySize = partySizeMatch ? partySizeMatch[0] : ''
+                      setEditBookingNotes(`${e.target.value}${partySize ? `\n${partySize}` : ''}`.trim())
+                    }}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Additional notes..."
+                  />
+                </div>
+
+                {/* Notification Option */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="sendNotification"
+                    checked={sendNotification}
+                    onChange={(e) => setSendNotification(e.target.checked)}
+                    className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="sendNotification" className="text-sm text-neutral-700">
+                    Send notification to customer about changes
+                  </label>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={cancelEditBooking}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEditedBooking}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

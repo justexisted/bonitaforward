@@ -139,7 +139,7 @@ type UserActivity = {
   created_at: string
   provider_name: string
   // New fields for notification types
-  type?: 'booking_received' | 'general'
+  type?: 'booking_received' | 'booking_updated' | 'general'
   message?: string
   title?: string
   booking_id?: string
@@ -2330,6 +2330,7 @@ export default function MyBusinessPage() {
                           activity.activity_type === 'discount_copy' ? 'bg-green-100 text-green-600' :
                           activity.activity_type === 'booking_request' ? 'bg-purple-100 text-purple-600' :
                           activity.type === 'booking_received' ? 'bg-emerald-100 text-emerald-600' :
+                          activity.type === 'booking_updated' ? 'bg-amber-100 text-amber-600' :
                           'bg-orange-100 text-orange-600'
                         }`}>
                           {activity.activity_type === 'profile_view' && (
@@ -2358,6 +2359,11 @@ export default function MyBusinessPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           )}
+                          {activity.type === 'booking_updated' && (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          )}
                         </div>
                       </div>
                       
@@ -2379,6 +2385,13 @@ export default function MyBusinessPage() {
                                 {activity.message || `Booking from ${activity.user_name || activity.user_email || 'Customer'}`}
                               </div>
                             </div>
+                          ) : activity.type === 'booking_updated' ? (
+                            <div>
+                              <span className="font-medium">Booking Details Updated</span>
+                              <div className="text-xs text-neutral-500 mt-1">
+                                {activity.message || 'Booking details have been updated.'}
+                              </div>
+                            </div>
                           ) : (
                             <>
                               <span className="font-medium">
@@ -2393,7 +2406,7 @@ export default function MyBusinessPage() {
                           )}
                         </div>
                         
-                        {activity.activity_details && activity.type !== 'booking_received' && (
+                        {activity.activity_details && activity.type !== 'booking_received' && activity.type !== 'booking_updated' && (
                           <div className="text-sm text-neutral-500 bg-neutral-50 p-2 rounded border-l-2 border-neutral-200">
                             {activity.activity_details}
                           </div>

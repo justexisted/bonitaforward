@@ -107,8 +107,8 @@ export const handler: Handler = async (event) => {
           }
         }
         
-        // Validate updates
-        const allowedFields = ['customer_name', 'customer_email', 'booking_date', 'booking_duration_minutes', 'booking_notes']
+        // Validate updates - only allow date, time, duration, and notes changes
+        const allowedFields = ['booking_date', 'booking_duration_minutes', 'booking_notes']
         const validUpdates: any = {}
         
         for (const [key, value] of Object.entries(updates)) {
@@ -129,6 +129,30 @@ export const handler: Handler = async (event) => {
           .from('booking_events')
           .update(validUpdates)
           .eq('id', bookingId)
+
+        // If edit was successful and notification is requested, create notification
+        if (!result.error && updates.sendNotification) {
+          const { data: updatedBooking } = await supabase
+            .from('booking_events')
+            .select('*')
+            .eq('id', bookingId)
+            .single()
+
+          if (updatedBooking) {
+            // Create notification for the customer
+            await supabase
+              .from('user_notifications')
+              .insert({
+                user_id: null, // Will be resolved by email
+                email: updatedBooking.customer_email,
+                provider_id: updatedBooking.provider_id,
+                type: 'booking_updated',
+                title: 'Booking Details Updated',
+                message: `Your booking at ${updatedBooking.provider_id ? 'the business' : 'the business'} has been updated. Please check the new details.`,
+                booking_id: bookingId
+              })
+          }
+        }
         break
 
       default:
