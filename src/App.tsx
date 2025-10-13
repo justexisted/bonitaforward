@@ -1159,7 +1159,7 @@ function ProviderPage() {
         setBookingMsg(`Failed to create booking: ${text}`)
         return
       }
-      const data = await res.json()
+      await res.json()
       setBookingMsg('✅ Booking requested! You will receive a confirmation email if provided.')
       // Close modal after short delay
       setTimeout(() => {
