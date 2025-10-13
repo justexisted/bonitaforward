@@ -2928,27 +2928,7 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
   }
 }
 
-// Create a booking row (if table exists)
-async function createBookingRow(params: { email?: string | null; category: CategoryKey; name?: string; notes?: string; answers?: Record<string, string> }) {
-  const { email, category, name, notes, answers } = params
-  if (!email) return
-  try {
-    await supabase
-      .from('bookings')
-      .insert([
-        {
-          user_email: email,
-          category,
-          name: name || null,
-          notes: notes || null,
-          answers: answers || null,
-          status: 'new',
-        },
-      ])
-  } catch (err) {
-    console.warn('[Supabase] insert bookings failed (safe to ignore if table missing)', err)
-  }
-}
+// Removed createBookingRow function - no longer needed since form submission is removed
 
 /**
  * BUSINESS APPLICATION SUBMISSION
@@ -3149,7 +3129,6 @@ function Funnel({ category }: { category: typeof categories[number] }) {
   const current = questions[step]
   const auth = useAuth()
   const initializedRef = useRef(false)
-  const navigate = useNavigate()
 
   // On mount, hydrate answers from localStorage so users never re-enter
   useEffect(() => {
@@ -3222,15 +3201,6 @@ function Funnel({ category }: { category: typeof categories[number] }) {
                 <Link
                   to={`/book?category=${category.key}`}
                   onClick={(e) => {
-                    if (!auth.isAuthed) {
-                      e.preventDefault()
-                      const card = (e.currentTarget.closest('section') as HTMLElement) || document.body
-                      card.classList.add('slide-out-right')
-                      setTimeout(() => {
-                        navigate('/signin', { state: { from: `/book?category=${category.key}` } })
-                      }, 160)
-                      return
-                    }
                     const card = (e.currentTarget.closest('section') as HTMLElement) || document.body
                     card.classList.add('slide-out-right')
                     setTimeout(() => {
@@ -3276,7 +3246,6 @@ function CategoryFilters({
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string>>(answers)
   const [filteredProviders, setFilteredProviders] = useState<Provider[]>([])
   const auth = useAuth()
-  const navigate = useNavigate()
 
   // Get available filter options based on category
   const getFilterOptions = (questionId: string) => {
@@ -3451,13 +3420,6 @@ function CategoryFilters({
               <div className="text-center mt-6">
                 <Link
                   to={`/book?category=${category.key}&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}`}
-                  onClick={(e) => {
-                    if (!auth.isAuthed) {
-                      e.preventDefault()
-                      navigate('/signin', { state: { from: `/book?category=${category.key}&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}` } })
-                      return
-                    }
-                  }}
                   className="inline-flex items-center gap-2 px-6 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   View All {filteredProviders.length} Results
@@ -4183,8 +4145,9 @@ function BookPage() {
 
   useEffect(() => {
     recompute()
-    if (auth.isAuthed) setSubmitted(true)
-  }, [categoryKey, auth.isAuthed, answers])
+    // Always show results immediately - no authentication or form submission required
+    setSubmitted(true)
+  }, [categoryKey, answers])
 
   useProviderUpdates(() => { recompute() }, [categoryKey, answers])
   return (
@@ -4477,41 +4440,9 @@ function BookPage() {
               )}
             </div>
           ) : (
-            <form
-              className="mt-4 grid grid-cols-1 gap-3 text-left"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const form = e.currentTarget as HTMLFormElement
-                const name = (form.elements.namedItem('name') as HTMLInputElement)?.value
-                const email = (form.elements.namedItem('email') as HTMLInputElement)?.value
-                const notes = (form.elements.namedItem('notes') as HTMLTextAreaElement)?.value
-                try {
-                  const data = { category: categoryKey, name, email, notes, answers, ts: Date.now() }
-                  const k = `bf-book-${categoryKey}`
-                  localStorage.setItem(k, JSON.stringify(data))
-                } catch {}
-                // Removed local pseudo-auth; require real sign-in
-                // Persist booking row if table exists
-                createBookingRow({ email, category: categoryKey, name, notes, answers })
-                const ranked = scoreProviders(categoryKey, answers)
-                setResults(ranked)
-                setSubmitted(true)
-              }}
-            >
-              <div>
-                <label className="block text-sm text-neutral-600">Full Name</label>
-                <input name="name" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Your full name" />
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-600">Email</label>
-                <input name="email" type="email" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="you@example.com" />
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-600">Notes (optional)</label>
-                <textarea name="notes" rows={3} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Anything else we should know?" />
-              </div>
-              <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Sign Up</button>
-            </form>
+            <div className="mt-4 text-center">
+              <p className="text-neutral-600">Loading the best {category?.name.toLowerCase() || 'providers'} for you...</p>
+            </div>
           )}
         </div>
       </Container>
