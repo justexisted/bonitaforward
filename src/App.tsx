@@ -1226,7 +1226,6 @@ function ProviderPage() {
                 )}
               </div>
               <div className="flex items-center gap-2 text-sm text-neutral-500">
-                <span>Category: {provider.category_key.replace('-', ' ')}</span>
                 {provider.rating && (
                   <div className="flex items-center gap-1">
                     <span className="text-amber-500">★</span>
@@ -1307,7 +1306,6 @@ function ProviderPage() {
                 {/* Business Description */}
                 {provider.description && (
                   <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 mb-2">About {provider.name}</h3>
                     <p className="text-neutral-700 leading-relaxed">{provider.description}</p>
                   </div>
                 )}
@@ -1315,7 +1313,6 @@ function ProviderPage() {
                 {/* Business Images */}
                 {provider.images && provider.images.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Photos</h3>
 
                     {/* Featured accounts get image grid, non-featured get single image */}
                     {isFeaturedProvider(provider) ? (
@@ -3414,7 +3411,6 @@ function CategoryFilters({
                           <div className="flex items-center justify-center gap-1 mb-3">
                             <span className="text-sm font-medium text-neutral-900">{provider.rating.toFixed(1)}</span>
                             <span className="text-amber-500">★</span>
-                            <span className="text-xs text-neutral-500">rating</span>
                           </div>
                         )}
                         
