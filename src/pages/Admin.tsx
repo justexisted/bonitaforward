@@ -904,6 +904,7 @@ export default function AdminPage() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
+  const [expandedChangeRequestIds, setExpandedChangeRequestIds] = useState<Set<string>>(new Set())
   const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
   const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
@@ -2285,6 +2286,110 @@ export default function AdminPage() {
   async function notifyUser(user_id: string | null | undefined, subject: string, body?: string, data?: any) {
     if (!user_id) return
     try { await supabase.from('user_notifications').insert([{ user_id, subject, body: body || null, data: data || null }]) } catch {}
+  }
+
+  /**
+   * HELPER FUNCTION: Compute field-by-field differences between old and new values
+   * 
+   * This function compares the current provider data with the proposed changes
+   * and returns an object with only the fields that actually changed.
+   * 
+   * @param currentProvider - The current provider data from the database
+   * @param proposedChanges - The proposed changes from the change request
+   * @returns An object containing only fields that changed, with old and new values
+   */
+  function computeChangeDiff(currentProvider: ProviderRow | undefined, proposedChanges: Record<string, any> | null) {
+    if (!currentProvider || !proposedChanges) return []
+
+    const diffs: Array<{ field: string; oldValue: any; newValue: any; fieldLabel: string }> = []
+    
+    // Field label mapping for better display
+    const fieldLabels: Record<string, string> = {
+      name: 'Business Name',
+      category_key: 'Category',
+      phone: 'Phone Number',
+      email: 'Email Address',
+      website: 'Website',
+      address: 'Address',
+      tags: 'Tags',
+      images: 'Images',
+      description: 'Description',
+      specialties: 'Specialties',
+      social_links: 'Social Media Links',
+      business_hours: 'Business Hours',
+      service_areas: 'Service Areas',
+      google_maps_url: 'Google Maps URL',
+      bonita_resident_discount: 'Bonita Residents Discount',
+      booking_enabled: 'Booking System',
+      booking_type: 'Booking Type',
+      booking_instructions: 'Booking Instructions',
+      booking_url: 'External Booking URL',
+      coupon_code: 'Coupon Code',
+      coupon_discount: 'Coupon Discount',
+      coupon_description: 'Coupon Description',
+      coupon_expires_at: 'Coupon Expiration',
+      published: 'Published Status',
+      is_member: 'Member Status',
+      rating: 'Rating',
+      badges: 'Badges'
+    }
+
+    // Compare each field in proposedChanges
+    Object.entries(proposedChanges).forEach(([field, newValue]) => {
+      const oldValue = (currentProvider as any)[field]
+      
+      // Check if values are different
+      let isDifferent = false
+      
+      if (Array.isArray(oldValue) && Array.isArray(newValue)) {
+        // Compare arrays
+        isDifferent = JSON.stringify(oldValue.sort()) !== JSON.stringify(newValue.sort())
+      } else if (typeof oldValue === 'object' && typeof newValue === 'object' && oldValue !== null && newValue !== null) {
+        // Compare objects
+        isDifferent = JSON.stringify(oldValue) !== JSON.stringify(newValue)
+      } else {
+        // Simple comparison
+        isDifferent = oldValue !== newValue
+      }
+      
+      if (isDifferent) {
+        diffs.push({
+          field,
+          oldValue,
+          newValue,
+          fieldLabel: fieldLabels[field] || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        })
+      }
+    })
+
+    return diffs
+  }
+
+  /**
+   * Format a value for display in the change request UI
+   */
+  function formatValueForDisplay(value: any): string {
+    if (value === null || value === undefined) return '(not set)'
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    if (Array.isArray(value)) return value.length === 0 ? '(empty)' : value.join(', ')
+    if (typeof value === 'object') return JSON.stringify(value, null, 2)
+    if (typeof value === 'string' && value.length === 0) return '(empty)'
+    return String(value)
+  }
+
+  /**
+   * Toggle expansion of a change request to show all details
+   */
+  function toggleChangeRequestExpansion(requestId: string) {
+    setExpandedChangeRequestIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(requestId)) {
+        newSet.delete(requestId)
+      } else {
+        newSet.add(requestId)
+      }
+      return newSet
+    })
   }
 
   async function approveChangeRequest(req: ProviderChangeRequestWithDetails) {
@@ -4331,69 +4436,152 @@ export default function AdminPage() {
             <div className="font-medium">Owner Change Requests</div>
             <div className="mt-2 space-y-2 text-sm">
               {changeRequests.length === 0 && <div className="text-neutral-500">No requests yet.</div>}
-              {changeRequests.filter((r) => r.status === 'pending').map((r) => (
-                <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">
-                      {r.type === 'update' ? 'Business Listing Update' : 
-                       r.type === 'delete' ? 'Business Listing Deletion' :
-                       r.type === 'feature_request' ? 'Featured Upgrade Request' :
-                       r.type === 'claim' ? 'Business Claim Request' : r.type}
-                    </div>
-                    <div className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</div>
-                  </div>
-                  
-                  {/* Show the actual changes being requested in a user-friendly format */}
-                  {r.changes && Object.keys(r.changes).length > 0 && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded-lg">
-                      <div className="text-xs font-medium text-gray-700 mb-1">Proposed Changes:</div>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        {Object.entries(r.changes).map(([field, value]) => (
-                          <div key={field} className="flex justify-between">
-                            <span className="font-medium capitalize">{field.replace('_', ' ')}:</span>
-                            <span className="ml-2">
-                              {field === 'pricing_options' ? (
-                                // Format pricing options nicely
-                                typeof value === 'object' && value !== null ? 
-                                  (value as any).annual || '$97/year' : 
-                                  '$97/year'
-                              ) : typeof value === 'object' ? 
-                                JSON.stringify(value) : 
-                                String(value || 'Not provided')
-                              }
-                            </span>
-                          </div>
-                        ))}
+              {changeRequests.filter((r) => r.status === 'pending').map((r) => {
+                // Find the current provider data to compare with proposed changes
+                const currentProvider = providers.find(p => p.id === r.provider_id)
+                const changeDiff = computeChangeDiff(currentProvider, r.changes)
+                const isExpanded = expandedChangeRequestIds.has(r.id)
+                
+                return (
+                  <div key={r.id} className="rounded-xl border border-neutral-200 p-3 bg-white shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-neutral-900">
+                        {r.type === 'update' ? 'Business Listing Update' : 
+                         r.type === 'delete' ? 'Business Listing Deletion' :
+                         r.type === 'feature_request' ? 'Featured Upgrade Request' :
+                         r.type === 'claim' ? 'Business Claim Request' : r.type}
                       </div>
+                      <div className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</div>
                     </div>
-                  )}
-                  
-                  <div className="text-xs text-neutral-600 mt-1">
-                    <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
-                    <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
-                    <div><strong>Owner Email:</strong> {r.profiles?.email || 'Loading...'}</div>
-                    <div><strong>Provider ID:</strong> {r.provider_id}</div>
+                    
+                    {/* Business Information */}
+                    <div className="text-xs text-neutral-600 mt-2 space-y-1">
+                      <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
+                      <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
+                      <div><strong>Owner Email:</strong> {r.profiles?.email || 'Loading...'}</div>
+                    </div>
+                    
+                    {/* Show what changed - this is the key improvement */}
+                    {r.type === 'update' && changeDiff.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-xs font-semibold text-neutral-700 mb-2">
+                          Changes Requested ({changeDiff.length} field{changeDiff.length !== 1 ? 's' : ''}):
+                        </div>
+                        
+                        {/* Show changed fields in a clean table-like format */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                          {changeDiff.map((diff, idx) => (
+                            <div key={diff.field} className={`${idx > 0 ? 'pt-2 border-t border-blue-200' : ''}`}>
+                              <div className="text-xs font-semibold text-blue-900 mb-1">
+                                {diff.fieldLabel}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-red-700 font-medium">Old:</span>
+                                  <div className="text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200 break-words">
+                                    {formatValueForDisplay(diff.oldValue)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-green-700 font-medium">New:</span>
+                                  <div className="text-green-600 mt-1 p-2 bg-green-50 rounded border border-green-200 break-words">
+                                    {formatValueForDisplay(diff.newValue)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {/* Button to show all details */}
+                        <button
+                          onClick={() => toggleChangeRequestExpansion(r.id)}
+                          className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="w-3 h-3" />
+                              Hide Full Details
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3 h-3" />
+                              View Full Business Details
+                            </>
+                          )}
+                        </button>
+                        
+                        {/* Expanded view showing all current business details */}
+                        {isExpanded && currentProvider && (
+                          <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-lg">
+                            <div className="text-xs font-semibold text-neutral-700 mb-2">
+                              Complete Business Information:
+                            </div>
+                            <div className="text-xs text-neutral-600 space-y-1">
+                              <div><strong>ID:</strong> {currentProvider.id}</div>
+                              <div><strong>Name:</strong> {currentProvider.name}</div>
+                              <div><strong>Category:</strong> {currentProvider.category_key}</div>
+                              <div><strong>Phone:</strong> {currentProvider.phone || '(not set)'}</div>
+                              <div><strong>Email:</strong> {currentProvider.email || '(not set)'}</div>
+                              <div><strong>Website:</strong> {currentProvider.website || '(not set)'}</div>
+                              <div><strong>Address:</strong> {currentProvider.address || '(not set)'}</div>
+                              <div><strong>Description:</strong> {currentProvider.description || '(not set)'}</div>
+                              <div><strong>Tags:</strong> {currentProvider.tags?.join(', ') || '(none)'}</div>
+                              <div><strong>Specialties:</strong> {currentProvider.specialties?.join(', ') || '(none)'}</div>
+                              <div><strong>Service Areas:</strong> {currentProvider.service_areas?.join(', ') || '(none)'}</div>
+                              <div><strong>Bonita Discount:</strong> {currentProvider.bonita_resident_discount || '(none)'}</div>
+                              <div><strong>Member Status:</strong> {currentProvider.is_member ? 'Yes' : 'No'}</div>
+                              <div><strong>Booking Enabled:</strong> {currentProvider.booking_enabled ? 'Yes' : 'No'}</div>
+                              {currentProvider.booking_enabled && (
+                                <>
+                                  <div><strong>Booking Type:</strong> {currentProvider.booking_type || '(not set)'}</div>
+                                  <div><strong>Booking Instructions:</strong> {currentProvider.booking_instructions || '(not set)'}</div>
+                                  <div><strong>Booking URL:</strong> {currentProvider.booking_url || '(not set)'}</div>
+                                </>
+                              )}
+                              <div><strong>Images:</strong> {currentProvider.images?.length || 0} image(s)</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Show all proposed changes for non-update types */}
+                    {r.type !== 'update' && r.changes && Object.keys(r.changes).length > 0 && (
+                      <div className="mt-2 p-2 bg-gray-50 rounded-lg">
+                        <div className="text-xs font-medium text-gray-700 mb-1">Proposed Changes:</div>
+                        <div className="text-xs text-gray-600 space-y-1">
+                          {Object.entries(r.changes).map(([field, value]) => (
+                            <div key={field} className="flex justify-between">
+                              <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span>
+                              <span className="ml-2">{formatValueForDisplay(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {r.reason && <div className="text-xs text-neutral-600 mt-2 p-2 bg-amber-50 border border-amber-200 rounded"><strong>Reason:</strong> {r.reason}</div>}
+                    
+                    <div className="mt-3 flex items-center gap-2">
+                      <button 
+                        onClick={() => approveChangeRequest(r)} 
+                        className="btn btn-primary text-xs"
+                        disabled={r.status !== 'pending'}
+                      >
+                        {r.status === 'pending' ? 'Approve' : r.status}
+                      </button>
+                      <button 
+                        onClick={() => rejectChangeRequest(r)} 
+                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs"
+                        disabled={r.status !== 'pending'}
+                      >
+                        {r.status === 'pending' ? 'Reject' : r.status}
+                      </button>
+                    </div>
                   </div>
-                  {r.reason && <div className="text-xs text-neutral-600 mt-1">Reason: {r.reason}</div>}
-                  
-                  <div className="mt-3 flex items-center gap-2">
-                    <button 
-                      onClick={() => approveChangeRequest(r)} 
-                      className="btn btn-primary text-xs"
-                      disabled={r.status !== 'pending'}
-                    >
-                      {r.status === 'pending' ? 'Approve' : r.status}
-                    </button>
-                    <button 
-                      onClick={() => rejectChangeRequest(r)} 
-                      className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs"
-                      disabled={r.status !== 'pending'}
-                    >
-                      {r.status === 'pending' ? 'Reject' : r.status}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

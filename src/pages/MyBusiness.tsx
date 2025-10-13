@@ -85,6 +85,11 @@ type BusinessListing = {
   coupon_discount: string | null
   coupon_description: string | null
   coupon_expires_at: string | null
+  // Booking system fields
+  booking_enabled: boolean | null
+  booking_type: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
+  booking_instructions: string | null
+  booking_url: string | null
 }
 
 // Type definition for business applications in the business_applications table
@@ -800,6 +805,12 @@ export default function MyBusinessPage() {
       if (updates.coupon_discount !== undefined) changesData.coupon_discount = updates.coupon_discount
       if (updates.coupon_description !== undefined) changesData.coupon_description = updates.coupon_description
       if (updates.coupon_expires_at !== undefined) changesData.coupon_expires_at = updates.coupon_expires_at
+      
+      // Booking system fields
+      if (updates.booking_enabled !== undefined) changesData.booking_enabled = updates.booking_enabled
+      if (updates.booking_type !== undefined) changesData.booking_type = updates.booking_type
+      if (updates.booking_instructions !== undefined) changesData.booking_instructions = updates.booking_instructions
+      if (updates.booking_url !== undefined) changesData.booking_url = updates.booking_url
       
       console.log('[MyBusiness] Final changes data for request:', changesData)
       
