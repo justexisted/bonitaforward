@@ -1225,7 +1225,7 @@ function ProviderPage() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-4 text-sm text-neutral-500">
+              <div className="flex items-center gap-2 text-sm text-neutral-500">
                 <span>Category: {provider.category_key.replace('-', ' ')}</span>
                 {provider.rating && (
                   <div className="flex items-center gap-1">
@@ -1252,7 +1252,7 @@ function ProviderPage() {
               
               {/* Exclusive Coupon Display */}
               {provider.coupon_code && provider.coupon_discount && (
-                <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 shadow-md">
+                <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-2 shadow-md">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 text-3xl">🎟️</div>
                     <div className="flex-1">
@@ -1578,7 +1578,7 @@ function ProviderPage() {
                         ) : (
                           <div className="space-y-3">
                             {provider.booking_instructions && (
-                              <div className="p-4 bg-white rounded-lg border border-neutral-200">
+                              <div className="p-2 bg-white rounded-lg border border-neutral-200">
                                 <h5 className="font-medium text-neutral-900 mb-2">Booking Instructions</h5>
                                 <p className="text-neutral-700 whitespace-pre-wrap">{provider.booking_instructions}</p>
                               </div>
@@ -3395,8 +3395,8 @@ function CategoryFilters({
                       </div>
                       
                       {/* Category Tag - Positioned between image and title, half on image */}
-                      <div className="relative -mt-6 mb-3">
-                        <div className="flex justify-center">
+                      <div className="relative -mt-3 mb-3">
+                        <div className="flex justify-start ml-2">
                           <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm">
                             {provider.category_key.replace('-', ' ')}
                           </span>
@@ -3404,13 +3404,18 @@ function CategoryFilters({
                       </div>
                       
                       {/* Provider Info */}
-                      <div className="p-4 text-center">
-                        <div className="flex flex-col items-center gap-2 mb-3">
+                      <div className="p-2 text-center mt-[-1rem]">
+                        <div className="flex flex-col items-center gap-2 mb-1.5">
                           <h3 className="font-semibold text-neutral-900 text-lg">{provider.name}</h3>
                         </div>
                         
-                        {provider.description && (
-                          <p className="text-sm text-neutral-600 mb-3 line-clamp-2">{provider.description}</p>
+                        {/* Rating Display */}
+                        {provider.rating && (
+                          <div className="flex items-center justify-center gap-1 mb-3">
+                            <span className="text-sm font-medium text-neutral-900">{provider.rating.toFixed(1)}</span>
+                            <span className="text-amber-500">★</span>
+                            <span className="text-xs text-neutral-500">rating</span>
+                          </div>
                         )}
                         
                         {/* Tags - Only visible to admin */}
@@ -4226,7 +4231,7 @@ function BookPage() {
                       </div>
                       
                       {/* Category Tag - Positioned between image and title, half on image */}
-                      <div className="relative -mt-6 mb-3">
+                      <div className="relative -mt-3 mb-3">
                         <div className="flex justify-start">
                           <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm">
                             {r.category_key.replace('-', ' ')}
