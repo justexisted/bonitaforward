@@ -4336,6 +4336,12 @@ function BookPage() {
                               {r.coupon_discount}
                             </div>
                           )}
+                          {/* Debug: Show coupon data for troubleshooting */}
+                          {r.name.toLowerCase().includes('thai') && (
+                            <div className="text-xs text-red-600 bg-red-50 p-1 rounded">
+                              Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}"
+                            </div>
+                          )}
                           <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
                         </div>
                       </div>
@@ -4479,6 +4485,12 @@ function BookPage() {
                               {r.coupon_code && r.coupon_discount && (
                                 <div className="inline-flex items-center rounded-md bg-green-100 text-green-800 px-2 py-1 text-xs font-medium">
                                   {r.coupon_discount}
+                                </div>
+                              )}
+                              {/* Debug: Show coupon data for troubleshooting */}
+                              {r.name.toLowerCase().includes('thai') && (
+                                <div className="text-xs text-red-600 bg-red-50 p-1 rounded">
+                                  Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}"
                                 </div>
                               )}
                               <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
