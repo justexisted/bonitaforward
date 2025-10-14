@@ -1305,7 +1305,9 @@ function ProviderPage() {
               <div className="flex items-center gap-2 text-sm text-neutral-500">
                 {provider.rating && (
                   <div className="flex items-center gap-1">
-                    <span className="text-amber-500">★</span>
+                    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
                     <span>{provider.rating.toFixed(1)}</span>
                   </div>
                 )}
@@ -3515,7 +3517,9 @@ function CategoryFilters({
                         {provider.rating && (
                           <div className="flex items-center justify-center gap-1 mb-3">
                             <span className="text-sm font-medium text-neutral-900">{provider.rating.toFixed(1)}</span>
-                            <span className="text-amber-500">★</span>
+                            <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
                           </div>
                         )}
                         
@@ -4358,32 +4362,22 @@ function BookPage() {
                               Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}", hasCode={!!r.coupon_code}, hasDiscount={!!r.coupon_discount}
                             </div>
                           )}
-                          <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                          <div className="flex items-center gap-1 text-xs text-neutral-500">
+                            <svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                            {r.rating?.toFixed(1)}
+                          </div>
                         </div>
                       </div>
                       
-                      {/* Admin Tags */}
-                      {isAdmin && r.tags && r.tags.length > 0 && (
-                        <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
-                          <span className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full">
-                            {r.tags.slice(0, 2).join(', ')}
-                          </span>
-                        </div>
-                      )}
-                      {isAdmin && (r.tags && r.tags.length > 0) && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {r.tags.slice(0, 3).map((t) => (
-                            <span key={t} className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-700 px-2 py-0.5 text-[11px]">{t}</span>
-                          ))}
-                        </div>
-                      )}
                       {canShowRich && d.reviews && d.reviews.length > 0 && (
                         <div className="mt-3">
                           <div className="font-medium text-sm">Reviews</div>
                           <ul className="mt-1 space-y-1 text-sm">
                             {d.reviews.map((rv, idx) => (
                               <li key={idx} className="text-neutral-700">
-                                <span className="text-neutral-500">{rv.author}</span> — {rv.rating.toFixed(1)}★ — {rv.text}
+                                <span className="text-neutral-500">{rv.author}</span> — <span className="flex items-center gap-1 inline-flex"><span>{rv.rating.toFixed(1)}</span><svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></span> — {rv.text}
                               </li>
                             ))}
                           </ul>
@@ -4509,27 +4503,20 @@ function BookPage() {
                                   Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}", hasCode={!!r.coupon_code}, hasDiscount={!!r.coupon_discount}
                                 </div>
                               )}
-                              <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
+                              <div className="flex items-center gap-1 text-xs text-neutral-500">
+                                <svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                                {r.rating?.toFixed(1)}
+                              </div>
                             </div>
                           </div>
-                          {/* Show category and tags */}
+                          {/* Show category only */}
                           <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
                             <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
                               {r.category_key.replace('-', ' ')}
                             </span>
-                            {isAdmin && r.tags && r.tags.length > 0 && (
-                              <span className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full">
-                                {r.tags.slice(0, 2).join(', ')}
-                              </span>
-                            )}
                           </div>
-                          {isAdmin && (r.tags && r.tags.length > 0) && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {r.tags.slice(0, 3).map((t) => (
-                                <span key={t} className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-700 px-2 py-0.5 text-[11px]">{t}</span>
-                              ))}
-                            </div>
-                          )}
                           <button onClick={() => setExpanded((e: Record<string, boolean>) => ({ ...e, [r.id]: !open }))} className="mt-2 text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5">{open ? 'Hide' : 'View'}</button>
                           <div className="collapsible mt-3 text-sm" data-open={open ? 'true' : 'false'}>
                               {r.isMember && d.reviews && d.reviews.length > 0 && (
@@ -4538,7 +4525,7 @@ function BookPage() {
                                   <ul className="mt-1 space-y-1">
                                     {d.reviews.map((rv, idx) => (
                                       <li key={idx} className="text-neutral-700">
-                                        <span className="text-neutral-500">{rv.author}</span> — {rv.rating.toFixed(1)}★ — {rv.text}
+                                        <span className="text-neutral-500">{rv.author}</span> — <span className="flex items-center gap-1 inline-flex"><span>{rv.rating.toFixed(1)}</span><svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></span> — {rv.text}
                                       </li>
                                     ))}
                                   </ul>
