@@ -868,14 +868,19 @@ function Layout() {
         }
 
         // Get unread booking notifications
-        const { data: notifications } = await supabase
+        const { data: notifications, error: notificationsError } = await supabase
           .from('user_notifications')
           .select('id')
           .eq('user_id', auth.userId)
           .eq('type', 'booking_received')
           .eq('is_read', false)
 
-        setUnreadBookingNotifications(notifications?.length || 0)
+        if (notificationsError) {
+          console.warn('Failed to load booking notifications (table may not exist yet):', notificationsError.message)
+          setUnreadBookingNotifications(0)
+        } else {
+          setUnreadBookingNotifications(notifications?.length || 0)
+        }
       } catch (error) {
         console.warn('Failed to load booking notifications:', error)
         setUnreadBookingNotifications(0)
@@ -4339,7 +4344,7 @@ function BookPage() {
                           {/* Debug: Show coupon data for troubleshooting */}
                           {r.name.toLowerCase().includes('thai') && (
                             <div className="text-xs text-red-600 bg-red-50 p-1 rounded">
-                              Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}"
+                              Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}", hasCode={!!r.coupon_code}, hasDiscount={!!r.coupon_discount}
                             </div>
                           )}
                           <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
@@ -4490,7 +4495,7 @@ function BookPage() {
                               {/* Debug: Show coupon data for troubleshooting */}
                               {r.name.toLowerCase().includes('thai') && (
                                 <div className="text-xs text-red-600 bg-red-50 p-1 rounded">
-                                  Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}"
+                                  Debug: coupon_code="{r.coupon_code}", coupon_discount="{r.coupon_discount}", hasCode={!!r.coupon_code}, hasDiscount={!!r.coupon_discount}
                                 </div>
                               )}
                               <div className="text-xs text-neutral-500">{r.rating?.toFixed(1)}★</div>
