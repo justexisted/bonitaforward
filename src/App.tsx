@@ -1534,7 +1534,7 @@ function ProviderPage() {
               </div>
 
               {/* Booking System - Featured Providers Only */}
-              {provider.isMember && provider.booking_enabled && (
+              {provider.isMember && (provider.booking_enabled || provider.enable_calendar_booking || provider.enable_call_contact || provider.enable_email_contact) && (
                 <div className="mt-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Book with {provider.name}</h3>
                   <div className="rounded-xl border border-neutral-200 p-6 bg-gradient-to-r from-blue-50 to-indigo-50">

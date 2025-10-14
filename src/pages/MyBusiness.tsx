@@ -50,7 +50,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { Link, useLocation } from 'react-router-dom'
-import { createProviderChangeRequest, type ProviderChangeRequest } from '../lib/supabaseData'
+import { createProviderChangeRequest, type ProviderChangeRequest, dismissNotification as dismissNotificationDB, getDismissedNotifications, getLatestActivityTimestamp, type DismissedNotification } from '../lib/supabaseData'
 
 // Type definition for business listings in the providers table
 // Updated to include all enhanced business management fields that were added to the database
@@ -156,7 +156,7 @@ export default function MyBusinessPage() {
   const [userActivity, setUserActivity] = useState<UserActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'jobs' | 'change-requests' | 'user-activity' | 'analytics'>('listings')
+  const [activeTab, setActiveTab] = useState<'listings' | 'applications' | 'jobs' | 'change-requests' | 'user-activity' | 'analytics' | 'recently-approved' | 'recently-rejected' | 'pending-requests'>('listings')
   const [editingListing, setEditingListing] = useState<BusinessListing | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showJobForm, setShowJobForm] = useState(false)
@@ -170,6 +170,8 @@ export default function MyBusinessPage() {
   const [showSubscriptionCard, setShowSubscriptionCard] = useState(true)
   // State to track user's plan choice and status (used for internal logic)
   const [userPlanChoice, setUserPlanChoice] = useState<'free' | 'featured-pending' | 'featured-approved' | null>(null)
+  // State to track dismissed notifications (database-based)
+  const [dismissedNotifications, setDismissedNotifications] = useState<DismissedNotification[]>([])
   
   // Suppress unused warning - this state is used for internal tracking logic
   void userPlanChoice
@@ -208,7 +210,10 @@ export default function MyBusinessPage() {
     { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
     { key: 'change-requests', label: 'Change Requests', count: changeRequests.filter(req => req.status === 'pending').length },
     { key: 'user-activity', label: 'User Activity', count: userActivity.length },
-    { key: 'analytics', label: 'Analytics' }
+    { key: 'analytics', label: 'Analytics' },
+    { key: 'recently-approved', label: 'Recently Approved', count: changeRequests.filter(req => req.status === 'approved' && req.decided_at && new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length },
+    { key: 'recently-rejected', label: 'Recently Rejected', count: changeRequests.filter(req => req.status === 'rejected' && req.decided_at && new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length },
+    { key: 'pending-requests', label: 'Pending Requests', count: changeRequests.filter(req => req.status === 'pending').length }
   ] as const
 
   // Get current tab information for dropdown display
@@ -279,7 +284,7 @@ export default function MyBusinessPage() {
    */
   useEffect(() => {
     const hash = window.location.hash.slice(1) // Remove the '#'
-    if (hash === 'jobs' || hash === 'listings' || hash === 'applications' || hash === 'change-requests' || hash === 'user-activity' || hash === 'analytics') {
+    if (hash === 'jobs' || hash === 'listings' || hash === 'applications' || hash === 'change-requests' || hash === 'user-activity' || hash === 'analytics' || hash === 'recently-approved' || hash === 'recently-rejected' || hash === 'pending-requests') {
       setActiveTab(hash as typeof activeTab)
       // Clear the hash after setting the tab so it doesn't persist on refresh
       window.history.replaceState(null, '', window.location.pathname)
@@ -503,10 +508,15 @@ export default function MyBusinessPage() {
       setChangeRequests((changeRequestsData as ProviderChangeRequest[]) || [])
       setUserActivity(userActivityData)
       
+      // Load dismissed notifications from database
+      const dismissedData = await getDismissedNotifications(auth.userId)
+      setDismissedNotifications(dismissedData)
+      
       console.log('[MyBusiness] Final comprehensive state:', {
         listings: allListings.length,
         applications: appsData?.length || 0,
-        jobPosts: jobPostsData.length
+        jobPosts: jobPostsData.length,
+        dismissedNotifications: dismissedData.length
       })
       
       // Debug: Log the actual listing data to see what's being displayed
@@ -1175,6 +1185,136 @@ export default function MyBusinessPage() {
   }
 
   /**
+   * CHECK IF NOTIFICATION SHOULD BE SHOWN
+   * 
+   * This function checks if a notification should be displayed based on whether
+   * there's new activity since the last dismissal.
+   */
+  const shouldShowNotification = (notificationType: 'pending' | 'approved' | 'rejected'): boolean => {
+    const dismissal = dismissedNotifications.find(d => d.notification_type === notificationType)
+    
+    if (!dismissal) {
+      // No dismissal recorded, show notification
+      return true
+    }
+    
+    // Check if there's new activity since dismissal
+    const dismissedTimestamp = new Date(dismissal.last_activity_timestamp)
+    
+    if (notificationType === 'pending') {
+      // For pending: show if there are any pending requests newer than dismissal
+      const hasNewPending = changeRequests.some(req => 
+        req.status === 'pending' && 
+        new Date(req.created_at) > dismissedTimestamp
+      )
+      return hasNewPending
+    } else if (notificationType === 'approved') {
+      // For approved: show if there are any approved requests newer than dismissal (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const hasNewApproved = changeRequests.some(req => 
+        req.status === 'approved' && 
+        req.decided_at &&
+        new Date(req.decided_at) > dismissedTimestamp &&
+        new Date(req.decided_at) > thirtyDaysAgo
+      )
+      return hasNewApproved
+    } else if (notificationType === 'rejected') {
+      // For rejected: show if there are any rejected requests newer than dismissal (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const hasNewRejected = changeRequests.some(req => 
+        req.status === 'rejected' && 
+        req.decided_at &&
+        new Date(req.decided_at) > dismissedTimestamp &&
+        new Date(req.decided_at) > thirtyDaysAgo
+      )
+      return hasNewRejected
+    }
+    
+    return false
+  }
+
+  /**
+   * DISMISS NOTIFICATION
+   * 
+   * This function allows users to dismiss notification sections from the top of the page.
+   * It saves the dismissal to the database with the timestamp of the most recent activity.
+   */
+  const dismissNotification = async (notificationType: 'pending' | 'approved' | 'rejected') => {
+    if (!auth.userId) return
+    
+    try {
+      // Get the timestamp of the most recent activity for this notification type
+      const latestActivityTimestamp = await getLatestActivityTimestamp(auth.userId, notificationType)
+      
+      if (!latestActivityTimestamp) {
+        console.warn(`[MyBusiness] No recent activity found for ${notificationType} notifications`)
+        return
+      }
+      
+      // Save dismissal to database
+      const { error } = await dismissNotificationDB(auth.userId, notificationType, latestActivityTimestamp)
+      
+      if (error) {
+        console.error(`[MyBusiness] Failed to dismiss ${notificationType} notification:`, error)
+        setMessage(`Failed to dismiss notification: ${error}`)
+        return
+      }
+      
+      // Update local state
+      const newDismissal: DismissedNotification = {
+        id: `${auth.userId}-${notificationType}`,
+        user_id: auth.userId,
+        notification_type: notificationType,
+        dismissed_at: new Date().toISOString(),
+        last_activity_timestamp: latestActivityTimestamp,
+        created_at: new Date().toISOString()
+      }
+      
+      setDismissedNotifications(prev => {
+        const filtered = prev.filter(d => d.notification_type !== notificationType)
+        return [...filtered, newDismissal]
+      })
+      
+      console.log(`[MyBusiness] Successfully dismissed ${notificationType} notification`)
+    } catch (error: any) {
+      console.error(`[MyBusiness] Error dismissing ${notificationType} notification:`, error)
+      setMessage(`Error dismissing notification: ${error.message}`)
+    }
+  }
+
+  /**
+   * CANCEL CHANGE REQUEST
+   * 
+   * This function allows business owners to cancel their pending change requests.
+   * It updates the request status to 'cancelled' in the database.
+   */
+  const cancelChangeRequest = async (requestId: string) => {
+    try {
+      setMessage('Cancelling change request...')
+      
+      const { error } = await supabase
+        .from('provider_change_requests')
+        .update({ 
+          status: 'cancelled',
+          decided_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+        .eq('owner_user_id', auth.userId) // Ensure user can only cancel their own requests
+      
+      if (error) throw new Error(error.message)
+      
+      setMessage('✅ Change request cancelled successfully!')
+      
+      // Refresh data to show updated status
+      await loadBusinessData()
+      
+    } catch (error: any) {
+      console.error('[MyBusiness] Error cancelling change request:', error)
+      setMessage(`❌ Error cancelling request: ${error.message}`)
+    }
+  }
+
+  /**
    * UPDATE JOB POST
    * 
    * This function updates an existing job post in the database.
@@ -1383,8 +1523,33 @@ export default function MyBusinessPage() {
         {/* Change Requests Status Section - Shows pending, approved, and rejected requests */}
         {changeRequests.length > 0 && (
           <div className="mb-6 space-y-3">
+            {/* Notification Summary */}
+            <div className="text-center mb-4">
+              <div className="inline-flex items-center gap-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-amber-800">
+                    {changeRequests.filter(req => req.status === 'pending').length} Pending
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-green-800">
+                    {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+                      new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length} Recently Approved
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-red-800">
+                    {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+                      new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length} Recently Rejected
+                  </span>
+                </div>
+              </div>
+            </div>
             {/* Pending Requests */}
-            {changeRequests.filter(req => req.status === 'pending').length > 0 && (
+            {changeRequests.filter(req => req.status === 'pending').length > 0 && shouldShowNotification('pending') && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
@@ -1393,23 +1558,60 @@ export default function MyBusinessPage() {
                     </svg>
                   </div>
                   <div className="ml-3 flex-1">
-                    <h3 className="text-sm font-medium text-amber-800">⏳ Pending Admin Review</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-amber-800">⏳ Pending Admin Review</h3>
+                      <button
+                        onClick={() => dismissNotification('pending')}
+                        className="text-amber-600 hover:text-amber-800 transition-colors"
+                        title="Dismiss notification"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                     <div className="mt-2 text-sm text-amber-700">
                       <p className="mb-2">You have {changeRequests.filter(req => req.status === 'pending').length} change request(s) waiting for admin approval:</p>
-                      <ul className="mt-2 space-y-1">
+                      <ul className="mt-2 space-y-2">
                         {changeRequests.filter(req => req.status === 'pending').map(req => {
                           const listing = listings.find(l => l.id === req.provider_id)
+                          const changeCount = req.changes ? Object.keys(req.changes).length : 0
+                          
                           return (
-                            <li key={req.id} className="text-xs bg-white rounded p-2">
-                              <strong>{listing?.name || 'Business'}</strong> - {
-                                req.type === 'update' ? 'Listing Update' :
-                                req.type === 'feature_request' ? '⭐ Featured Upgrade Request' :
-                                req.type === 'delete' ? 'Deletion Request' :
-                                req.type === 'claim' ? 'Ownership Claim' :
-                                req.type
-                              }
-                              <div className="text-amber-600 mt-1">
-                                Submitted {new Date(req.created_at).toLocaleDateString()}
+                            <li key={req.id} className="text-xs bg-white rounded p-3 border border-amber-200">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium text-amber-900">
+                                    <strong>{listing?.name || 'Business'}</strong> - {
+                                      req.type === 'update' ? 'Listing Update' :
+                                      req.type === 'feature_request' ? '⭐ Featured Upgrade Request' :
+                                      req.type === 'delete' ? 'Deletion Request' :
+                                      req.type === 'claim' ? 'Ownership Claim' :
+                                      req.type
+                                    }
+                                  </div>
+                                  
+                                  {changeCount > 0 && (
+                                    <div className="text-amber-700 mt-1">
+                                      {changeCount} field{changeCount !== 1 ? 's' : ''} being changed: {
+                                        req.changes ? Object.keys(req.changes)
+                                          .map(field => field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))
+                                          .join(', ') : 'Details available in Change Requests tab'
+                                      }
+                                    </div>
+                                  )}
+                                  
+                                  <div className="text-amber-600 mt-1">
+                                    Submitted {new Date(req.created_at).toLocaleDateString()}
+                                  </div>
+                                </div>
+                                
+                                <button
+                                  onClick={() => setActiveTab('change-requests')}
+                                  className="ml-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  View Details
+                                </button>
                               </div>
                             </li>
                           )
@@ -1423,7 +1625,7 @@ export default function MyBusinessPage() {
 
             {/* Recently Approved Requests */}
             {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
-              new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length > 0 && (
+              new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length > 0 && shouldShowNotification('approved') && (
               <div className="rounded-xl border border-green-200 bg-green-50 p-4">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
@@ -1432,21 +1634,61 @@ export default function MyBusinessPage() {
                     </svg>
                   </div>
                   <div className="ml-3 flex-1">
-                    <h3 className="text-sm font-medium text-green-800">✅ Recently Approved</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-green-800">✅ Recently Approved</h3>
+                      <button
+                        onClick={() => dismissNotification('approved')}
+                        className="text-green-600 hover:text-green-800 transition-colors"
+                        title="Dismiss notification"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                     <div className="mt-2 text-sm text-green-700">
-                      <ul className="space-y-1">
+                      <p className="mb-2">Great news! The following change requests have been approved:</p>
+                      <ul className="mt-2 space-y-2">
                         {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
-                          new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).map(req => {
+                          new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map(req => {
                           const listing = listings.find(l => l.id === req.provider_id)
+                          const changeCount = req.changes ? Object.keys(req.changes).length : 0
+                          
                           return (
-                            <li key={req.id} className="text-xs bg-white rounded p-2">
-                              <strong>{listing?.name || 'Business'}</strong> - {
-                                req.type === 'update' ? 'Updates' :
-                                req.type === 'feature_request' ? '⭐ Featured Status' :
-                                req.type
-                              } approved!
-                              <div className="text-green-600 mt-1">
-                                Approved {req.decided_at ? new Date(req.decided_at).toLocaleDateString() : 'recently'}
+                            <li key={req.id} className="text-xs bg-white rounded p-3 border border-green-200">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium text-green-900">
+                                    <strong>{listing?.name || 'Business'}</strong> - {
+                                      req.type === 'update' ? 'Business Listing Updates' :
+                                      req.type === 'feature_request' ? '⭐ Featured Upgrade' :
+                                      req.type === 'delete' ? 'Business Deletion' :
+                                      req.type === 'claim' ? 'Business Ownership Claim' :
+                                      req.type
+                                    } Approved!
+                                  </div>
+                                  
+                                  {changeCount > 0 && (
+                                    <div className="text-green-700 mt-1">
+                                      {changeCount} field{changeCount !== 1 ? 's' : ''} updated: {
+                                        req.changes ? Object.keys(req.changes)
+                                          .map(field => field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))
+                                          .join(', ') : 'Changes are now live'
+                                      }
+                                    </div>
+                                  )}
+                                  
+                                  <div className="text-green-600 mt-1">
+                                    ✅ Approved {req.decided_at ? new Date(req.decided_at).toLocaleDateString() : 'recently'}
+                                  </div>
+                                </div>
+                                
+                                <button
+                                  onClick={() => setActiveTab('change-requests')}
+                                  className="ml-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  View Details
+                                </button>
                               </div>
                             </li>
                           )
@@ -1460,7 +1702,7 @@ export default function MyBusinessPage() {
 
             {/* Recently Rejected Requests */}
             {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
-              new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length > 0 && (
+              new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length > 0 && shouldShowNotification('rejected') && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
@@ -1469,11 +1711,22 @@ export default function MyBusinessPage() {
                     </svg>
                   </div>
                   <div className="ml-3 flex-1">
-                    <h3 className="text-sm font-medium text-red-800">❌ Recently Rejected</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-red-800">❌ Recently Rejected</h3>
+                      <button
+                        onClick={() => dismissNotification('rejected')}
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                        title="Dismiss notification"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                     <div className="mt-2 text-sm text-red-700">
                       <ul className="space-y-1">
                         {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
-                          new Date(req.decided_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).map(req => {
+                          new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map(req => {
                           const listing = listings.find(l => l.id === req.provider_id)
                           return (
                             <li key={req.id} className="text-xs bg-white rounded p-2">
@@ -1570,6 +1823,7 @@ export default function MyBusinessPage() {
                       </div>
                     </button>
                   ))}
+                  
                 </div>
               </div>
             )}
@@ -2241,6 +2495,7 @@ export default function MyBusinessPage() {
                           request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                           request.status === 'approved' ? 'bg-green-100 text-green-800' :
                           request.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          request.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {request.status}
@@ -2254,27 +2509,80 @@ export default function MyBusinessPage() {
                     {/* Show the changes being requested */}
                     {request.changes && Object.keys(request.changes).length > 0 && (
                       <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="text-sm font-medium text-gray-700 mb-2">Proposed Changes:</div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          {Object.entries(request.changes).map(([field, value]) => (
-                            <div key={field} className="flex justify-between">
-                              <span className="font-medium capitalize">{field.replace('_', ' ')}:</span>
-                              <span className="ml-2">
-                                {typeof value === 'object' ? JSON.stringify(value) : String(value || 'Not provided')}
-                              </span>
-                            </div>
-                          ))}
+                        <div className="text-sm font-medium text-gray-700 mb-2">Specific Changes Being Requested:</div>
+                        <div className="text-sm text-gray-600 space-y-2">
+                          {Object.entries(request.changes).map(([field, value]) => {
+                            // Get current value from the listing for comparison
+                            const currentListing = listings.find(l => l.id === request.provider_id)
+                            const currentValue = currentListing ? (currentListing as any)[field] : null
+                            
+                            // Format field names for better readability
+                            const fieldDisplayName = field
+                              .replace(/_/g, ' ')
+                              .replace(/\b\w/g, l => l.toUpperCase())
+                              .replace('Id', 'ID')
+                              .replace('Url', 'URL')
+                              .replace('Email', 'Email')
+                              .replace('Phone', 'Phone')
+                            
+                            // Format values for better display
+                            const formatValue = (val: any) => {
+                              if (val === null || val === undefined) return 'Not set'
+                              if (typeof val === 'boolean') return val ? 'Yes' : 'No'
+                              if (typeof val === 'object') {
+                                if (Array.isArray(val)) {
+                                  return val.length > 0 ? val.join(', ') : 'None'
+                                }
+                                return JSON.stringify(val)
+                              }
+                              if (typeof val === 'string' && val.length > 50) {
+                                return val.substring(0, 50) + '...'
+                              }
+                              return String(val)
+                            }
+                            
+                            return (
+                              <div key={field} className="border-l-2 border-blue-200 pl-3 py-1">
+                                <div className="font-medium text-gray-800">{fieldDisplayName}</div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  <div className="flex justify-between">
+                                    <span>Current: <span className="text-gray-600">{formatValue(currentValue)}</span></span>
+                                    <span className="text-blue-600">→</span>
+                                    <span>New: <span className="text-gray-600">{formatValue(value)}</span></span>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )}
 
-                    <div className="text-xs text-neutral-600">
-                      <div>Provider ID: {request.provider_id}</div>
-                      {request.reason && <div>Reason: {request.reason}</div>}
-                      {request.decided_at && (
-                        <div>
-                          {request.status === 'approved' ? 'Approved' : 'Rejected'} on: {new Date(request.decided_at).toLocaleString()}
-                        </div>
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="text-xs text-neutral-600">
+                        <div>Provider ID: {request.provider_id}</div>
+                        {request.reason && <div>Reason: {request.reason}</div>}
+                        {request.decided_at && (
+                          <div>
+                            {request.status === 'approved' ? 'Approved' : 
+                             request.status === 'rejected' ? 'Rejected' : 
+                             request.status === 'cancelled' ? 'Cancelled' : 'Unknown'} on: {new Date(request.decided_at).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Cancel button for pending requests */}
+                      {request.status === 'pending' && (
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to cancel this change request? This action cannot be undone.')) {
+                              cancelChangeRequest(request.id)
+                            }
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                        >
+                          Cancel Request
+                        </button>
                       )}
                     </div>
                   </div>
@@ -2416,6 +2724,213 @@ export default function MyBusinessPage() {
           </div>
         )}
 
+        {/* Recently Approved Tab */}
+        {activeTab === 'recently-approved' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Recently Approved Requests</h2>
+                <p className="text-sm text-neutral-600">Change requests that have been approved in the last 30 days</p>
+              </div>
+            </div>
+
+            {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+              new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length === 0 ? (
+              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                <h3 className="text-lg font-medium text-neutral-900">No Recently Approved Requests</h3>
+                <p className="mt-2 text-neutral-600">
+                  Approved change requests from the last 30 days will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+                  new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map((request) => (
+                  <div key={request.id} className="rounded-xl border border-green-200 p-4 bg-green-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-green-900">
+                          {request.type === 'update' ? 'Business Listing Update' : 
+                           request.type === 'delete' ? 'Business Listing Deletion' :
+                           request.type === 'feature_request' ? 'Featured Upgrade Request' :
+                           request.type === 'claim' ? 'Business Claim Request' : request.type}
+                        </h3>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          approved
+                        </span>
+                      </div>
+                      <div className="text-xs text-green-600">
+                        Approved {request.decided_at ? new Date(request.decided_at).toLocaleString() : 'recently'}
+                      </div>
+                    </div>
+
+                    {/* Show the changes that were approved */}
+                    {request.changes && Object.keys(request.changes).length > 0 && (
+                      <div className="mb-3 p-3 bg-white rounded-lg border border-green-200">
+                        <div className="text-sm font-medium text-green-700 mb-2">Approved Changes:</div>
+                        <div className="text-sm text-green-600 space-y-1">
+                          {Object.keys(request.changes).map((field) => (
+                            <div key={field} className="capitalize">
+                              {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-xs text-green-600">
+                      <div>Provider ID: {request.provider_id}</div>
+                      {request.reason && <div>Reason: {request.reason}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Recently Rejected Tab */}
+        {activeTab === 'recently-rejected' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Recently Rejected Requests</h2>
+                <p className="text-sm text-neutral-600">Change requests that have been rejected in the last 30 days</p>
+              </div>
+            </div>
+
+            {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+              new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length === 0 ? (
+              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                <h3 className="text-lg font-medium text-neutral-900">No Recently Rejected Requests</h3>
+                <p className="mt-2 text-neutral-600">
+                  Rejected change requests from the last 30 days will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+                  new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map((request) => (
+                  <div key={request.id} className="rounded-xl border border-red-200 p-4 bg-red-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-red-900">
+                          {request.type === 'update' ? 'Business Listing Update' : 
+                           request.type === 'delete' ? 'Business Listing Deletion' :
+                           request.type === 'feature_request' ? 'Featured Upgrade Request' :
+                           request.type === 'claim' ? 'Business Claim Request' : request.type}
+                        </h3>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          rejected
+                        </span>
+                      </div>
+                      <div className="text-xs text-red-600">
+                        Rejected {request.decided_at ? new Date(request.decided_at).toLocaleString() : 'recently'}
+                      </div>
+                    </div>
+
+                    {/* Show the changes that were rejected */}
+                    {request.changes && Object.keys(request.changes).length > 0 && (
+                      <div className="mb-3 p-3 bg-white rounded-lg border border-red-200">
+                        <div className="text-sm font-medium text-red-700 mb-2">Rejected Changes:</div>
+                        <div className="text-sm text-red-600 space-y-1">
+                          {Object.keys(request.changes).map((field) => (
+                            <div key={field} className="capitalize">
+                              {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-xs text-red-600">
+                      <div>Provider ID: {request.provider_id}</div>
+                      {request.reason && <div>Reason: {request.reason}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pending Requests Tab */}
+        {activeTab === 'pending-requests' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Pending Requests</h2>
+                <p className="text-sm text-neutral-600">Change requests waiting for admin approval</p>
+              </div>
+            </div>
+
+            {changeRequests.filter(req => req.status === 'pending').length === 0 ? (
+              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                <h3 className="text-lg font-medium text-neutral-900">No Pending Requests</h3>
+                <p className="mt-2 text-neutral-600">
+                  Change requests waiting for admin approval will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {changeRequests.filter(req => req.status === 'pending').map((request) => (
+                  <div key={request.id} className="rounded-xl border border-amber-200 p-4 bg-amber-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-amber-900">
+                          {request.type === 'update' ? 'Business Listing Update' : 
+                           request.type === 'delete' ? 'Business Listing Deletion' :
+                           request.type === 'feature_request' ? 'Featured Upgrade Request' :
+                           request.type === 'claim' ? 'Business Claim Request' : request.type}
+                        </h3>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          pending
+                        </span>
+                      </div>
+                      <div className="text-xs text-amber-600">
+                        Submitted {new Date(request.created_at).toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Show the changes being requested */}
+                    {request.changes && Object.keys(request.changes).length > 0 && (
+                      <div className="mb-3 p-3 bg-white rounded-lg border border-amber-200">
+                        <div className="text-sm font-medium text-amber-700 mb-2">Requested Changes:</div>
+                        <div className="text-sm text-amber-600 space-y-1">
+                          {Object.keys(request.changes).map((field) => (
+                            <div key={field} className="capitalize">
+                              {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="text-xs text-amber-600">
+                        <div>Provider ID: {request.provider_id}</div>
+                        {request.reason && <div>Reason: {request.reason}</div>}
+                      </div>
+                      
+                      {/* Cancel button for pending requests */}
+                      <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to cancel this change request? This action cannot be undone.')) {
+                            cancelChangeRequest(request.id)
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                      >
+                        Cancel Request
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Business Listing Creation/Edit Modal */}
         {(showCreateForm || editingListing) && (
           <BusinessListingForm
@@ -2523,7 +3038,16 @@ function BusinessListingForm({
     coupon_code: listing?.coupon_code || '',
     coupon_discount: listing?.coupon_discount || '',
     coupon_description: listing?.coupon_description || '',
-    coupon_expires_at: listing?.coupon_expires_at || null
+    coupon_expires_at: listing?.coupon_expires_at || null,
+    
+    // Booking system fields
+    booking_enabled: listing?.booking_enabled || false,
+    booking_type: listing?.booking_type || null,
+    booking_instructions: listing?.booking_instructions || '',
+    booking_url: listing?.booking_url || '',
+    enable_calendar_booking: listing?.enable_calendar_booking || false,
+    enable_call_contact: listing?.enable_call_contact || false,
+    enable_email_contact: listing?.enable_email_contact || false
   })
 
   // Restaurant tag options
@@ -2592,8 +3116,42 @@ function BusinessListingForm({
       return
     }
     
-    console.log('[BusinessListingForm] Form submitted with data:', formData)
-    onSave(formData)
+    // Only send changed fields, not all form data
+    const changes: Partial<BusinessListing> = {}
+    
+    // Compare each field with the original listing to find actual changes
+    Object.entries(formData).forEach(([key, value]) => {
+      const originalValue = listing ? (listing as any)[key] : null
+      
+      // Handle different data types
+      if (Array.isArray(value) && Array.isArray(originalValue)) {
+        // Compare arrays
+        if (JSON.stringify(value.sort()) !== JSON.stringify(originalValue.sort())) {
+          changes[key as keyof BusinessListing] = value as any
+        }
+      } else if (typeof value === 'object' && value !== null && typeof originalValue === 'object' && originalValue !== null) {
+        // Compare objects
+        if (JSON.stringify(value) !== JSON.stringify(originalValue)) {
+          changes[key as keyof BusinessListing] = value as any
+        }
+      } else if (value !== originalValue) {
+        // Compare primitive values
+        changes[key as keyof BusinessListing] = value as any
+      }
+    })
+    
+    console.log('[BusinessListingForm] Original listing data:', listing)
+    console.log('[BusinessListingForm] Form data:', formData)
+    console.log('[BusinessListingForm] Detected changes:', changes)
+    console.log('[BusinessListingForm] Number of changed fields:', Object.keys(changes).length)
+    
+    // Only proceed if there are actual changes
+    if (Object.keys(changes).length === 0) {
+      console.log('[BusinessListingForm] No changes detected, skipping submission')
+      return
+    }
+    
+    onSave(changes)
   }
 
   const addTag = () => {

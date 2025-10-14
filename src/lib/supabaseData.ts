@@ -478,3 +478,86 @@ export async function markNotificationRead(id: string): Promise<{ error?: string
     return { error: err?.message || 'Failed to mark as read' }
   }
 }
+
+// Notification dismissal tracking
+export type DismissedNotification = {
+  id: string
+  user_id: string
+  notification_type: 'pending' | 'approved' | 'rejected'
+  dismissed_at: string
+  last_activity_timestamp: string
+  created_at: string
+}
+
+export async function dismissNotification(
+  user_id: string, 
+  notification_type: 'pending' | 'approved' | 'rejected', 
+  last_activity_timestamp: string
+): Promise<{ error?: string }> {
+  try {
+    const payload = {
+      user_id,
+      notification_type,
+      last_activity_timestamp,
+      dismissed_at: new Date().toISOString()
+    }
+    
+    // Use upsert to update existing dismissal or create new one
+    const { error } = await supabase
+      .from('dismissed_notifications')
+      .upsert(payload, { 
+        onConflict: 'user_id,notification_type',
+        ignoreDuplicates: false 
+      })
+    
+    if (error) return { error: error.message }
+    return {}
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to dismiss notification' }
+  }
+}
+
+export async function getDismissedNotifications(user_id: string): Promise<DismissedNotification[]> {
+  try {
+    const { data, error } = await supabase
+      .from('dismissed_notifications')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false })
+    
+    if (error) return []
+    return (data || []) as DismissedNotification[]
+  } catch {
+    return []
+  }
+}
+
+export async function getLatestActivityTimestamp(
+  user_id: string, 
+  notification_type: 'pending' | 'approved' | 'rejected'
+): Promise<string | null> {
+  try {
+    let query = supabase.from('provider_change_requests').select('created_at,decided_at')
+    
+    if (notification_type === 'pending') {
+      query = query.eq('owner_user_id', user_id).eq('status', 'pending')
+    } else if (notification_type === 'approved') {
+      query = query.eq('owner_user_id', user_id).eq('status', 'approved').not('decided_at', 'is', null)
+    } else if (notification_type === 'rejected') {
+      query = query.eq('owner_user_id', user_id).eq('status', 'rejected').not('decided_at', 'is', null)
+    }
+    
+    const { data, error } = await query
+      .order(notification_type === 'pending' ? 'created_at' : 'decided_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (error || !data) return null
+    
+    // For pending requests, use created_at. For approved/rejected, use decided_at
+    const timestamp = notification_type === 'pending' ? data.created_at : data.decided_at
+    return timestamp
+  } catch {
+    return null
+  }
+}
