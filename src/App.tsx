@@ -4262,7 +4262,6 @@ function BookPage() {
     return getLocalStorageJSON<Record<string, string>>(`bf-tracking-${categoryKey}`, {})
   }, [categoryKey, params.get('filters')])
   const auth = useAuth()
-  const isAdmin = isUserAdmin(auth.email)
 
   function recompute() {
     const ranked = scoreProviders(categoryKey, answers)
