@@ -4513,10 +4513,15 @@ export default function AdminPage() {
 
         {isAdmin && section === 'owner-change-requests' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
-            <div className="font-medium">Owner Change Requests</div>
+            <div className="font-medium">Owner Change Requests & Logs</div>
             <div className="mt-2 space-y-2 text-sm">
-              {changeRequests.length === 0 && <div className="text-neutral-500">No requests yet.</div>}
-              {changeRequests.filter((r) => r.status === 'pending').map((r) => {
+              
+              {/* Pending Requests (Non-Featured Businesses) */}
+              {changeRequests.filter((r) => r.status === 'pending').length > 0 && (
+                <div className="mb-4">
+                  <div className="font-medium text-amber-800 mb-2">📋 Pending Requests (Require Approval)</div>
+                  <div className="space-y-2">
+                    {changeRequests.filter((r) => r.status === 'pending').map((r) => {
                 // Find the current provider data to compare with proposed changes
                 const currentProvider = providers.find(p => p.id === r.provider_id)
                 const changeDiff = computeChangeDiff(currentProvider, r.changes)
@@ -4662,6 +4667,81 @@ export default function AdminPage() {
                   </div>
                 )
               })}
+                  </div>
+                </div>
+              )}
+
+              {/* Change Logs (Featured Businesses) */}
+              {changeRequests.filter((r) => r.status === 'approved' && r.reason?.includes('Featured business update')).length > 0 && (
+                <div className="mb-4">
+                  <div className="font-medium text-green-800 mb-2">📝 Recent Change Logs (Featured Businesses)</div>
+                  <div className="space-y-2">
+                    {changeRequests
+                      .filter((r) => r.status === 'approved' && r.reason?.includes('Featured business update'))
+                      .slice(0, 10) // Show last 10 changes
+                      .map((r) => {
+                        const currentProvider = providers.find(p => p.id === r.provider_id)
+                        const changeDiff = computeChangeDiff(currentProvider, r.changes)
+                        
+                        return (
+                          <div key={r.id} className="rounded-xl border border-green-200 p-3 bg-green-50 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <div className="font-medium text-green-900">
+                                ✅ Auto-Applied Changes
+                              </div>
+                              <div className="text-xs text-green-600">{new Date(r.created_at).toLocaleString()}</div>
+                            </div>
+                            
+                            {/* Business Information */}
+                            <div className="text-xs text-green-700 mt-2 space-y-1">
+                              <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
+                              <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
+                            </div>
+                            
+                            {/* Show what changed */}
+                            {r.type === 'update' && changeDiff.length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-xs font-semibold text-green-800 mb-2">
+                                  Changes Applied ({changeDiff.length} field{changeDiff.length !== 1 ? 's' : ''}):
+                                </div>
+                                
+                                {/* Show changed fields */}
+                                <div className="bg-white border border-green-200 rounded-lg p-3 space-y-2">
+                                  {changeDiff.map((diff, idx) => (
+                                    <div key={diff.field} className={`${idx > 0 ? 'pt-2 border-t border-green-200' : ''}`}>
+                                      <div className="text-xs font-semibold text-green-900 mb-1">
+                                        {diff.fieldLabel}
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>
+                                          <span className="text-red-700 font-medium">Old:</span>
+                                          <div className="text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200 break-words">
+                                            {formatValueForDisplay(diff.oldValue)}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <span className="text-green-700 font-medium">New:</span>
+                                          <div className="text-green-600 mt-1 p-2 bg-green-50 rounded border border-green-200 break-words">
+                                            {formatValueForDisplay(diff.newValue)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* No requests message */}
+              {changeRequests.length === 0 && (
+                <div className="text-neutral-500">No requests or changes yet.</div>
+              )}
             </div>
           </div>
         )}

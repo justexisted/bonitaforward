@@ -859,52 +859,42 @@ export default function MyBusinessPage() {
       const currentListing = listings.find(l => l.id === listingId)
       const isFeatured = currentListing?.is_member === true
       
-      // Define booking-related fields that can be updated immediately for featured businesses
-      const bookingFields = [
-        'booking_enabled', 'booking_type', 'booking_instructions', 'booking_url',
-        'enable_calendar_booking', 'enable_call_contact', 'enable_email_contact'
-      ]
-      
-      // Separate booking changes from other changes
-      const bookingChanges: Record<string, any> = {}
-      const otherChanges: Record<string, any> = {}
-      
-      // Categorize changes
-      Object.entries(updates).forEach(([key, value]) => {
-        if (bookingFields.includes(key)) {
-          bookingChanges[key] = value
-        } else {
-          otherChanges[key] = value
-        }
-      })
-      
-      let message = ''
-      
-      // Apply booking changes immediately for featured businesses
-      if (isFeatured && Object.keys(bookingChanges).length > 0) {
-        console.log('[MyBusiness] Applying booking changes immediately for featured business:', bookingChanges)
+      if (isFeatured) {
+        // Featured businesses: Apply ALL changes immediately
+        console.log('[MyBusiness] Applying all changes immediately for featured business:', updates)
         
         const { error } = await supabase
           .from('providers')
-          .update(bookingChanges)
+          .update(updates)
           .eq('id', listingId)
         
-        if (error) throw new Error(`Failed to update booking settings: ${error.message}`)
+        if (error) throw new Error(`Failed to update listing: ${error.message}`)
         
-        message += '✅ Booking settings updated immediately! '
-      }
-      
-      // Create change request for other changes (or all changes if not featured)
-      const changesToRequest = isFeatured ? otherChanges : updates
-      
-      if (Object.keys(changesToRequest).length > 0) {
-        console.log('[MyBusiness] Creating change request for non-booking changes:', changesToRequest)
+        // Create a change log entry for admin tracking (not for approval)
+        const { error: logError } = await createProviderChangeRequest({
+          provider_id: listingId,
+          owner_user_id: auth.userId!,
+          type: 'update',
+          changes: updates,
+          status: 'approved', // Automatically approved for featured businesses
+          reason: `Featured business update from ${auth.email} - applied immediately`
+        })
+        
+        if (logError) {
+          console.warn('[MyBusiness] Failed to create change log:', logError)
+          // Don't throw error for logging failure, the main update succeeded
+        }
+        
+        setMessage('✅ All changes applied immediately! (Featured business)')
+      } else {
+        // Non-featured businesses: Create change request for admin approval
+        console.log('[MyBusiness] Creating change request for non-featured business:', updates)
         
         const { error, id } = await createProviderChangeRequest({
           provider_id: listingId,
           owner_user_id: auth.userId!,
           type: 'update',
-          changes: changesToRequest,
+          changes: updates,
           reason: `Business listing update request from ${auth.email}`
         })
         
@@ -914,15 +904,6 @@ export default function MyBusinessPage() {
         }
         
         console.log('[MyBusiness] Change request created successfully with ID:', id)
-        message += '📋 Other changes submitted for admin approval!'
-      }
-      
-      // Set appropriate success message
-      if (isFeatured && Object.keys(bookingChanges).length > 0 && Object.keys(changesToRequest).length > 0) {
-        setMessage(message) // Combined message
-      } else if (isFeatured && Object.keys(bookingChanges).length > 0) {
-        setMessage('✅ Booking settings updated immediately!')
-      } else {
         setMessage('📋 Changes submitted for admin approval! You\'ll be notified once they\'re reviewed.')
       }
       

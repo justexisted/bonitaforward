@@ -1555,7 +1555,12 @@ function ProviderPage() {
                           {!provider.booking_type && 'Book Online'}
                         </h4>
                         
-                        {provider.booking_url ? (
+                        {/* Debug info - remove this after fixing */}
+                        <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
+                          Debug: booking_url="{provider.booking_url}", enable_calendar_booking={String(provider.enable_calendar_booking)}, booking_enabled={String(provider.booking_enabled)}
+                        </div>
+                        
+                        {provider.booking_url && provider.booking_url.trim() ? (
                           <div className="space-y-3">
                             <p className="text-neutral-700">
                               Click the button below to book online through our booking platform.
@@ -1582,7 +1587,7 @@ function ProviderPage() {
                             )}
                             
                             <div className="flex flex-wrap gap-3">
-                              {/* Primary booking action - only show if calendar booking is enabled */}
+                              {/* Primary booking action - show if calendar booking is enabled OR if no booking URL */}
                               {provider.enable_calendar_booking && (
                                 <button
                                   type="button"
