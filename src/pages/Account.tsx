@@ -684,21 +684,20 @@ export default function AccountPage() {
       <div className="container-px mx-auto max-w-xl">
         <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
           <h1 className="text-xl font-semibold tracking-tight">Account</h1>
-          {role && <div className="mt-1 text-xs text-neutral-500">Type: {String(role).toLowerCase() === 'business' ? 'Business account' : 'Community account'}</div>}
           {message && <div className="mt-2 text-sm text-neutral-700">{message}</div>}
 
           <div className="mt-4 grid grid-cols-1 gap-3">
             <div>
-              <label className="block text-sm text-neutral-600">Display Name</label>
+              <label className="block text-sm text-neutral-600">Name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Your name" />
             </div>
             <div>
               <label className="block text-sm text-neutral-600">Email</label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="you@example.com" />
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button disabled={busy} onClick={saveProfile} className="flex-1 rounded-full bg-neutral-900 text-white py-2.5 elevate">{busy ? 'Saving…' : 'Save Changes'}</button>
-              <button disabled={busy} onClick={updatePassword} className="rounded-full bg-neutral-100 text-neutral-900 px-4 py-2.5 border border-neutral-200 hover:bg-neutral-50">Change Password</button>
+              <button disabled={busy} onClick={updatePassword} className="flex-1 sm:flex-none rounded-full bg-neutral-100 text-neutral-900 px-4 py-2.5 border border-neutral-200 hover:bg-neutral-50">Change Password</button>
             </div>
           </div>
 
@@ -852,17 +851,27 @@ export default function AccountPage() {
                           
                           {booking.booking_notes && (
                             <div className="text-sm text-neutral-600 mb-2">
-                              <div className="flex items-start gap-1">
-                                <svg className="w-4 h-4 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                                </svg>
-                                <span>{booking.booking_notes}</span>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-start gap-1">
+                                  <svg className="w-4 h-4 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                  </svg>
+                                  <span>{booking.booking_notes.replace(/Party size: \d+/g, '').trim()}</span>
+                                </div>
+                                {booking.booking_notes.match(/Party size: (\d+)/) && (
+                                  <div className="flex items-center gap-1 ml-5">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span>Party size: {booking.booking_notes.match(/Party size: (\d+)/)?.[1]}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
                           
                           <div className="text-xs text-neutral-500">
-                            Booked on {new Date(booking.created_at || '').toLocaleDateString()}
+                            Booked on {new Date(booking.created_at || '').toLocaleDateString()} at {new Date(booking.created_at || '').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                           </div>
                         </div>
                         
