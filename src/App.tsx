@@ -1555,10 +1555,52 @@ function ProviderPage() {
                           {!provider.booking_type && 'Book Online'}
                         </h4>
                         
-                        {/* Debug info - remove this after fixing */}
+                        {/* Debug info - showing all provider data */}
                         <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
-                          Debug: booking_url="{provider.booking_url}", enable_calendar_booking={String(provider.enable_calendar_booking)}, booking_enabled={String(provider.booking_enabled)}
+                          <div><strong>Provider ID:</strong> {provider.id}</div>
+                          <div><strong>Provider Name:</strong> {provider.name}</div>
+                          <div><strong>booking_url:</strong> "{provider.booking_url}"</div>
+                          <div><strong>enable_calendar_booking:</strong> {String(provider.enable_calendar_booking)} ({typeof provider.enable_calendar_booking})</div>
+                          <div><strong>booking_enabled:</strong> {String(provider.booking_enabled)}</div>
+                          <div><strong>isMember:</strong> {String(provider.isMember)}</div>
+                          <div><strong>All provider keys:</strong> {Object.keys(provider).join(', ')}</div>
+                          <div><strong>Raw provider object:</strong> {JSON.stringify(provider, null, 2)}</div>
                         </div>
+                        
+                        {/* Force refresh button for debugging */}
+                        <button 
+                          onClick={() => {
+                            // Clear any cached data and reload
+                            window.location.reload()
+                          }}
+                          className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded mb-2 mr-2"
+                        >
+                          🔄 Force Refresh Page
+                        </button>
+                        
+                        {/* Test database columns button */}
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const { data, error } = await supabase
+                                .from('providers')
+                                .select('id, name, enable_calendar_booking, enable_call_contact, enable_email_contact')
+                                .eq('id', provider.id)
+                                .single()
+                              
+                              if (error) {
+                                alert(`Database Error: ${error.message}`)
+                              } else {
+                                alert(`Database Data: ${JSON.stringify(data, null, 2)}`)
+                              }
+                            } catch (err: any) {
+                              alert(`Error: ${err.message}`)
+                            }
+                          }}
+                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded mb-2"
+                        >
+                          🗄️ Test Database Columns
+                        </button>
                         
                         {provider.booking_url && provider.booking_url.trim() ? (
                           <div className="space-y-3">
@@ -2357,6 +2399,10 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       booking_type: r.booking_type ?? null,
       booking_instructions: r.booking_instructions ?? null,
       booking_url: r.booking_url ?? null,
+      // Contact method toggles
+      enable_calendar_booking: r.enable_calendar_booking ?? null,
+      enable_call_contact: r.enable_call_contact ?? null,
+      enable_email_contact: r.enable_email_contact ?? null,
     })
   })
   providersByCategory = grouped
