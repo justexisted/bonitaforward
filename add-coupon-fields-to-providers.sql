@@ -1,31 +1,18 @@
--- Add coupon fields to providers table
--- Allows businesses to offer specific coupons to Bonita Forward users
+-- Add coupon fields to the 'providers' table
+-- These fields enable businesses to display exclusive coupons to customers
 
--- 1. Add coupon_code field (e.g., "BONITA10", "COMMUNITY15")
-ALTER TABLE providers 
-ADD COLUMN IF NOT EXISTS coupon_code TEXT;
-
--- 2. Add coupon_discount field (e.g., "10% off", "$20 off", "Free consultation")
-ALTER TABLE providers 
-ADD COLUMN IF NOT EXISTS coupon_discount TEXT;
-
--- 3. Add coupon_description field (optional details about the coupon)
-ALTER TABLE providers 
-ADD COLUMN IF NOT EXISTS coupon_description TEXT;
-
--- 4. Add coupon_expires_at field (optional expiration date)
-ALTER TABLE providers 
+ALTER TABLE public.providers
+ADD COLUMN IF NOT EXISTS coupon_code TEXT,
+ADD COLUMN IF NOT EXISTS coupon_discount TEXT,
+ADD COLUMN IF NOT EXISTS coupon_description TEXT,
 ADD COLUMN IF NOT EXISTS coupon_expires_at TIMESTAMPTZ;
 
--- 5. Create index for finding active coupons
-CREATE INDEX IF NOT EXISTS idx_providers_active_coupons 
-ON providers(coupon_code) 
-WHERE coupon_code IS NOT NULL;
+-- Add comments for clarity
+COMMENT ON COLUMN public.providers.coupon_code IS 'The coupon code that customers can use (e.g., "SAVE20", "WELCOME10")';
+COMMENT ON COLUMN public.providers.coupon_discount IS 'The discount description shown to customers (e.g., "20% Off", "Free Consultation")';
+COMMENT ON COLUMN public.providers.coupon_description IS 'Additional details about the coupon offer';
+COMMENT ON COLUMN public.providers.coupon_expires_at IS 'When the coupon expires (optional)';
 
--- Verify the changes
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_name = 'providers'
-  AND column_name LIKE 'coupon%'
-ORDER BY column_name;
-
+-- Add indexes for performance (optional but recommended)
+CREATE INDEX IF NOT EXISTS idx_providers_coupon_code ON public.providers(coupon_code) WHERE coupon_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_providers_coupon_expires ON public.providers(coupon_expires_at) WHERE coupon_expires_at IS NOT NULL;

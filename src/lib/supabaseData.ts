@@ -42,6 +42,12 @@ export type DbProvider = {
   enable_calendar_booking?: boolean | null
   enable_call_contact?: boolean | null
   enable_email_contact?: boolean | null
+  // Coupon fields
+  coupon_code?: string | null
+  coupon_discount?: string | null
+  coupon_description?: string | null
+  coupon_expires_at?: string | null
+  bonita_resident_discount?: string | null
 }
 
 // Helper function to fix image URLs if they're relative paths

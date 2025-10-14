@@ -2429,6 +2429,12 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       enable_calendar_booking: r.enable_calendar_booking ?? null,
       enable_call_contact: r.enable_call_contact ?? null,
       enable_email_contact: r.enable_email_contact ?? null,
+      // Coupon fields
+      coupon_code: r.coupon_code ?? null,
+      coupon_discount: r.coupon_discount ?? null,
+      coupon_description: r.coupon_description ?? null,
+      coupon_expires_at: r.coupon_expires_at ?? null,
+      bonita_resident_discount: r.bonita_resident_discount ?? null,
     })
   })
   providersByCategory = grouped

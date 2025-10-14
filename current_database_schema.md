@@ -32,6 +32,10 @@
 - booking_type (text)
 - booking_instructions (text)
 - booking_url (text)
+- coupon_code (text)
+- coupon_discount (text)
+- coupon_description (text)
+- coupon_expires_at (timestamptz)
 
 ## Missing columns that were in old schema but don't exist:
 - plan (text) - REMOVED
