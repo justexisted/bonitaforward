@@ -929,6 +929,9 @@ export default function MyBusinessPage() {
       // Refresh the data to show updated state
       await loadBusinessData()
       
+      // Close the editing form after successful update
+      setEditingListing(null)
+      
     } catch (error: any) {
       console.error('[MyBusiness] Error updating listing:', error)
       setMessage(`❌ Error updating listing: ${error.message}`)
@@ -3067,6 +3070,51 @@ function BusinessListingForm({
       'Full Service', 'Buffet', 'Café', 'Bar & Grill', 'Food Truck'
     ]
   }
+
+  // Update form data when listing changes (important for after successful updates)
+  useEffect(() => {
+    if (listing) {
+      setFormData({
+        // Core business fields
+        name: listing.name || '',
+        category_key: listing.category_key || '',
+        phone: listing.phone || '',
+        email: listing.email || '',
+        website: listing.website || '',
+        address: listing.address || '',
+        tags: listing.tags || [],
+        images: listing.images || [],
+        rating: listing.rating || null,
+        badges: listing.badges || [],
+        published: listing.published || false,
+        is_member: listing.is_member || false,
+        
+        // Enhanced business management fields
+        description: listing.description || '',
+        specialties: listing.specialties || [],
+        social_links: listing.social_links || {},
+        business_hours: listing.business_hours || {},
+        service_areas: listing.service_areas || [],
+        google_maps_url: listing.google_maps_url || '',
+        bonita_resident_discount: listing.bonita_resident_discount || '',
+        
+        // Coupon fields
+        coupon_code: listing.coupon_code || '',
+        coupon_discount: listing.coupon_discount || '',
+        coupon_description: listing.coupon_description || '',
+        coupon_expires_at: listing.coupon_expires_at || null,
+        
+        // Booking system fields
+        booking_enabled: listing.booking_enabled || false,
+        booking_type: listing.booking_type || null,
+        booking_instructions: listing.booking_instructions || '',
+        booking_url: listing.booking_url || '',
+        enable_calendar_booking: listing.enable_calendar_booking || false,
+        enable_call_contact: listing.enable_call_contact || false,
+        enable_email_contact: listing.enable_email_contact || false
+      })
+    }
+  }, [listing])
 
   // Initialize restaurant tags when listing changes or when editing existing listing
   useEffect(() => {
