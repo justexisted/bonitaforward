@@ -1660,8 +1660,8 @@ function ProviderPage() {
                             )}
                             
                             <div className="flex flex-wrap gap-3">
-                              {/* Primary booking action - show if calendar booking is enabled */}
-                              {provider.enable_calendar_booking && (
+                              {/* Primary booking action - show if calendar booking is enabled AND user is signed in */}
+                              {provider.enable_calendar_booking && auth.isAuthed && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1675,6 +1675,17 @@ function ProviderPage() {
                                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                   Book Appointment
                                 </button>
+                              )}
+                              
+                              {/* Show sign-in prompt for non-authenticated users when booking is available */}
+                              {provider.enable_calendar_booking && !auth.isAuthed && (
+                                <Link
+                                  to="/sign-in"
+                                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                  Sign In to Book
+                                </Link>
                               )}
                               
                               {provider.phone && provider.enable_call_contact && (
