@@ -73,6 +73,10 @@ type ProviderRow = {
   booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
   booking_instructions?: string | null
   booking_url?: string | null
+  // Contact method toggles
+  enable_calendar_booking?: boolean | null
+  enable_call_contact?: boolean | null
+  enable_email_contact?: boolean | null
 }
 
 type FunnelRow = {
