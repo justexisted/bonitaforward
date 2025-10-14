@@ -1629,6 +1629,12 @@ function ProviderPage() {
                             )}
                             
                             <div className="flex flex-wrap gap-3">
+                              {/* Debug: Show button condition */}
+                              <div className="text-xs text-red-600 mb-2 p-2 bg-red-100 rounded">
+                                Button Condition: enable_calendar_booking = {String(provider.enable_calendar_booking)} 
+                                ({typeof provider.enable_calendar_booking}) - Should show button: {String(!!provider.enable_calendar_booking)}
+                              </div>
+                              
                               {/* Primary booking action - show if calendar booking is enabled OR if no booking URL */}
                               {provider.enable_calendar_booking && (
                                 <button
