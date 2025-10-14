@@ -845,6 +845,66 @@ function Footer() {
 function Layout() {
   const navigate = useNavigate()
   const auth = useAuth()
+  const [unreadBookingNotifications, setUnreadBookingNotifications] = useState(0)
+
+  // Load unread booking notifications for business owners
+  useEffect(() => {
+    if (!auth.isAuthed || !auth.userId) {
+      setUnreadBookingNotifications(0)
+      return
+    }
+
+    const loadNotifications = async () => {
+      try {
+        // Check if user owns any businesses
+        const { data: providers } = await supabase
+          .from('providers')
+          .select('id')
+          .eq('owner_user_id', auth.userId)
+
+        if (!providers || providers.length === 0) {
+          setUnreadBookingNotifications(0)
+          return
+        }
+
+        // Get unread booking notifications
+        const { data: notifications } = await supabase
+          .from('user_notifications')
+          .select('id')
+          .eq('user_id', auth.userId)
+          .eq('type', 'booking_received')
+          .eq('is_read', false)
+
+        setUnreadBookingNotifications(notifications?.length || 0)
+      } catch (error) {
+        console.warn('Failed to load booking notifications:', error)
+        setUnreadBookingNotifications(0)
+      }
+    }
+
+    loadNotifications()
+
+    // Set up real-time subscription for notifications
+    const subscription = supabase
+      .channel('booking_notifications')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'user_notifications',
+          filter: `user_id=eq.${auth.userId}`
+        }, 
+        () => {
+          // Reload notifications when they change
+          loadNotifications()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [auth.isAuthed, auth.userId])
 
   const dockItems: DockItemData[] = [
     {
@@ -873,6 +933,18 @@ function Layout() {
       onClick: () => navigate('/community')
     }
   ]
+
+  // Add My Business item with notifications for business owners
+  if (auth.isAuthed && auth.role === 'business') {
+    dockItems.push({
+      icon: <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>,
+      label: "My Business",
+      onClick: () => navigate('/my-business'),
+      notificationCount: unreadBookingNotifications
+    })
+  }
 
   return (
     <div className="min-h-full flex flex-col">
@@ -1555,52 +1627,6 @@ function ProviderPage() {
                           {!provider.booking_type && 'Book Online'}
                         </h4>
                         
-                        {/* Debug info - showing all provider data */}
-                        <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
-                          <div><strong>Provider ID:</strong> {provider.id}</div>
-                          <div><strong>Provider Name:</strong> {provider.name}</div>
-                          <div><strong>booking_url:</strong> "{provider.booking_url}"</div>
-                          <div><strong>enable_calendar_booking:</strong> {String(provider.enable_calendar_booking)} ({typeof provider.enable_calendar_booking})</div>
-                          <div><strong>booking_enabled:</strong> {String(provider.booking_enabled)}</div>
-                          <div><strong>isMember:</strong> {String(provider.isMember)}</div>
-                          <div><strong>All provider keys:</strong> {Object.keys(provider).join(', ')}</div>
-                          <div><strong>Raw provider object:</strong> {JSON.stringify(provider, null, 2)}</div>
-                        </div>
-                        
-                        {/* Force refresh button for debugging */}
-                        <button 
-                          onClick={() => {
-                            // Clear any cached data and reload
-                            window.location.reload()
-                          }}
-                          className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded mb-2 mr-2"
-                        >
-                          🔄 Force Refresh Page
-                        </button>
-                        
-                        {/* Test database columns button */}
-                        <button 
-                          onClick={async () => {
-                            try {
-                              const { data, error } = await supabase
-                                .from('providers')
-                                .select('id, name, enable_calendar_booking, enable_call_contact, enable_email_contact')
-                                .eq('id', provider.id)
-                                .single()
-                              
-                              if (error) {
-                                alert(`Database Error: ${error.message}`)
-                              } else {
-                                alert(`Database Data: ${JSON.stringify(data, null, 2)}`)
-                              }
-                            } catch (err: any) {
-                              alert(`Error: ${err.message}`)
-                            }
-                          }}
-                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded mb-2"
-                        >
-                          🗄️ Test Database Columns
-                        </button>
                         
                         {provider.booking_url && provider.booking_url.trim() ? (
                           <div className="space-y-3">
@@ -1629,13 +1655,7 @@ function ProviderPage() {
                             )}
                             
                             <div className="flex flex-wrap gap-3">
-                              {/* Debug: Show button condition */}
-                              <div className="text-xs text-red-600 mb-2 p-2 bg-red-100 rounded">
-                                Button Condition: enable_calendar_booking = {String(provider.enable_calendar_booking)} 
-                                ({typeof provider.enable_calendar_booking}) - Should show button: {String(!!provider.enable_calendar_booking)}
-                              </div>
-                              
-                              {/* Primary booking action - show if calendar booking is enabled OR if no booking URL */}
+                              {/* Primary booking action - show if calendar booking is enabled */}
                               {provider.enable_calendar_booking && (
                                 <button
                                   type="button"

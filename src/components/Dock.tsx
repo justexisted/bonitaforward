@@ -16,6 +16,7 @@ export type DockItemData = {
   label: React.ReactNode;
   onClick: () => void;
   className?: string;
+  notificationCount?: number;
 };
 
 export type DockProps = {
@@ -38,6 +39,7 @@ type DockItemProps = {
   distance: number;
   baseItemSize: number;
   magnification: number;
+  notificationCount?: number;
 };
 
 function DockItem({
@@ -48,7 +50,8 @@ function DockItem({
   spring,
   distance,
   magnification,
-  baseItemSize
+  baseItemSize,
+  notificationCount = 0
 }: DockItemProps) {
   const ref = useRef<HTMLDivElement>(null);
   const isHovered = useMotionValue(0);
@@ -85,6 +88,18 @@ function DockItem({
         React.isValidElement(child)
           ? cloneElement(child as React.ReactElement<{ isHovered?: MotionValue<number> }>, { isHovered })
           : child
+      )}
+      
+      {/* Notification badge */}
+      {notificationCount > 0 && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute -top-2 -right-2 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 border-2 border-[#060010] shadow-lg"
+          aria-label={`${notificationCount} unread notifications`}
+        >
+          {notificationCount > 99 ? '99+' : notificationCount}
+        </motion.div>
       )}
     </motion.div>
   );
@@ -179,6 +194,7 @@ export default function Dock({
             distance={distance}
             magnification={magnification}
             baseItemSize={baseItemSize}
+            notificationCount={item.notificationCount}
           >
             <DockIcon>{item.icon}</DockIcon>
             <DockLabel>{item.label}</DockLabel>

@@ -531,6 +531,20 @@ export default function MyBusinessPage() {
       setMessage(`Error loading data: ${error.message}`)
     } finally {
       setLoading(false)
+      
+      // Mark booking notifications as read when user visits My Business page
+      if (auth.userId) {
+        try {
+          await supabase
+            .from('user_notifications')
+            .update({ is_read: true })
+            .eq('user_id', auth.userId)
+            .eq('type', 'booking_received')
+            .eq('is_read', false)
+        } catch (error) {
+          console.warn('Failed to mark booking notifications as read:', error)
+        }
+      }
     }
   }
 
