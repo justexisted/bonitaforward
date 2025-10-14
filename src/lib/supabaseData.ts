@@ -47,7 +47,6 @@ export type DbProvider = {
   coupon_discount?: string | null
   coupon_description?: string | null
   coupon_expires_at?: string | null
-  bonita_resident_discount?: string | null
 }
 
 // Helper function to fix image URLs if they're relative paths
