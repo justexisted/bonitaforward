@@ -824,15 +824,13 @@ export default function MyBusinessPage() {
    * UPDATE BUSINESS LISTING
    * 
    * This function allows business owners to update their existing business listings.
-   * Instead of directly updating the database, it creates a change request that requires admin approval.
+   * For featured businesses, booking-related changes are applied immediately.
+   * Other changes still require admin approval.
    * 
    * How it works:
-   * 1. Creates a change request in the provider_change_requests table
-   * 2. Stores the proposed changes in the 'changes' JSONB field
-   * 3. Sets status to 'pending' for admin review
-   * 4. Admin can then approve/reject the changes in the admin panel
-   * 
-   * This ensures all business listing changes go through proper admin approval workflow.
+   * 1. For featured businesses: Booking changes are applied immediately to the database
+   * 2. For all other changes: Creates a change request that requires admin approval
+   * 3. This ensures featured businesses can manage their booking settings without delays
    */
   const updateBusinessListing = async (listingId: string, updates: Partial<BusinessListing>) => {
     // Prevent multiple simultaneous updates
@@ -842,100 +840,88 @@ export default function MyBusinessPage() {
     }
 
     setIsUpdating(true)
-    setMessage('Submitting changes for admin approval...')
     
     try {
-      console.log('[MyBusiness] Creating change request for listing:', listingId)
+      console.log('[MyBusiness] Updating listing:', listingId)
       console.log('[MyBusiness] Proposed changes:', updates)
       
-      // Prepare the changes data for the change request
-      // Only include fields that are actually being updated
-      const changesData: Record<string, any> = {}
+      // Get the current listing to check if it's featured
+      const currentListing = listings.find(l => l.id === listingId)
+      const isFeatured = currentListing?.is_member === true
       
-      // Core business fields
-      if (updates.name !== undefined) changesData.name = updates.name
-      if (updates.category_key !== undefined) changesData.category_key = updates.category_key
-      if (updates.phone !== undefined) changesData.phone = updates.phone
-      if (updates.email !== undefined) changesData.email = updates.email
-      if (updates.website !== undefined) changesData.website = updates.website
-      if (updates.address !== undefined) changesData.address = updates.address
-      if (updates.tags !== undefined) changesData.tags = updates.tags
-      if (updates.images !== undefined) changesData.images = updates.images
-      if (updates.rating !== undefined) changesData.rating = updates.rating
-      if (updates.badges !== undefined) changesData.badges = updates.badges
-      if (updates.published !== undefined) changesData.published = updates.published
-      if (updates.is_member !== undefined) changesData.is_member = updates.is_member
+      // Define booking-related fields that can be updated immediately for featured businesses
+      const bookingFields = [
+        'booking_enabled', 'booking_type', 'booking_instructions', 'booking_url',
+        'enable_calendar_booking', 'enable_call_contact', 'enable_email_contact'
+      ]
       
-      // Enhanced business management fields
-      if (updates.description !== undefined) changesData.description = updates.description
-      if (updates.specialties !== undefined) changesData.specialties = updates.specialties
-      if (updates.social_links !== undefined) changesData.social_links = updates.social_links
-      if (updates.business_hours !== undefined) changesData.business_hours = updates.business_hours
-      if (updates.service_areas !== undefined) changesData.service_areas = updates.service_areas
-      if (updates.google_maps_url !== undefined) changesData.google_maps_url = updates.google_maps_url
-      if (updates.bonita_resident_discount !== undefined) changesData.bonita_resident_discount = updates.bonita_resident_discount
+      // Separate booking changes from other changes
+      const bookingChanges: Record<string, any> = {}
+      const otherChanges: Record<string, any> = {}
       
-      // Coupon fields
-      if (updates.coupon_code !== undefined) changesData.coupon_code = updates.coupon_code
-      if (updates.coupon_discount !== undefined) changesData.coupon_discount = updates.coupon_discount
-      if (updates.coupon_description !== undefined) changesData.coupon_description = updates.coupon_description
-      if (updates.coupon_expires_at !== undefined) changesData.coupon_expires_at = updates.coupon_expires_at
-      
-      // Booking system fields
-      if (updates.booking_enabled !== undefined) changesData.booking_enabled = updates.booking_enabled
-      if (updates.booking_type !== undefined) changesData.booking_type = updates.booking_type
-      if (updates.booking_instructions !== undefined) changesData.booking_instructions = updates.booking_instructions
-      if (updates.booking_url !== undefined) changesData.booking_url = updates.booking_url
-      // Contact method toggles
-      if (updates.enable_calendar_booking !== undefined) changesData.enable_calendar_booking = updates.enable_calendar_booking
-      if (updates.enable_call_contact !== undefined) changesData.enable_call_contact = updates.enable_call_contact
-      if (updates.enable_email_contact !== undefined) changesData.enable_email_contact = updates.enable_email_contact
-      
-      console.log('[MyBusiness] Final changes data for request:', changesData)
-      
-      // Create a change request instead of directly updating the database
-      const { error, id } = await createProviderChangeRequest({
-        provider_id: listingId,
-        owner_user_id: auth.userId!,
-        type: 'update',
-        changes: changesData,
-        reason: `Business listing update request from ${auth.email}`
+      // Categorize changes
+      Object.entries(updates).forEach(([key, value]) => {
+        if (bookingFields.includes(key)) {
+          bookingChanges[key] = value
+        } else {
+          otherChanges[key] = value
+        }
       })
-
-      if (error) {
-        console.error('[MyBusiness] Change request creation error:', error)
-        throw new Error(error)
+      
+      let message = ''
+      
+      // Apply booking changes immediately for featured businesses
+      if (isFeatured && Object.keys(bookingChanges).length > 0) {
+        console.log('[MyBusiness] Applying booking changes immediately for featured business:', bookingChanges)
+        
+        const { error } = await supabase
+          .from('providers')
+          .update(bookingChanges)
+          .eq('id', listingId)
+        
+        if (error) throw new Error(`Failed to update booking settings: ${error.message}`)
+        
+        message += '✅ Booking settings updated immediately! '
       }
-
-      console.log('[MyBusiness] Change request created successfully with ID:', id)
       
-      // Create specific message based on what was updated
-      const updatedFields = []
-      if (updates.website) updatedFields.push('website')
-      if (updates.description) updatedFields.push('description')
-      if (updates.phone) updatedFields.push('phone')
-      if (updates.email) updatedFields.push('email')
-      if (updates.address) updatedFields.push('address')
-      if (updates.bonita_resident_discount) updatedFields.push('Bonita residents discount')
-      if (updates.coupon_code || updates.coupon_discount) updatedFields.push('coupon settings')
+      // Create change request for other changes (or all changes if not featured)
+      const changesToRequest = isFeatured ? otherChanges : updates
       
-      const fieldText = updatedFields.length > 0 ? ` (${updatedFields.join(', ')})` : ''
-      setMessage(`✅ Change request submitted successfully! Your changes${fieldText} will be reviewed by our admin team before going live. You will receive an email notification once approved.`)
+      if (Object.keys(changesToRequest).length > 0) {
+        console.log('[MyBusiness] Creating change request for non-booking changes:', changesToRequest)
+        
+        const { error, id } = await createProviderChangeRequest({
+          provider_id: listingId,
+          owner_user_id: auth.userId!,
+          type: 'update',
+          changes: changesToRequest,
+          reason: `Business listing update request from ${auth.email}`
+        })
+        
+        if (error) {
+          console.error('[MyBusiness] Change request creation error:', error)
+          throw new Error(error)
+        }
+        
+        console.log('[MyBusiness] Change request created successfully with ID:', id)
+        message += '📋 Other changes submitted for admin approval!'
+      }
       
-      // Refresh data to show the change request in the applications section
+      // Set appropriate success message
+      if (isFeatured && Object.keys(bookingChanges).length > 0 && Object.keys(changesToRequest).length > 0) {
+        setMessage(message) // Combined message
+      } else if (isFeatured && Object.keys(bookingChanges).length > 0) {
+        setMessage('✅ Booking settings updated immediately!')
+      } else {
+        setMessage('📋 Changes submitted for admin approval! You\'ll be notified once they\'re reviewed.')
+      }
+      
+      // Refresh the data to show updated state
       await loadBusinessData()
-      setEditingListing(null)
-      
-      // Show success message for 5 seconds then redirect
-      setTimeout(() => {
-        setMessage(null)
-        // Redirect to applications tab to show the change request
-        setActiveTab('applications')
-      }, 5000)
       
     } catch (error: any) {
-      console.error('[MyBusiness] Change request failed:', error)
-      setMessage(`Error submitting changes: ${error.message}. Please try again.`)
+      console.error('[MyBusiness] Error updating listing:', error)
+      setMessage(`❌ Error updating listing: ${error.message}`)
     } finally {
       setIsUpdating(false)
     }
