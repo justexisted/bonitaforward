@@ -3523,8 +3523,8 @@ function CategoryFilters({
                           </div>
                         )}
                         
-                        {/* Tags - Only visible to admin */}
-                        {auth.isAuthed && provider.tags && provider.tags.length > 0 && (
+                        {/* Tags - Only visible to admin, but hidden for restaurants-cafes */}
+                        {auth.isAuthed && provider.tags && provider.tags.length > 0 && provider.category_key !== 'restaurants-cafes' && (
                           <div className="flex flex-wrap gap-1 justify-center mb-3">
                             {provider.tags.slice(0, 3).map((tag) => (
                               <span
