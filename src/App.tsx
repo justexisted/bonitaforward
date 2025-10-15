@@ -1289,41 +1289,173 @@ function ProviderPage() {
   return (
     <section className="py-8">
       <Container>
-        <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
-          {!provider ? (
-            <div className="text-sm text-neutral-600">Provider not found.</div>
-          ) : (
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{provider.name}</h1>
+        {!provider ? (
+          <div className="text-sm text-neutral-600">Provider not found.</div>
+        ) : (
+          <div>
+            {/* Hero Image Section */}
+            {provider.images && provider.images.length > 0 ? (
+              <div className="relative w-full h-[50vh] max-h-96 mb-6 rounded-2xl overflow-hidden">
+                <img
+                  src={provider.images[0]}
+                  alt={`${provider.name} - Main Image`}
+                  className="w-full h-full object-cover"
+                />
+                {/* Enhanced gradient overlay for better text readability and button visibility */}
+                <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-black/20 to-black/50"></div>
+                {/* Additional gradient from bottom for Save Business button area */}
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/60 to-transparent"></div>
+                
+                {/* Title overlay - top left */}
+                <div className="absolute top-6 left-6">
+                  <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-2xl">
+                    {provider.name}
+                  </h1>
+                  {provider.rating && (
+                    <div className="flex items-center gap-1 mt-2">
+                      <svg className="w-5 h-5 text-amber-400 drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      <span className="text-white drop-shadow-2xl font-medium">{provider.rating.toFixed(1)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Featured badge overlay - top right */}
                 {provider.isMember && (
-                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-sm font-medium">
-                    ⭐ Featured
-                  </span>
+                  <div className="absolute top-6 right-6">
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-sm font-medium shadow-2xl">
+                      ⭐ Featured
+                    </span>
+                  </div>
                 )}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-neutral-500">
-                {provider.rating && (
-                  <div className="flex items-center gap-1">
-                    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    <span>{provider.rating.toFixed(1)}</span>
+
+                {/* Save Business button overlay - bottom left */}
+                {auth.isAuthed && (
+                  <div className="absolute bottom-6 left-6">
+                    <button
+                      onClick={toggleSaveProvider}
+                      disabled={saving}
+                      className="rounded-full bg-white/95 backdrop-blur-sm text-neutral-900 px-4 py-2 text-sm font-medium hover:bg-white transition-colors shadow-2xl"
+                    >
+                      {saving ? 'Please wait…' : isSaved ? 'Saved ✓' : 'Save Business'}
+                    </button>
+                    {saveMsg && (
+                      <div className="mt-2 text-xs text-white drop-shadow-2xl bg-black/50 rounded px-2 py-1 backdrop-blur-sm">
+                        {saveMsg}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-              {/* Save Business button - available to all authenticated users */}
-              {auth.isAuthed && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={toggleSaveProvider}
-                    disabled={saving}
-                    className="rounded-full bg-neutral-900 text-white px-3 py-1.5 text-sm hover:bg-neutral-800 transition-colors"
-                  >
-                    {saving ? 'Please wait…' : isSaved ? 'Saved ✓' : 'Save Business'}
-                  </button>
-                  {saveMsg && (
-                    <span className="text-xs text-neutral-600">{saveMsg}</span>
+            ) : (
+              /* Fallback header when no image */
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl md:text-4xl font-bold text-neutral-900">
+                      {provider.name}
+                    </h1>
+                    {provider.isMember && (
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-sm font-medium">
+                        ⭐ Featured
+                      </span>
+                    )}
+                  </div>
+                  {auth.isAuthed && (
+                    <button
+                      onClick={toggleSaveProvider}
+                      disabled={saving}
+                      className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 transition-colors"
+                    >
+                      {saving ? 'Please wait…' : isSaved ? 'Saved ✓' : 'Save Business'}
+                    </button>
+                  )}
+                </div>
+                {provider.rating && (
+                  <div className="flex items-center gap-1">
+                    <svg className="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    <span className="text-neutral-600 font-medium">{provider.rating.toFixed(1)}</span>
+                  </div>
+                )}
+                {saveMsg && (
+                  <div className="mt-2 text-xs text-neutral-600">
+                    {saveMsg}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Main content container */}
+            <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
+              {/* Business Description - First content below image */}
+              {provider.description && (
+                <div className="mb-6">
+                  <p className="text-neutral-700 leading-relaxed text-lg">{provider.description}</p>
+                </div>
+              )}
+
+              {/* Additional Images Grid - Only show if more than 1 image */}
+              {provider.images && provider.images.length > 1 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">More Photos</h3>
+                  {isFeaturedProvider(provider) ? (
+                    // Featured accounts: Dynamic responsive image grid based on image count
+                    <div className={`grid gap-3 ${
+                      provider.images.length === 2 ? 'grid-cols-2' :
+                      provider.images.length === 3 ? 'grid-cols-3' :
+                      'grid-cols-2' // 4 or more images
+                    }`}>
+                      {provider.images.slice(1).map((image, index) => (
+                        <div key={index} className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer">
+                          <img
+                            src={image}
+                            alt={`${provider.name} photo ${index + 2}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            onClick={() => setSelectedImage(image)}
+                            onError={(e) => {
+                              const img = e.currentTarget as HTMLImageElement
+                              img.style.display = 'none'
+                              img.parentElement!.innerHTML = `
+                                <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                                  <div class="text-center text-neutral-500">
+                                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <p class="text-xs">Image unavailable</p>
+                                  </div>
+                                </div>
+                              `
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // Non-featured accounts: Show remaining images in a simple grid
+                    <div className="grid grid-cols-2 gap-3">
+                      {provider.images.slice(1, 3).map((image, index) => (
+                        <div key={index} className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer">
+                          <img
+                            src={image}
+                            alt={`${provider.name} photo ${index + 2}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            onClick={() => setSelectedImage(image)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Optional: Show upgrade message for non-featured accounts with multiple images */}
+                  {!isFeaturedProvider(provider) && provider.images.length > 3 && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Upgrade to Featured</strong> to showcase all {provider.images.length} images in an interactive gallery!
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -1332,17 +1464,21 @@ function ProviderPage() {
               {provider.coupon_code && provider.coupon_discount && (
                 <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-2 shadow-md">
                   <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 text-3xl">🎟️</div>
+                    <div className="flex-shrink-0">
+                      <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                      </svg>
+                    </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-bold text-green-900">Exclusive Coupon</h3>
+                        <span className="text-lg font-bold text-green-700">{provider.coupon_discount}</span>
                         {provider.coupon_expires_at && new Date(provider.coupon_expires_at) > new Date() && (
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
                             Expires {new Date(provider.coupon_expires_at).toLocaleDateString()}
                           </span>
                         )}
                       </div>
-                      <div className="text-lg font-bold text-green-700 mb-2">{provider.coupon_discount}</div>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-sm text-green-800 font-medium">Code:</span>
                         <code className="bg-white border border-green-300 px-3 py-1 rounded text-green-900 font-mono font-semibold text-sm">
@@ -1359,16 +1495,32 @@ function ProviderPage() {
                         </button>
                       </div>
                       {provider.coupon_description && (
-                        <p className="text-sm text-green-800 mt-2">{provider.coupon_description}</p>
+                        <div className="relative group">
+                          <p className="text-sm text-green-800 mt-2 md:hidden">{provider.coupon_description}</p>
+                          <div className="hidden md:block">
+                            <div className="absolute top-0 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-green-100 border border-green-300 rounded-lg p-2 shadow-lg z-10">
+                              <p className="text-sm text-green-900">{provider.coupon_description}</p>
+                            </div>
+                          </div>
+                        </div>
                       )}
                       {auth.isAuthed && (
                         <div>
                           <button
                             onClick={saveCoupon}
                             disabled={couponBusy}
-                            className="mt-3 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium"
+                            className="mt-3 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
                           >
-                            {couponBusy ? 'Saving…' : '💾 Save to My Account'}
+                            {couponBusy ? (
+                              'Saving…'
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                </svg>
+                                Save to My Account
+                              </>
+                            )}
                           </button>
                           {couponMsg && (
                             <p className="text-xs text-green-700 mt-2">{couponMsg}</p>
@@ -1380,83 +1532,7 @@ function ProviderPage() {
                 </div>
               )}
 
-              {/* Business Details Section */}
-              <div className="mt-6 space-y-6">
-                {/* Business Description */}
-                {provider.description && (
-                  <div>
-                    <p className="text-neutral-700 leading-relaxed">{provider.description}</p>
-                  </div>
-                )}
-
-                {/* Business Images */}
-                {provider.images && provider.images.length > 0 && (
-                  <div>
-
-                    {/* Featured accounts get image grid, non-featured get single image */}
-                    {isFeaturedProvider(provider) ? (
-                      // Featured accounts: Dynamic responsive image grid based on image count
-                      <div className={`grid gap-3 ${
-                        provider.images.length === 1 ? 'grid-cols-1' :
-                        provider.images.length === 2 ? 'grid-cols-2' :
-                        provider.images.length === 3 ? 'grid-cols-3' :
-                        'grid-cols-2' // 4 or more images
-                      }`}>
-                        {provider.images.map((image, index) => (
-                          <div key={index} className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer">
-                            <img
-                              src={image}
-                              alt={`${provider.name} photo ${index + 1}`}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                              onClick={() => setSelectedImage(image)}
-                              onError={(e) => {
-                                const img = e.currentTarget as HTMLImageElement
-                                img.style.display = 'none'
-                                img.parentElement!.innerHTML = `
-                                  <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                                    <div class="text-center text-neutral-500">
-                                      <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                      </svg>
-                                      <p class="text-xs">Image unavailable</p>
-                                    </div>
-                                  </div>
-                                `
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      // Non-featured accounts: Single image display
-                      <div className="flex justify-center">
-                        <div className="relative group max-w-md cursor-pointer">
-                          <img
-                            src={provider.images?.[0] || ''}
-                            alt={`${provider.name} - Main Image`}
-                            className="w-full h-64 object-cover rounded-lg border border-neutral-200 hover:shadow-lg transition-shadow"
-                            onClick={() => setSelectedImage(provider.images?.[0] || '')}
-                          />
-                          {/* Optional: Add a subtle indicator that this is a single image */}
-                          <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs text-neutral-600">
-                            1 of {provider.images.length}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Optional: Show upgrade message for non-featured accounts with multiple images */}
-                    {!isFeaturedProvider(provider) && provider.images.length > 1 && (
-                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-800">
-                          <strong>Upgrade to Featured</strong> to showcase all {provider.images.length} images in an interactive gallery!
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Contact Information */}
+              {/* Contact Information */}
                 <div>
                   <h3 className="text-lg font-semibold text-neutral-900 mb-3">Contact Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1738,8 +1814,7 @@ function ProviderPage() {
                 </div>
               )}
             </div>
-          )}
-        </div>
+        )}
       </Container>
 
       {/* Full-screen Image Modal */}
