@@ -4531,8 +4531,6 @@ export default function AdminPage() {
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Owner Change Requests & Logs</div>
             <div className="mt-2 space-y-2 text-sm">
-              
-              {/* Group change requests by business name */}
               {(() => {
                 // Group requests by business name
                 const businessGroups = changeRequests.reduce((groups, r) => {
@@ -4587,7 +4585,6 @@ export default function AdminPage() {
                       {/* Collapsible Content */}
                       {isExpanded && (
                         <div className="border-t border-neutral-200 p-4 space-y-4">
-                          
                           {/* Pending Requests */}
                           {requests.filter(r => r.status === 'pending').length > 0 && (
                             <div>
@@ -4622,52 +4619,51 @@ export default function AdminPage() {
                                           <div className="text-xs font-semibold text-neutral-700 mb-2">
                                             Changes Requested ({changeDiff.length} field{changeDiff.length !== 1 ? 's' : ''}):
                                           </div>
-                                          
-                                          {/* Show changed fields in a clean table-like format */}
-                                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-                          {changeDiff.map((diff, idx) => (
-                            <div key={diff.field} className={`${idx > 0 ? 'pt-2 border-t border-blue-200' : ''}`}>
-                              <div className="text-xs font-semibold text-blue-900 mb-1">
-                                {diff.fieldLabel}
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>
-                                  <span className="text-red-700 font-medium">Old:</span>
-                                  <div className="text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200 break-words">
-                                    {formatValueForDisplay(diff.oldValue)}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-green-700 font-medium">New:</span>
-                                  <div className="text-green-600 mt-1 p-2 bg-green-50 rounded border border-green-200 break-words">
-                                    {formatValueForDisplay(diff.newValue)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {/* Button to show all details */}
-                        <button
-                          onClick={() => toggleChangeRequestExpansion(r.id)}
-                          className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
-                        >
-                          {isExpanded ? (
-                            <>
-                              <ChevronUp className="w-3 h-3" />
-                              Hide Full Details
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="w-3 h-3" />
-                              View Full Business Details
-                            </>
-                          )}
-                        </button>
-                        
-                        {/* Expanded view showing all current business details */}
-                        {isExpanded && currentProvider && (
+
+                                          {changeDiff.map((diff, idx) => (
+                                            <div key={diff.field} className={`${idx > 0 ? 'pt-2 border-t border-blue-200' : ''}`}>
+                                              <div className="text-xs font-semibold text-blue-900 mb-1">
+                                                {diff.fieldLabel}
+                                              </div>
+                                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                  <span className="text-red-700 font-medium">Old:</span>
+                                                  <div className="text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200 break-words">
+                                                    {formatValueForDisplay(diff.oldValue)}
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <span className="text-green-700 font-medium">New:</span>
+                                                  <div className="text-green-600 mt-1 p-2 bg-green-50 rounded border border-green-200 break-words">
+                                                    {formatValueForDisplay(diff.newValue)}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Button to show all details */}
+                                      <button
+                                        onClick={() => toggleChangeRequestExpansion(r.id)}
+                                        className="mt-3 text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                                      >
+                                        {isRequestExpanded ? (
+                                          <>
+                                            <ChevronUp className="w-3 h-3" />
+                                            Hide Full Details
+                                          </>
+                                        ) : (
+                                          <>
+                                            <ChevronDown className="w-3 h-3" />
+                                            View Full Business Details
+                                          </>
+                                        )}
+                                      </button>
+                                      
+                                      {/* Expanded view showing all current business details */}
+                                      {isRequestExpanded && currentProvider && (
                           <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-lg">
                             <div className="text-xs font-semibold text-neutral-700 mb-2">
                               Complete Business Information:
@@ -4698,45 +4694,43 @@ export default function AdminPage() {
                             </div>
                           </div>
                         )}
-                      </div>
-                    )}
-                    
-                    {/* Show all proposed changes for non-update types */}
-                    {r.type !== 'update' && r.changes && Object.keys(r.changes).length > 0 && (
-                      <div className="mt-2 p-2 bg-gray-50 rounded-lg">
-                        <div className="text-xs font-medium text-gray-700 mb-1">Proposed Changes:</div>
-                        <div className="text-xs text-gray-600 space-y-1">
-                          {Object.entries(r.changes).map(([field, value]) => (
-                            <div key={field} className="flex justify-between">
-                              <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span>
-                              <span className="ml-2">{formatValueForDisplay(value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {r.reason && <div className="text-xs text-neutral-600 mt-2 p-2 bg-amber-50 border border-amber-200 rounded"><strong>Reason:</strong> {r.reason}</div>}
-                    
-                    <div className="mt-3 flex items-center gap-2">
-                      <button 
-                        onClick={() => approveChangeRequest(r)} 
-                        className="btn btn-primary text-xs"
-                        disabled={r.status !== 'pending'}
-                      >
-                        {r.status === 'pending' ? 'Approve' : r.status}
-                      </button>
-                      <button 
-                        onClick={() => rejectChangeRequest(r)} 
-                        className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs"
-                        disabled={r.status !== 'pending'}
-                      >
-                        {r.status === 'pending' ? 'Reject' : r.status}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
+                                      
+                                      {/* Show all proposed changes for non-update types */}
+                                      {r.type !== 'update' && r.changes && Object.keys(r.changes).length > 0 && (
+                                        <div className="mt-2 p-2 bg-gray-50 rounded-lg">
+                                          <div className="text-xs font-medium text-gray-700 mb-1">Proposed Changes:</div>
+                                          <div className="text-xs text-gray-600 space-y-1">
+                                            {Object.entries(r.changes).map(([field, value]) => (
+                                              <div key={field} className="flex justify-between">
+                                                <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span>
+                                                <span className="ml-2">{formatValueForDisplay(value)}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {r.reason && <div className="text-xs text-neutral-600 mt-2 p-2 bg-amber-50 border border-amber-200 rounded"><strong>Reason:</strong> {r.reason}</div>}
+                                      
+                                      <div className="mt-3 flex items-center gap-2">
+                                        <button 
+                                          onClick={() => approveChangeRequest(r)} 
+                                          className="btn btn-primary text-xs"
+                                          disabled={r.status !== 'pending'}
+                                        >
+                                          {r.status === 'pending' ? 'Approve' : r.status}
+                                        </button>
+                                        <button 
+                                          onClick={() => rejectChangeRequest(r)} 
+                                          className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs"
+                                          disabled={r.status !== 'pending'}
+                                        >
+                                          {r.status === 'pending' ? 'Reject' : r.status}
+                                        </button>
+                                      </div>
+                                    </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -4807,14 +4801,18 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
-
-              {/* No requests message */}
-              {changeRequests.length === 0 && (
-                <div className="text-neutral-500">No requests or changes yet.</div>
-              )}
             </div>
           </div>
         )}
+      })()}
+      
+            {/* No requests message */}
+            {changeRequests.length === 0 && (
+              <div className="text-neutral-500">No requests or changes yet.</div>
+            )}
+          </div>
+        )}
+
         {isAdmin && section === 'job-posts' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Job Posts</div>
@@ -4892,6 +4890,7 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+      </div>
         {isAdmin && section === 'blog' && (
           <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white">
             <div className="font-medium">Blog Post Manager</div>
@@ -5915,6 +5914,7 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+    </div>
     </section>
   )
 }
