@@ -1,72 +1,39 @@
+import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
-export default async (req: any, context: any) => {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    }
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+export const handler: Handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: 'Method Not Allowed' }
+  }
+
+  // Admin verification (similar to admin-verify function)
+  const token = event.headers.authorization?.split(' ')[1]
+  if (!token) {
+    return { statusCode: 401, body: 'Unauthorized: No token provided' }
+  }
+
+  const { data: userResponse, error: userError } = await supabaseAdmin.auth.getUser(token)
+  if (userError || !userResponse.user) {
+    console.error('Admin verification failed:', userError?.message)
+    return { statusCode: 401, body: `Unauthorized: ${userError?.message || 'Invalid token'}` }
+  }
+
+  const adminEmails = (process.env.VITE_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+  const userEmail = userResponse.user.email?.toLowerCase()
+
+  if (!userEmail || !adminEmails.includes(userEmail)) {
+    console.warn(`Non-admin user (${userEmail}) attempted to access admin-list-job-posts`)
+    return { statusCode: 403, body: 'Forbidden: Not an administrator' }
   }
 
   try {
-    // Get the authorization header
-    const authHeader = req.headers.authorization
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Missing or invalid authorization header' })
-      }
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1]
-    if (!token) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'No token provided' })
-      }
-    }
-
-    // Create Supabase client with service role key to bypass RLS
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Missing Supabase configuration' })
-      }
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Verify the token and get user info
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
-    
-    if (userError || !user) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Invalid token' })
-      }
-    }
-
-    // Check if user is admin
-    const { data: adminCheck, error: adminError } = await supabase
-      .from('admin_emails')
-      .select('email')
-      .eq('email', user.email)
-      .single()
-
-    if (adminError || !adminCheck) {
-      return {
-        statusCode: 403,
-        body: JSON.stringify({ error: 'Access denied - admin only' })
-      }
-    }
-
-    // Fetch job posts with provider and profile details
-    const { data: jobPosts, error: jobPostsError } = await supabase
+    // Fetch all job posts with associated provider and owner profile details
+    const { data: jobPosts, error } = await supabaseAdmin
       .from('provider_job_posts')
       .select(`
         *,
@@ -75,30 +42,23 @@ export default async (req: any, context: any) => {
       `)
       .order('created_at', { ascending: false })
 
-    if (jobPostsError) {
-      console.error('Error fetching job posts:', jobPostsError)
+    if (error) {
+      console.error('Error fetching job posts:', error)
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: 'Failed to fetch job posts' })
+        body: JSON.stringify({ error: 'Failed to fetch job posts', details: error.message }),
       }
     }
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
-      body: JSON.stringify({ jobPosts: jobPosts || [] })
+      body: JSON.stringify({ jobPosts }),
     }
-
   } catch (error: any) {
-    console.error('Admin job posts function error:', error)
+    console.error('Exception in admin-list-job-posts:', error)
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
+      body: JSON.stringify({ error: 'Internal server error', details: error.message }),
     }
   }
 }
