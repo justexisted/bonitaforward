@@ -1111,6 +1111,11 @@ function Hero() {
 function ProviderPage() {
   const params = useParams()
   const providerIdentifier = params.id as string // Can be either ID or slug
+  const [version, setVersion] = useState(0) // Force re-render when providers update
+  
+  // Listen for provider updates to handle page refreshes
+  useProviderUpdates(() => { setVersion(v => v + 1) }, [])
+  
   const all: Provider[] = getAllProviders(providersByCategory)
   
   // CRITICAL FIX: Support both ID and slug lookups for backward compatibility
@@ -1289,7 +1294,14 @@ function ProviderPage() {
   return (
     <section className="py-8">
       <Container>
-        {!provider ? (
+        {all.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="text-sm text-neutral-600">Loading provider...</div>
+            </div>
+          </div>
+        ) : !provider ? (
           <div className="text-sm text-neutral-600">Provider not found.</div>
         ) : (
           <div>
@@ -1307,7 +1319,7 @@ function ProviderPage() {
                 <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/30 to-transparent"></div>
                 
                 {/* Title overlay - top left */}
-                <div className="absolute top-6 left-6">
+                <div className="absolute top-8 left-4 md:top-6 md:left-6">
                   <h1 className="text-3xl md:text-4xl font-bold text-white" style={{ textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.6)' }}>
                     {provider.name}
                   </h1>
@@ -1323,7 +1335,7 @@ function ProviderPage() {
 
                 {/* Featured badge overlay - top right */}
                 {provider.isMember && (
-                  <div className="absolute top-6 right-6">
+                  <div className="absolute top-1 right-1 md:top-6 md:right-6">
                     <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-sm font-medium" style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4)' }}>
                       ⭐ Featured
                     </span>
