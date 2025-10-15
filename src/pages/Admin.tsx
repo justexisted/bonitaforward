@@ -1184,8 +1184,9 @@ export default function AdminPage() {
       }
 
       // Call Netlify function with service role to bypass RLS
-      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
-        (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+      // For production: use relative URL (/.netlify/functions/...)
+      const isLocal = window.location.hostname === 'localhost'
+      const fnBase = isLocal ? 'http://localhost:8888' : ''
       const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-job-posts` : '/.netlify/functions/admin-list-job-posts'
       
       const response = await fetch(url, {
