@@ -4533,24 +4533,24 @@ export default function AdminPage() {
             <div className="mt-2 space-y-2 text-sm">
               {(() => {
                 // Group requests by business name
-                const businessGroups = changeRequests.reduce((groups, r) => {
-                  const businessName = r.providers?.name || 'Unknown Business'
+                const businessGroups = changeRequests.reduce<Record<string, typeof changeRequests[number][]>>((groups, r) => {
+                  const businessName = r.providers?.name || 'Unknown Business';
                   if (!groups[businessName]) {
-                    groups[businessName] = []
+                    groups[businessName] = [];
                   }
-                  groups[businessName].push(r)
-                  return groups
-                }, {} as Record<string, typeof changeRequests>)
+                  groups[businessName].push(r);
+                  return groups;
+                }, {});
 
                 return Object.entries(businessGroups).map(([businessName, requests]) => {
-                  const isExpanded = expandedBusinessDropdowns.has(businessName)
-                  const pendingCount = requests.filter(r => r.status === 'pending').length
-                  const approvedCount = requests.filter(r => r.status === 'approved').length
-                  const rejectedCount = requests.filter(r => r.status === 'rejected').length
+                  const isExpanded = expandedBusinessDropdowns.has(businessName);
+                  const pendingCount = requests.filter(r => r.status === 'pending').length;
+                  const approvedCount = requests.filter(r => r.status === 'approved').length;
+                  const rejectedCount = requests.filter(r => r.status === 'rejected').length;
 
                   return (
                     <div key={businessName} className="border border-neutral-200 rounded-lg">
-                      {/* Business Header - Always Visible */}
+                      {/* Business Header */}
                       <button
                         onClick={() => toggleBusinessDropdown(businessName)}
                         className="w-full px-4 py-3 text-left hover:bg-neutral-50 transition-colors flex items-center justify-between"
@@ -4586,42 +4586,61 @@ export default function AdminPage() {
                       {isExpanded && (
                         <div className="border-t border-neutral-200 p-4 space-y-4">
                           {/* Pending Requests */}
-                          {requests.filter(r => r.status === 'pending').length > 0 && (
+                          {requests.some(r => r.status === 'pending') && (
                             <div>
                               <div className="font-medium text-amber-800 mb-3">📋 Pending Requests (Require Approval)</div>
                               <div className="space-y-3">
                                 {requests.filter(r => r.status === 'pending').map((r) => {
-                                  const currentProvider = providers.find(p => p.id === r.provider_id)
-                                  const changeDiff = computeChangeDiff(currentProvider, r.changes)
-                                  const isRequestExpanded = expandedChangeRequestIds.has(r.id)
-                                  
+                                  const currentProvider = providers.find(p => p.id === r.provider_id);
+                                  const changeDiff = computeChangeDiff(currentProvider, r.changes);
+                                  const isRequestExpanded = expandedChangeRequestIds.has(r.id);
+
                                   return (
-                                    <div key={r.id} className="rounded-xl border border-neutral-200 p-3 bg-white shadow-sm">
+                                    <div
+                                      key={r.id}
+                                      className="rounded-xl border border-neutral-200 p-3 bg-white shadow-sm"
+                                    >
                                       <div className="flex items-center justify-between">
                                         <div className="font-medium text-neutral-900">
-                                          {r.type === 'update' ? 'Business Listing Update' : 
-                                           r.type === 'delete' ? 'Business Listing Deletion' :
-                                           r.type === 'feature_request' ? 'Featured Upgrade Request' :
-                                           r.type === 'claim' ? 'Business Claim Request' : r.type}
+                                          {r.type === 'update'
+                                            ? 'Business Listing Update'
+                                            : r.type === 'delete'
+                                            ? 'Business Listing Deletion'
+                                            : r.type === 'feature_request'
+                                            ? 'Featured Upgrade Request'
+                                            : r.type === 'claim'
+                                            ? 'Business Claim Request'
+                                            : r.type}
                                         </div>
-                                        <div className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</div>
+                                        <div className="text-xs text-neutral-500">
+                                          {new Date(r.created_at).toLocaleString()}
+                                        </div>
                                       </div>
-                                      
+
                                       {/* Owner Information */}
                                       <div className="text-xs text-neutral-600 mt-2 space-y-1">
-                                        <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
-                                        <div><strong>Owner Email:</strong> {r.profiles?.email || 'Loading...'}</div>
+                                        <div>
+                                          <strong>Owner:</strong>{' '}
+                                          {r.profiles?.name || r.profiles?.email || 'Loading...'}
+                                        </div>
+                                        <div>
+                                          <strong>Owner Email:</strong>{' '}
+                                          {r.profiles?.email || 'Loading...'}
+                                        </div>
                                       </div>
-                                      
+
                                       {/* Show what changed */}
                                       {r.type === 'update' && changeDiff.length > 0 && (
                                         <div className="mt-3">
                                           <div className="text-xs font-semibold text-neutral-700 mb-2">
-                                            Changes Requested ({changeDiff.length} field{changeDiff.length !== 1 ? 's' : ''}):
+                                            Changes Requested ({changeDiff.length} field
+                                            {changeDiff.length !== 1 ? 's' : ''}):
                                           </div>
-
                                           {changeDiff.map((diff, idx) => (
-                                            <div key={diff.field} className={`${idx > 0 ? 'pt-2 border-t border-blue-200' : ''}`}>
+                                            <div
+                                              key={diff.field}
+                                              className={idx > 0 ? 'pt-2 border-t border-blue-200' : ''}
+                                            >
                                               <div className="text-xs font-semibold text-blue-900 mb-1">
                                                 {diff.fieldLabel}
                                               </div>
@@ -4643,7 +4662,7 @@ export default function AdminPage() {
                                           ))}
                                         </div>
                                       )}
-                                      
+
                                       {/* Button to show all details */}
                                       <button
                                         onClick={() => toggleChangeRequestExpansion(r.id)}
@@ -4661,67 +4680,75 @@ export default function AdminPage() {
                                           </>
                                         )}
                                       </button>
-                                      
+
                                       {/* Expanded view showing all current business details */}
                                       {isRequestExpanded && currentProvider && (
-                          <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-lg">
-                            <div className="text-xs font-semibold text-neutral-700 mb-2">
-                              Complete Business Information:
-                            </div>
-                            <div className="text-xs text-neutral-600 space-y-1">
-                              <div><strong>ID:</strong> {currentProvider.id}</div>
-                              <div><strong>Name:</strong> {currentProvider.name}</div>
-                              <div><strong>Category:</strong> {currentProvider.category_key}</div>
-                              <div><strong>Phone:</strong> {currentProvider.phone || '(not set)'}</div>
-                              <div><strong>Email:</strong> {currentProvider.email || '(not set)'}</div>
-                              <div><strong>Website:</strong> {currentProvider.website || '(not set)'}</div>
-                              <div><strong>Address:</strong> {currentProvider.address || '(not set)'}</div>
-                              <div><strong>Description:</strong> {currentProvider.description || '(not set)'}</div>
-                              <div><strong>Tags:</strong> {currentProvider.tags?.join(', ') || '(none)'}</div>
-                              <div><strong>Specialties:</strong> {currentProvider.specialties?.join(', ') || '(none)'}</div>
-                              <div><strong>Service Areas:</strong> {currentProvider.service_areas?.join(', ') || '(none)'}</div>
-                              <div><strong>Bonita Discount:</strong> {currentProvider.bonita_resident_discount || '(none)'}</div>
-                              <div><strong>Member Status:</strong> {currentProvider.is_member ? 'Yes' : 'No'}</div>
-                              <div><strong>Booking Enabled:</strong> {currentProvider.booking_enabled ? 'Yes' : 'No'}</div>
-                              {currentProvider.booking_enabled && (
-                                <>
-                                  <div><strong>Booking Type:</strong> {currentProvider.booking_type || '(not set)'}</div>
-                                  <div><strong>Booking Instructions:</strong> {currentProvider.booking_instructions || '(not set)'}</div>
-                                  <div><strong>Booking URL:</strong> {currentProvider.booking_url || '(not set)'}</div>
-                                </>
-                              )}
-                              <div><strong>Images:</strong> {currentProvider.images?.length || 0} image(s)</div>
-                            </div>
-                          </div>
-                        )}
-                                      
+                                        <div className="mt-3 p-3 bg-neutral-50 border border-neutral-200 rounded-lg">
+                                          <div className="text-xs font-semibold text-neutral-700 mb-2">
+                                            Complete Business Information:
+                                          </div>
+                                          <div className="text-xs text-neutral-600 space-y-1">
+                                            <div><strong>ID:</strong> {currentProvider.id}</div>
+                                            <div><strong>Name:</strong> {currentProvider.name}</div>
+                                            <div><strong>Category:</strong> {currentProvider.category_key}</div>
+                                            <div><strong>Phone:</strong> {currentProvider.phone || '(not set)'}</div>
+                                            <div><strong>Email:</strong> {currentProvider.email || '(not set)'}</div>
+                                            <div><strong>Website:</strong> {currentProvider.website || '(not set)'}</div>
+                                            <div><strong>Address:</strong> {currentProvider.address || '(not set)'}</div>
+                                            <div><strong>Description:</strong> {currentProvider.description || '(not set)'}</div>
+                                            <div><strong>Tags:</strong> {currentProvider.tags?.join(', ') || '(none)'}</div>
+                                            <div><strong>Specialties:</strong> {currentProvider.specialties?.join(', ') || '(none)'}</div>
+                                            <div><strong>Service Areas:</strong> {currentProvider.service_areas?.join(', ') || '(none)'}</div>
+                                            <div><strong>Bonita Discount:</strong> {currentProvider.bonita_resident_discount || '(none)'}</div>
+                                            <div><strong>Member Status:</strong> {currentProvider.is_member ? 'Yes' : 'No'}</div>
+                                            <div><strong>Booking Enabled:</strong> {currentProvider.booking_enabled ? 'Yes' : 'No'}</div>
+                                            {currentProvider.booking_enabled && (
+                                              <>
+                                                <div><strong>Booking Type:</strong> {currentProvider.booking_type || '(not set)'}</div>
+                                                <div><strong>Booking Instructions:</strong> {currentProvider.booking_instructions || '(not set)'}</div>
+                                                <div><strong>Booking URL:</strong> {currentProvider.booking_url || '(not set)'}</div>
+                                              </>
+                                            )}
+                                            <div><strong>Images:</strong> {currentProvider.images?.length || 0} image(s)</div>
+                                          </div>
+                                        </div>
+                                      )}
+
                                       {/* Show all proposed changes for non-update types */}
                                       {r.type !== 'update' && r.changes && Object.keys(r.changes).length > 0 && (
                                         <div className="mt-2 p-2 bg-gray-50 rounded-lg">
-                                          <div className="text-xs font-medium text-gray-700 mb-1">Proposed Changes:</div>
+                                          <div className="text-xs font-medium text-gray-700 mb-1">
+                                            Proposed Changes:
+                                          </div>
                                           <div className="text-xs text-gray-600 space-y-1">
-                                            {Object.entries(r.changes).map(([field, value]) => (
+                                            {Object.entries(r.changes || {}).map(([field, value]) => (
                                               <div key={field} className="flex justify-between">
-                                                <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span>
+                                                <span className="font-medium capitalize">
+                                                  {field.replace(/_/g, ' ')}:
+                                                </span>
                                                 <span className="ml-2">{formatValueForDisplay(value)}</span>
                                               </div>
                                             ))}
                                           </div>
                                         </div>
                                       )}
-                                      
-                                      {r.reason && <div className="text-xs text-neutral-600 mt-2 p-2 bg-amber-50 border border-amber-200 rounded"><strong>Reason:</strong> {r.reason}</div>}
-                                      
+
+                                      {r.reason && (
+                                        <div className="text-xs text-neutral-600 mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+                                          <strong>Reason:</strong> {r.reason}
+                                        </div>
+                                      )}
+
                                       <div className="mt-3 flex items-center gap-2">
-                                        <button 
-                                          onClick={() => approveChangeRequest(r)} 
+                                        <button
+                                          onClick={() => approveChangeRequest(r)}
                                           className="btn btn-primary text-xs"
                                           disabled={r.status !== 'pending'}
                                         >
                                           {r.status === 'pending' ? 'Approve' : r.status}
                                         </button>
-                                        <button 
-                                          onClick={() => rejectChangeRequest(r)} 
+                                        <button
+                                          onClick={() => rejectChangeRequest(r)}
                                           className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs"
                                           disabled={r.status !== 'pending'}
                                         >
@@ -4729,14 +4756,22 @@ export default function AdminPage() {
                                         </button>
                                       </div>
                                     </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
 
               {/* Change Logs (Featured Businesses) */}
-              {changeRequests.filter((r) => r.status === 'approved' && r.reason?.includes('Featured business update')).length > 0 && (
+              {changeRequests.some(
+                (r) => r.status === 'approved' && r.reason?.includes('Featured business update')
+              ) && (
                 <div className="mb-4">
                   <div className="font-medium text-green-800 mb-2">📝 Recent Change Logs (Featured Businesses)</div>
                   <div className="space-y-2">
@@ -4801,19 +4836,15 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+
+              {/* No requests message */}
+              {changeRequests.length === 0 && (
+                <div className="text-neutral-500">No requests or changes yet.</div>
+              )}
             </div>
           </div>
         )}
-      })()}
-      
-            {/* No requests message */}
-            {changeRequests.length === 0 && (
-              <div className="text-neutral-500">No requests or changes yet.</div>
-            )}
-          </div>
-        )}
-
-        {isAdmin && section === 'job-posts' && (
+          {isAdmin && section === 'job-posts' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Job Posts</div>
             
@@ -5915,11 +5946,8 @@ export default function AdminPage() {
         )}
       </div>
     </div>
-    </section>
   )
 }
-
-// Job Card Component for Admin
 function JobCard({ 
   job, 
   onApprove, 
