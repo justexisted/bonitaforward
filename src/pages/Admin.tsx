@@ -1870,9 +1870,10 @@ export default function AdminPage() {
       setError(error.message)
     } else {
       setMessage('Application approved and provider created')
-      // Delete the application now that it has been approved
+      // Update status to approved before deleting the application
       try {
-        await supabase.from('business_applications').delete().eq('id', appId)
+        await supabase.from('business_applications').update({ status: 'approved' }).eq('id', appId)
+        // Keep the application visible for a short time to show approved status, then remove from admin view
         setBizApps((rows) => rows.filter((r) => r.id !== appId))
       } catch {}
       // Refresh providers with enhanced fields
@@ -1888,10 +1889,17 @@ export default function AdminPage() {
 
   async function deleteApplication(appId: string) {
     setMessage(null)
+    // Update status to rejected before deleting the application
+    const { error: updateError } = await supabase.from('business_applications').update({ status: 'rejected' }).eq('id', appId)
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    
     const { error } = await supabase.from('business_applications').delete().eq('id', appId)
     if (error) setError(error.message)
     else {
-      setMessage('Application deleted')
+      setMessage('Application rejected and deleted')
       setBizApps((rows) => rows.filter((r) => r.id !== appId))
     }
   }
@@ -3786,7 +3794,7 @@ export default function AdminPage() {
                         onClick={() => deleteApplication(app.id)} 
                         className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 border border-red-200 font-medium text-sm transition-colors"
                       >
-                        ✗ Delete Application
+                        ✗ Reject Application
                       </button>
                     </div>
                   </div>
@@ -3989,6 +3997,86 @@ export default function AdminPage() {
                               </div>
                             </div>
 
+                            {/* Business Hours - Only for Featured Accounts */}
+                            <div>
+                              <h4 className="text-md font-medium text-green-800 mb-4">Business Hours</h4>
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    id="enable-business-hours"
+                                    checked={newProviderForm.subscription_type !== 'free' && newProviderForm.business_hours !== null}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        // Initialize with default hours if enabling
+                                        const defaultHours = {
+                                          monday: '9:00 AM - 5:00 PM',
+                                          tuesday: '9:00 AM - 5:00 PM',
+                                          wednesday: '9:00 AM - 5:00 PM',
+                                          thursday: '9:00 AM - 5:00 PM',
+                                          friday: '9:00 AM - 5:00 PM',
+                                          saturday: '10:00 AM - 4:00 PM',
+                                          sunday: 'Closed'
+                                        }
+                                        setNewProviderForm(prev => ({ ...prev, business_hours: defaultHours }))
+                                      } else {
+                                        setNewProviderForm(prev => ({ ...prev, business_hours: null }))
+                                      }
+                                    }}
+                                    disabled={newProviderForm.subscription_type === 'free'}
+                                    className="rounded border-green-300 text-green-600 focus:ring-green-500"
+                                  />
+                                  <label htmlFor="enable-business-hours" className="text-sm font-medium text-green-700">
+                                    Set Business Hours
+                                    {newProviderForm.subscription_type === 'free' && (
+                                      <span className="text-xs text-green-600 ml-2">(Featured accounts only)</span>
+                                    )}
+                                  </label>
+                                </div>
+                                
+                                {newProviderForm.subscription_type !== 'free' && newProviderForm.business_hours && (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {[
+                                      { key: 'monday', label: 'Monday' },
+                                      { key: 'tuesday', label: 'Tuesday' },
+                                      { key: 'wednesday', label: 'Wednesday' },
+                                      { key: 'thursday', label: 'Thursday' },
+                                      { key: 'friday', label: 'Friday' },
+                                      { key: 'saturday', label: 'Saturday' },
+                                      { key: 'sunday', label: 'Sunday' }
+                                    ].map(({ key, label }) => (
+                                      <div key={key} className="flex items-center gap-2">
+                                        <label className="text-sm font-medium text-green-700 w-20">
+                                          {label}:
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={newProviderForm.business_hours?.[key] || ''}
+                                          onChange={(e) => {
+                                            setNewProviderForm(prev => ({
+                                              ...prev,
+                                              business_hours: {
+                                                ...prev.business_hours,
+                                                [key]: e.target.value
+                                              }
+                                            }))
+                                          }}
+                                          className="flex-1 rounded-lg border border-green-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                          placeholder="e.g., 9:00 AM - 5:00 PM"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {newProviderForm.subscription_type === 'free' && (
+                                  <p className="text-xs text-green-600 bg-green-50 p-2 rounded">
+                                    Business hours are only available for featured accounts. Upgrade to a featured plan to set business hours.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
                             {/* Plan Selection */}
                             <div>
                               <h4 className="text-md font-medium text-green-800 mb-4">Plan Type</h4>
@@ -4001,7 +4089,9 @@ export default function AdminPage() {
                                     subscription_type: newPlan === 'free' ? null : newPlan,
                                     is_member: newPlan !== 'free',
                                     is_featured: newPlan !== 'free',
-                                    featured_since: newPlan !== 'free' ? new Date().toISOString() : null
+                                    featured_since: newPlan !== 'free' ? new Date().toISOString() : null,
+                                    // Clear business hours if downgrading to free plan
+                                    business_hours: newPlan === 'free' ? null : prev.business_hours
                                   }))
                                 }}
                                 className="rounded-lg border border-green-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -4112,7 +4202,9 @@ export default function AdminPage() {
                                   subscription_type: newPlan === 'free' ? null : newPlan,
                                   is_member: newPlan !== 'free',
                                   is_featured: newPlan !== 'free',
-                                    featured_since: newPlan !== 'free' ? (p.featured_since || now) : null
+                                    featured_since: newPlan !== 'free' ? (p.featured_since || now) : null,
+                                    // Clear business hours if downgrading to free plan
+                                    business_hours: newPlan === 'free' ? null : p.business_hours
                                   } : p
                                 ))
                               }}
@@ -4388,6 +4480,91 @@ export default function AdminPage() {
                                 disabled={!editingProvider.is_member}
                               />
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Business Hours - Featured Only */}
+                        <div className={!editingProvider.is_member ? 'opacity-50 pointer-events-none' : ''}>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">
+                            Business Hours
+                            {!editingProvider.is_member && (
+                              <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
+                            )}
+                          </h4>
+                          
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                id={`enable-business-hours-${editingProvider.id}`}
+                                checked={editingProvider.business_hours !== null}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    // Initialize with default hours if enabling
+                                    const defaultHours = {
+                                      monday: '9:00 AM - 5:00 PM',
+                                      tuesday: '9:00 AM - 5:00 PM',
+                                      wednesday: '9:00 AM - 5:00 PM',
+                                      thursday: '9:00 AM - 5:00 PM',
+                                      friday: '9:00 AM - 5:00 PM',
+                                      saturday: '10:00 AM - 4:00 PM',
+                                      sunday: 'Closed'
+                                    }
+                                    setProviders((arr) => arr.map(p => 
+                                      p.id === editingProvider.id ? { ...p, business_hours: defaultHours } : p
+                                    ))
+                                  } else {
+                                    setProviders((arr) => arr.map(p => 
+                                      p.id === editingProvider.id ? { ...p, business_hours: null } : p
+                                    ))
+                                  }
+                                }}
+                                disabled={!editingProvider.is_member}
+                                className="rounded border-neutral-300 text-neutral-600 focus:ring-neutral-500"
+                              />
+                              <label htmlFor={`enable-business-hours-${editingProvider.id}`} className="text-sm font-medium text-neutral-700">
+                                Set Business Hours
+                              </label>
+                            </div>
+                            
+                            {editingProvider.is_member && editingProvider.business_hours && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {[
+                                  { key: 'monday', label: 'Monday' },
+                                  { key: 'tuesday', label: 'Tuesday' },
+                                  { key: 'wednesday', label: 'Wednesday' },
+                                  { key: 'thursday', label: 'Thursday' },
+                                  { key: 'friday', label: 'Friday' },
+                                  { key: 'saturday', label: 'Saturday' },
+                                  { key: 'sunday', label: 'Sunday' }
+                                ].map(({ key, label }) => (
+                                  <div key={key} className="flex items-center gap-2">
+                                    <label className="text-sm font-medium text-neutral-700 w-20">
+                                      {label}:
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editingProvider.business_hours?.[key] || ''}
+                                      onChange={(e) => setProviders((arr) => arr.map(p => 
+                                        p.id === editingProvider.id ? { 
+                                          ...p, 
+                                          business_hours: { ...p.business_hours, [key]: e.target.value } 
+                                        } : p
+                                      ))}
+                                      className="flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-500"
+                                      placeholder="e.g., 9:00 AM - 5:00 PM"
+                                      disabled={!editingProvider.is_member}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {!editingProvider.is_member && (
+                              <p className="text-xs text-neutral-500 bg-neutral-50 p-2 rounded">
+                                Business hours are only available for featured accounts. Upgrade to a featured plan to set business hours.
+                              </p>
+                            )}
                           </div>
                         </div>
 

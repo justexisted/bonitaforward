@@ -460,20 +460,35 @@ export default function MyBusinessPage() {
 
       // Load change requests for this business owner
       console.log('[MyBusiness] Loading change requests for user:', auth.userId)
-      const { data: changeRequestsData, error: changeRequestsError } = await supabase
-        .from('provider_change_requests')
-        .select('*')
-        .eq('owner_user_id', auth.userId)
-        .order('created_at', { ascending: false })
+      let changeRequestsData: any[] = []
+      let changeRequestsError: any = null
+      
+      try {
+        const { data, error } = await supabase
+          .from('provider_change_requests')
+          .select('*')
+          .eq('owner_user_id', auth.userId)
+          .order('created_at', { ascending: false })
+        
+        changeRequestsData = data || []
+        changeRequestsError = error
 
-      console.log('[MyBusiness] Change requests query result:', {
-        error: changeRequestsError,
-        count: changeRequestsData?.length || 0,
-        data: changeRequestsData
-      })
+        console.log('[MyBusiness] Change requests query result:', {
+          error: changeRequestsError,
+          count: changeRequestsData?.length || 0,
+          data: changeRequestsData
+        })
 
-      if (changeRequestsError) {
-        console.warn('[MyBusiness] Change requests error (non-critical):', changeRequestsError)
+        if (changeRequestsError) {
+          console.warn('[MyBusiness] Change requests error (non-critical):', changeRequestsError)
+          // If it's a 403 error, it's likely an RLS policy issue
+          if (changeRequestsError.code === 'PGRST301' || changeRequestsError.message?.includes('403')) {
+            console.warn('[MyBusiness] RLS policy issue detected - user may not have permission to view change requests')
+          }
+        }
+      } catch (err) {
+        console.error('[MyBusiness] Unexpected error loading change requests:', err)
+        changeRequestsError = err
       }
 
       // Combine listings from both queries (owned and by email)
@@ -1529,6 +1544,12 @@ export default function MyBusinessPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   <strong>Analytics</strong> - view customer interactions
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <strong>No admin approval needed</strong> - make changes instantly
                 </li>
               </ul>
               <button

@@ -101,7 +101,7 @@ export default function OwnerPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [requests, setRequests] = useState<ProviderChangeRequest[]>([])
-  const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
+  const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string; status: string | null }[]>([])
 
   async function load() {
     setLoading(true)
@@ -132,11 +132,11 @@ export default function OwnerPage() {
       if (email) {
         const { data } = await supabase
           .from('business_applications')
-          .select('id,business_name,created_at,email')
+          .select('id,business_name,created_at,email,status')
           .eq('email', email)
           .order('created_at', { ascending: false })
           .limit(10)
-        const rows = ((data as any[]) || []).map((r) => ({ id: r.id, business_name: r.business_name, created_at: r.created_at }))
+        const rows = ((data as any[]) || []).map((r) => ({ id: r.id, business_name: r.business_name, created_at: r.created_at, status: r.status }))
         setPendingApps(rows)
       }
     } catch {}
@@ -210,6 +210,56 @@ export default function OwnerPage() {
         <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
           <h1 className="text-xl font-semibold tracking-tight">My Business</h1>
           {message && <div className="mt-2 text-sm text-neutral-600">{message}</div>}
+          
+          {/* Application Status Banner */}
+          {pendingApps.length > 0 && pendingApps.some(a => a.status === 'pending' || !a.status) && (
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="font-medium text-amber-900">Business Application Status</h3>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Status: <strong>Pending admin approval</strong> - We will notify you when your application is reviewed and approved.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {pendingApps.length > 0 && pendingApps.some(a => a.status === 'approved') && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="font-medium text-green-900">Business Application Approved</h3>
+                  <p className="text-sm text-green-700 mt-1">
+                    Status: <strong>Approved</strong> - Your business has been successfully added to the directory!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {pendingApps.length > 0 && pendingApps.some(a => a.status === 'rejected') && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="font-medium text-red-900">Business Application Rejected</h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    Status: <strong>Rejected</strong> - Please contact support if you have questions about this decision.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {loading ? (
             <div className="mt-3 text-sm text-neutral-500">Loading…</div>
           ) : (
@@ -254,15 +304,46 @@ export default function OwnerPage() {
               ))}
               {(pendingApps.length > 0) && (
                 <div className="rounded-xl border border-neutral-200 p-4">
-                  <div className="text-sm font-medium">Pending Applications</div>
-                  <ul className="mt-2 text-sm space-y-1">
+                  <div className="text-sm font-medium">Business Applications</div>
+                  <ul className="mt-2 text-sm space-y-2">
                     {pendingApps.map((a) => (
                       <li key={a.id} className="flex items-center justify-between">
-                        <span>{a.business_name || 'Unnamed Business'}</span>
-                        <span className="text-xs text-neutral-500">{new Date(a.created_at).toLocaleString()}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{a.business_name || 'Unnamed Business'}</span>
+                          <span className="text-xs text-neutral-500">{new Date(a.created_at).toLocaleString()}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          {a.status === 'pending' && (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-xs font-medium">
+                              Under Review
+                            </span>
+                          )}
+                          {a.status === 'approved' && (
+                            <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 text-green-700 px-2 py-0.5 text-xs font-medium">
+                              Approved
+                            </span>
+                          )}
+                          {a.status === 'rejected' && (
+                            <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 text-red-700 px-2 py-0.5 text-xs font-medium">
+                              Rejected
+                            </span>
+                          )}
+                          {!a.status && (
+                            <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 text-gray-700 px-2 py-0.5 text-xs font-medium">
+                              Under Review
+                            </span>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
+                  {pendingApps.some(a => a.status === 'pending' || !a.status) && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs text-blue-700">
+                        <strong>Status Update:</strong> We will notify you when your application is reviewed and approved.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               {requests.length > 0 && (

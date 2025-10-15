@@ -35,6 +35,7 @@ export default function CreateBusinessForm() {
         email: auth.email, // Use signed-in user's email
         category: category,
         phone: phone || null,
+        status: 'pending', // Set initial status as pending
         // Store business-specific details in challenge field (we'll parse it later)
         challenge: JSON.stringify({
           businessEmail: businessEmail || null,
@@ -47,7 +48,7 @@ export default function CreateBusinessForm() {
       if (error) {
         setMessage(error.message)
       } else {
-        setMessage('Success! Your business listing request has been submitted. Redirecting to your account...')
+        setMessage('Success! Your business listing request has been submitted and is now under review. We will notify you when it is approved. Redirecting to your account...')
         // Redirect to account page after 2 seconds
         setTimeout(() => {
           navigate('/account')
