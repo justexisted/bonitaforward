@@ -32,14 +32,10 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Fetch all job posts with associated provider and owner profile details
+    // Fetch all job posts first, then enrich with provider and profile data
     const { data: jobPosts, error } = await supabaseAdmin
       .from('provider_job_posts')
-      .select(`
-        *,
-        providers!provider_id(id, name, email),
-        profiles!owner_user_id(id, email, name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -50,9 +46,49 @@ export const handler: Handler = async (event) => {
       }
     }
 
+    // Enrich job posts with provider and profile information
+    const enrichedJobPosts = await Promise.all(
+      (jobPosts || []).map(async (jobPost) => {
+        let providerInfo = null
+        let ownerInfo = null
+
+        // Fetch provider information
+        if (jobPost.provider_id) {
+          const { data: provider, error: providerError } = await supabaseAdmin
+            .from('providers')
+            .select('id, name, email')
+            .eq('id', jobPost.provider_id)
+            .maybeSingle()
+          
+          if (!providerError && provider) {
+            providerInfo = provider
+          }
+        }
+
+        // Fetch owner profile information
+        if (jobPost.owner_user_id) {
+          const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, email, name')
+            .eq('id', jobPost.owner_user_id)
+            .maybeSingle()
+          
+          if (!profileError && profile) {
+            ownerInfo = profile
+          }
+        }
+
+        return {
+          ...jobPost,
+          provider: providerInfo,
+          owner: ownerInfo
+        }
+      })
+    )
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ jobPosts }),
+      body: JSON.stringify({ jobPosts: enrichedJobPosts }),
     }
   } catch (error: any) {
     console.error('Exception in admin-list-job-posts:', error)
