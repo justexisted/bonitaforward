@@ -793,11 +793,8 @@ export default function AdminPage() {
     try {
       setMessage('Triggering server-side iCalendar refresh...')
       
-      // For local dev: use http://localhost:8888 (Netlify Dev port)
-      // For production: use relative URL (/.netlify/functions/...)
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/manual-fetch-events` : '/.netlify/functions/manual-fetch-events'
+      // Use relative URL for Netlify functions (works in both dev and production)
+      const url = '/.netlify/functions/manual-fetch-events'
       
       const response = await fetch(url)
       const result = await response.json()
@@ -823,11 +820,8 @@ export default function AdminPage() {
     try {
       setMessage('Fetching Voice of San Diego events...')
       
-      // For local dev: use http://localhost:8888 (Netlify Dev port)
       // For production: use relative URL (/.netlify/functions/...)
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/fetch-vosd-events` : '/.netlify/functions/fetch-vosd-events'
+      const url = '/.netlify/functions/fetch-vosd-events'
       
       const response = await fetch(url)
       const result = await response.json()
@@ -853,11 +847,8 @@ export default function AdminPage() {
     try {
       setMessage('Fetching KPBS events...')
       
-      // For local dev: use http://localhost:8888 (Netlify Dev port)
       // For production: use relative URL (/.netlify/functions/...)
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/fetch-kpbs-events` : '/.netlify/functions/fetch-kpbs-events'
+      const url = '/.netlify/functions/fetch-kpbs-events'
       
       const response = await fetch(url)
       const result = await response.json()
@@ -1124,12 +1115,8 @@ export default function AdminPage() {
       // console.log('[Admin] ✓ Auth token acquired, calling Netlify function...')
 
       // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
-      // For local dev: use http://localhost:8888 (Netlify Dev port)
-      // For production: use relative URL (/.netlify/functions/...)
-      // VITE_FN_BASE_URL should NOT include /.netlify/functions - just the base URL
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-change-requests` : '/.netlify/functions/admin-list-change-requests'
+      // Use relative URL for Netlify functions (works in both dev and production)
+      const url = '/.netlify/functions/admin-list-change-requests'
       // console.log('[Admin] Fetching from:', url)
       
       const response = await fetch(url, {
@@ -1201,10 +1188,8 @@ export default function AdminPage() {
       }
 
       // Call Netlify function with service role to bypass RLS
-      // For production: use relative URL (/.netlify/functions/...)
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-job-posts` : '/.netlify/functions/admin-list-job-posts'
+      // For development, use relative URL since local Netlify functions may not be running
+      const url = '/.netlify/functions/admin-list-job-posts'
       
       const response = await fetch(url, {
         method: 'POST',
@@ -1255,9 +1240,8 @@ export default function AdminPage() {
       }
 
       // Call Netlify function with service role to bypass RLS
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-booking-events` : '/.netlify/functions/admin-list-booking-events'
+      // For development, use relative URL since local Netlify functions may not be running
+      const url = '/.netlify/functions/admin-list-booking-events'
       
       const response = await fetch(url, {
         method: 'POST',
@@ -1524,11 +1508,8 @@ export default function AdminPage() {
           return
         }
 
-        // For local dev: use http://localhost:8888 (Netlify Dev port)
-        // For production: use relative URL (/.netlify/functions/...)
-        const isLocal = window.location.hostname === 'localhost'
-        const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
+        // Use relative URL for Netlify functions (works in both dev and production)
+        const url = '/.netlify/functions/admin-verify'
       
       // console.log('[Admin] Making server verification request to:', url)
         
@@ -1691,11 +1672,8 @@ export default function AdminPage() {
             const token = session.session?.access_token
             
           if (token) {
-            // For local dev: use http://localhost:8888 (Netlify Dev port)
-            // For production: use relative URL (/.netlify/functions/...)
-            const isLocal = window.location.hostname === 'localhost'
-            const fnBase = isLocal ? 'http://localhost:8888' : ''
-            const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-profiles` : '/.netlify/functions/admin-list-profiles'
+            // Use relative URL for Netlify functions (works in both dev and production)
+            const url = '/.netlify/functions/admin-list-profiles'
             const res = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -1749,15 +1727,29 @@ export default function AdminPage() {
     )
   }, [profiles])
 
-  // Customer users: emails present in funnels/bookings, excluding business owner emails
+  // Customer users: emails present in funnels/bookings/booking_events/profiles, excluding business owner emails
   const customerUsers = useMemo(() => {
     const set = new Set<string>()
+    
+    // Add users from funnel responses
     funnels.forEach((f) => { const e = normalizeEmail(f.user_email); if (e) set.add(e) })
+    
+    // Add users from bookings
     bookings.forEach((b) => { const e = normalizeEmail(b.user_email); if (e) set.add(e) })
+    
+    // Add users from booking events
+    bookingEvents.forEach((be) => { const e = normalizeEmail(be.customer_email); if (e) set.add(e) })
+    
+    // Add users from profiles (non-business users)
+    profiles.forEach((p) => { 
+      const e = normalizeEmail(p.email); 
+      if (e && p.role !== 'business') set.add(e) 
+    })
+    
     return Array.from(set)
       .filter((e) => !businessEmails.has(normalizeEmail(e)))
       .sort()
-  }, [funnels, bookings, businessEmails])
+  }, [funnels, bookings, bookingEvents, profiles, businessEmails])
 
   // Filtered funnel responses based on user email filter
   // This allows admins to view responses from specific users to avoid overwhelming display
@@ -2290,11 +2282,9 @@ export default function AdminPage() {
       }
       
       // Use Netlify function to delete provider (handles all FK constraints and related data)
-      // For local dev: use http://localhost:8888 (Netlify Dev port)
       // For production: use relative URL (/.netlify/functions/...)
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/delete-business-listing` : '/.netlify/functions/delete-business-listing'
+      // Use relative URL for Netlify functions (works in both dev and production)
+      const url = '/.netlify/functions/delete-business-listingdelete-business-listing'
       
       // console.log('[Admin] Calling delete function:', url)
       
@@ -2617,11 +2607,9 @@ export default function AdminPage() {
       }
       
       // Call Netlify function (not Supabase Edge Function)
-      // For local dev: use http://localhost:8888 (Netlify Dev port)
       // For production: use relative URL (/.netlify/functions/...)
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/admin-delete-user` : '/.netlify/functions/admin-delete-user'
+      // Use relative URL for Netlify functions (works in both dev and production)
+      const url = '/.netlify/functions/admin-delete-useradmin-delete-user'
       
       const response = await fetch(url, {
         method: 'POST',
@@ -2723,11 +2711,8 @@ export default function AdminPage() {
         const role = (prof as any)?.role as string | undefined
         if (pid && role !== 'business') {
           // Call Netlify function (not Supabase Edge Function)
-          // For local dev: use http://localhost:8888 (Netlify Dev port)
-          // For production: use relative URL (/.netlify/functions/...)
-          const isLocal = window.location.hostname === 'localhost'
-          const fnBase = isLocal ? 'http://localhost:8888' : ''
-          const url = fnBase ? `${fnBase}/.netlify/functions/admin-delete-user` : '/.netlify/functions/admin-delete-user'
+          // Use relative URL for Netlify functions (works in both dev and production)
+          const url = '/.netlify/functions/admin-delete-user'
           
           const response = await fetch(url, {
             method: 'POST',
@@ -2788,11 +2773,9 @@ export default function AdminPage() {
       }
 
       // Call Netlify function to fetch business details (bypasses RLS)
-      // For local dev: use http://localhost:8888 (Netlify Dev port)
       // For production: use relative URL (/.netlify/functions/...)
-      const isLocal = window.location.hostname === 'localhost'
-      const fnBase = isLocal ? 'http://localhost:8888' : ''
-      const url = fnBase ? `${fnBase}/.netlify/functions/admin-get-business-details` : '/.netlify/functions/admin-get-business-details'
+      // Use relative URL for Netlify functions (works in both dev and production)
+      const url = '/.netlify/functions/admin-get-business-detailsadmin-get-business-details'
 
       const response = await fetch(url, {
         method: 'POST',
@@ -3261,9 +3244,29 @@ export default function AdminPage() {
           )}
           {isAdmin && section === 'customer-users' && (
             <div className="rounded-2xl border border-neutral-100 p-4 bg-white">
-              <div className="font-medium">Customer Users</div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="font-medium">Customer Users</div>
+                <div className="text-sm text-neutral-500">
+                  {customerUsers.length} users found
+                </div>
+              </div>
+              
+              {/* Debug information */}
+              <div className="mb-4 p-3 bg-neutral-50 rounded-lg text-xs text-neutral-600">
+                <div><strong>Data Sources:</strong></div>
+                <div>• Funnel responses: {funnels.length} entries</div>
+                <div>• Bookings: {bookings.length} entries</div>
+                <div>• Booking events: {bookingEvents.length} entries</div>
+                <div>• Profiles: {profiles.length} entries</div>
+                <div>• Business emails excluded: {businessEmails.size} emails</div>
+              </div>
+              
               <ul className="mt-2 text-sm">
-                {customerUsers.length === 0 && <li className="text-neutral-500">No users yet.</li>}
+                {customerUsers.length === 0 && (
+                  <li className="text-neutral-500">
+                    No customer users found. Users are identified from funnel responses, bookings, booking events, and profiles (excluding business owners).
+                  </li>
+                )}
                 {customerUsers.map((u) => (
                   <li key={u} className="py-1 border-b border-neutral-100 last:border-0 flex items-center justify-between">
                     <span>{u}</span>
