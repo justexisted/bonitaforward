@@ -1449,77 +1449,6 @@ function ProviderPage() {
                 </div>
               )}
               
-              {/* Exclusive Coupon Display */}
-              {provider.coupon_code && provider.coupon_discount && (
-                <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-2 shadow-md">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-bold text-green-900">Exclusive Coupon</h3>
-                        <span className="text-lg font-bold text-green-700">{provider.coupon_discount}</span>
-                        {provider.coupon_expires_at && new Date(provider.coupon_expires_at) > new Date() && (
-                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                            Expires {new Date(provider.coupon_expires_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm text-green-800 font-medium">Code:</span>
-                        <code className="bg-white border border-green-300 px-3 py-1 rounded text-green-900 font-mono font-semibold text-sm">
-                          {provider.coupon_code}
-                        </code>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(provider.coupon_code || '')
-                            alert('Coupon code copied to clipboard!')
-                          }}
-                          className="text-xs text-green-700 hover:text-green-900 underline"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                      {provider.coupon_description && (
-                        <div className="relative group">
-                          <p className="text-sm text-green-800 mt-2 md:hidden">{provider.coupon_description}</p>
-                          <div className="hidden md:block">
-                            <div className="absolute top-0 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-green-100 border border-green-300 rounded-lg p-2 shadow-lg z-10">
-                              <p className="text-sm text-green-900">{provider.coupon_description}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {auth.isAuthed && (
-                        <div>
-                          <button
-                            onClick={saveCoupon}
-                            disabled={couponBusy}
-                            className="mt-3 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
-                          >
-                            {couponBusy ? (
-                              'Saving…'
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                                </svg>
-                                Save to My Account
-                              </>
-                            )}
-                          </button>
-                          {couponMsg && (
-                            <p className="text-xs text-green-700 mt-2">{couponMsg}</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Contact Information */}
                 <div>
@@ -1661,27 +1590,97 @@ function ProviderPage() {
 
               </div>
 
+              {/* Exclusive Coupon Display - Moved to bottom after Follow Us */}
+              {provider.coupon_code && provider.coupon_discount && (
+                <div className="mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 shadow-md">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-green-900">Exclusive Coupon</h3>
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                      </svg>
+                      <span className="text-lg font-bold text-green-700">{provider.coupon_discount}</span>
+                    </div>
+                    {provider.coupon_expires_at && new Date(provider.coupon_expires_at) > new Date() && (
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                        Expires {new Date(provider.coupon_expires_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-sm text-green-800 font-medium">Code:</span>
+                    <code className="bg-white border border-green-300 px-3 py-1 rounded text-green-900 font-mono font-semibold text-sm">
+                      {provider.coupon_code}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(provider.coupon_code || '')
+                        alert('Coupon code copied to clipboard!')
+                      }}
+                      className="text-xs text-green-700 hover:text-green-900 underline"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  
+                  {provider.coupon_description && (
+                    <div className="relative group mb-3">
+                      <p className="text-sm text-green-800 md:hidden">{provider.coupon_description}</p>
+                      <div className="hidden md:block">
+                        <div className="absolute top-0 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-green-100 border border-green-300 rounded-lg p-2 shadow-lg z-10">
+                          <p className="text-sm text-green-900">{provider.coupon_description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {auth.isAuthed && (
+                    <div>
+                      <button
+                        onClick={saveCoupon}
+                        disabled={couponBusy}
+                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                      >
+                        {couponBusy ? (
+                          'Saving…'
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Save to My Account
+                          </>
+                        )}
+                      </button>
+                      {couponMsg && (
+                        <p className="text-xs text-green-700 mt-2">{couponMsg}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Booking System - Featured Providers Only */}
               {provider.isMember && (provider.booking_enabled || provider.enable_calendar_booking || provider.enable_call_contact || provider.enable_email_contact) && (
                 <div className="mt-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Book with {provider.name}</h3>
                   <div className="rounded-xl border border-neutral-200 p-6 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        </div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-lg font-semibold text-neutral-900">
+                        {provider.booking_type === 'appointment' && 'Book an Appointment'}
+                        {provider.booking_type === 'reservation' && 'Make a Reservation'}
+                        {provider.booking_type === 'consultation' && 'Schedule a Consultation'}
+                        {provider.booking_type === 'walk-in' && 'Walk-in Information'}
+                        {!provider.booking_type && 'Book Online'}
+                      </h4>
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-neutral-900 mb-2">
-                          {provider.booking_type === 'appointment' && 'Book an Appointment'}
-                          {provider.booking_type === 'reservation' && 'Make a Reservation'}
-                          {provider.booking_type === 'consultation' && 'Schedule a Consultation'}
-                          {provider.booking_type === 'walk-in' && 'Walk-in Information'}
-                          {!provider.booking_type && 'Book Online'}
-                        </h4>
+                    </div>
+                    <div className="flex-1">
                         
                         
                         {provider.booking_url && provider.booking_url.trim() ? (
@@ -1765,7 +1764,6 @@ function ProviderPage() {
                             </div>
                           </div>
                         )}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1773,11 +1771,11 @@ function ProviderPage() {
 
               {jobs.length > 0 && (
                 <div className="mt-6">
-                  <div className="text-sm font-medium">Open Roles</div>
+                  <div className="text-sm font-medium">Open Jobs</div>
                   <div className="mt-2 space-y-2">
                     {jobs.map((j) => (
                       <div key={j.id} className="rounded-xl border border-neutral-200 p-3">
-                        <div className="font-medium text-sm">{j.title}</div>
+                        <div className="font-medium text-sm">Title: {j.title}</div>
                         {j.salary_range && <div className="text-xs text-neutral-600">{j.salary_range}</div>}
                         {j.description && <div className="mt-1 text-sm text-neutral-700 whitespace-pre-wrap">{j.description}</div>}
                         {j.apply_url && <div className="mt-1"><a className="text-xs underline" href={j.apply_url} target="_blank" rel="noreferrer">Apply</a></div>}
@@ -1786,7 +1784,7 @@ function ProviderPage() {
                   </div>
                 </div>
               )}
-            </div>
+          </div>
         )}
       </Container>
 
