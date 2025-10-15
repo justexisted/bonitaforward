@@ -1170,6 +1170,59 @@ export default function AdminPage() {
     }
   }
 
+  const loadJobPosts = async () => {
+    try {
+      console.log('[Admin] STARTING loadJobPosts')
+      
+      // Get auth session
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        console.error('[Admin] No session token available for job posts')
+        setError('Not authenticated')
+        return
+      }
+
+      // Call Netlify function with service role to bypass RLS
+      const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
+        (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
+      const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-job-posts` : '/.netlify/functions/admin-list-job-posts'
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[Admin] Job posts function error:', response.status, errorText)
+        throw new Error(`Function call failed: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.error) {
+        console.error('[Admin] Function returned error:', result.error)
+        throw new Error(result.error)
+      }
+
+      // Process the job posts data
+      const jobPostsData = result.jobPosts || []
+      console.log('[Admin] ✓ Received', jobPostsData.length, 'job posts from function')
+      
+      // Update state with the fetched data
+      setJobPosts(jobPostsData)
+      
+    } catch (error: any) {
+      console.error('[Admin] ❌ EXCEPTION in loadJobPosts:', error)
+      setError(`Failed to load job posts: ${error.message}`)
+      setJobPosts([])
+    }
+  }
+
   useEffect(() => {
     // Load content into editor when switching drafts
     if (editorRef.current) {
@@ -1590,86 +1643,9 @@ export default function AdminPage() {
           await loadChangeRequests()
         } catch {}
         try {
-          // console.log('[Admin] Loading job posts with provider details...')
-          
-          // Load job posts
-          const { data: jpData, error: jpError } = await supabase
-            .from('provider_job_posts')
-            .select('*')
-            .order('created_at', { ascending: false })
-          
-          // console.log('[Admin] Job posts query result:', { error: jpError, data: jpData, count: jpData?.length || 0 })
-          
-          if (jpError) {
-            console.error('[Admin] Job posts query error:', jpError)
-            setError(`Failed to load job posts: ${jpError.message}`)
-          } else if (jpData && jpData.length > 0) {
-            // Get unique provider IDs and owner IDs
-            const providerIds = [...new Set(jpData.map(j => j.provider_id).filter(Boolean))]
-            const ownerIds = [...new Set(jpData.map(j => j.owner_user_id).filter(Boolean))]
-            
-            // Fetch provider details
-            const { data: providersData } = await supabase
-              .from('providers')
-              .select('id, name, email')
-              .in('id', providerIds)
-            
-            // Fetch owner (user) details
-            const { data: ownersData } = await supabase
-              .from('profiles')
-              .select('id, email, name')
-              .in('id', ownerIds)
-            
-            // Combine data
-            const jobsWithDetails: ProviderJobPostWithDetails[] = jpData.map(job => {
-              const provider = providersData?.find(p => p.id === job.provider_id)
-              const owner = ownersData?.find(o => o.id === job.owner_user_id)
-              return {
-                ...job,
-                provider: provider || undefined,
-                owner: owner || undefined
-              }
-            })
-            
-            setJobPosts(jobsWithDetails)
-            // console.log('[Admin] Loaded', jobsWithDetails.length, 'job posts with provider details')
-          } else {
-            setJobPosts([])
-          }
-        } catch (err) {
-          console.error('[Admin] Error loading job posts:', err)
-          setError('Failed to load job posts')
-          // Try a simpler fallback query
-          try {
-            // console.log('[Admin] Trying fallback query...')
-            const { data: fallbackData, error: fallbackError } = await supabase
-              .from('provider_job_posts')
-              .select('id, provider_id, owner_user_id, title, status, created_at')
-              .order('created_at', { ascending: false })
-            
-            // console.log('[Admin] Fallback query result:', { error: fallbackError, data: fallbackData })
-            
-            if (!fallbackError && fallbackData) {
-              // Use fallback data with minimal fields
-              const minimalJobs: ProviderJobPostWithDetails[] = (fallbackData || []).map(job => ({
-                ...job,
-                description: null,
-                apply_url: null,
-                salary_range: null,
-                decided_at: null,
-                provider: undefined,
-                owner: undefined
-              }))
-              setJobPosts(minimalJobs)
-              // console.log('[Admin] Using fallback job data:', minimalJobs)
-            } else {
-              setJobPosts([])
-            }
-          } catch (fallbackErr) {
-            console.error('[Admin] Fallback query also failed:', fallbackErr)
-            setJobPosts([])
-          }
-        }
+          // Load job posts using Netlify function (bypasses RLS with SERVICE_ROLE_KEY)
+          await loadJobPosts()
+        } catch {}
       } catch (err: any) {
         console.error('[Admin] unexpected failure', err)
         if (!cancelled) setError(err?.message || 'Failed to load')
@@ -4921,7 +4897,8 @@ export default function AdminPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+
         {isAdmin && section === 'blog' && (
           <div className="mt-4 rounded-2xl border border-neutral-100 p-4 bg-white">
             <div className="font-medium">Blog Post Manager</div>
@@ -5944,8 +5921,7 @@ export default function AdminPage() {
             )}
           </div>
         )}
-      </div>
-    </div>
+    </section>
   )
 }
 function JobCard({ 
