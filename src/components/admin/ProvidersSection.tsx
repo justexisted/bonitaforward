@@ -1,9 +1,7 @@
 // Providers section component - extracted from Admin.tsx
 
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useAdminProviders } from '../../hooks/useAdminProviders'
-import { providerService } from '../../services/adminService'
-import { adminUtils } from '../../utils/adminUtils'
 import type { AdminSection } from '../../types/admin'
 
 interface ProvidersSectionProps {
@@ -17,17 +15,13 @@ export default function ProvidersSection({ isAdmin, section }: ProvidersSectionP
     loading,
     error,
     savingProvider,
-    uploadingImages,
     retryProvider,
-    selectedProviderId,
     confirmDeleteProviderId,
     loadProviders,
     saveProvider,
     deleteProvider,
     toggleFeaturedStatus,
     updateSubscriptionType,
-    handleImageUpload,
-    removeImage,
     setError,
     setRetryProvider,
     setSelectedProviderId,

@@ -84,7 +84,7 @@ export function useAdminJobPosts() {
     }
   }, [])
 
-  const rejectJobPost = useCallback(async (job: ProviderJobPostWithDetails, reason?: string) => {
+  const rejectJobPost = useCallback(async (job: ProviderJobPostWithDetails, _reason?: string) => {
     setLoading(true)
     setError(null)
     try {
