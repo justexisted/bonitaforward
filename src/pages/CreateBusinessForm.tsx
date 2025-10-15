@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../App'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function CreateBusinessForm() {
   const auth = useAuth()

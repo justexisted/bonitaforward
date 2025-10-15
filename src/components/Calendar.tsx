@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, MapPin, Clock } from 'lucide-react'
 import { type CalendarEvent } from '../pages/Calendar'
-import { useAuth } from '../App'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
 interface CalendarProps {

@@ -48,7 +48,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../App'
+import { useAuth } from '../contexts/AuthContext'
 import { Link, useLocation } from 'react-router-dom'
 import { createProviderChangeRequest, type ProviderChangeRequest, dismissNotification as dismissNotificationDB, getDismissedNotifications, getLatestActivityTimestamp, type DismissedNotification } from '../lib/supabaseData'
 

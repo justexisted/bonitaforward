@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../App'
+import { useAuth } from '../contexts/AuthContext'
 import { Link } from 'react-router-dom'
 import { type CalendarEvent } from './Calendar'
 

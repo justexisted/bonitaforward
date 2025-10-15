@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../App'
+import { useAuth } from '../contexts/AuthContext'
 import { ChevronUp, ChevronDown, MapPin, Calendar, Clock, X } from 'lucide-react'
 import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 

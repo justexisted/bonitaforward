@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../App'
+import { useAuth } from '../contexts/AuthContext'
 import { deleteBlogPost, fetchAllBlogPosts, upsertBlogPost, uploadBlogImage, deleteBlogImage, type BlogPost } from '../lib/supabaseData'
 import { type CalendarEvent } from './Calendar'
 // iCalendar parsing moved to server-side Netlify function for reliability

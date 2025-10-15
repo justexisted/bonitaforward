@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../App'
+import { useAuth } from '../contexts/AuthContext'
 
 /**
  * SignIn page: modern, minimal auth screen with
