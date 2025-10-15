@@ -816,6 +816,75 @@ export default function MyBusinessPage() {
   }
 
   /**
+   * PROMPT AND UPLOAD IMAGES
+   * Opens a file picker, uploads selected images to Supabase Storage, then updates the listing's images array
+   */
+  const promptAndUploadImages = async (listing: BusinessListing) => {
+    try {
+      if (!auth.userId) {
+        setMessage('You must be signed in to upload images.')
+        return
+      }
+
+      // Create a transient file input to avoid persistent hidden inputs per row
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      // Featured listings may upload multiple images; free could be limited to 1 if desired
+      input.multiple = true
+
+      input.onchange = async () => {
+        const files = Array.from(input.files || [])
+        if (files.length === 0) return
+
+        setMessage('Uploading images...')
+        const uploadedUrls: string[] = []
+
+        for (const file of files) {
+          // Unique path per user/listing/filename
+          const path = `${auth.userId}/${listing.id}/${Date.now()}-${file.name}`
+          const { error: uploadErr } = await supabase.storage.from('business-images').upload(path, file, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+          if (uploadErr) {
+            console.error('[MyBusiness] Image upload failed:', uploadErr)
+            setMessage(`Image upload failed: ${uploadErr.message}`)
+            return
+          }
+          const { data: pub } = supabase.storage.from('business-images').getPublicUrl(path)
+          if (pub?.publicUrl) uploadedUrls.push(pub.publicUrl)
+        }
+
+        // Merge with existing images
+        const newImages = [...(listing.images || []), ...uploadedUrls]
+
+        // Persist to providers table
+        const { error: updateErr } = await supabase
+          .from('providers')
+          .update({ images: newImages, updated_at: new Date().toISOString() })
+          .eq('id', listing.id)
+          .eq('owner_user_id', auth.userId)
+
+        if (updateErr) {
+          console.error('[MyBusiness] Failed to update listing images:', updateErr)
+          setMessage(`Failed to update listing: ${updateErr.message}`)
+          return
+        }
+
+        setMessage('Images uploaded successfully!')
+        await loadBusinessData()
+      }
+
+      // Trigger picker
+      input.click()
+    } catch (err: any) {
+      console.error('[MyBusiness] Unexpected error during image upload:', err)
+      setMessage(`Unexpected error: ${err.message || err}`)
+    }
+  }
+
+  /**
    * CREATE NEW BUSINESS LISTING
    * 
    * This function allows business owners to create new business listings directly.
@@ -2095,7 +2164,18 @@ export default function MyBusinessPage() {
                               </div>
                             ))}
                           </div>
-                          <p className="text-xs text-neutral-500 mt-2">Click any image to view full size</p>
+                          <div className="mt-3 flex items-center justify-between">
+                            <p className="text-xs text-neutral-500">Click any image to view full size</p>
+                            <button
+                              onClick={() => promptAndUploadImages(listing)}
+                              className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              Upload Images
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="mt-4">
@@ -2108,7 +2188,10 @@ export default function MyBusinessPage() {
                               <p className="text-sm text-neutral-500 mb-4 max-w-sm">
                                 Showcase your business with high-quality photos to attract more customers
                               </p>
-                              <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                              <button
+                                onClick={() => promptAndUploadImages(listing)}
+                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                              >
                                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                 </svg>
