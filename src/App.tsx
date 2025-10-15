@@ -1111,10 +1111,9 @@ function Hero() {
 function ProviderPage() {
   const params = useParams()
   const providerIdentifier = params.id as string // Can be either ID or slug
-  const [version, setVersion] = useState(0) // Force re-render when providers update
   
   // Listen for provider updates to handle page refreshes
-  useProviderUpdates(() => { setVersion(v => v + 1) }, [])
+  useProviderUpdates(() => {}, [])
   
   const all: Provider[] = getAllProviders(providersByCategory)
   
