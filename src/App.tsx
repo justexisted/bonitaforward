@@ -1293,7 +1293,7 @@ function ProviderPage() {
           <div className="text-sm text-neutral-600">Provider not found.</div>
         ) : (
           <div>
-            {/* Hero Image Section */}
+            {/* Hero Image Section - Show for any image */}
             {provider.images && provider.images.length > 0 ? (
               <div className="relative w-full h-[50vh] max-h-96 mb-6 rounded-2xl overflow-hidden">
                 <img
@@ -1302,21 +1302,21 @@ function ProviderPage() {
                   className="w-full h-full object-cover"
                 />
                 {/* Enhanced gradient overlay for better text readability and button visibility */}
-                <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-black/20 to-black/50"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-black/0 via-black/10 to-black/25"></div>
                 {/* Additional gradient from bottom for Save Business button area */}
-                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/60 to-transparent"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/30 to-transparent"></div>
                 
                 {/* Title overlay - top left */}
                 <div className="absolute top-6 left-6">
-                  <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-2xl">
+                  <h1 className="text-3xl md:text-4xl font-bold text-white" style={{ textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.6)' }}>
                     {provider.name}
                   </h1>
                   {provider.rating && (
                     <div className="flex items-center gap-1 mt-2">
-                      <svg className="w-5 h-5 text-amber-400 drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20" style={{ filter: 'drop-shadow(2px 2px 6px rgba(0, 0, 0, 0.8))' }}>
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                       </svg>
-                      <span className="text-white drop-shadow-2xl font-medium">{provider.rating.toFixed(1)}</span>
+                      <span className="text-white font-medium" style={{ textShadow: '2px 2px 8px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.6)' }}>{provider.rating.toFixed(1)}</span>
                     </div>
                   )}
                 </div>
@@ -1324,7 +1324,7 @@ function ProviderPage() {
                 {/* Featured badge overlay - top right */}
                 {provider.isMember && (
                   <div className="absolute top-6 right-6">
-                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-sm font-medium shadow-2xl">
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-sm font-medium" style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4)' }}>
                       ⭐ Featured
                     </span>
                   </div>
@@ -1336,12 +1336,13 @@ function ProviderPage() {
                     <button
                       onClick={toggleSaveProvider}
                       disabled={saving}
-                      className="rounded-full bg-white/95 backdrop-blur-sm text-neutral-900 px-4 py-2 text-sm font-medium hover:bg-white transition-colors shadow-2xl"
+                      className="rounded-full bg-white/95 backdrop-blur-sm text-neutral-900 px-4 py-2 text-sm font-medium hover:bg-white transition-colors"
+                      style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4)' }}
                     >
                       {saving ? 'Please wait…' : isSaved ? 'Saved ✓' : 'Save Business'}
                     </button>
                     {saveMsg && (
-                      <div className="mt-2 text-xs text-white drop-shadow-2xl bg-black/50 rounded px-2 py-1 backdrop-blur-sm">
+                      <div className="mt-2 text-xs text-white bg-black/50 rounded px-2 py-1 backdrop-blur-sm" style={{ textShadow: '1px 1px 4px rgba(0, 0, 0, 0.8)' }}>
                         {saveMsg}
                       </div>
                     )}
@@ -1397,66 +1398,43 @@ function ProviderPage() {
                 </div>
               )}
 
-              {/* Additional Images Grid - Only show if more than 1 image */}
+              {/* Additional Images Gallery - Show only additional images */}
               {provider.images && provider.images.length > 1 && (
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">More Photos</h3>
-                  {isFeaturedProvider(provider) ? (
-                    // Featured accounts: Dynamic responsive image grid based on image count
-                    <div className={`grid gap-3 ${
-                      provider.images.length === 2 ? 'grid-cols-2' :
-                      provider.images.length === 3 ? 'grid-cols-3' :
-                      'grid-cols-2' // 4 or more images
-                    }`}>
-                      {provider.images.slice(1).map((image, index) => (
-                        <div key={index} className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer">
-                          <img
-                            src={image}
-                            alt={`${provider.name} photo ${index + 2}`}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            onClick={() => setSelectedImage(image)}
-                            onError={(e) => {
-                              const img = e.currentTarget as HTMLImageElement
-                              img.style.display = 'none'
-                              img.parentElement!.innerHTML = `
-                                <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                                  <div class="text-center text-neutral-500">
-                                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                    <p class="text-xs">Image unavailable</p>
-                                  </div>
+                  
+                  {/* Dynamic grid based on remaining image count */}
+                  <div className={`grid gap-3 ${
+                    (provider.images.length - 1) === 1 ? 'grid-cols-1' :
+                    (provider.images.length - 1) === 2 ? 'grid-cols-2' :
+                    (provider.images.length - 1) === 3 ? 'grid-cols-3' :
+                    'grid-cols-2' // 4 or more remaining images
+                  }`}>
+                    {provider.images.slice(1).map((image, index) => (
+                      <div key={index} className="relative group aspect-video md:aspect-[4/3] overflow-hidden rounded-lg cursor-pointer">
+                        <img
+                          src={image}
+                          alt={`${provider.name} photo ${index + 1}`}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          onClick={() => setSelectedImage(image)}
+                          onError={(e) => {
+                            const img = e.currentTarget as HTMLImageElement
+                            img.style.display = 'none'
+                            img.parentElement!.innerHTML = `
+                              <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                                <div class="text-center text-neutral-500">
+                                  <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <p class="text-xs">Image unavailable</p>
                                 </div>
-                              `
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    // Non-featured accounts: Show remaining images in a simple grid
-                    <div className="grid grid-cols-2 gap-3">
-                      {provider.images.slice(1, 3).map((image, index) => (
-                        <div key={index} className="relative group aspect-square overflow-hidden rounded-lg cursor-pointer">
-                          <img
-                            src={image}
-                            alt={`${provider.name} photo ${index + 2}`}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            onClick={() => setSelectedImage(image)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Optional: Show upgrade message for non-featured accounts with multiple images */}
-                  {!isFeaturedProvider(provider) && provider.images.length > 3 && (
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-800">
-                        <strong>Upgrade to Featured</strong> to showcase all {provider.images.length} images in an interactive gallery!
-                      </p>
-                    </div>
-                  )}
+                              </div>
+                            `
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               
@@ -1670,22 +1648,6 @@ function ProviderPage() {
                   </div>
                 )}
 
-                {/* Tags */}
-                {provider.tags && provider.tags.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Tags</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {provider.tags.map((tag, index) => (
-                        <span 
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded text-sm bg-neutral-100 text-neutral-700"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Booking System - Featured Providers Only */}
