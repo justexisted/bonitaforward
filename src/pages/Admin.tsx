@@ -4738,6 +4738,326 @@ export default function AdminPage() {
                               </div>
                             </div>
                           )}
+
+                          {/* Approved Requests */}
+                          {requests.some(r => r.status === 'approved') && (
+                            <div>
+                              <div className="font-medium text-green-800 mb-3">✅ Approved Requests</div>
+                              <div className="space-y-3">
+                                {requests.filter(r => r.status === 'approved').map((r) => {
+                                  const currentProvider = providers.find(p => p.id === r.provider_id);
+                                  const changeDiff = computeChangeDiff(currentProvider, r.changes);
+                                  const isRequestExpanded = expandedChangeRequestIds.has(r.id);
+
+                                  return (
+                                    <div
+                                      key={r.id}
+                                      className="rounded-xl border border-green-200 p-3 bg-green-50 shadow-sm"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="font-medium text-green-900">
+                                          {r.type === 'update'
+                                            ? 'Business Listing Update'
+                                            : r.type === 'delete'
+                                            ? 'Business Listing Deletion'
+                                            : r.type === 'feature_request'
+                                            ? 'Featured Upgrade Request'
+                                            : r.type === 'claim'
+                                            ? 'Business Claim Request'
+                                            : r.type}
+                                        </div>
+                                        <div className="text-xs text-green-600">
+                                          {new Date(r.created_at).toLocaleString()}
+                                        </div>
+                                      </div>
+
+                                      {/* Owner Information */}
+                                      <div className="text-xs text-green-700 mt-2 space-y-1">
+                                        <div>
+                                          <strong>Owner:</strong>{' '}
+                                          {r.profiles?.name || r.profiles?.email || 'Loading...'}
+                                        </div>
+                                        <div>
+                                          <strong>Owner Email:</strong>{' '}
+                                          {r.profiles?.email || 'Loading...'}
+                                        </div>
+                                      </div>
+
+                                      {/* Show what changed */}
+                                      {r.type === 'update' && changeDiff.length > 0 && (
+                                        <div className="mt-3">
+                                          <div className="text-xs font-semibold text-green-800 mb-2">
+                                            Changes Applied ({changeDiff.length} field
+                                            {changeDiff.length !== 1 ? 's' : ''}):
+                                          </div>
+                                          {changeDiff.map((diff, idx) => (
+                                            <div
+                                              key={diff.field}
+                                              className={idx > 0 ? 'pt-2 border-t border-green-200' : ''}
+                                            >
+                                              <div className="text-xs font-semibold text-green-900 mb-1">
+                                                {diff.fieldLabel}
+                                              </div>
+                                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                  <span className="text-red-700 font-medium">Old:</span>
+                                                  <div className="text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200 break-words">
+                                                    {formatValueForDisplay(diff.oldValue)}
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <span className="text-green-700 font-medium">New:</span>
+                                                  <div className="text-green-600 mt-1 p-2 bg-green-50 rounded border border-green-200 break-words">
+                                                    {formatValueForDisplay(diff.newValue)}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Show all proposed changes for non-update types */}
+                                      {r.type !== 'update' && r.changes && Object.keys(r.changes || {}).length > 0 && (
+                                        <div className="mt-2 p-2 bg-white rounded-lg border border-green-200">
+                                          <div className="text-xs font-medium text-green-700 mb-1">
+                                            Changes Applied:
+                                          </div>
+                                          <div className="text-xs text-green-600 space-y-1">
+                                            {Object.entries(r.changes || {}).map(([field, value]) => (
+                                              <div key={field} className="flex justify-between">
+                                                <span className="font-medium capitalize">
+                                                  {field.replace(/_/g, ' ')}:
+                                                </span>
+                                                <span className="ml-2">{formatValueForDisplay(value)}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {r.reason && (
+                                        <div className="text-xs text-green-600 mt-2 p-2 bg-green-100 border border-green-200 rounded">
+                                          <strong>Reason:</strong> {r.reason}
+                                        </div>
+                                      )}
+
+                                      {/* Button to show all details */}
+                                      <button
+                                        onClick={() => toggleChangeRequestExpansion(r.id)}
+                                        className="mt-3 text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                                      >
+                                        {isRequestExpanded ? (
+                                          <>
+                                            <ChevronUp className="w-3 h-3" />
+                                            Hide Full Details
+                                          </>
+                                        ) : (
+                                          <>
+                                            <ChevronDown className="w-3 h-3" />
+                                            View Full Business Details
+                                          </>
+                                        )}
+                                      </button>
+
+                                      {/* Expanded view showing all current business details */}
+                                      {isRequestExpanded && currentProvider && (
+                                        <div className="mt-3 p-3 bg-white border border-green-200 rounded-lg">
+                                          <div className="text-xs font-semibold text-green-700 mb-2">
+                                            Complete Business Information:
+                                          </div>
+                                          <div className="text-xs text-green-600 space-y-1">
+                                            <div><strong>ID:</strong> {currentProvider.id}</div>
+                                            <div><strong>Name:</strong> {currentProvider.name}</div>
+                                            <div><strong>Category:</strong> {currentProvider.category_key}</div>
+                                            <div><strong>Phone:</strong> {currentProvider.phone || '(not set)'}</div>
+                                            <div><strong>Email:</strong> {currentProvider.email || '(not set)'}</div>
+                                            <div><strong>Website:</strong> {currentProvider.website || '(not set)'}</div>
+                                            <div><strong>Address:</strong> {currentProvider.address || '(not set)'}</div>
+                                            <div><strong>Description:</strong> {currentProvider.description || '(not set)'}</div>
+                                            <div><strong>Tags:</strong> {currentProvider.tags?.join(', ') || '(none)'}</div>
+                                            <div><strong>Specialties:</strong> {currentProvider.specialties?.join(', ') || '(none)'}</div>
+                                            <div><strong>Service Areas:</strong> {currentProvider.service_areas?.join(', ') || '(none)'}</div>
+                                            <div><strong>Bonita Discount:</strong> {currentProvider.bonita_resident_discount || '(none)'}</div>
+                                            <div><strong>Member Status:</strong> {currentProvider.is_member ? 'Yes' : 'No'}</div>
+                                            <div><strong>Booking Enabled:</strong> {currentProvider.booking_enabled ? 'Yes' : 'No'}</div>
+                                            {currentProvider.booking_enabled && (
+                                              <>
+                                                <div><strong>Booking Type:</strong> {currentProvider.booking_type || '(not set)'}</div>
+                                                <div><strong>Booking Instructions:</strong> {currentProvider.booking_instructions || '(not set)'}</div>
+                                                <div><strong>Booking URL:</strong> {currentProvider.booking_url || '(not set)'}</div>
+                                              </>
+                                            )}
+                                            <div><strong>Images:</strong> {currentProvider.images?.length || 0} image(s)</div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Rejected Requests */}
+                          {requests.some(r => r.status === 'rejected') && (
+                            <div>
+                              <div className="font-medium text-red-800 mb-3">❌ Rejected Requests</div>
+                              <div className="space-y-3">
+                                {requests.filter(r => r.status === 'rejected').map((r) => {
+                                  const currentProvider = providers.find(p => p.id === r.provider_id);
+                                  const changeDiff = computeChangeDiff(currentProvider, r.changes);
+                                  const isRequestExpanded = expandedChangeRequestIds.has(r.id);
+
+                                  return (
+                                    <div
+                                      key={r.id}
+                                      className="rounded-xl border border-red-200 p-3 bg-red-50 shadow-sm"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="font-medium text-red-900">
+                                          {r.type === 'update'
+                                            ? 'Business Listing Update'
+                                            : r.type === 'delete'
+                                            ? 'Business Listing Deletion'
+                                            : r.type === 'feature_request'
+                                            ? 'Featured Upgrade Request'
+                                            : r.type === 'claim'
+                                            ? 'Business Claim Request'
+                                            : r.type}
+                                        </div>
+                                        <div className="text-xs text-red-600">
+                                          {new Date(r.created_at).toLocaleString()}
+                                        </div>
+                                      </div>
+
+                                      {/* Owner Information */}
+                                      <div className="text-xs text-red-700 mt-2 space-y-1">
+                                        <div>
+                                          <strong>Owner:</strong>{' '}
+                                          {r.profiles?.name || r.profiles?.email || 'Loading...'}
+                                        </div>
+                                        <div>
+                                          <strong>Owner Email:</strong>{' '}
+                                          {r.profiles?.email || 'Loading...'}
+                                        </div>
+                                      </div>
+
+                                      {/* Show what was requested */}
+                                      {r.type === 'update' && changeDiff.length > 0 && (
+                                        <div className="mt-3">
+                                          <div className="text-xs font-semibold text-red-800 mb-2">
+                                            Changes Requested ({changeDiff.length} field
+                                            {changeDiff.length !== 1 ? 's' : ''}):
+                                          </div>
+                                          {changeDiff.map((diff, idx) => (
+                                            <div
+                                              key={diff.field}
+                                              className={idx > 0 ? 'pt-2 border-t border-red-200' : ''}
+                                            >
+                                              <div className="text-xs font-semibold text-red-900 mb-1">
+                                                {diff.fieldLabel}
+                                              </div>
+                                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                  <span className="text-red-700 font-medium">Current:</span>
+                                                  <div className="text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200 break-words">
+                                                    {formatValueForDisplay(diff.oldValue)}
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <span className="text-red-700 font-medium">Requested:</span>
+                                                  <div className="text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200 break-words">
+                                                    {formatValueForDisplay(diff.newValue)}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Show all proposed changes for non-update types */}
+                                      {r.type !== 'update' && r.changes && Object.keys(r.changes || {}).length > 0 && (
+                                        <div className="mt-2 p-2 bg-white rounded-lg border border-red-200">
+                                          <div className="text-xs font-medium text-red-700 mb-1">
+                                            Changes Requested:
+                                          </div>
+                                          <div className="text-xs text-red-600 space-y-1">
+                                            {Object.entries(r.changes || {}).map(([field, value]) => (
+                                              <div key={field} className="flex justify-between">
+                                                <span className="font-medium capitalize">
+                                                  {field.replace(/_/g, ' ')}:
+                                                </span>
+                                                <span className="ml-2">{formatValueForDisplay(value)}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {r.reason && (
+                                        <div className="text-xs text-red-600 mt-2 p-2 bg-red-100 border border-red-200 rounded">
+                                          <strong>Rejection Reason:</strong> {r.reason}
+                                        </div>
+                                      )}
+
+                                      {/* Button to show all details */}
+                                      <button
+                                        onClick={() => toggleChangeRequestExpansion(r.id)}
+                                        className="mt-3 text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                                      >
+                                        {isRequestExpanded ? (
+                                          <>
+                                            <ChevronUp className="w-3 h-3" />
+                                            Hide Full Details
+                                          </>
+                                        ) : (
+                                          <>
+                                            <ChevronDown className="w-3 h-3" />
+                                            View Full Business Details
+                                          </>
+                                        )}
+                                      </button>
+
+                                      {/* Expanded view showing all current business details */}
+                                      {isRequestExpanded && currentProvider && (
+                                        <div className="mt-3 p-3 bg-white border border-red-200 rounded-lg">
+                                          <div className="text-xs font-semibold text-red-700 mb-2">
+                                            Complete Business Information:
+                                          </div>
+                                          <div className="text-xs text-red-600 space-y-1">
+                                            <div><strong>ID:</strong> {currentProvider.id}</div>
+                                            <div><strong>Name:</strong> {currentProvider.name}</div>
+                                            <div><strong>Category:</strong> {currentProvider.category_key}</div>
+                                            <div><strong>Phone:</strong> {currentProvider.phone || '(not set)'}</div>
+                                            <div><strong>Email:</strong> {currentProvider.email || '(not set)'}</div>
+                                            <div><strong>Website:</strong> {currentProvider.website || '(not set)'}</div>
+                                            <div><strong>Address:</strong> {currentProvider.address || '(not set)'}</div>
+                                            <div><strong>Description:</strong> {currentProvider.description || '(not set)'}</div>
+                                            <div><strong>Tags:</strong> {currentProvider.tags?.join(', ') || '(none)'}</div>
+                                            <div><strong>Specialties:</strong> {currentProvider.specialties?.join(', ') || '(none)'}</div>
+                                            <div><strong>Service Areas:</strong> {currentProvider.service_areas?.join(', ') || '(none)'}</div>
+                                            <div><strong>Bonita Discount:</strong> {currentProvider.bonita_resident_discount || '(none)'}</div>
+                                            <div><strong>Member Status:</strong> {currentProvider.is_member ? 'Yes' : 'No'}</div>
+                                            <div><strong>Booking Enabled:</strong> {currentProvider.booking_enabled ? 'Yes' : 'No'}</div>
+                                            {currentProvider.booking_enabled && (
+                                              <>
+                                                <div><strong>Booking Type:</strong> {currentProvider.booking_type || '(not set)'}</div>
+                                                <div><strong>Booking Instructions:</strong> {currentProvider.booking_instructions || '(not set)'}</div>
+                                                <div><strong>Booking URL:</strong> {currentProvider.booking_url || '(not set)'}</div>
+                                              </>
+                                            )}
+                                            <div><strong>Images:</strong> {currentProvider.images?.length || 0} image(s)</div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

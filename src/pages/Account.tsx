@@ -149,52 +149,63 @@ export default function AccountPage() {
         // This includes appointments made through the Google Calendar booking system
         console.log('[Account] Loading booking events for user:', auth.email)
         try {
-          const { data, error } = await supabase
-            .from('booking_events')
-            .select(`
-              id,
-              provider_id,
-              customer_email,
-              customer_name,
-              booking_date,
-              booking_duration_minutes,
-              booking_notes,
-              status,
-              created_at,
-              providers!inner(name, category_key, address, phone)
-            `)
-            .eq('customer_email', auth.email)
-            .order('booking_date', { ascending: false })
-            .limit(50)
+          // Use Netlify function to bypass RLS issues
+          const isLocal = window.location.hostname === 'localhost'
+          const fnBase = isLocal ? 'http://localhost:8888' : ''
+          const url = fnBase ? `${fnBase}/.netlify/functions/admin-list-booking-events` : '/.netlify/functions/admin-list-booking-events'
           
-          console.log('[Account] Booking events query result:', { data: data?.length || 0, error })
-          
-          if (error) {
-            console.error('[Account] booking_events select error:', error)
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session?.access_token) {
+            console.error('[Account] No session token available for booking events')
             setBookings([])
-          } else {
-            const rows = (data as any[]) || []
-            console.log('[Account] Processing booking events:', rows.length, 'bookings found')
-            
-            const processedBookings = rows.map((r) => ({
-              id: r.id,
-              provider_id: r.provider_id ?? null,
-              provider_name: r.providers?.name ?? null,
-              time: r.booking_date ?? null,
-              status: r.status ?? null,
-              created_at: r.created_at ?? null,
-              customer_name: r.customer_name ?? null,
-              customer_email: r.customer_email ?? null,
-              booking_duration_minutes: r.booking_duration_minutes ?? null,
-              booking_notes: r.booking_notes ?? null,
-              provider_category: r.providers?.category_key ?? null,
-              provider_address: r.providers?.address ?? null,
-              provider_phone: r.providers?.phone ?? null,
-            }))
-            
-            console.log('[Account] Setting bookings state:', processedBookings.length, 'processed bookings')
-            setBookings(processedBookings)
+            return
           }
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ customerEmail: auth.email })
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('[Account] Booking events function error:', response.status, errorText)
+            setBookings([])
+            return
+          }
+
+          const result = await response.json()
+
+          if (result.error) {
+            console.error('[Account] Booking events function returned error:', result.error)
+            setBookings([])
+            return
+          }
+
+          const bookingEvents = result.bookingEvents || []
+          console.log('[Account] Processing booking events:', bookingEvents.length, 'bookings found')
+          
+          const processedBookings = bookingEvents.map((r: any) => ({
+            id: r.id,
+            provider_id: r.provider_id ?? null,
+            provider_name: r.providers?.name ?? null,
+            time: r.booking_date ?? null,
+            status: r.status ?? null,
+            created_at: r.created_at ?? null,
+            customer_name: r.customer_name ?? null,
+            customer_email: r.customer_email ?? null,
+            booking_duration_minutes: r.booking_duration_minutes ?? null,
+            booking_notes: r.booking_notes ?? null,
+            provider_category: r.providers?.category_key ?? null,
+            provider_address: r.providers?.address ?? null,
+            provider_phone: r.providers?.phone ?? null,
+          }))
+          
+          console.log('[Account] Setting bookings state:', processedBookings.length, 'processed bookings')
+          setBookings(processedBookings)
         } catch (e) {
           console.error('[Account] booking_events load failed:', e)
           setBookings([])
