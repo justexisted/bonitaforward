@@ -2058,33 +2058,44 @@ export default function AdminPage() {
       const startTime = Date.now()
       
       try {
-        // DIRECT UPDATE: Simple, direct update without AbortController complexity
-        // This approach is more reliable and less prone to timeout issues
-        const { error } = await supabase
-          .from('providers')
-          .update(updateData)
-          .eq('id', p.id)
+        // Use Netlify function to bypass RLS issues
+        const url = '/.netlify/functions/admin-update-provider'
         
-        // const duration = Date.now() - startTime
-        // console.log(`[Admin] Database update completed in ${duration}ms`)
-        
-        if (error) {
-          console.error('[Admin] Provider save error:', error)
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            providerId: p.id,
+            updates: updateData
+          })
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('[Admin] Provider update function error:', response.status, errorText)
           
           // IMPROVED ERROR HANDLING: Provide specific error messages based on error type
-          if (error.message.includes('timeout') || error.message.includes('aborted')) {
-            setError(`Database operation timed out. This might be due to network issues or server load. Please try again in a moment.`)
-            setRetryProvider(p) // Store provider for retry
-          } else if (error.message.includes('permission') || error.message.includes('denied')) {
+          if (response.status === 403) {
             setError(`Permission denied. Please check your admin access and try again.`)
-          } else if (error.message.includes('network') || error.message.includes('connection')) {
-            setError(`Network error. Please check your internet connection and try again.`)
+          } else if (response.status === 401) {
+            setError(`Authentication failed. Please refresh the page and try again.`)
+          } else if (response.status >= 500) {
+            setError(`Server error. Please try again in a moment.`)
             setRetryProvider(p) // Store provider for retry
-          } else if (error.message.includes('foreign key') || error.message.includes('constraint')) {
-            setError(`Database constraint error: ${error.message}. Please contact support.`)
           } else {
-            setError(`Failed to save provider: ${error.message}`)
+            setError(`Failed to save provider: ${errorText}`)
           }
+          return
+        }
+
+        const result = await response.json()
+
+        if (result.error) {
+          console.error('[Admin] Function returned error:', result.error)
+          setError(`Failed to save provider: ${result.error}`)
           return
         }
         
