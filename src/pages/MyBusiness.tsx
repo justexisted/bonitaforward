@@ -432,10 +432,11 @@ export default function MyBusinessPage() {
       if (appsError) throw appsError
 
       // Load job posts for all user's providers
-      const providerIds = [
-        ...(listingsData || []).map(l => l.id),
-        ...(emailListingsData || []).map(l => l.id)
-      ]
+      // const providerIds = [
+      //   ...(listingsData || []).map(l => l.id),
+      //   ...(emailListingsData || []).map(l => l.id)
+      // ]
+      // Note: Job posts functionality temporarily disabled - provider_job_posts table doesn't exist
       
       let jobPostsData: JobPost[] = []
       // TEMPORARILY DISABLED: provider_job_posts table doesn't exist
@@ -1038,7 +1039,7 @@ export default function MyBusinessPage() {
    * This function allows business owners to create job postings for their business.
    * It creates an entry in the provider_job_posts table for admin review.
    */
-  const createJobPost = async (providerId: string, jobData: {
+  const createJobPost = async (_providerId: string, _jobData: {
     title: string
     description?: string
     apply_url?: string
@@ -1259,7 +1260,7 @@ export default function MyBusinessPage() {
    * This function deletes a job post from the database.
    * It removes the job post entry and refreshes the data.
    */
-  const deleteJobPost = async (jobId: string) => {
+  const deleteJobPost = async (_jobId: string) => {
     if (!confirm('Are you sure you want to delete this job post? This action cannot be undone.')) {
       return
     }
