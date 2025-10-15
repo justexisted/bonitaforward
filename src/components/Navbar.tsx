@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useAuth, saveReturnUrl } from '../contexts/AuthContext'
 import CardNav, { type CardNavItem } from './CardNav'
 
