@@ -37,8 +37,8 @@ export const handler: Handler = async (event) => {
       .from('provider_job_posts')
       .select(`
         *,
-        provider:providers(id, name, email),
-        owner:profiles(id, email, name)
+        providers!provider_id(id, name, email),
+        profiles!owner_user_id(id, email, name)
       `)
       .order('created_at', { ascending: false })
 
