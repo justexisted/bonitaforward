@@ -909,6 +909,7 @@ export default function AdminPage() {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
   const [expandedChangeRequestIds, setExpandedChangeRequestIds] = useState<Set<string>>(new Set())
+  const [expandedBusinessDropdowns, setExpandedBusinessDropdowns] = useState<Set<string>>(new Set())
   const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
   const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
@@ -2393,6 +2394,21 @@ export default function AdminPage() {
         newSet.delete(requestId)
       } else {
         newSet.add(requestId)
+      }
+      return newSet
+    })
+  }
+
+  /**
+   * Toggle expansion of a business dropdown
+   */
+  function toggleBusinessDropdown(businessName: string) {
+    setExpandedBusinessDropdowns(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(businessName)) {
+        newSet.delete(businessName)
+      } else {
+        newSet.add(businessName)
       }
       return newSet
     })
@@ -4516,45 +4532,99 @@ export default function AdminPage() {
             <div className="font-medium">Owner Change Requests & Logs</div>
             <div className="mt-2 space-y-2 text-sm">
               
-              {/* Pending Requests (Non-Featured Businesses) */}
-              {changeRequests.filter((r) => r.status === 'pending').length > 0 && (
-                <div className="mb-4">
-                  <div className="font-medium text-amber-800 mb-2">📋 Pending Requests (Require Approval)</div>
-                  <div className="space-y-2">
-                    {changeRequests.filter((r) => r.status === 'pending').map((r) => {
-                // Find the current provider data to compare with proposed changes
-                const currentProvider = providers.find(p => p.id === r.provider_id)
-                const changeDiff = computeChangeDiff(currentProvider, r.changes)
-                const isExpanded = expandedChangeRequestIds.has(r.id)
-                
-                return (
-                  <div key={r.id} className="rounded-xl border border-neutral-200 p-3 bg-white shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium text-neutral-900">
-                        {r.type === 'update' ? 'Business Listing Update' : 
-                         r.type === 'delete' ? 'Business Listing Deletion' :
-                         r.type === 'feature_request' ? 'Featured Upgrade Request' :
-                         r.type === 'claim' ? 'Business Claim Request' : r.type}
-                      </div>
-                      <div className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</div>
-                    </div>
-                    
-                    {/* Business Information */}
-                    <div className="text-xs text-neutral-600 mt-2 space-y-1">
-                      <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
-                      <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
-                      <div><strong>Owner Email:</strong> {r.profiles?.email || 'Loading...'}</div>
-                    </div>
-                    
-                    {/* Show what changed - this is the key improvement */}
-                    {r.type === 'update' && changeDiff.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-xs font-semibold text-neutral-700 mb-2">
-                          Changes Requested ({changeDiff.length} field{changeDiff.length !== 1 ? 's' : ''}):
+              {/* Group change requests by business name */}
+              {(() => {
+                // Group requests by business name
+                const businessGroups = changeRequests.reduce((groups, r) => {
+                  const businessName = r.providers?.name || 'Unknown Business'
+                  if (!groups[businessName]) {
+                    groups[businessName] = []
+                  }
+                  groups[businessName].push(r)
+                  return groups
+                }, {} as Record<string, typeof changeRequests>)
+
+                return Object.entries(businessGroups).map(([businessName, requests]) => {
+                  const isExpanded = expandedBusinessDropdowns.has(businessName)
+                  const pendingCount = requests.filter(r => r.status === 'pending').length
+                  const approvedCount = requests.filter(r => r.status === 'approved').length
+                  const rejectedCount = requests.filter(r => r.status === 'rejected').length
+
+                  return (
+                    <div key={businessName} className="border border-neutral-200 rounded-lg">
+                      {/* Business Header - Always Visible */}
+                      <button
+                        onClick={() => toggleBusinessDropdown(businessName)}
+                        className="w-full px-4 py-3 text-left hover:bg-neutral-50 transition-colors flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="font-medium text-neutral-900">{businessName}</div>
+                          <div className="flex items-center gap-2 text-xs">
+                            {pendingCount > 0 && (
+                              <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full">
+                                {pendingCount} pending
+                              </span>
+                            )}
+                            {approvedCount > 0 && (
+                              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                                {approvedCount} approved
+                              </span>
+                            )}
+                            {rejectedCount > 0 && (
+                              <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full">
+                                {rejectedCount} rejected
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        
-                        {/* Show changed fields in a clean table-like format */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-neutral-500" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-neutral-500" />
+                        )}
+                      </button>
+
+                      {/* Collapsible Content */}
+                      {isExpanded && (
+                        <div className="border-t border-neutral-200 p-4 space-y-4">
+                          
+                          {/* Pending Requests */}
+                          {requests.filter(r => r.status === 'pending').length > 0 && (
+                            <div>
+                              <div className="font-medium text-amber-800 mb-3">📋 Pending Requests (Require Approval)</div>
+                              <div className="space-y-3">
+                                {requests.filter(r => r.status === 'pending').map((r) => {
+                                  const currentProvider = providers.find(p => p.id === r.provider_id)
+                                  const changeDiff = computeChangeDiff(currentProvider, r.changes)
+                                  const isRequestExpanded = expandedChangeRequestIds.has(r.id)
+                                  
+                                  return (
+                                    <div key={r.id} className="rounded-xl border border-neutral-200 p-3 bg-white shadow-sm">
+                                      <div className="flex items-center justify-between">
+                                        <div className="font-medium text-neutral-900">
+                                          {r.type === 'update' ? 'Business Listing Update' : 
+                                           r.type === 'delete' ? 'Business Listing Deletion' :
+                                           r.type === 'feature_request' ? 'Featured Upgrade Request' :
+                                           r.type === 'claim' ? 'Business Claim Request' : r.type}
+                                        </div>
+                                        <div className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleString()}</div>
+                                      </div>
+                                      
+                                      {/* Owner Information */}
+                                      <div className="text-xs text-neutral-600 mt-2 space-y-1">
+                                        <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
+                                        <div><strong>Owner Email:</strong> {r.profiles?.email || 'Loading...'}</div>
+                                      </div>
+                                      
+                                      {/* Show what changed */}
+                                      {r.type === 'update' && changeDiff.length > 0 && (
+                                        <div className="mt-3">
+                                          <div className="text-xs font-semibold text-neutral-700 mb-2">
+                                            Changes Requested ({changeDiff.length} field{changeDiff.length !== 1 ? 's' : ''}):
+                                          </div>
+                                          
+                                          {/* Show changed fields in a clean table-like format */}
+                                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
                           {changeDiff.map((diff, idx) => (
                             <div key={diff.field} className={`${idx > 0 ? 'pt-2 border-t border-blue-200' : ''}`}>
                               <div className="text-xs font-semibold text-blue-900 mb-1">

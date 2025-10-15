@@ -204,16 +204,24 @@ export default function MyBusinessPage() {
    * This defines all available tabs with their labels and counts.
    * Used for both the dropdown menu and tab display logic.
    */
+  // Helper function to get change requests for non-featured businesses only
+  const getNonFeaturedChangeRequests = () => {
+    const nonFeaturedBusinessIds = listings.filter(listing => !listing.is_member).map(listing => listing.id)
+    return changeRequests.filter(req => nonFeaturedBusinessIds.includes(req.provider_id))
+  }
+
+  const nonFeaturedChangeRequests = getNonFeaturedChangeRequests()
+
   const tabs = [
     { key: 'listings', label: 'Business Listings', count: listings.length },
     { key: 'applications', label: 'Applications', count: applications.length },
     { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
-    { key: 'change-requests', label: 'Change Requests', count: changeRequests.filter(req => req.status === 'pending').length },
+    { key: 'change-requests', label: 'Change Requests', count: nonFeaturedChangeRequests.filter(req => req.status === 'pending').length },
     { key: 'user-activity', label: 'User Activity', count: userActivity.length },
     { key: 'analytics', label: 'Analytics' },
-    { key: 'recently-approved', label: 'Recently Approved', count: changeRequests.filter(req => req.status === 'approved' && req.decided_at && new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length },
-    { key: 'recently-rejected', label: 'Recently Rejected', count: changeRequests.filter(req => req.status === 'rejected' && req.decided_at && new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length },
-    { key: 'pending-requests', label: 'Pending Requests', count: changeRequests.filter(req => req.status === 'pending').length }
+    { key: 'recently-approved', label: 'Recently Approved', count: nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length },
+    { key: 'recently-rejected', label: 'Recently Rejected', count: nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length },
+    { key: 'pending-requests', label: 'Pending Requests', count: nonFeaturedChangeRequests.filter(req => req.status === 'pending').length }
   ] as const
 
   // Get current tab information for dropdown display
@@ -1191,8 +1199,20 @@ export default function MyBusinessPage() {
    * 
    * This function checks if a notification should be displayed based on whether
    * there's new activity since the last dismissal.
+   * 
+   * CRITICAL FIX: Only show notifications for NON-FEATURED businesses.
+   * Featured businesses have changes applied immediately, so they don't need
+   * approval notifications.
    */
   const shouldShowNotification = (notificationType: 'pending' | 'approved' | 'rejected'): boolean => {
+    // Check if user has any non-featured businesses
+    const hasNonFeaturedBusinesses = listings.some(listing => !listing.is_member)
+    
+    // Only show notifications if user has non-featured businesses
+    if (!hasNonFeaturedBusinesses) {
+      return false
+    }
+    
     const dismissal = dismissedNotifications.find(d => d.notification_type === notificationType)
     
     if (!dismissal) {
@@ -1531,27 +1551,27 @@ export default function MyBusinessPage() {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
                   <span className="text-sm font-medium text-amber-800">
-                    {changeRequests.filter(req => req.status === 'pending').length} Pending
+                    {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length} Pending
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-sm font-medium text-green-800">
-                    {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+                    {nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && 
                       new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length} Recently Approved
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                   <span className="text-sm font-medium text-red-800">
-                    {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+                    {nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
                       new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length} Recently Rejected
                   </span>
                 </div>
               </div>
             </div>
             {/* Pending Requests */}
-            {changeRequests.filter(req => req.status === 'pending').length > 0 && shouldShowNotification('pending') && (
+            {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length > 0 && shouldShowNotification('pending') && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
@@ -1573,9 +1593,9 @@ export default function MyBusinessPage() {
                       </button>
                     </div>
                     <div className="mt-2 text-sm text-amber-700">
-                      <p className="mb-2">You have {changeRequests.filter(req => req.status === 'pending').length} change request(s) waiting for admin approval:</p>
+                      <p className="mb-2">You have {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length} change request(s) waiting for admin approval:</p>
                       <ul className="mt-2 space-y-2">
-                        {changeRequests.filter(req => req.status === 'pending').map(req => {
+                        {nonFeaturedChangeRequests.filter(req => req.status === 'pending').map(req => {
                           const listing = listings.find(l => l.id === req.provider_id)
                           const changeCount = req.changes ? Object.keys(req.changes).length : 0
                           
@@ -1626,7 +1646,7 @@ export default function MyBusinessPage() {
             )}
 
             {/* Recently Approved Requests */}
-            {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+            {nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && 
               new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length > 0 && shouldShowNotification('approved') && (
               <div className="rounded-xl border border-green-200 bg-green-50 p-4">
                 <div className="flex items-start">
@@ -1651,7 +1671,7 @@ export default function MyBusinessPage() {
                     <div className="mt-2 text-sm text-green-700">
                       <p className="mb-2">Great news! The following change requests have been approved:</p>
                       <ul className="mt-2 space-y-2">
-                        {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+                        {nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && 
                           new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map(req => {
                           const listing = listings.find(l => l.id === req.provider_id)
                           const changeCount = req.changes ? Object.keys(req.changes).length : 0
@@ -1703,7 +1723,7 @@ export default function MyBusinessPage() {
             )}
 
             {/* Recently Rejected Requests */}
-            {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+            {nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
               new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length > 0 && shouldShowNotification('rejected') && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                 <div className="flex items-start">
@@ -1727,7 +1747,7 @@ export default function MyBusinessPage() {
                     </div>
                     <div className="mt-2 text-sm text-red-700">
                       <ul className="space-y-1">
-                        {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+                        {nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
                           new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map(req => {
                           const listing = listings.find(l => l.id === req.provider_id)
                           return (
@@ -2474,7 +2494,7 @@ export default function MyBusinessPage() {
               </div>
             </div>
 
-            {changeRequests.length === 0 ? (
+            {nonFeaturedChangeRequests.length === 0 ? (
               <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
                 <h3 className="text-lg font-medium text-neutral-900">No Change Requests</h3>
                 <p className="mt-2 text-neutral-600">
@@ -2483,7 +2503,7 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {changeRequests.map((request) => (
+                {nonFeaturedChangeRequests.map((request) => (
                   <div key={request.id} className="rounded-xl border border-neutral-200 p-4 bg-white">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -2736,7 +2756,7 @@ export default function MyBusinessPage() {
               </div>
             </div>
 
-            {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+            {nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && 
               new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length === 0 ? (
               <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
                 <h3 className="text-lg font-medium text-neutral-900">No Recently Approved Requests</h3>
@@ -2746,7 +2766,7 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {changeRequests.filter(req => req.status === 'approved' && req.decided_at && 
+                {nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && 
                   new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map((request) => (
                   <div key={request.id} className="rounded-xl border border-green-200 p-4 bg-green-50">
                     <div className="flex items-center justify-between mb-3">
@@ -2801,7 +2821,7 @@ export default function MyBusinessPage() {
               </div>
             </div>
 
-            {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+            {nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
               new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length === 0 ? (
               <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
                 <h3 className="text-lg font-medium text-neutral-900">No Recently Rejected Requests</h3>
@@ -2811,7 +2831,7 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {changeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
+                {nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
                   new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map((request) => (
                   <div key={request.id} className="rounded-xl border border-red-200 p-4 bg-red-50">
                     <div className="flex items-center justify-between mb-3">
@@ -2866,7 +2886,7 @@ export default function MyBusinessPage() {
               </div>
             </div>
 
-            {changeRequests.filter(req => req.status === 'pending').length === 0 ? (
+            {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length === 0 ? (
               <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
                 <h3 className="text-lg font-medium text-neutral-900">No Pending Requests</h3>
                 <p className="mt-2 text-neutral-600">
@@ -2875,7 +2895,7 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {changeRequests.filter(req => req.status === 'pending').map((request) => (
+                {nonFeaturedChangeRequests.filter(req => req.status === 'pending').map((request) => (
                   <div key={request.id} className="rounded-xl border border-amber-200 p-4 bg-amber-50">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
