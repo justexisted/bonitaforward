@@ -1194,7 +1194,7 @@ export default function AdminPage() {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
+          'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -1246,7 +1246,7 @@ export default function AdminPage() {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
+          'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({}) // No customer email filter - get all bookings
@@ -2072,7 +2072,7 @@ export default function AdminPage() {
         const response = await fetch(url, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -2311,7 +2311,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({ listing_id: providerId })  // Function expects 'listing_id' not 'listingId'
       })
@@ -2634,7 +2634,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({ user_id: userId })
       })
@@ -2737,7 +2737,7 @@ export default function AdminPage() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
+              'Authorization': `Bearer ${session?.access_token}`
             },
             body: JSON.stringify({ user_id: pid })
           })
