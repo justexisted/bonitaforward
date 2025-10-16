@@ -432,33 +432,31 @@ export default function MyBusinessPage() {
       if (appsError) throw appsError
 
       // Load job posts for all user's providers
-      // const providerIds = [
-      //   ...(listingsData || []).map(l => l.id),
-      //   ...(emailListingsData || []).map(l => l.id)
-      // ]
-      // Note: Job posts functionality temporarily disabled - provider_job_posts table doesn't exist
+      const providerIds = [
+        ...(listingsData || []).map(l => l.id),
+        ...(emailListingsData || []).map(l => l.id)
+      ]
       
       let jobPostsData: JobPost[] = []
-      // TEMPORARILY DISABLED: provider_job_posts table doesn't exist
-      // if (providerIds.length > 0) {
-      //   const { data: jobsData, error: jobsError } = await supabase
-      //     .from('provider_job_posts')
-      //     .select('*')
-      //     .in('provider_id', providerIds)
-      //     .order('created_at', { ascending: false })
+      if (providerIds.length > 0) {
+        const { data: jobsData, error: jobsError } = await supabase
+          .from('provider_job_posts')
+          .select('*')
+          .in('provider_id', providerIds)
+          .order('created_at', { ascending: false })
 
-      //   console.log('[MyBusiness] Job posts query result:', {
-      //     error: jobsError,
-      //     count: jobsData?.length || 0,
-      //     data: jobsData
-      //   })
+        console.log('[MyBusiness] Job posts query result:', {
+          error: jobsError,
+          count: jobsData?.length || 0,
+          data: jobsData
+        })
 
-      //   if (jobsError) {
-      //     console.warn('[MyBusiness] Job posts error (non-critical):', jobsError)
-      //   } else {
-      //     jobPostsData = (jobsData as JobPost[]) || []
-      //   }
-      // }
+        if (jobsError) {
+          console.warn('[MyBusiness] Job posts error (non-critical):', jobsError)
+        } else {
+          jobPostsData = (jobsData as JobPost[]) || []
+        }
+      }
 
       // Load change requests for this business owner
       console.log('[MyBusiness] Loading change requests for user:', auth.userId)
@@ -1048,21 +1046,18 @@ export default function MyBusinessPage() {
     try {
       setMessage('Creating job post...')
       
-      // TEMPORARILY DISABLED: provider_job_posts table doesn't exist
-      // const { error } = await supabase
-      //   .from('provider_job_posts')
-      //   .insert([{
-      //     provider_id: providerId,
-      //     owner_user_id: auth.userId,
-      //     title: jobData.title,
-      //     description: jobData.description,
-      //     apply_url: jobData.apply_url,
-      //     salary_range: jobData.salary_range,
-      //     status: 'pending'
-      //   }])
+      const { error } = await supabase
+        .from('provider_job_posts')
+        .insert([{
+          provider_id: providerId,
+          owner_user_id: auth.userId,
+          title: jobData.title,
+          description: jobData.description,
+          apply_url: jobData.apply_url,
+          salary_range: jobData.salary_range,
+          status: 'pending'
+        }])
 
-      // Mock error for now
-      const error = { message: 'Job posts functionality temporarily disabled - table does not exist' }
       if (error) throw error
 
       setMessage('Job post created! It will be reviewed by our admin team.')
@@ -1268,15 +1263,11 @@ export default function MyBusinessPage() {
     try {
       setMessage('Deleting job post...')
       
-      // TEMPORARILY DISABLED: provider_job_posts table doesn't exist
-      // const { error } = await supabase
-      //   .from('provider_job_posts')
-      //   .delete()
-      //   .eq('id', jobId)
-      //   .eq('owner_user_id', auth.userId) // Ensure user owns this job post
-      
-      // Mock error for now
-      const error = { message: 'Job posts functionality temporarily disabled - table does not exist' }
+      const { error } = await supabase
+        .from('provider_job_posts')
+        .delete()
+        .eq('id', jobId)
+        .eq('owner_user_id', auth.userId) // Ensure user owns this job post
 
       if (error) throw error
 
