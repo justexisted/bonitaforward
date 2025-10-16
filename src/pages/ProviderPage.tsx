@@ -57,16 +57,6 @@ function getAllProviders(providersByCategory: Record<CategoryKey, Provider[]>): 
   return keys.flatMap((k) => providersByCategory[k] || [])
 }
 
-/**
- * Custom hook for listening to provider updates
- */
-function useProviderUpdates(callback: () => void, deps: React.DependencyList = []) {
-  useEffect(() => {
-    function onUpdate() { callback() }
-    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
-    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
-  }, deps)
-}
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
@@ -90,10 +80,9 @@ function Container(props: { children: React.ReactNode; className?: string }) {
  */
 interface ProviderPageProps {
   providersByCategory: Record<CategoryKey, Provider[]>
-  useProviderUpdates: (callback: () => void, deps: React.DependencyList) => void
 }
 
-export default function ProviderPage({ providersByCategory, useProviderUpdates }: ProviderPageProps) {
+export default function ProviderPage({ providersByCategory }: ProviderPageProps) {
   const params = useParams()
   const providerIdentifier = params.id as string // Can be either ID or slug
   

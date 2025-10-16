@@ -2260,8 +2260,8 @@ export default function App() {
             <Route path="account" element={<AccountPage />} />
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
-            <Route path="category/:id" element={<CategoryPage categories={categories} providersByCategory={providersByCategory} useProviderUpdates={useProviderUpdates} scoreProviders={scoreProviders} />} />
-            <Route path="provider/:id" element={<ProviderPage providersByCategory={providersByCategory} useProviderUpdates={useProviderUpdates} />} />
+            <Route path="category/:id" element={<CategoryPage categories={categories} scoreProviders={scoreProviders} />} />
+            <Route path="provider/:id" element={<ProviderPage providersByCategory={providersByCategory} />} />
             <Route path="thank-you" element={<ThankYouPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

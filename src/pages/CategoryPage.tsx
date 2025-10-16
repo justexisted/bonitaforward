@@ -677,15 +677,11 @@ interface CategoryPageProps {
     description: string
     icon: string
   }>
-  providersByCategory: Record<CategoryKey, Provider[]>
-  useProviderUpdates: (callback: () => void, deps: React.DependencyList) => void
   scoreProviders: (category: CategoryKey, answers: Record<string, string>) => Provider[]
 }
 
 export default function CategoryPage({ 
   categories, 
-  providersByCategory, 
-  useProviderUpdates,
   scoreProviders 
 }: CategoryPageProps) {
   const path = window.location.pathname.split('/').pop() as CategoryKey
