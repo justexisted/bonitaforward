@@ -98,7 +98,6 @@ export default function ProviderPage({ providersByCategory, useProviderUpdates }
   const providerIdentifier = params.id as string // Can be either ID or slug
   
   // Listen for provider updates to handle page refreshes
-  useProviderUpdates(() => {}, [])
   
   const all: Provider[] = getAllProviders(providersByCategory)
   

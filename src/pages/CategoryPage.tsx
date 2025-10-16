@@ -67,16 +67,6 @@ type ProviderDetails = {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-/**
- * Custom hook for listening to provider updates
- */
-function useProviderUpdates(callback: () => void, deps: React.DependencyList = []) {
-  useEffect(() => {
-    function onUpdate() { callback() }
-    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
-    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
-  }, deps)
-}
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
@@ -96,21 +86,6 @@ function getLocalStorageJSON<T>(key: string, defaultValue: T): T {
   }
 }
 
-/**
- * Utility function to fix malformed image URLs
- */
-function fixImageUrl(url: string): string {
-  if (!url || typeof url !== 'string') return ''
-  
-  // If URL doesn't have an extension, add .jpg
-  if (!/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url)) {
-    const baseUrl = url.split('?')[0] // Remove query params
-    // For now, default to .jpg as it's most common
-    return baseUrl + '.jpg'
-  }
-  
-  return url
-}
 
 function isFeaturedProvider(p: Provider): boolean {
   return Boolean(p.isMember)
@@ -285,7 +260,7 @@ const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
   ],
 }
 
-function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, string>): FunnelQuestion[] {
+function getFunnelQuestions(categoryKey: CategoryKey, _answers: Record<string, string>): FunnelQuestion[] {
   if (categoryKey === 'real-estate') {
     const list = [
       { id: 'need', prompt: 'What do you need help with?', options: [ { id: 'buy', label: 'Buying' }, { id: 'sell', label: 'Selling' }, { id: 'rent', label: 'Renting' } ] },
@@ -334,7 +309,7 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
 /**
  * Funnel component for collecting user preferences
  */
-function Funnel({ category }: { category: typeof categories[number] }) {
+function Funnel({ category }: { category: { key: CategoryKey; name: string; description: string; icon: string } }) {
   const [step, setStep] = useState<number>(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [anim, setAnim] = useState<'in' | 'out'>('in')
@@ -455,12 +430,10 @@ function Funnel({ category }: { category: typeof categories[number] }) {
 function CategoryFilters({ 
   category, 
   answers,
-  providersByCategory,
   scoreProviders
 }: { 
-  category: typeof categories[number]
+  category: { key: CategoryKey; name: string; description: string; icon: string }
   answers: Record<string, string>
-  providersByCategory: Record<CategoryKey, Provider[]>
   scoreProviders: (category: CategoryKey, answers: Record<string, string>) => Provider[]
 }) {
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string>>(answers)
@@ -719,11 +692,8 @@ export default function CategoryPage({
   const category = categories.find((c) => c.key === path)
   if (!category) return <Container className="py-10">Category not found.</Container>
   
-  const [, setVersion] = useState(0)
   const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false)
   const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
-  
-  useProviderUpdates(() => { setVersion((v: number) => v + 1) }, [])
 
   // Check if user has completed questionnaire for this category
   useEffect(() => {
@@ -760,7 +730,6 @@ export default function CategoryPage({
         <CategoryFilters 
           category={category} 
           answers={questionnaireAnswers}
-          providersByCategory={providersByCategory}
           scoreProviders={scoreProviders}
         />
       ) : (
