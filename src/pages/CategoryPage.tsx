@@ -478,11 +478,13 @@ function CategoryFilters({
     <div className="space-y-6">
       <div className="text-center mb-6">
         <span className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral-50">
-          <img 
-            src={category.icon} 
-            alt={`${category.name} icon`}
-            className="h-20 w-20 object-contain"
-          />
+                          <img
+                              src={category.icon}
+                              alt={`${category.name} icon`}
+                              className="h-20 w-20 object-contain"
+                              loading="lazy"
+                              decoding="async"
+                            />
         </span>
         <h3 className="text-xl font-semibold text-neutral-900 mb-2">
           Refine Your {category.name} Search
@@ -550,6 +552,9 @@ function CategoryFilters({
                               src={details.images[0]}
                               alt={`${provider.name} business photo`}
                               className="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                              referrerPolicy="no-referrer"
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement
                                 img.style.display = 'none'
