@@ -1,10 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
-import { ArrowRight } from 'lucide-react'
-// import CreateBusinessForm from './pages/CreateBusinessForm'
-// import { supabase } from './lib/supabase'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
 import { fetchProvidersFromSupabase } from './lib/supabaseData.ts'
 import SignInPage from './pages/SignIn'
@@ -18,23 +15,16 @@ import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
 import PricingPage from './pages/Pricing'
 import JobsPage from './pages/Jobs'
-import CalendarPage, { fetchCalendarEvents, type CalendarEvent } from './pages/Calendar'
-import Calendar from './components/Calendar'
+import CalendarPage from './pages/Calendar'
 import NotFoundPage from './pages/NotFound'
-// import SplitText from './components/SplitText'
-import GlareHover from './components/GlareHover'
-import ScrollFloat from './components/ScrollFloat'
-import GradientText from './components/GradientText'
-// import CountUp from './components/CountUp'
-// import ScrollStack, { ScrollStackItem } from './components/ScrollStack'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
-import Hero from './components/Hero'
 import ProviderPage from './pages/ProviderPage'
 import CategoryPage from './pages/CategoryPage'
 import BookPage from './pages/BookPage'
 import BusinessPage from './pages/BusinessPage'
+import HomePage from './pages/HomePage'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -90,32 +80,11 @@ const categories: {
 
 // getAllProviders function moved to ProviderPage.tsx
 
-/**
- * Custom hook for listening to provider updates
- */
-function useProviderUpdates(callback: () => void, deps: React.DependencyList = []) {
-  useEffect(() => {
-    function onUpdate() { callback() }
-    window.addEventListener('bf-providers-updated', onUpdate as EventListener)
-    return () => window.removeEventListener('bf-providers-updated', onUpdate as EventListener)
-  }, deps)
-}
+// useProviderUpdates moved to src/pages/HomePage.tsx
 
-/**
- * Reusable loading spinner component
- */
-function LoadingSpinner({ message = 'Loading...', className = '' }: { message?: string; className?: string }) {
-  return (
-    <div className={`text-center ${className}`}>
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
-      <p className="mt-4 text-neutral-600">{message}</p>
-    </div>
-  )
-}
+// LoadingSpinner moved to src/pages/HomePage.tsx
 
-function Container(props: { children: React.ReactNode; className?: string }) {
-  return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
-}
+// Container moved to src/pages/HomePage.tsx
 
 
 
@@ -142,138 +111,11 @@ function Container(props: { children: React.ReactNode; className?: string }) {
  */
 // ProviderPage component has been moved to src/pages/ProviderPage.tsx
 
-function CategoryCard({ cat }: { cat: typeof categories[number] }) {
-  return (
-    <GlareHover
-      width="auto"
-      height="auto"
-      background="#ffffff"
-      glareColor="#999999"
-      glareOpacity={0.3}
-      glareAngle={-33}
-      glareSize={300}
-      transitionDuration={800}
-      playOnce={false}
-    >
-    <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex h-20 w-25 items-center justify-center rounded-2xl bg-neutral-50">
-          <img 
-            src={cat.icon} 
-            alt={`${cat.name} icon`}
-            className="h-20 w-25 object-contain"
-          />
-        </span>
-      <div>
-          <div className="font-medium text-neutral-900">{cat.name}</div>
-          <div className="text-sm text-neutral-600">{cat.description}</div>
-      </div>
-        <ArrowRight className="ml-auto h-4 w-4 text-neutral-400" />
-      </div>
-    </Link>
-    </GlareHover>
-  )
-}
+// CategoryCard moved to src/pages/HomePage.tsx
 
-function CalendarSection() {
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
+// CalendarSection moved to src/pages/HomePage.tsx
 
-  useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const calendarEvents = await fetchCalendarEvents()
-        setEvents(calendarEvents)
-      } catch (error) {
-        console.error('Error loading calendar events:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    loadEvents()
-  }, [])
-
-  if (loading) {
-    return (
-      <section className="py-16 bg-gradient-to-b from-neutral-50 to-white">
-        <div className="container-px mx-auto max-w-6xl">
-          <LoadingSpinner message="Loading calendar events..." />
-        </div>
-      </section>
-    )
-  }
-
-  return <Calendar events={events} />
-}
-
-function CommunitySection() {
-  const cards = [
-    { category_key: 'restaurants-cafes', title: 'Top 5 Restaurants This Month', excerpt: 'Discover trending dining spots loved by Bonita locals.' },
-    { category_key: 'home-services', title: 'Bonita Home Service Deals', excerpt: 'Seasonal offers from trusted local pros.' },
-    { category_key: 'health-wellness', title: 'Wellness Spotlight', excerpt: 'Chiropractors, gyms, and med spas to try now.' },
-    { category_key: 'real-estate', title: 'Property Opportunities in Bonita', excerpt: 'Latest properties and market highlights.' },
-    { category_key: 'professional-services', title: 'Top Professional Services of Bonita', excerpt: 'Standout legal, accounting, and consulting pros.' },
-  ]
-  return (
-    <section className="py-8">
-      <Container>
-        <ScrollFloat
-          animationDuration={1}
-          ease='back.inOut(2)'
-          scrollStart='center bottom+=50%'
-          scrollEnd='bottom bottom-=40%'
-          stagger={0.03}
-          textClassName="text-2xl md:text-4xl font-semibold tracking-tight text-neutral-900 font-display"
-        >
-          Community Blogs
-        </ScrollFloat>
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {cards.map((c) => {
-            const bgMap: Record<string, string> = {
-              'restaurants-cafes': "/images/community/restaurants-cafes.png",
-     'home-services': "/images/community/home-services.png",
-     'health-wellness': "/images/community/health-wellness.png",
-     'real-estate': "/images/community/real-estate.png",
-     'professional-services': "/images/community/professional-services.png",
-            }
-            const bg = bgMap[c.category_key as CategoryKey]
-            return (
-              <Link key={c.title} to={`/community/${c.category_key}`} className="relative rounded-2xl overflow-hidden block hover:shadow-sm border border-white/40">
-                <img
-                  src={bg}
-                  alt=""
-                  loading="eager"
-                  decoding="async"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => {
-                    const img = e.currentTarget as HTMLImageElement
-                    img.onerror = null
-                    img.src = `/images/community/{c.category_key}-fallback.png`
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/60" aria-hidden></div>
-                <div className="relative z-10 p-4 min-h-[160px] flex flex-col justify-between">
-                  <div>
-                    <GradientText
-                      colors={["#313672", "#8cd884", "#ffe3c6", "#fcddff", "#914471"]}
-                      animationSpeed={6}
-                      showBorder={false}
-                      className="animated-gradient-text font-medium"
-                    >{c.title}
-                    </GradientText>
-                    <div className="text-sm text-neutral-100 mt-1">{c.excerpt}</div>
-                  </div>
-                  <span className="mt-3 inline-block text-sm px-2 py-2 text-center full-w-bg self-center" style={{ color: 'white' }}>Read more</span>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      </Container>
-    </section>
-  )
-}
+// CommunitySection moved to src/pages/HomePage.tsx
 
 function Confetti() {
   // simple CSS confetti using pseudo-random gradients
@@ -302,7 +144,7 @@ function Confetti() {
 function ThankYouPage() {
   return (
     <section className="py-12">
-      <Container>
+      <div className="container-px mx-auto max-w-6xl">
         <div className="relative rounded-2xl border border-neutral-100 p-8 bg-white text-center elevate form-fade">
           <Confetti />
           <h1 className="text-2xl font-semibold tracking-tight">Thanks! 🎉</h1>
@@ -311,44 +153,12 @@ function ThankYouPage() {
             <Link to="/" className="btn btn-primary">Back to Home</Link>
           </div>
         </div>
-      </Container>
+      </div>
     </section>
   )
 }
 
-function HomePage() {
-  const [, setVersion] = useState(0)
-  
-  // Listen for provider updates to trigger re-renders when data loads
-  useProviderUpdates(() => { setVersion((v: number) => v + 1) }, [])
-
-  return (
-    <>
-      <Hero providersByCategory={providersByCategory} useProviderUpdates={useProviderUpdates} />
-      <section id="categories" className="py-2">
-        <Container>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {categories.slice(0, 4).map((c) => (
-              <CategoryCard cat={c} key={c.key} />
-            ))}
-            <details className="rounded-2xl p-4 bg-white">
-              <summary className="cursor-pointer select-none text-sm" style={{ color: '#7070e3' }}>See more</summary>
-              <div className="mt-3">
-                {categories.slice(4).map((c) => (
-                  <div key={c.key} className="mt-2">
-                    <CategoryCard cat={c} />
-                  </div>
-                ))}
-              </div>
-            </details>
-          </div>
-        </Container>
-      </section>
-      <CalendarSection />
-      <CommunitySection />
-    </>
-  )
-}
+// HomePage moved to src/pages/HomePage.tsx
 
 // Removed old LeadForm in favor of the new 4-step Funnel
 
@@ -449,15 +259,9 @@ function isFeaturedProvider(p: Provider): boolean {
 
 // getProviderDetails moved to src/pages/BookPage.tsx
 
-let providersByCategory: Record<CategoryKey, Provider[]> = {
-  'real-estate': [],
-  'home-services': [],
-  'health-wellness': [],
-  'restaurants-cafes': [],
-  'professional-services': [],
-}
+// providersByCategory moved to App component state
 
-async function loadProvidersFromSheet(): Promise<void> {
+async function loadProvidersFromSheet(setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void): Promise<void> {
   try {
     const rows = await fetchSheetRows()
     const mapped = mapRowsToProviders(rows)
@@ -474,7 +278,7 @@ async function loadProvidersFromSheet(): Promise<void> {
         grouped[cat].push({ id: sp.id, name: sp.name, slug: generateSlug(sp.name), category_key: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
       }
     })
-    providersByCategory = ensureDemoMembers(grouped)
+    setProvidersByCategory(ensureDemoMembers(grouped))
     // console.log('[Sheets] Providers loaded from Google Sheets', grouped)
   } catch (err) {
     console.warn('[Sheets] Failed to load providers from Google Sheets, using defaults', err)
@@ -482,15 +286,18 @@ async function loadProvidersFromSheet(): Promise<void> {
   try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
 }
 
-async function loadProvidersFromSupabase(): Promise<boolean> {
-  const rows = await fetchProvidersFromSupabase()
-  if (!rows || rows.length === 0) {
-    console.warn('[Supabase] No providers found or failed to load')
-    return false
-  }
-  console.log(`[Supabase] Loaded ${rows.length} providers from database`)
-  
-  const grouped: Record<CategoryKey, Provider[]> = {
+async function loadProvidersFromSupabase(setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void): Promise<boolean> {
+  console.log('[Supabase] Starting to load providers from Supabase...')
+  try {
+    const rows = await fetchProvidersFromSupabase()
+    console.log('[Supabase] fetchProvidersFromSupabase returned:', rows?.length || 0, 'providers')
+    if (!rows || rows.length === 0) {
+      console.warn('[Supabase] No providers found or failed to load')
+      return false
+    }
+    console.log(`[Supabase] Loaded ${rows.length} providers from database`)
+    
+    const grouped: Record<CategoryKey, Provider[]> = {
     'real-estate': [],
     'home-services': [],
     'health-wellness': [],
@@ -564,7 +371,7 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
       bonita_resident_discount: r.bonita_resident_discount ?? null,
     })
   })
-  providersByCategory = grouped
+    setProvidersByCategory(grouped)
   
   // Log summary of loaded providers by category
   // Object.keys(grouped).forEach((category) => {
@@ -572,12 +379,16 @@ async function loadProvidersFromSupabase(): Promise<boolean> {
   //   console.log(`[Supabase] ${category}: ${count} providers loaded`)
   // })
   
-  // console.log('[Supabase] Providers loaded successfully', grouped)
-  try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
-  return true
+    // console.log('[Supabase] Providers loaded successfully', grouped)
+    try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
+    return true
+  } catch (error) {
+    console.error('[Supabase] Error loading providers:', error)
+    return false
+  }
 }
 
-function scoreProviders(category: CategoryKey, answers: Record<string, string>): Provider[] {
+function scoreProviders(category: CategoryKey, answers: Record<string, string>, providersByCategory: Record<CategoryKey, Provider[]>): Provider[] {
   // CRITICAL FIX: Only get providers from the specified category
   const providers = providersByCategory[category] || []
   
@@ -1160,39 +971,49 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
 
 // BookPage moved to src/pages/BookPage.tsx
 
-function AppInit() {
+function AppInit({ setProvidersByCategory }: { setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void }) {
   useEffect(() => {
     ;(async () => {
-      const ok = await loadProvidersFromSupabase()
-      if (!ok) await loadProvidersFromSheet()
+      console.log('[AppInit] Starting provider data loading...')
+      const ok = await loadProvidersFromSupabase(setProvidersByCategory)
+      console.log('[AppInit] Supabase loading result:', ok)
+      if (!ok) {
+        console.log('[AppInit] Supabase failed, trying Google Sheets fallback...')
+        await loadProvidersFromSheet(setProvidersByCategory)
+        console.log('[AppInit] Google Sheets fallback completed')
+      }
     })()
     function onRefresh() {
       ;(async () => {
-        const ok = await loadProvidersFromSupabase()
-        if (!ok) await loadProvidersFromSheet()
+        console.log('[AppInit] Refreshing provider data...')
+        const ok = await loadProvidersFromSupabase(setProvidersByCategory)
+        if (!ok) await loadProvidersFromSheet(setProvidersByCategory)
       })()
     }
     window.addEventListener('bf-refresh-providers', onRefresh as EventListener)
     return () => {
       window.removeEventListener('bf-refresh-providers', onRefresh as EventListener)
     }
-  }, [])
+  }, [setProvidersByCategory])
   return null
 }
 
 export default function App() {
-  const [, setVersion] = useState(0)
-  
-  // Listen for provider updates to trigger re-renders when data loads
-  useProviderUpdates(() => { setVersion((v: number) => v + 1) }, [])
+  const [providersByCategory, setProvidersByCategory] = useState<Record<CategoryKey, Provider[]>>({
+    'real-estate': [],
+    'home-services': [],
+    'health-wellness': [],
+    'restaurants-cafes': [],
+    'professional-services': [],
+  })
 
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppInit />
+        <AppInit setProvidersByCategory={setProvidersByCategory} />
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<HomePage />} />
+            <Route index element={<HomePage providersByCategory={providersByCategory as any} />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="signin" element={<SignInPage />} />
@@ -1219,9 +1040,9 @@ export default function App() {
               </ProtectedRoute>
             } />
             <Route path="account" element={<AccountPage />} />
-            <Route path="book" element={<BookPage categories={categories} scoreProviders={scoreProviders} providersByCategory={providersByCategory} />} />
+            <Route path="book" element={<BookPage categories={categories} scoreProviders={(category, answers) => scoreProviders(category, answers, providersByCategory)} providersByCategory={providersByCategory} />} />
             <Route path="business" element={<BusinessPage />} />
-            <Route path="category/:id" element={<CategoryPage categories={categories} scoreProviders={scoreProviders} />} />
+            <Route path="category/:id" element={<CategoryPage categories={categories} scoreProviders={(category, answers) => scoreProviders(category, answers, providersByCategory)} />} />
             <Route path="provider/:id" element={<ProviderPage providersByCategory={providersByCategory} />} />
             <Route path="thank-you" element={<ThankYouPage />} />
             <Route path="*" element={<NotFoundPage />} />

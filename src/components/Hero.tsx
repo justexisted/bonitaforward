@@ -77,6 +77,11 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
   console.log('[Hero] Render - providersByCategory:', providersByCategory)
   const allProviders = getAllProviders(providersByCategory)
   console.log('[Hero] Render - Total providers:', allProviders.length)
+  
+  // Debug: Log sample providers to verify data structure
+  if (allProviders.length > 0) {
+    console.log('[Hero] Sample provider:', allProviders[0])
+  }
 
   // Re-run search when providers data changes
   useEffect(() => {
@@ -125,8 +130,14 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
       .map((s) => s.p)
     
     console.log('[Hero] Search results:', scored.length, 'matches')
+    if (scored.length > 0) {
+      console.log('[Hero] Sample search result:', scored[0])
+    }
     setResults(scored)
   }
+
+  // Debug: Log current state values
+  console.log('[Hero] Current state - open:', open, 'results.length:', results.length, 'query:', query)
 
   return (
     <section className="relative overflow-hidden" style={{ minHeight: '33vh', overflow: 'visible' }}>
