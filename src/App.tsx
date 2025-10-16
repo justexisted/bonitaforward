@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
@@ -25,6 +25,7 @@ import CategoryPage from './pages/CategoryPage'
 import BookPage from './pages/BookPage'
 import BusinessPage from './pages/BusinessPage'
 import HomePage from './pages/HomePage'
+import ThankYouPage from './pages/ThankYouPage'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -117,46 +118,9 @@ const categories: {
 
 // CommunitySection moved to src/pages/HomePage.tsx
 
-function Confetti() {
-  // simple CSS confetti using pseudo-random gradients
-  const pieces = Array.from({ length: 40 })
-  return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-      <div className="absolute inset-0">
-        {pieces.map((_, i) => (
-          <span
-            key={i}
-            className="absolute block h-1.5 w-3 rounded-sm opacity-80"
-            style={{
-              left: Math.random() * 100 + '%',
-              top: '-10px',
-              background: `hsl(${Math.floor(Math.random() * 360)}, 80%, 60%)`,
-              transform: `rotate(${Math.random() * 360}deg)`,
-              animation: `confetti-fall ${2000 + Math.random() * 1200}ms ease-in forwards`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
+// Confetti moved to src/pages/ThankYouPage.tsx
 
-function ThankYouPage() {
-  return (
-    <section className="py-12">
-      <div className="container-px mx-auto max-w-6xl">
-        <div className="relative rounded-2xl border border-neutral-100 p-8 bg-white text-center elevate form-fade">
-          <Confetti />
-          <h1 className="text-2xl font-semibold tracking-tight">Thanks! 🎉</h1>
-          <p className="mt-2 text-neutral-600">Your request to be featured was successfully submitted.</p>
-          <div className="mt-5">
-            <Link to="/" className="btn btn-primary">Back to Home</Link>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
+// ThankYouPage moved to src/pages/ThankYouPage.tsx
 
 // HomePage moved to src/pages/HomePage.tsx
 
