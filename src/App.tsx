@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
@@ -31,6 +31,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Hero from './components/Hero'
 import ProviderPage from './pages/ProviderPage'
+import CategoryPage from './pages/CategoryPage'
 
 type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
 
@@ -357,198 +358,11 @@ function HomePage() {
 
 // Removed old LeadForm in favor of the new 4-step Funnel
 
-type FunnelOption = {
-  id: string
-  label: string
-}
+// FunnelOption type has been moved to src/pages/CategoryPage.tsx
 
-type FunnelQuestion = {
-  id: string
-  prompt: string
-  options: FunnelOption[]
-}
+// FunnelQuestion type has been moved to src/pages/CategoryPage.tsx
 
-const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
-  'real-estate': [
-    // real-estate is built dynamically via getFunnelQuestions; this serves as a fallback
-    { id: 'need', prompt: 'What do you need help with?', options: [ { id: 'buy', label: 'Buying' }, { id: 'sell', label: 'Selling' }, { id: 'rent', label: 'Renting' } ] },
-    { id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] },
-    { id: 'budget', prompt: 'Approximate budget?', options: [ { id: 'entry', label: '$' }, { id: 'mid', label: '$$' }, { id: 'high', label: '$$$' } ] },
-    { id: 'beds', prompt: 'Bedrooms', options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4', label: '4+' } ] },
-  ],
-  'home-services': [
-    {
-      id: 'type',
-      prompt: 'Which service do you need?',
-      options: [
-        { id: 'landscaping', label: 'Landscaping' },
-        { id: 'cleaning', label: 'Cleaning' },
-        { id: 'solar', label: 'Solar' },
-        { id: 'remodeling', label: 'Remodeling' },
-        { id: 'plumbing', label: 'Plumbing' },
-        { id: 'electrical', label: 'Electrical' },
-        { id: 'hvac', label: 'HVAC' },
-        { id: 'roofing', label: 'Roofing' },
-        { id: 'flooring', label: 'Flooring' },
-        { id: 'painting', label: 'Painting' },
-        { id: 'handyman', label: 'Handyman' },
-        { id: 'pool', label: 'Pool Service' },
-        { id: 'pest control', label: 'Pest Control' },
-        { id: 'security', label: 'Security' },
-        { id: 'windows', label: 'Windows' },
-        { id: 'doors', label: 'Doors' },
-        { id: 'insulation', label: 'Insulation' },
-        { id: 'concrete', label: 'Concrete' },
-        { id: 'masonry', label: 'Masonry' },
-      ],
-    },
-    {
-      id: 'urgency',
-      prompt: 'How soon do you need it?',
-      options: [
-        { id: 'asap', label: 'ASAP' },
-        { id: 'this-month', label: 'This month' },
-        { id: 'flexible', label: 'Flexible' },
-      ],
-    },
-    {
-      id: 'property',
-      prompt: 'Property type?',
-      options: [
-        { id: 'house', label: 'House' },
-        { id: 'condo', label: 'Condo' },
-        { id: 'other', label: 'Other' },
-      ],
-    },
-    {
-      id: 'budget',
-      prompt: 'Budget range?',
-      options: [
-        { id: 'low', label: '$' },
-        { id: 'med', label: '$$' },
-        { id: 'high', label: '$$$' },
-      ],
-    },
-  ],
-  'health-wellness': [
-    {
-      id: 'type',
-      prompt: 'What are you looking for?',
-      options: [
-        { id: 'chiro', label: 'Chiropractor' },
-        { id: 'gym', label: 'Gym' },
-        { id: 'salon', label: 'Salon' },
-        { id: 'medspa', label: 'Med Spa' },
-        { id: 'dental', label: 'Dental' },
-        { id: 'medical', label: 'Medical' },
-        { id: 'therapy', label: 'Therapy' },
-        { id: 'naturopathic', label: 'Naturopathic' },
-      ],
-    },
-    {
-      id: 'goal',
-      prompt: 'Your primary goal?',
-      options: [
-        { id: 'relief', label: 'Pain relief' },
-        { id: 'fitness', label: 'Fitness' },
-        { id: 'beauty', label: 'Beauty' },
-      ],
-    },
-    {
-      id: 'when',
-      prompt: 'When would you start?',
-      options: [
-        { id: 'this-week', label: 'This week' },
-        { id: 'this-month', label: 'This month' },
-        { id: 'later', label: 'Later' },
-      ],
-    },
-    {
-      id: 'membership',
-      prompt: 'Membership or one-off?',
-      options: [
-        { id: 'membership', label: 'Membership' },
-        { id: 'one-off', label: 'One‑off' },
-      ],
-    },
-  ],
-  'restaurants-cafes': [
-    {
-      id: 'cuisine',
-      prompt: 'What sounds good?',
-      options: [
-        { id: 'mexican', label: 'Mexican' },
-        { id: 'asian', label: 'Asian' },
-        { id: 'american', label: 'American' },
-        { id: 'cafes', label: 'Cafés' },
-      ],
-    },
-    {
-      id: 'occasion',
-      prompt: 'Occasion?',
-      options: [
-        { id: 'casual', label: 'Casual' },
-        { id: 'date', label: 'Date' },
-        { id: 'family', label: 'Family' },
-      ],
-    },
-    {
-      id: 'price',
-      prompt: 'Price range?',
-      options: [
-        { id: 'low', label: '$' },
-        { id: 'med', label: '$$' },
-        { id: 'high', label: '$$$' },
-      ],
-    },
-    {
-      id: 'mode',
-      prompt: 'Dine‑in or takeout?',
-      options: [
-        { id: 'dine', label: 'Dine‑in' },
-        { id: 'takeout', label: 'Takeout' },
-      ],
-    },
-  ],
-  'professional-services': [
-    {
-      id: 'type',
-      prompt: 'Which service?',
-      options: [
-        { id: 'attorney', label: 'Attorney' },
-        { id: 'accountant', label: 'Accountant' },
-        { id: 'consultant', label: 'Consultant' },
-      ],
-    },
-    {
-      id: 'need',
-      prompt: 'What do you need?',
-      options: [
-        { id: 'advice', label: 'Advice' },
-        { id: 'ongoing', label: 'Ongoing help' },
-        { id: 'project', label: 'Project‑based' },
-      ],
-    },
-    {
-      id: 'timeline',
-      prompt: 'Timeline?',
-      options: [
-        { id: 'now', label: 'Now' },
-        { id: 'soon', label: 'Soon' },
-        { id: 'flex', label: 'Flexible' },
-      ],
-    },
-    {
-      id: 'budget',
-      prompt: 'Budget?',
-      options: [
-        { id: 'low', label: '$' },
-        { id: 'med', label: '$$' },
-        { id: 'high', label: '$$$' },
-      ],
-    },
-  ],
-}
+// funnelConfig has been moved to src/pages/CategoryPage.tsx
 
 type Provider = {
   id: string
@@ -1337,28 +1151,7 @@ function scoreProviders(category: CategoryKey, answers: Record<string, string>):
   return withScores.map((s) => s.p)
 }
 
-// Persist funnel answers per user to Supabase (if tables exist)
-async function persistFunnelForUser(params: { email?: string | null; category: CategoryKey; answers: Record<string, string> }) {
-  const { email, category, answers } = params
-  if (!email || !answers || !Object.keys(answers).length) return
-  try {
-    await supabase
-      .from('funnel_responses')
-      .upsert(
-        [
-          {
-            user_email: email,
-            category,
-            answers,
-          },
-        ],
-        { onConflict: 'user_email,category' }
-      )
-  } catch (err) {
-    // Silently ignore if table isn't created yet
-    console.warn('[Supabase] upsert funnel_responses failed (safe to ignore if table missing)', err)
-  }
-}
+// persistFunnelForUser function has been moved to src/pages/CategoryPage.tsx
 
 // Removed createBookingRow function - no longer needed since form submission is removed
 
@@ -1410,536 +1203,15 @@ async function createBusinessApplication(params: { full_name?: string; business_
 // (Kept for backward compatibility with older forms)
 // Removed unused createContactLead implementation after migrating contact to general user form
 
-function getFunnelQuestions(categoryKey: CategoryKey, answers: Record<string, string>): FunnelQuestion[] {
-  if (categoryKey === 'health-wellness') {
-    const type = answers['type']
-    const list: FunnelQuestion[] = []
-    // Q1: Service type
-    list.push({
-      id: 'type',
-      prompt: 'What are you looking for?',
-      options: [
-        { id: 'chiro', label: 'Chiropractor' },
-        { id: 'physical-therapy', label: 'Physical Therapy' },
-        { id: 'gym', label: 'Gym' },
-        { id: 'pilates-yoga', label: 'Pilates/Yoga' },
-        { id: 'salon', label: 'Salon' },
-        { id: 'medspa', label: 'Med Spa' },
-        { id: 'general-healthcare', label: 'General Healthcare' },
-        { id: 'naturopathic', label: 'Naturopathic' },
-        { id: 'dental', label: 'Dental' },
-        { id: 'mental-health', label: 'Mental Health' },
-      ],
-    })
+// getFunnelQuestions function has been moved to src/pages/CategoryPage.tsx
 
-    if (!type) return list.slice(0, 1)
+// trackChoice function has been moved to src/pages/CategoryPage.tsx
 
-    // Q2: Specialized goal/need by type
-    if (type === 'salon') {
-      list.push({ id: 'salon_kind', prompt: 'Salon service?', options: [ { id: 'salon-hair', label: 'Hair' }, { id: 'salon-nail', label: 'Nail' }, { id: 'salon-other', label: 'Other' } ] })
-    } else if (type === 'chiro') {
-      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'relief', label: 'Pain relief' }, { id: 'mobility', label: 'Mobility' }, { id: 'injury', label: 'Injury recovery' } ] })
-    } else if (type === 'physical-therapy') {
-      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'rehab', label: 'Rehab' }, { id: 'performance', label: 'Performance' }, { id: 'post-surgery', label: 'Post‑surgery' } ] })
-    } else if (type === 'gym' || type === 'pilates-yoga') {
-      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'fitness', label: 'Fitness' }, { id: 'strength', label: 'Strength' }, { id: 'classes', label: 'Classes' } ] })
-    } else if (type === 'medspa') {
-      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'beauty', label: 'Beauty' }, { id: 'wellness', label: 'Wellness' } ] })
-    } else if (type === 'general-healthcare' || type === 'naturopathic') {
-      list.push({ id: 'goal', prompt: 'Your primary goal?', options: [ { id: 'wellness', label: 'Wellness' }, { id: 'general', label: 'General health' } ] })
-    } else if (type === 'dental') {
-      list.push({ id: 'goal', prompt: 'Dental need?', options: [ { id: 'cleaning', label: 'Cleaning' }, { id: 'emergency', label: 'Emergency' }, { id: 'ortho', label: 'Ortho' } ] })
-    } else if (type === 'mental-health') {
-      list.push({ id: 'goal', prompt: 'Support needed?', options: [ { id: 'therapy', label: 'Therapy' }, { id: 'counseling', label: 'Counseling' } ] })
-    }
+// Funnel component has been moved to src/pages/CategoryPage.tsx
 
-    // Q3: Urgency (generic, phrased naturally)
-    list.push({ id: 'when', prompt: 'When would you like to start?', options: [ { id: 'this-week', label: 'This week' }, { id: 'this-month', label: 'This month' }, { id: 'later', label: 'Later' } ] })
+// CategoryFilters component has been moved to src/pages/CategoryPage.tsx
 
-    // Q4: Payment model only for gym/pilates (others default one‑off)
-    if (type === 'gym' || type === 'pilates-yoga') {
-      list.push({ id: 'payment', prompt: 'Payment preference?', options: [ { id: 'membership', label: 'Membership' }, { id: 'one-off', label: 'One‑off' } ] })
-    }
-
-    return list.slice(0, 4)
-  }
-  if (categoryKey === 'real-estate') {
-    const need = answers['need']
-    const propertyType = answers['property_type']
-    const isResidential = (pt?: string) => ['single-family','condo-townhome','apartment-multifamily'].includes(pt || '')
-    const isLandOrCommercial = (pt?: string) => ['land','office','retail','industrial-warehouse'].includes(pt || '')
-
-    const list: FunnelQuestion[] = []
-
-    // Q1: Need
-    list.push({
-      id: 'need',
-      prompt: 'What do you need help with?',
-      options: [
-        { id: 'buy', label: 'Buying' },
-        { id: 'sell', label: 'Selling' },
-        { id: 'rent', label: 'Renting' },
-      ],
-    })
-
-    // Q2: Property type (works for buy/sell/rent and drives conditionals)
-    list.push({
-      id: 'property_type',
-      prompt: 'Property type?',
-      options: [
-        { id: 'single-family', label: 'Single‑Family' },
-        { id: 'condo-townhome', label: 'Condo/Townhome' },
-        { id: 'apartment-multifamily', label: 'Apartment/Multifamily' },
-        { id: 'land', label: 'Land' },
-        { id: 'office', label: 'Office' },
-        { id: 'retail', label: 'Retail' },
-        { id: 'industrial-warehouse', label: 'Industrial/Warehouse' },
-      ],
-    })
-
-    if (need === 'sell') {
-      // Q3: Staging toggle for sellers (relevant to presentation)
-      list.push({
-        id: 'staging',
-        prompt: 'Interested in home staging?',
-        options: [ { id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' } ],
-      })
-      // Q4: Residential → Bedrooms; Land/Commercial → Listing timeline
-      if (isResidential(propertyType)) {
-        list.push({ id: 'beds', prompt: 'Bedrooms in your property?', options: [ { id: '2', label: '2' }, { id: '3', label: '3' }, { id: '4+', label: '4+' } ] })
-      } else {
-        list.push({ id: 'timeline', prompt: 'When are you planning to list?', options: [ { id: 'now', label: 'Now' }, { id: '30-60', label: '30–60 days' }, { id: '60+', label: '60+ days' } ] })
-      }
-      return list.slice(0, 4)
-    }
-
-    if (need === 'rent') {
-      // Q3: Monthly budget for rentals
-      list.push({ id: 'budget', prompt: 'Monthly budget?', options: [ { id: 'low', label: '$' }, { id: 'med', label: '$$' }, { id: 'high', label: '$$$' } ] })
-      // Q4: Residential → Bedrooms; Land/Commercial → Move timeline
-      if (isResidential(propertyType)) {
-        list.push({ id: 'beds', prompt: 'Bedrooms needed?', options: [ { id: '1', label: '1' }, { id: '2', label: '2' }, { id: '3+', label: '3+' } ] })
-      } else {
-        list.push({ id: 'move_when', prompt: 'When do you plan to start?', options: [ { id: 'this-week', label: 'This week' }, { id: 'this-month', label: 'This month' }, { id: 'later', label: 'Later' } ] })
-      }
-      return list.slice(0, 4)
-    }
-
-    // Default BUY flow
-    // Q3: Purchase budget
-    list.push({ id: 'budget', prompt: 'Purchase budget?', options: [ { id: 'entry', label: '$' }, { id: 'mid', label: '$$' }, { id: 'high', label: '$$$' } ] })
-    // Q4: Residential → Bedrooms; Land/Commercial → Timeline
-    if (isResidential(propertyType)) {
-      list.push({ id: 'beds', prompt: 'Bedrooms needed?', options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4+', label: '4+' } ] })
-    } else if (isLandOrCommercial(propertyType)) {
-      list.push({ id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
-    } else {
-      list.push({ id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] })
-    }
-    return list.slice(0, 4)
-  }
-  // other categories use static config above
-  return funnelConfig[categoryKey].slice(0, 4)
-}
-
-function trackChoice(category: CategoryKey, questionId: string, optionId: string) {
-  try {
-    const key = `bf-tracking-${category}`
-    const existing = getLocalStorageJSON<Record<string, string>>(key, {})
-    existing[questionId] = optionId
-    localStorage.setItem(key, JSON.stringify(existing))
-    // Optionally POST to backend when available
-    // void fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category, questionId, optionId, ts: Date.now() }) })
-  } catch {}
-}
-
-function Funnel({ category }: { category: typeof categories[number] }) {
-  const [step, setStep] = useState<number>(0)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [anim, setAnim] = useState<'in' | 'out'>('in')
-  const questions = useMemo(() => getFunnelQuestions(category.key, answers), [category.key, answers])
-  const current = questions[step]
-  const auth = useAuth()
-  const initializedRef = useRef(false)
-
-  // On mount, hydrate answers from localStorage so users never re-enter
-  useEffect(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
-    try {
-      const key = `bf-tracking-${category.key}`
-      const existing = getLocalStorageJSON<Record<string, string>>(key, {})
-      if (existing && typeof existing === 'object') {
-        setAnswers(existing)
-        // fast-forward step to first unanswered question
-        const qs = getFunnelQuestions(category.key, existing)
-        const firstUnanswered = qs.findIndex((q) => !existing[q.id])
-        if (firstUnanswered >= 0) setStep(firstUnanswered)
-        else setStep(qs.length)
-      }
-    } catch {}
-  }, [category.key])
-
-  function choose(option: FunnelOption) {
-    trackChoice(category.key, current.id, option.id)
-    setAnswers((a: Record<string, string>) => ({ ...a, [current.id]: option.id }))
-    setAnim('out')
-    setTimeout(() => {
-      setStep((s: number) => Math.min(s + 1, questions.length))
-      setAnim('in')
-    }, 120)
-  }
-
-  // Whenever answers change and user is authenticated, persist to Supabase
-  useEffect(() => {
-    if (!auth.email) return
-    persistFunnelForUser({ email: auth.email, category: category.key, answers })
-  }, [auth.email, category.key, answers])
-
-  const done = step >= questions.length
-
-  return (
-    <div className="w-full flex justify-center">
-      <div className="w-full max-w-md text-center">
-        {!done ? (
-          <div key={current.id} className={`rounded-2xl border border-neutral-100 p-5 bg-white elevate transition-all duration-200 ${anim === 'in' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}>
-            <div className="text-sm text-neutral-500">Step {step + 1} of {questions.length}</div>
-            <h3 className="mt-1 text-lg font-semibold tracking-tight text-neutral-900">{current.prompt}</h3>
-            <div className="mt-4 grid grid-cols-1 gap-2">
-              {current.options.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => choose(opt)}
-                  className="btn btn-secondary sparkle border border-neutral-200"
-                >
-                  {opt.label}
-        </button>
-              ))}
-      </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-            <h3 className="text-lg font-semibold tracking-tight text-neutral-900">Great! Here's your summary</h3>
-            <ul className="mt-3 text-sm text-neutral-700 text-left">
-              {questions.map((q) => (
-                <li key={q.id} className="flex justify-between border-b border-neutral-100 py-2">
-                  <span className="text-neutral-500">{q.prompt}</span>
-                  <span>{q.options.find((o) => o.id === answers[q.id])?.label || '-'}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4">
-              <div className="flex flex-col gap-2">
-                <Link
-                  to={`/book?category=${category.key}`}
-                  onClick={(e) => {
-                    const card = (e.currentTarget.closest('section') as HTMLElement) || document.body
-                    card.classList.add('slide-out-right')
-                    setTimeout(() => {
-                      // allow navigation after animation; Link will handle it
-                    }, 160)
-                  }}
-                  className="btn btn-primary"
-                >
-                  Find Best Match
-                </Link>
-                <button
-                  onClick={() => {
-                    const container = (document.querySelector('section') as HTMLElement)
-                    if (container) container.classList.add('slide-out-left')
-                    setTimeout(() => {
-                      try { localStorage.removeItem(`bf-tracking-${category.key}`) } catch {}
-                      setAnswers({})
-                      setStep(0)
-                      setAnim('in')
-                      if (container) container.classList.remove('slide-out-left')
-                    }, 160)
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Edit Answers
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function CategoryFilters({ 
-  category, 
-  answers
-}: { 
-  category: typeof categories[number]
-  answers: Record<string, string>
-}) {
-  const [selectedFilters, setSelectedFilters] = useState<Record<string, string>>(answers)
-  const [filteredProviders, setFilteredProviders] = useState<Provider[]>([])
-  const auth = useAuth()
-
-  // Get available filter options based on category
-  const getFilterOptions = (questionId: string) => {
-    const questions = getFunnelQuestions(category.key, {})
-    const question = questions.find(q => q.id === questionId)
-    return question?.options || []
-  }
-
-  const updateFilter = (questionId: string, value: string) => {
-    const newFilters = { ...selectedFilters, [questionId]: value }
-    setSelectedFilters(newFilters)
-    
-    // Immediately apply filters and show results
-    const scored = scoreProviders(category.key, newFilters)
-    setFilteredProviders(scored)
-  }
-
-  const clearFilter = (questionId: string) => {
-    const newFilters = { ...selectedFilters }
-    delete newFilters[questionId]
-    setSelectedFilters(newFilters)
-    
-    // Immediately apply filters and show results
-    const scored = scoreProviders(category.key, newFilters)
-    setFilteredProviders(scored)
-  }
-
-  // Apply initial filters on mount
-  useEffect(() => {
-    const scored = scoreProviders(category.key, selectedFilters)
-    setFilteredProviders(scored)
-  }, [category.key, selectedFilters])
-
-  const questions = getFunnelQuestions(category.key, {})
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <span className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral-50">
-          <img 
-            src={category.icon} 
-            alt={`${category.name} icon`}
-            className="h-20 w-20 object-contain"
-          />
-        </span>
-        <h3 className="text-xl font-semibold text-neutral-900 mb-2">
-          Refine Your {category.name} Search
-        </h3>
-        <p className="text-sm text-neutral-600">
-          Adjust your preferences to find the perfect match
-        </p>
-      </div>
-
-      {/* Compact Filter Controls - Horizontal Layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {questions.map((question) => {
-          const options = getFilterOptions(question.id)
-          const currentValue = selectedFilters[question.id]
-          
-          return (
-            <div key={question.id} className="space-y-1">
-              <label className="text-xs font-medium text-neutral-600 block">
-                {question.prompt}
-              </label>
-              <select
-                value={currentValue || ''}
-                onChange={(e) => {
-                  if (e.target.value === '') {
-                    clearFilter(question.id)
-                  } else {
-                    updateFilter(question.id, e.target.value)
-                  }
-                }}
-                className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-              >
-                <option value="">All</option>
-                {options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Results - Always Visible */}
-      <div className="space-y-6">
-        <div className="text-center">
-          <h4 className="text-xl font-semibold text-neutral-900">
-            Your Matches ({filteredProviders.length})
-          </h4>
-        </div>
-        
-        {filteredProviders.length > 0 ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredProviders.slice(0, 8).map((provider) => {
-                const details = getProviderDetails(provider)
-                return (
-                  <Link key={provider.id} to={`/provider/${provider.slug}`} className="block">
-                    <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                      {/* Provider Image with Overlays */}
-                      <div className="relative">
-                        {details.images && details.images.length > 0 ? (
-                          <div className="aspect-video bg-neutral-100">
-                            <img
-                              src={fixImageUrl(details.images[0])}
-                              alt={`${provider.name} business photo`}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const img = e.currentTarget as HTMLImageElement
-                                img.style.display = 'none'
-                                img.parentElement!.innerHTML = `
-                                  <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                                    <div class="text-center text-neutral-500">
-                                      <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                      </svg>
-                                      <p class="text-xs">No image available</p>
-                                    </div>
-                                  </div>
-                                `
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="aspect-video bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                            <div className="text-center text-neutral-500">
-                              <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                              <p className="text-xs">No image available</p>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Featured Badge - Top Right Over Image */}
-                        {isFeaturedProvider(provider) && (
-                          <div className="absolute top-2 right-2">
-                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] font-medium shadow-sm">
-                              ⭐ Featured
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Category Tag - Positioned between image and title, half on image */}
-                      <div className="relative -mt-3 mb-3">
-                        <div className="flex justify-start ml-2">
-                          <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm">
-                            {provider.category_key.replace('-', ' ')}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Provider Info */}
-                      <div className="p-2 text-center mt-[-1rem]">
-                        <div className="flex flex-col items-center gap-2 mb-1.5">
-                          <h3 className="font-semibold text-neutral-900 text-lg">{provider.name}</h3>
-                        </div>
-                        
-                        {/* Rating Display */}
-                        {provider.rating && (
-                          <div className="flex items-center justify-center gap-1 mb-3">
-                            <span className="text-sm font-medium text-neutral-900">{provider.rating.toFixed(1)}</span>
-                            <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          </div>
-                        )}
-                        
-                        {/* Tags - Only visible to admin, but hidden for restaurants-cafes */}
-                        {auth.isAuthed && provider.tags && provider.tags.length > 0 && provider.category_key !== 'restaurants-cafes' && (
-                          <div className="flex flex-wrap gap-1 justify-center mb-3">
-                            {provider.tags.slice(0, 3).map((tag) => (
-                              <span
-                                key={tag}
-                                className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600 rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-            
-            {filteredProviders.length > 8 && (
-              <div className="text-center mt-6">
-                <Link
-                  to={`/book?category=${category.key}&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}`}
-                  className="inline-flex items-center gap-2 px-6 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  View All {filteredProviders.length} Results
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-8 text-neutral-500">
-            <p>No matches found with your current filters.</p>
-            <p className="text-sm mt-1">Try adjusting your preferences or clearing some filters.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function CategoryPage() {
-  const path = window.location.pathname.split('/').pop() as CategoryKey
-  const category = categories.find((c) => c.key === path)
-  if (!category) return <Container className="py-10">Category not found.</Container>
-  const [, setVersion] = useState(0)
-  const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false)
-  const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({})
-  
-  useProviderUpdates(() => { setVersion((v: number) => v + 1) }, [])
-
-  // Check if user has completed questionnaire for this category
-  useEffect(() => {
-    try {
-      const key = `bf-tracking-${category.key}`
-      const existing = getLocalStorageJSON<Record<string, string>>(key, {})
-      if (existing && typeof existing === 'object') {
-        const questions = getFunnelQuestions(category.key, existing)
-        const isComplete = questions.every((q) => existing[q.id])
-        setHasCompletedQuestionnaire(isComplete)
-        setQuestionnaireAnswers(existing)
-      }
-    } catch {}
-  }, [category.key])
-  
-  return (
-    <section className="py-4 px-4">
-
-      {/* Content */}
-      {hasCompletedQuestionnaire ? (
-        <CategoryFilters 
-          category={category} 
-          answers={questionnaireAnswers}
-        />
-      ) : (
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-6">
-            <h2 className="text-lg font-medium text-neutral-900 mb-2">
-              Let's find the best match for you in {category.name}
-            </h2>
-          </div>
-          <Funnel category={category} />
-        </div>
-      )}
-    </section>
-  )
-}
+// CategoryPage component has been moved to src/pages/CategoryPage.tsx
 
 function AboutPage() {
   return (
@@ -2624,13 +1896,13 @@ function BookPage() {
                           <img 
                             src={fixImageUrl(d.images?.[0] || '')} 
                             alt={`${r.name} business photo`} 
-                            className="w-full h-32 object-cover rounded-lg border border-neutral-100"
+                            className="w-full h-40 object-cover rounded-lg border border-neutral-100"
                             onError={(e) => {
                               console.warn(`[BookPage] Failed to load image for ${r.name}:`, fixImageUrl(d.images?.[0] || ''))
                               const img = e.currentTarget as HTMLImageElement
                               img.style.display = 'none'
                               img.parentElement!.innerHTML = `
-                                <div class="w-full h-32 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                                <div class="w-full h-40 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
                                   <div class="text-center text-neutral-500">
                                     <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -2642,7 +1914,7 @@ function BookPage() {
                             }}
                           />
                         ) : (
-                          <div className="w-full h-32 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                          <div className="w-full h-40 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
                             <div className="text-center text-neutral-500">
                               <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -2665,7 +1937,7 @@ function BookPage() {
                       {/* Category Tag - Positioned between image and title, half on image */}
                       <div className="relative -mt-3 mb-3">
                         <div className="flex justify-start">
-                          <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm">
+                          <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm mt-[-1rem]">
                             {r.category_key.replace('-', ' ')}
                           </span>
                         </div>
@@ -2988,7 +2260,7 @@ export default function App() {
             <Route path="account" element={<AccountPage />} />
             <Route path="book" element={<BookPage />} />
             <Route path="business" element={<BusinessPage />} />
-            <Route path="category/:id" element={<CategoryPage />} />
+            <Route path="category/:id" element={<CategoryPage categories={categories} providersByCategory={providersByCategory} useProviderUpdates={useProviderUpdates} scoreProviders={scoreProviders} />} />
             <Route path="provider/:id" element={<ProviderPage providersByCategory={providersByCategory} useProviderUpdates={useProviderUpdates} />} />
             <Route path="thank-you" element={<ThankYouPage />} />
             <Route path="*" element={<NotFoundPage />} />
