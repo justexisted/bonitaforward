@@ -39,7 +39,7 @@ export const handler: Handler = async (event) => {
     if (!token) return { statusCode: 401, headers, body: 'Unauthorized' }
 
     const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+    const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE')
     // Try both VITE_ and non-VITE_ versions (Netlify backend might not have VITE_ vars)
     const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
     if (!SUPABASE_ANON_KEY) throw new Error('Missing SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY')

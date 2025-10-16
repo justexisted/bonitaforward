@@ -1232,7 +1232,6 @@ export default function AdminPage() {
       
       // Get auth session
       const { data: { session } } = await supabase.auth.getSession()
-      
       if (!session?.access_token) {
         console.error('[Admin] No session token available for booking events')
         setError('Not authenticated')

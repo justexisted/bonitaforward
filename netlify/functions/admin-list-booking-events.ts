@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE!
 )
 
 export const handler: Handler = async (event) => {
@@ -12,7 +12,8 @@ export const handler: Handler = async (event) => {
   }
 
   // Admin verification (similar to admin-verify function)
-  const token = event.headers.authorization?.split(' ')[1]
+  const authHeader = event.headers['authorization'] || event.headers['Authorization']
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
   if (!token) {
     return { statusCode: 401, body: 'Unauthorized: No token provided' }
   }
