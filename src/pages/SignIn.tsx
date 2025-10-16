@@ -159,18 +159,17 @@ export default function SignInPage() {
           setBusy(false) // CRITICAL FIX: Reset busy state on error
         } else {
           console.log('[SignIn] Sign in successful, waiting for redirect...')
-          
-          // CRITICAL FIX: Add timeout to prevent infinite "Please wait" state
-          // If redirect doesn't happen within 5 seconds, reset busy state
-          setTimeout(() => {
-            if (busy) {
-              console.log('[SignIn] Timeout reached, resetting busy state')
-              setBusy(false)
-              setMessage('Sign-in completed but redirect is taking longer than expected. Please refresh the page.')
-            }
-          }, 5000)
-          
-          // Don't set busy to false here - let the redirect useEffect handle it
+
+          // Prefer an explicit redirect even without a stored return URL
+          const stored = (() => {
+            try { return localStorage.getItem('bf-return-url') || null } catch { return null }
+          })()
+          const target = location?.state?.from || stored || '/account'
+          try { localStorage.removeItem('bf-return-url') } catch {}
+
+          // Navigate immediately; auth context will settle shortly after
+          setBusy(false)
+          navigate(target, { replace: true })
           return
         }
       } else if (mode === 'signup') {
