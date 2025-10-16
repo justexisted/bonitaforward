@@ -71,12 +71,13 @@ export default function SignInPage() {
   useEffect(() => {
     console.log('[SignIn] Auth state check:', { isAuthed: auth.isAuthed, loading: auth.loading, email: auth.email })
     
-    // CRITICAL FIX: Redirect if we have an email and not loading (even if isAuthed is false)
-    // This handles the case where profile is being set but isAuthed hasn't updated yet
-    if (auth.email && !auth.loading) {
-      console.log('[SignIn] User has email and not loading, redirecting...')
+    // Only redirect if we have a specific return URL or if user was redirected here from another page
+    // Don't redirect if user navigated directly to /signin (like from "Join Community" button)
+    const hasReturnUrl = location?.state?.from || localStorage.getItem('bf-return-url')
+    
+    if (hasReturnUrl && auth.email && !auth.loading) {
+      console.log('[SignIn] User has email, not loading, and return URL - redirecting...')
       
-      // CRITICAL FIX: Reset busy state before redirect to prevent stuck button
       setBusy(false)
       
       const stored = (() => {
@@ -86,11 +87,10 @@ export default function SignInPage() {
       try { localStorage.removeItem('bf-return-url') } catch {}
       navigate(target, { replace: true })
     }
-    // Fallback: Only redirect if fully authenticated and not loading
-    else if (auth.isAuthed && !auth.loading) {
-      console.log('[SignIn] User is authenticated, redirecting...')
+    // Only redirect authenticated users if they have a return URL
+    else if (hasReturnUrl && auth.isAuthed && !auth.loading) {
+      console.log('[SignIn] User is authenticated with return URL - redirecting...')
       
-      // CRITICAL FIX: Reset busy state before redirect to prevent stuck button
       setBusy(false)
       
       const stored = (() => {
@@ -123,20 +123,27 @@ export default function SignInPage() {
     e.preventDefault()
     setMessage(null)
     
-    // CRITICAL FIX: Prevent duplicate sign-in attempts if user is already authenticated
-    // This prevents the stuck "Please wait" button when user is already signed in
-    if (auth.isAuthed && !auth.loading) {
-      console.log('[SignIn] User is already authenticated, redirecting instead of signing in again')
+    // Only prevent sign-in if user is already authenticated AND they have a return URL
+    // This allows users to access the sign-in page even if authenticated (for account switching, etc.)
+    const hasReturnUrl = location?.state?.from || localStorage.getItem('bf-return-url')
+    if (auth.isAuthed && !auth.loading && hasReturnUrl) {
+      console.log('[SignIn] User is already authenticated with return URL, redirecting instead of signing in again')
       const target = location?.state?.from || '/'
       navigate(target, { replace: true })
       return
     }
     
-    // CRITICAL FIX: Also prevent sign-in if we have a profile but loading is false
-    // This handles the case where profile is being set but not yet reflected in isAuthed
-    if (auth.email && !auth.loading) {
-      console.log('[SignIn] User profile exists but not fully authenticated yet, waiting for auth state to update')
+    // Also prevent sign-in if we have a profile, loading is false, AND there's a return URL
+    if (auth.email && !auth.loading && hasReturnUrl) {
+      console.log('[SignIn] User already has a profile with return URL, redirecting instead of signing in again')
+      const target = location?.state?.from || '/'
+      navigate(target, { replace: true })
       return
+    }
+    
+    // If user has a profile but no return URL, allow them to stay on sign-in page
+    if (auth.email && !auth.loading) {
+      console.log('[SignIn] User profile exists but no return URL, allowing access to sign-in page')
     }
     
     setBusy(true)
