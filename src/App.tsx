@@ -13,6 +13,7 @@ import AccountPage from './pages/Account'
 import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import AboutPage from './pages/AboutPage'
+import ContactPage from './pages/ContactPage'
 import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
 import PricingPage from './pages/Pricing'
@@ -1213,52 +1214,7 @@ async function createBusinessApplication(params: { full_name?: string; business_
 
 // CategoryPage component has been moved to src/pages/CategoryPage.tsx
 // AboutPage component has been moved to src/pages/AboutPage.tsx
-
-function ContactPage() {
-  return (
-    <section className="py-8">
-      <Container>
-        <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate max-w-xl mx-auto">
-          <h2 className="text-xl font-semibold tracking-tight">Contact Bonita Forward</h2>
-          <p className="mt-1 text-neutral-600">Have a question or feedback? Reach us at <a href="mailto:bonitaforward@gmail.com" className="underline">bonitaforward@gmail.com</a> or call <a href="tel:+16197075351" className="underline">(619) 707-5351</a>.</p>
-          <form
-            className="mt-4 grid grid-cols-1 gap-3"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const form = e.currentTarget as HTMLFormElement
-              const name = (form.elements.namedItem('name') as HTMLInputElement)?.value
-              const email = (form.elements.namedItem('email') as HTMLInputElement)?.value
-              const subject = (form.elements.namedItem('subject') as HTMLInputElement)?.value
-              const message = (form.elements.namedItem('message') as HTMLTextAreaElement)?.value
-              try { localStorage.setItem('bf-user-contact', JSON.stringify({ name, email, subject, message, ts: Date.now() })) } catch {}
-              form.reset()
-              window.location.assign('/thank-you')
-            }}
-          >
-            <div>
-              <label className="block text-sm text-neutral-600">Full Name</label>
-              <input name="name" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Your full name" />
-            </div>
-            <div>
-              <label className="block text-sm text-neutral-600">Email</label>
-              <input name="email" type="email" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="you@example.com" />
-            </div>
-            <div>
-              <label className="block text-sm text-neutral-600">Subject</label>
-              <input name="subject" required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="How can we help?" />
-            </div>
-            <div>
-              <label className="block text-sm text-neutral-600">Message</label>
-              <textarea name="message" rows={5} required className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" placeholder="Write your message here" />
-            </div>
-            <div className="text-xs text-neutral-500">By submitting, you agree to our <a className="underline" href="/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a> and <a className="underline" href="/terms.html" target="_blank" rel="noreferrer">Terms</a>.</div>
-            <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Send Message</button>
-          </form>
-        </div>
-      </Container>
-    </section>
-  )
-}
+// ContactPage component has been moved to src/pages/ContactPage.tsx
 
 function BusinessPage() {
   const auth = useAuth()

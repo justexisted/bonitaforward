@@ -570,3 +570,28 @@ export async function getLatestActivityTimestamp(
     return null
   }
 }
+
+// Contact lead type
+export type ContactLead = {
+  id?: string
+  business_name: string | null
+  contact_email: string | null
+  details: string | null
+  created_at?: string
+}
+
+// Create a new contact lead
+export async function createContactLead(contactData: Omit<ContactLead, 'id' | 'created_at'>): Promise<ContactLead> {
+  const { data, error } = await supabase
+    .from('contact_leads')
+    .insert([contactData])
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating contact lead:', error)
+    throw new Error(`Failed to create contact lead: ${error.message}`)
+  }
+
+  return data
+}
