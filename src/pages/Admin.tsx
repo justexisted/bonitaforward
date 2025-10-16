@@ -1122,7 +1122,7 @@ export default function AdminPage() {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -1194,7 +1194,7 @@ export default function AdminPage() {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${session.session.access_token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -1246,7 +1246,7 @@ export default function AdminPage() {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${session.session.access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({}) // No customer email filter - get all bookings
@@ -1499,8 +1499,8 @@ export default function AdminPage() {
       setAdminStatus(prev => ({ ...prev, loading: true }))
 
       try {
-        const { data: session } = await supabase.auth.getSession()
-        const token = session.session?.access_token
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
         
         if (!token) {
           // console.log('[Admin] No auth token, using client-side admin check:', isClientAdmin)
@@ -1668,8 +1668,8 @@ export default function AdminPage() {
         }
         try {
           if (isAdmin) {
-            const { data: session } = await supabase.auth.getSession()
-            const token = session.session?.access_token
+            const { data: { session } } = await supabase.auth.getSession()
+            const token = session?.access_token
             
           if (token) {
             // Use relative URL for Netlify functions (works in both dev and production)
