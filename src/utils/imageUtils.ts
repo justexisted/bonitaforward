@@ -3,51 +3,26 @@
  * 
  * Handles normalization of image URLs from various sources:
  * - Supabase storage paths
- * - External URLs
+ * - External URLs (including Google user content)
  * - Relative paths
- * 
- * Note: Google user content images (lh3.googleusercontent.com) cannot be
- * reliably displayed due to hot-linking restrictions. These will return
- * empty string and should be handled with fallback UI.
  */
 
 import { supabase } from '../lib/supabase'
-
-// Track which Google image URLs we've already warned about to reduce console noise
-const warnedUrls = new Set<string>()
 
 /**
  * Fix and normalize image URLs
  * Handles full URLs, Supabase storage paths, and relative paths
  * 
  * @param url - The image URL to normalize
- * @returns Normalized URL ready for display, or empty string for unsupported URLs
+ * @returns Normalized URL ready for display
  */
 export function fixImageUrl(url: string): string {
   if (!url || typeof url !== 'string') {
     return ''
   }
   
-  // Google user content images cannot be reliably hot-linked
-  // Return empty to trigger fallback UI
-  if (url.startsWith('https://lh3.googleusercontent.com/')) {
-    // Only warn once per unique URL to reduce console noise
-    if (!warnedUrls.has(url)) {
-      warnedUrls.add(url)
-      if (warnedUrls.size === 1) {
-        // Show helpful message on first Google image encountered
-        console.info(
-          '%c🖼️ Google Images Notice',
-          'background: #4285f4; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold',
-          '\nGoogle blocks hot-linking of their images. Showing placeholders instead.',
-          '\n💡 Run "npm run migrate:images" to permanently fix this by uploading images to Supabase.'
-        )
-      }
-    }
-    return ''
-  }
-  
-  // If it's already a full URL (non-Google), return as-is
+  // If it's already a full URL (including Google images), return as-is
+  // Let the browser try to load it; onError handlers will catch failures
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url
   }
