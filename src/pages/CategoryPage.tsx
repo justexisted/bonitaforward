@@ -107,7 +107,7 @@ function getProviderDetails(p: Provider): ProviderDetails {
  * Get funnel questions for a specific category
  * This is a simplified version for CategoryPage use
  */
-function getFunnelQuestions(categoryKey: CategoryKey, _answers: Record<string, string>): any[] {
+function getFunnelQuestions(_categoryKey: CategoryKey, _answers: Record<string, string>): any[] {
   // Return a simple array for CategoryPage use
   // The full implementation is in the Funnel component
   return []
@@ -221,7 +221,7 @@ function CategoryFilters({
                 className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               >
                 <option value="">All</option>
-                {options.map((option) => (
+                {options.map((option: { id: string; label: string }) => (
                   <option key={option.id} value={option.id}>
                     {option.label}
                   </option>
