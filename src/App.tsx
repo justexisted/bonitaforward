@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
-import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from './lib/sheets.ts'
-import { fetchProvidersFromSupabase } from './lib/supabaseData.ts'
 import SignInPage from './pages/SignIn'
 import OnboardingPage from './pages/Onboarding'
 import AccountPage from './pages/Account'
@@ -20,13 +18,14 @@ import NotFoundPage from './pages/NotFound'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
+import AppInit from './components/AppInit'
 import ProviderPage from './pages/ProviderPage'
 import CategoryPage from './pages/CategoryPage'
 import BookPage from './pages/BookPage'
 import BusinessPage from './pages/BusinessPage'
 import HomePage from './pages/HomePage'
 import ThankYouPage from './pages/ThankYouPage'
-import { type CategoryKey, type Provider, generateSlug, ensureDemoMembers } from './utils/helpers'
+import type { CategoryKey, Provider } from './types'
 import { scoreProviders } from './utils/providerScoring'
 
 const categories: {
@@ -147,132 +146,8 @@ const categories: {
 
 // providersByCategory moved to App component state
 
-async function loadProvidersFromSheet(setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void): Promise<void> {
-  try {
-    const rows = await fetchSheetRows()
-    const mapped = mapRowsToProviders(rows)
-    const grouped: Record<CategoryKey, Provider[]> = {
-      'real-estate': [],
-      'home-services': [],
-      'health-wellness': [],
-      'restaurants-cafes': [],
-      'professional-services': [],
-    }
-    mapped.forEach((sp: SheetProvider) => {
-      const cat = (sp.category_key as CategoryKey)
-      if (grouped[cat]) {
-        grouped[cat].push({ id: sp.id, name: sp.name, slug: generateSlug(sp.name), category_key: cat, tags: sp.tags.length ? sp.tags : (sp.details.badges || []), rating: sp.rating })
-      }
-    })
-    setProvidersByCategory(ensureDemoMembers(grouped))
-    // console.log('[Sheets] Providers loaded from Google Sheets', grouped)
-  } catch (err) {
-    console.warn('[Sheets] Failed to load providers from Google Sheets, using defaults', err)
-  }
-  try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
-}
-
-async function loadProvidersFromSupabase(setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void): Promise<boolean> {
-  console.log('[Supabase] Starting to load providers from Supabase...')
-  try {
-    const rows = await fetchProvidersFromSupabase()
-    console.log('[Supabase] fetchProvidersFromSupabase returned:', rows?.length || 0, 'providers')
-    if (!rows || rows.length === 0) {
-      console.warn('[Supabase] No providers found or failed to load')
-      return false
-    }
-    console.log(`[Supabase] Loaded ${rows.length} providers from database`)
-    
-    const grouped: Record<CategoryKey, Provider[]> = {
-    'real-estate': [],
-    'home-services': [],
-    'health-wellness': [],
-    'restaurants-cafes': [],
-    'professional-services': [],
-  }
-  function coerceIsMember(r: any): boolean {
-    // CRITICAL FIX: Match Admin page logic EXACTLY - only check for boolean true values
-    // Admin page uses: provider.is_featured === true || provider.is_member === true
-    // This ensures perfect consistency between admin page and provider page featured status
-    // We only check for boolean true, not string 'true' or numeric 1, to match admin page exactly
-    const isFeatured = r.is_featured === true
-    const isMember = r.is_member === true
-    
-    // Return true if EITHER field indicates featured status (matching Admin page logic exactly)
-    return isFeatured || isMember
-  }
-
-  rows.forEach((r) => {
-    const key = (r.category_key as CategoryKey)
-    if (!grouped[key]) return
-    // Combine tags and badges to preserve featured/member flags
-    const combinedTags = Array.from(new Set([...
-      (((r.tags as string[] | null) || []) as string[]),
-      (((r.badges as string[] | null) || []) as string[]),
-    ].flat().map((s) => String(s).trim()).filter(Boolean)))
-
-    // Debug: Only log health-wellness providers to avoid spam
-    // if (key === 'health-wellness') {
-    //   console.log(`[Supabase] Loading health-wellness provider: ${r.name} (published: ${r.published})`)
-    // }
-
-    grouped[key].push({
-      id: r.id,
-      name: r.name,
-      slug: generateSlug(r.name), // Generate URL-friendly slug from business name
-      category_key: key,
-      tags: combinedTags,
-      rating: r.rating ?? undefined,
-      phone: r.phone ?? null,
-      email: r.email ?? null,
-      website: r.website ?? null,
-      address: r.address ?? null,
-      isMember: coerceIsMember(r),
-      // Enhanced business fields
-      description: r.description ?? null,
-      specialties: r.specialties ?? null,
-      social_links: r.social_links ?? null,
-      business_hours: r.business_hours ?? null,
-      service_areas: r.service_areas ?? null,
-      google_maps_url: r.google_maps_url ?? null,
-      images: r.images ?? null,
-      badges: r.badges ?? null,
-      published: r.published ?? null,
-      created_at: r.created_at ?? null,
-      updated_at: r.updated_at ?? null,
-      // Booking system fields
-      booking_enabled: r.booking_enabled ?? null,
-      booking_type: r.booking_type ?? null,
-      booking_instructions: r.booking_instructions ?? null,
-      booking_url: r.booking_url ?? null,
-      // Contact method toggles
-      enable_calendar_booking: r.enable_calendar_booking ?? null,
-      enable_call_contact: r.enable_call_contact ?? null,
-      enable_email_contact: r.enable_email_contact ?? null,
-      // Coupon fields
-      coupon_code: r.coupon_code ?? null,
-      coupon_discount: r.coupon_discount ?? null,
-      coupon_description: r.coupon_description ?? null,
-      coupon_expires_at: r.coupon_expires_at ?? null,
-      bonita_resident_discount: r.bonita_resident_discount ?? null,
-    })
-  })
-    setProvidersByCategory(grouped)
-  
-  // Log summary of loaded providers by category
-  // Object.keys(grouped).forEach((category) => {
-  //   const count = grouped[category as CategoryKey].length
-  //   console.log(`[Supabase] ${category}: ${count} providers loaded`)
-  // })
-  
-    // console.log('[Supabase] Providers loaded successfully', grouped)
-    try { window.dispatchEvent(new CustomEvent('bf-providers-updated')) } catch {}
-    return true
-  } catch (error) {
-    console.error('[Supabase] Error loading providers:', error)
-    return false
-  }
-}
+// loadProvidersFromSheet moved to src/services/providerService.ts
+// loadProvidersFromSupabase moved to src/services/providerService.ts
 
 // ============================================================================
 // PROVIDER SCORING LOGIC
@@ -329,32 +204,7 @@ function scoreProviders(...) { ... }
 
 // BookPage moved to src/pages/BookPage.tsx
 
-function AppInit({ setProvidersByCategory }: { setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void }) {
-  useEffect(() => {
-    ;(async () => {
-      console.log('[AppInit] Starting provider data loading...')
-      const ok = await loadProvidersFromSupabase(setProvidersByCategory)
-      console.log('[AppInit] Supabase loading result:', ok)
-      if (!ok) {
-        console.log('[AppInit] Supabase failed, trying Google Sheets fallback...')
-        await loadProvidersFromSheet(setProvidersByCategory)
-        console.log('[AppInit] Google Sheets fallback completed')
-      }
-    })()
-    function onRefresh() {
-      ;(async () => {
-        console.log('[AppInit] Refreshing provider data...')
-        const ok = await loadProvidersFromSupabase(setProvidersByCategory)
-        if (!ok) await loadProvidersFromSheet(setProvidersByCategory)
-      })()
-    }
-    window.addEventListener('bf-refresh-providers', onRefresh as EventListener)
-    return () => {
-      window.removeEventListener('bf-refresh-providers', onRefresh as EventListener)
-    }
-  }, [setProvidersByCategory])
-  return null
-}
+// AppInit component moved to src/components/AppInit.tsx
 
 export default function App() {
   const [providersByCategory, setProvidersByCategory] = useState<Record<CategoryKey, Provider[]>>({

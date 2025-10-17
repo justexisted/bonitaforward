@@ -3169,13 +3169,113 @@ export default function AdminPage() {
                 <div className="space-y-2 text-sm">
                 {contactLeads.length === 0 && <div className="text-neutral-500">No leads yet.</div>}
                 {contactLeads.map((row) => (
-                  <div key={row.id} className="rounded-xl border border-neutral-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{row.business_name || '-'}</div>
+                  <div key={row.id} className="rounded-xl border border-neutral-200 p-3 bg-white hover:border-blue-300 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-medium text-neutral-900">{row.business_name || 'Unnamed Business'}</div>
                       <div className="text-xs text-neutral-500">{new Date(row.created_at).toLocaleString()}</div>
                     </div>
-                    <div className="text-xs text-neutral-600 mt-1">Email: {row.contact_email || '-'}</div>
-                    <div className="text-xs text-neutral-600 mt-1">Details: {row.details || '-'}</div>
+                    <div className="text-xs text-neutral-600 mt-1">
+                      <span className="font-medium">Email:</span> {row.contact_email || 'No email provided'}
+                    </div>
+                    <div className="text-xs text-neutral-600 mt-1">
+                      <span className="font-medium">Details:</span> {row.details || 'No details provided'}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-neutral-100">
+                      {/* Message Button */}
+                      {row.contact_email && (
+                        <a
+                          href={`mailto:${row.contact_email}?subject=Re: Featured Listing Request - ${row.business_name || 'Your Business'}&body=Hi,
+
+Thank you for reaching out about getting featured on Bonita Forward!
+
+${row.details ? `Regarding your inquiry: "${row.details}"` : ''}
+
+We'd love to discuss how we can help promote your business. Here are our featured listing options:
+
+- Featured Placement: Your business appears at the top of relevant category searches
+- Enhanced Profile: Showcase your business with photos, special offers, and more
+- Priority Support: Get dedicated assistance with your listing
+
+Would you like to schedule a quick call to discuss the best option for ${row.business_name || 'your business'}?
+
+Best regards,
+Bonita Forward Team`}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          Message
+                        </a>
+                      )}
+                      
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => {
+                          const newBusinessName = prompt('Business Name:', row.business_name || '')
+                          const newEmail = prompt('Contact Email:', row.contact_email || '')
+                          const newDetails = prompt('Details:', row.details || '')
+                          
+                          if (newBusinessName !== null && newEmail !== null && newDetails !== null) {
+                            supabase
+                              .from('contact_leads')
+                              .update({
+                                business_name: newBusinessName,
+                                contact_email: newEmail,
+                                details: newDetails
+                              })
+                              .eq('id', row.id)
+                              .then(({ error }) => {
+                                if (error) {
+                                  setError(`Failed to update lead: ${error.message}`)
+                                } else {
+                                  setMessage('Lead updated successfully')
+                                  setContactLeads(prev => prev.map(l => 
+                                    l.id === row.id 
+                                      ? { ...l, business_name: newBusinessName, contact_email: newEmail, details: newDetails }
+                                      : l
+                                  ))
+                                }
+                              })
+                          }
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-600 bg-amber-50 rounded-md hover:bg-amber-100 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit
+                      </button>
+                      
+                      {/* Delete Button */}
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Delete lead from "${row.business_name || 'Unnamed Business'}"? This action cannot be undone.`)) return
+                          
+                          const { error } = await supabase
+                            .from('contact_leads')
+                            .delete()
+                            .eq('id', row.id)
+                          
+                          if (error) {
+                            setError(`Failed to delete lead: ${error.message}`)
+                          } else {
+                            setMessage('Lead deleted successfully')
+                            setContactLeads(prev => prev.filter(l => l.id !== row.id))
+                          }
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
                 </div>
