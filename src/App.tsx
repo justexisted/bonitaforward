@@ -26,8 +26,7 @@ import BookPage from './pages/BookPage'
 import BusinessPage from './pages/BusinessPage'
 import HomePage from './pages/HomePage'
 import ThankYouPage from './pages/ThankYouPage'
-
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+import { type CategoryKey, type Provider, generateSlug, isFeaturedProvider, ensureDemoMembers } from './utils/helpers'
 
 const categories: {
   key: CategoryKey
@@ -132,94 +131,16 @@ const categories: {
 
 // funnelConfig has been moved to src/pages/CategoryPage.tsx
 
-type Provider = {
-  id: string
-  name: string
-  slug: string // URL-friendly version of the business name (e.g., "flora-cafe")
-  category_key: CategoryKey // FIXED: Use category_key to match database schema
-  tags: string[]
-  rating?: number
-  phone?: string | null
-  email?: string | null
-  website?: string | null
-  address?: string | null
-  isMember?: boolean
-  // Enhanced business fields from database
-  description?: string | null
-  specialties?: string[] | null
-  social_links?: Record<string, string> | null
-  business_hours?: Record<string, string> | null
-  service_areas?: string[] | null
-  google_maps_url?: string | null
-  images?: string[] | null
-  badges?: string[] | null
-  published?: boolean | null
-  created_at?: string | null
-  updated_at?: string | null
-  // Missing fields:
-  featured_since?: string | null
-  subscription_type?: 'monthly' | 'yearly' | null
-  // Booking system fields
-  booking_enabled?: boolean | null
-  booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
-  booking_instructions?: string | null
-  booking_url?: string | null
-  // Contact method toggles
-  enable_calendar_booking?: boolean | null
-  enable_call_contact?: boolean | null
-  enable_email_contact?: boolean | null
-  // Coupon fields
-  coupon_code?: string | null
-  coupon_discount?: string | null
-  coupon_description?: string | null
-  coupon_expires_at?: string | null
-  bonita_resident_discount?: string | null
-}
-function ensureDemoMembers(input: Record<CategoryKey, Provider[]>): Record<CategoryKey, Provider[]> {
-  const out: Record<CategoryKey, Provider[]> = {
-    'real-estate': [],
-    'home-services': [],
-    'health-wellness': [],
-    'restaurants-cafes': [],
-    'professional-services': [],
-  };
-  (Object.keys(input) as CategoryKey[]).forEach((k: CategoryKey) => {
-    const key = k
-    const arr = input[key] || []
-    out[key] = arr.map((p: Provider, idx: number) => ({ ...p, isMember: Boolean(p.isMember) || idx < 3 }))
-  })
-  return out
-}
+// Provider type imported from src/utils/helpers.ts
+// ensureDemoMembers imported from src/utils/helpers.ts
 
 
 // ProviderDetails type moved to src/pages/BookPage.tsx
 
 // Removed unused providerDescriptions/getProviderDescription to satisfy TypeScript build
 
-/**
- * SLUG GENERATION FUNCTION
- * 
- * Creates URL-friendly slugs from business names for cleaner URLs.
- * Example: "Flora Cafe" -> "flora-cafe"
- * 
- * This enables professional URLs like /provider/flora-cafe instead of /provider/uuid
- */
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-}
-
-function isFeaturedProvider(p: Provider): boolean {
-  // Only check the isMember field to ensure consistency with admin page
-  // This prevents discrepancies where providers show as featured on provider page
-  // but not on admin page due to different logic
-  return Boolean(p.isMember)
-}
+// generateSlug imported from src/utils/helpers.ts
+// isFeaturedProvider imported from src/utils/helpers.ts
 
 // getProviderDetails moved to src/pages/BookPage.tsx
 

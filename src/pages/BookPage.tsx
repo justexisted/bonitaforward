@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { getLocalStorageJSON, isFeaturedProvider as isProviderFeatured } from '../utils/helpers'
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
@@ -35,15 +36,7 @@ type ProviderDetails = {
   posts?: { id: string; title: string; url?: string }[]
 }
 
-function getLocalStorageJSON<T>(key: string, defaultValue: T): T {
-  try {
-    const item = localStorage.getItem(key)
-    if (!item) return defaultValue
-    return JSON.parse(item) as T
-  } catch {
-    return defaultValue
-  }
-}
+// getLocalStorageJSON imported from src/utils/helpers.ts
 
 function useProviderUpdates(callback: () => void, deps: React.DependencyList = []) {
   useEffect(() => {
@@ -53,8 +46,9 @@ function useProviderUpdates(callback: () => void, deps: React.DependencyList = [
   }, deps)
 }
 
+// isFeaturedProvider imported from src/utils/helpers.ts as isProviderFeatured
 function isFeaturedProvider(p: Provider): boolean {
-  return Boolean(p.isMember)
+  return isProviderFeatured(p)
 }
 
 function getProviderDetails(p: Provider): ProviderDetails {

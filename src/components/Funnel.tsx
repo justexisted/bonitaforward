@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { getLocalStorageJSON, type CategoryKey } from '../utils/helpers'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+// CategoryKey imported from src/utils/helpers.ts
 
 type FunnelOption = {
   id: string
@@ -32,19 +33,7 @@ interface FunnelProps {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-/**
- * Get JSON from localStorage with error handling
- */
-function getLocalStorageJSON<T>(key: string, defaultValue: T): T {
-  try {
-    const item = localStorage.getItem(key)
-    if (!item) return defaultValue
-    return JSON.parse(item) as T
-  } catch (e) {
-    console.warn(`Failed to parse localStorage key "${key}":`, e)
-    return defaultValue
-  }
-}
+// getLocalStorageJSON imported from src/utils/helpers.ts
 
 // ============================================================================
 // FUNNEL CONFIGURATION

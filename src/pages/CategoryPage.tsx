@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Funnel, { type CategoryKey, getFunnelQuestions } from '../components/Funnel'
 import CategoryFilters from '../components/CategoryFilters'
+import { getLocalStorageJSON } from '../utils/helpers'
 
 // ============================================================================
 // TYPES
@@ -62,20 +63,7 @@ function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
 }
 
-/**
- * Get JSON from localStorage with error handling
- */
-function getLocalStorageJSON<T>(key: string, defaultValue: T): T {
-  try {
-    const item = localStorage.getItem(key)
-    if (!item) return defaultValue
-    return JSON.parse(item) as T
-  } catch (e) {
-    console.warn(`Failed to parse localStorage key "${key}":`, e)
-    return defaultValue
-  }
-}
-
+// getLocalStorageJSON imported from src/utils/helpers.ts
 
 function isFeaturedProvider(p: Provider): boolean {
   return Boolean(p.isMember)

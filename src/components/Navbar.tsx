@@ -1,30 +1,14 @@
 import { useEffect } from 'react'
 import { useAuth, saveReturnUrl } from '../contexts/AuthContext'
 import CardNav, { type CardNavItem } from './CardNav'
+import { getAdminList, isUserAdmin } from '../utils/helpers'
 
 // ============================================================================
 // ADMIN UTILITY FUNCTIONS
 // ============================================================================
 
-/**
- * Get list of admin emails from environment variable
- */
-function getAdminList(): string[] {
-  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
-    .split(',')
-    .map((s: string) => s.trim().toLowerCase())
-    .filter(Boolean)
-  return adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
-}
-
-/**
- * Check if a user email is in the admin list
- */
-function isUserAdmin(email: string | undefined): boolean {
-  if (!email) return false
-  const adminList = getAdminList()
-  return adminList.includes(email.toLowerCase())
-}
+// getAdminList imported from src/utils/helpers.ts
+// isUserAdmin imported from src/utils/helpers.ts
 
 // ============================================================================
 // NAVBAR COMPONENT
