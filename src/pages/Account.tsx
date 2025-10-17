@@ -37,7 +37,16 @@ export default function AccountPage() {
     provider_phone?: string | null
     provider_tags?: string[] | null
   }>>([])
-  const [discounts, setDiscounts] = useState<Array<{ id: string; provider_id?: string | null; code?: string | null; created_at?: string | null; provider_name?: string | null }>>([])
+  const [discounts, setDiscounts] = useState<Array<{ 
+    id: string; 
+    provider_id?: string | null; 
+    code?: string | null; 
+    created_at?: string | null; 
+    provider_name?: string | null;
+    coupon_description?: string | null;
+    coupon_discount?: string | null;
+    coupon_expires_at?: string | null;
+  }>>([])
   const [communityLoading, setCommunityLoading] = useState(false)
   const [myEvents, setMyEvents] = useState<CalendarEvent[]>([])
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
@@ -240,11 +249,11 @@ export default function AccountPage() {
           setSavedBusinesses([])
         }
 
-        // Discounts Redeemed
+        // Discounts/Coupons Redeemed - Load with provider details and coupon info via join
         try {
           const { data, error } = await supabase
             .from('coupon_redemptions')
-            .select('*')
+            .select('id, provider_id, code, created_at, providers(name, coupon_code, coupon_description, coupon_discount, coupon_expires_at)')
             .eq('user_id', auth.userId)
             .order('created_at', { ascending: false })
             .limit(100)
@@ -253,11 +262,15 @@ export default function AccountPage() {
             setDiscounts([])
           } else {
             const rows = (data as any[]) || []
+            console.log('[Account] Loaded coupon redemptions:', rows.length)
             setDiscounts(rows.map((r) => ({
               id: r.id,
               provider_id: r.provider_id ?? null,
-              provider_name: (r as any).provider_name ?? null,
-              code: (r as any).code ?? null,
+              provider_name: r.providers?.name ?? 'Business',
+              code: (r.code || r.providers?.coupon_code) ?? null,
+              coupon_description: r.providers?.coupon_description ?? null,
+              coupon_discount: r.providers?.coupon_discount ?? null,
+              coupon_expires_at: r.providers?.coupon_expires_at ?? null,
               created_at: r.created_at ?? null,
             })))
           }
@@ -345,6 +358,28 @@ export default function AccountPage() {
     } catch (error: any) {
       console.error('Error removing saved business:', error)
       alert('Failed to remove business: ' + error.message)
+    }
+  }
+
+  // Remove saved coupon
+  const handleRemoveSavedCoupon = async (couponId: string, providerName: string | null) => {
+    if (!confirm(`Remove coupon from "${providerName || 'this business'}"?`)) return
+
+    try {
+      const { error } = await supabase
+        .from('coupon_redemptions')
+        .delete()
+        .eq('id', couponId)
+        .eq('user_id', auth.userId || '')
+
+      if (error) throw error
+
+      // Update local state
+      setDiscounts(prev => prev.filter(c => c.id !== couponId))
+      setMessage('Coupon removed from saved list')
+    } catch (error: any) {
+      console.error('Error removing saved coupon:', error)
+      alert('Failed to remove coupon: ' + error.message)
     }
   }
 
@@ -1058,23 +1093,140 @@ export default function AccountPage() {
               </div>
             </div>
           </div>
-          {String(auth.role || role || '').toLowerCase() === 'community' && (
-            <div className="mt-6 border-t border-neutral-100 pt-4">
-              <div className="text-sm font-medium">Discounts Redeemed</div>
-              <div className="mt-2 text-sm">
-                {communityLoading && <div className="text-neutral-500">Loading…</div>}
-                {!communityLoading && discounts.length === 0 && <div className="text-neutral-600">No discounts redeemed yet.</div>}
-                <ul className="space-y-1">
-                  {discounts.map((d) => (
-                    <li key={d.id} className="flex items-center justify-between">
-                      <span>{d.provider_name || d.provider_id || 'Business'}{d.code ? ` • ${d.code}` : ''}</span>
-                      <span className="text-xs text-neutral-500">{d.created_at ? new Date(d.created_at).toLocaleString() : ''}</span>
-                    </li>
-                  ))}
-                </ul>
+          
+          {/* Saved Coupons/Discounts - Available to all users */}
+          <div className="mt-6 border-t border-neutral-100 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">Saved Coupons</div>
+              <div className="text-xs text-neutral-500">
+                {discounts.length} saved
               </div>
             </div>
-          )}
+            <div className="mt-2">
+              {communityLoading && <div className="text-sm text-neutral-500">Loading…</div>}
+              {!communityLoading && discounts.length === 0 && (
+                <div className="text-sm text-neutral-600 bg-neutral-50 rounded-lg p-4 text-center">
+                  No coupons saved yet. <br/>
+                  <span className="text-xs text-neutral-500 mt-1">Save coupons from business pages to use them later!</span>
+                </div>
+              )}
+              <div className="space-y-2">
+                {discounts.map((d) => {
+                  const isExpired = d.coupon_expires_at ? new Date(d.coupon_expires_at) < new Date() : false
+                  const expiresDate = d.coupon_expires_at ? new Date(d.coupon_expires_at) : null
+                  
+                  return (
+                    <div 
+                      key={d.id}
+                      className={`border rounded-lg p-3 transition-colors ${
+                        isExpired 
+                          ? 'border-red-200 bg-red-50 opacity-75' 
+                          : 'border-neutral-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          {/* Business name and expired badge */}
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="font-medium text-neutral-900 text-sm">
+                              {d.provider_name || 'Business'}
+                            </div>
+                            {isExpired && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                Expired
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Coupon description */}
+                          {d.coupon_description && (
+                            <div className="text-xs text-neutral-600 mb-2">
+                              {d.coupon_description}
+                            </div>
+                          )}
+                          
+                          {/* Discount amount */}
+                          {d.coupon_discount && (
+                            <div className="text-xs font-medium text-green-700 mb-2">
+                              Save {d.coupon_discount}
+                            </div>
+                          )}
+                          
+                          {/* Coupon code with copy button */}
+                          {d.code && (
+                            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 border rounded-lg ${
+                              isExpired 
+                                ? 'bg-neutral-100 border-neutral-300' 
+                                : 'bg-green-50 border-green-200'
+                            }`}>
+                              <span className={`text-xs font-mono font-medium ${
+                                isExpired ? 'text-neutral-600' : 'text-green-700'
+                              }`}>
+                                {d.code}
+                              </span>
+                              {!isExpired && (
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(d.code || '')
+                                    alert('Coupon code copied to clipboard!')
+                                  }}
+                                  className="text-green-600 hover:text-green-700"
+                                  title="Copy code"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Expiration date */}
+                          {expiresDate && (
+                            <div className={`text-xs mt-2 flex items-center gap-1 ${
+                              isExpired ? 'text-red-600' : 'text-amber-600'
+                            }`}>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {isExpired 
+                                ? `Expired on ${expiresDate.toLocaleDateString()}`
+                                : `Expires ${expiresDate.toLocaleDateString()}`
+                              }
+                            </div>
+                          )}
+                          
+                          {/* Saved date */}
+                          <div className="text-xs text-neutral-400 mt-2">
+                            Saved {d.created_at ? new Date(d.created_at).toLocaleDateString() : ''}
+                          </div>
+                        </div>
+                        
+                        {/* Action buttons */}
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          {d.provider_id && (
+                            <Link
+                              to={`/provider/${d.provider_id}`}
+                              className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors text-center"
+                            >
+                              View Business
+                            </Link>
+                          )}
+                          <button
+                            onClick={() => handleRemoveSavedCoupon(d.id, d.provider_name || null)}
+                            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+                            title="Remove coupon"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
 
           {/* My Events Section - Available to all users */}
           <div className="mt-6 border-t border-neutral-100 pt-4">
