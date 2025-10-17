@@ -431,32 +431,70 @@ export default function MyBusinessPage() {
 
       if (appsError) throw appsError
 
-      // Load job posts for all user's providers
+      // Load job posts for all user's providers AND job posts owned by the user
       const providerIds = [
         ...(listingsData || []).map(l => l.id),
         ...(emailListingsData || []).map(l => l.id)
       ]
       
       let jobPostsData: JobPost[] = []
+      
+      // Query job posts in two ways:
+      // 1. Job posts for providers owned by this user
+      // 2. Job posts directly owned by this user (owner_user_id)
+      let allJobPosts: JobPost[] = []
+      
+      // First, get job posts for user's providers
       if (providerIds.length > 0) {
-        const { data: jobsData, error: jobsError } = await supabase
+        const { data: providerJobsData, error: providerJobsError } = await supabase
           .from('provider_job_posts')
           .select('*')
           .in('provider_id', providerIds)
           .order('created_at', { ascending: false })
 
-        console.log('[MyBusiness] Job posts query result:', {
-          error: jobsError,
-          count: jobsData?.length || 0,
-          data: jobsData
+        console.log('[MyBusiness] Provider job posts query result:', {
+          error: providerJobsError,
+          count: providerJobsData?.length || 0,
+          data: providerJobsData
         })
 
-        if (jobsError) {
-          console.warn('[MyBusiness] Job posts error (non-critical):', jobsError)
+        if (providerJobsError) {
+          console.warn('[MyBusiness] Provider job posts error (non-critical):', providerJobsError)
         } else {
-          jobPostsData = (jobsData as JobPost[]) || []
+          allJobPosts = [...allJobPosts, ...(providerJobsData as JobPost[] || [])]
         }
       }
+      
+      // Second, get job posts directly owned by this user
+      const { data: ownedJobsData, error: ownedJobsError } = await supabase
+        .from('provider_job_posts')
+        .select('*')
+        .eq('owner_user_id', auth.userId)
+        .order('created_at', { ascending: false })
+
+      console.log('[MyBusiness] Owned job posts query result:', {
+        error: ownedJobsError,
+        count: ownedJobsData?.length || 0,
+        data: ownedJobsData
+      })
+
+      if (ownedJobsError) {
+        console.warn('[MyBusiness] Owned job posts error (non-critical):', ownedJobsError)
+      } else {
+        allJobPosts = [...allJobPosts, ...(ownedJobsData as JobPost[] || [])]
+      }
+      
+      // Remove duplicates (in case a job post matches both criteria)
+      const uniqueJobPosts = allJobPosts.filter((job, index, self) => 
+        index === self.findIndex(j => j.id === job.id)
+      )
+      
+      jobPostsData = uniqueJobPosts
+      
+      console.log('[MyBusiness] Final job posts result:', {
+        totalCount: jobPostsData.length,
+        data: jobPostsData
+      })
 
       // Load change requests for this business owner
       console.log('[MyBusiness] Loading change requests for user:', auth.userId)
