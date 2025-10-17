@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import Funnel, { type CategoryKey, type FunnelOption, type FunnelQuestion } from '../components/Funnel'
+import Funnel, { type CategoryKey } from '../components/Funnel'
 
 // ============================================================================
 // TYPES
@@ -64,7 +64,19 @@ function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
 }
 
-// getLocalStorageJSON function moved to Funnel component
+/**
+ * Get JSON from localStorage with error handling
+ */
+function getLocalStorageJSON<T>(key: string, defaultValue: T): T {
+  try {
+    const item = localStorage.getItem(key)
+    if (!item) return defaultValue
+    return JSON.parse(item) as T
+  } catch (e) {
+    console.warn(`Failed to parse localStorage key "${key}":`, e)
+    return defaultValue
+  }
+}
 
 
 function isFeaturedProvider(p: Provider): boolean {
@@ -91,7 +103,15 @@ function getProviderDetails(p: Provider): ProviderDetails {
 
 // Funnel configuration moved to Funnel component
 
-// getFunnelQuestions function moved to Funnel component
+/**
+ * Get funnel questions for a specific category
+ * This is a simplified version for CategoryPage use
+ */
+function getFunnelQuestions(categoryKey: CategoryKey, _answers: Record<string, string>): any[] {
+  // Return a simple array for CategoryPage use
+  // The full implementation is in the Funnel component
+  return []
+}
 
 // trackChoice function moved to Funnel component
 

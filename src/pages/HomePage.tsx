@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import Hero from '../components/Hero'
-import ScrollFloat from '../components/ScrollFloat'
 import CategoryCard, { type Category, type CategoryKey } from '../components/CategoryCard'
 import CalendarSection from '../components/CalendarSection'
 import CommunitySection from '../components/CommunitySection'
