@@ -71,7 +71,6 @@ export default function AccountPage() {
     async function loadUserData() {
       if (!auth.userId) { 
         setPendingApps([])
-        setRole('')
         return 
       }
       
