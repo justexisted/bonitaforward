@@ -3,22 +3,10 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ChevronUp, ChevronDown, MapPin, Calendar, Clock, X } from 'lucide-react'
 import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
+import type { CalendarEvent } from '../types'
 
-export type CalendarEvent = {
-  id: string
-  title: string
-  description?: string
-  date: string
-  time?: string
-  location?: string
-  address?: string
-  category: string
-  source: string
-  upvotes: number
-  downvotes: number
-  created_at: string
-  updated_at?: string
-}
+// Re-export type for backward compatibility
+export type { CalendarEvent }
 
 // RSS Feed parser for local event feeds
 const parseRSSFeed = async (feedUrl: string, source: string): Promise<CalendarEvent[]> => {

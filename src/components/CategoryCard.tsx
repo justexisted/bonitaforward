@@ -2,16 +2,10 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import GlareHover from './GlareHover'
+import type { Category, CategoryKey } from '../types'
 
-// Type definition for category data structure
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
-
-type Category = {
-  key: CategoryKey
-  name: string
-  description: string
-  icon: string
-}
+// Re-export types for backward compatibility
+export type { Category, CategoryKey }
 
 interface CategoryCardProps {
   cat: Category
@@ -64,6 +58,3 @@ export default function CategoryCard({ cat }: CategoryCardProps) {
     </GlareHover>
   )
 }
-
-// Export the Category type for use in other components
-export type { Category, CategoryKey }

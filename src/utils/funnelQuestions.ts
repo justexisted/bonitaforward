@@ -14,28 +14,10 @@
  * Each category has 4 questions to keep the funnel quick and user-friendly.
  */
 
-import { type CategoryKey } from './helpers'
+import type { CategoryKey, FunnelOption, FunnelQuestion } from '../types'
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-/**
- * Funnel option - a single answer choice for a question
- */
-export type FunnelOption = {
-  id: string
-  label: string
-}
-
-/**
- * Funnel question - a question with multiple answer options
- */
-export type FunnelQuestion = {
-  id: string
-  prompt: string
-  options: FunnelOption[]
-}
+// Re-export types for backward compatibility
+export type { FunnelOption, FunnelQuestion }
 
 // ============================================================================
 // FUNNEL CONFIGURATION

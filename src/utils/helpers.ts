@@ -12,56 +12,10 @@
  * - Admin/Auth Utilities
  */
 
-// ============================================================================
-// TYPES
-// ============================================================================
+import type { CategoryKey, Provider } from '../types'
 
-/**
- * Category keys for business types
- */
-export type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
-
-/**
- * Provider type matching the database schema
- */
-export type Provider = {
-  id: string
-  name: string
-  slug: string
-  category_key: CategoryKey
-  tags: string[]
-  rating?: number
-  phone?: string | null
-  email?: string | null
-  website?: string | null
-  address?: string | null
-  isMember?: boolean
-  description?: string | null
-  specialties?: string[] | null
-  social_links?: Record<string, string> | null
-  business_hours?: Record<string, string> | null
-  service_areas?: string[] | null
-  google_maps_url?: string | null
-  images?: string[] | null
-  badges?: string[] | null
-  published?: boolean | null
-  created_at?: string | null
-  updated_at?: string | null
-  featured_since?: string | null
-  subscription_type?: 'monthly' | 'yearly' | null
-  booking_enabled?: boolean | null
-  booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
-  booking_instructions?: string | null
-  booking_url?: string | null
-  enable_calendar_booking?: boolean | null
-  enable_call_contact?: boolean | null
-  enable_email_contact?: boolean | null
-  coupon_code?: string | null
-  coupon_discount?: string | null
-  coupon_description?: string | null
-  coupon_expires_at?: string | null
-  bonita_resident_discount?: string | null
-}
+// Re-export types for backward compatibility
+export type { CategoryKey, Provider }
 
 // ============================================================================
 // LOCAL STORAGE UTILITIES
