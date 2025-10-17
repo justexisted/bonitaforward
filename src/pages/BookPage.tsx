@@ -2,15 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { getLocalStorageJSON, isFeaturedProvider as isProviderFeatured } from '../utils/helpers'
+import { getLocalStorageJSON, isFeaturedProvider as isProviderFeatured, type Provider as HelperProvider, type CategoryKey } from '../utils/helpers'
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
 }
 
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
-
-type Provider = {
+// Use Provider type from helpers.ts, but allow it to be a subset for BookPage
+type Provider = HelperProvider | {
   id: string
   name: string
   slug: string
@@ -24,6 +23,7 @@ type Provider = {
   images?: string[] | null
   coupon_code?: string | null
   coupon_discount?: string | null
+  tags?: string[]
 }
 
 type ProviderDetails = {
@@ -48,7 +48,7 @@ function useProviderUpdates(callback: () => void, deps: React.DependencyList = [
 
 // isFeaturedProvider imported from src/utils/helpers.ts as isProviderFeatured
 function isFeaturedProvider(p: Provider): boolean {
-  return isProviderFeatured(p)
+  return isProviderFeatured(p as HelperProvider)
 }
 
 function getProviderDetails(p: Provider): ProviderDetails {

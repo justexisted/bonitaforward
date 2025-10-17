@@ -1,13 +1,12 @@
 import { useEffect } from 'react'
 import { useAuth, saveReturnUrl } from '../contexts/AuthContext'
 import CardNav, { type CardNavItem } from './CardNav'
-import { getAdminList, isUserAdmin } from '../utils/helpers'
+import { isUserAdmin } from '../utils/helpers'
 
 // ============================================================================
 // ADMIN UTILITY FUNCTIONS
 // ============================================================================
 
-// getAdminList imported from src/utils/helpers.ts
 // isUserAdmin imported from src/utils/helpers.ts
 
 // ============================================================================
