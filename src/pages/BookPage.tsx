@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
 import { getLocalStorageJSON, isFeaturedProvider as isProviderFeatured, type Provider as HelperProvider, type CategoryKey } from '../utils/helpers'
 
 function Container(props: { children: React.ReactNode; className?: string }) {
@@ -63,32 +62,24 @@ function getProviderDetails(p: Provider): ProviderDetails {
   }
 }
 
+/**
+ * Fix and normalize image URLs
+ * Images from the database come in various formats:
+ * 1. Full URLs (http/https) - return as-is
+ * 2. Supabase storage bucket paths - return as-is (they're already public URLs from the database)
+ * 3. Relative paths - shouldn't happen but handle gracefully
+ */
 function fixImageUrl(url: string): string {
   if (!url || typeof url !== 'string') return ''
   
-  // If it's already a full URL, return as-is
+  // If it's already a full URL (including Supabase storage URLs), return as-is
+  // Database stores full public URLs like: https://bfsspdvdwgakolivwuko.supabase.co/storage/v1/object/public/business-images/...
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url
   }
   
-  // If it's a Supabase storage path, convert to public URL
-  if (url.startsWith('business-images/') || url.startsWith('blog-images/')) {
-    const { data } = supabase.storage.from('business-images').getPublicUrl(url)
-    return data.publicUrl
-  }
-  
-  // If it's a relative path, assume it's in business-images bucket
-  if (url.startsWith('/') || !url.includes('/')) {
-    const { data } = supabase.storage.from('business-images').getPublicUrl(url)
-    return data.publicUrl
-  }
-  
-  // If it has a file extension, return as-is
-  if (url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
-    return url
-  }
-  
-  // Return as-is if we can't determine the format
+  // For any other format, return as-is and let the browser handle it
+  // This allows for local development paths or other URL schemes
   return url
 }
 
@@ -132,12 +123,12 @@ export default function BookPage(props: {
   return (
     <section className="py-8">
       <Container>
-        <div className="rounded-2xl bg-white max-w-md mx-auto text-center">
+        <div className="rounded-2xl bg-white max-w-md md:max-w-full mx-auto text-center">
           <h2 className="text-xl font-semibold tracking-tight">Bonita's top {category?.name.toLowerCase() || 'providers'}</h2>
           {auth.isAuthed || submitted || results.length > 0 ? (
             <div className="mt-5 text-left">
               <div className="mt-4 text-sm text-neutral-500">Top matches</div>
-              <div className="mt-2 grid grid-cols-1 gap-2">
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {results.slice(0, 3).map((r) => {
                   const d = getProviderDetails(r)
                   const canShowRich = Boolean(r.isMember)
@@ -279,18 +270,18 @@ export default function BookPage(props: {
               {results.length > 3 && (
                 <>
                   <div className="mt-5 text-sm text-neutral-500">Other providers</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2">
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {results.slice(3).map((r) => {
                       const open = !!expanded[r.id]
                       const d = getProviderDetails(r)
                       return (
                         <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
-                          {d.images && d.images.length > 0 ? (
-                            <div className="mb-3">
+                          <div className="relative mb-3">
+                            {d.images && d.images.length > 0 ? (
                               <img 
                                 src={fixImageUrl(d.images?.[0] || '')} 
                                 alt={`${r.name} business photo`} 
-                                className="w-full h-24 object-cover rounded-lg border border-neutral-100"
+                                className="w-full h-40 object-cover rounded-lg border border-neutral-100"
                                 loading="lazy"
                                 decoding="async"
                                 referrerPolicy="no-referrer"
@@ -298,28 +289,45 @@ export default function BookPage(props: {
                                   const img = e.currentTarget as HTMLImageElement
                                   img.style.display = 'none'
                                   img.parentElement!.innerHTML = `
-                                    <div class=\"w-full h-24 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center\">\n      <div class=\"text-center text-neutral-500\">\n        <svg class=\"w-6 h-6 mx-auto mb-1\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\">\n          <path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4\" />\n        </svg>\n        <p class=\"text-xs\">No image</p>\n      </div>\n    </div>`
+                                    <div class="w-full h-40 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                                      <div class="text-center text-neutral-500">
+                                        <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        <p class="text-xs">No image available</p>
+                                      </div>
+                                    </div>
+                                  `
                                 }}
                               />
-                            </div>
-                          ) : (
-                            <div className="mb-3 h-24 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
-                              <div className="text-center text-neutral-500">
-                                <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                                <p className="text-xs">No image</p>
+                            ) : (
+                              <div className="w-full h-40 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
+                                <div className="text-center text-neutral-500">
+                                  <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                  </svg>
+                                  <p className="text-xs">No image available</p>
+                                </div>
                               </div>
+                            )}
+                            {isFeaturedProvider(r) && (
+                              <div className="absolute top-2 right-2">
+                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] font-medium shadow-sm">
+                                  ⭐ Featured
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="relative -mt-3 mb-3">
+                            <div className="flex justify-start">
+                              <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-medium border border-blue-200 shadow-sm mt-[-1rem]">
+                                {r.category_key.replace('-', ' ')}
+                              </span>
                             </div>
-                          )}
+                          </div>
                           <div className="flex items-center justify-between">
-                            <Link to={`/provider/${r.slug}`} className="font-medium flex items-center gap-2 cursor-pointer hover:underline">
-                              <div className="font-medium flex items-center gap-2">
-                                {r.name}
-                                {isFeaturedProvider(r) && (
-                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px]">Featured</span>
-                                )}
-                              </div>
+                            <Link to={`/provider/${r.slug}`} className="font-medium cursor-pointer hover:underline">
+                              {r.name}
                             </Link>
                             <div className="flex items-center gap-2">
                               {r.coupon_code && r.coupon_discount && (
@@ -334,11 +342,6 @@ export default function BookPage(props: {
                                 {r.rating?.toFixed(1)}
                               </div>
                             </div>
-                          </div>
-                          <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
-                              {r.category_key.replace('-', ' ')}
-                            </span>
                           </div>
                           <button onClick={() => setExpanded((e: Record<string, boolean>) => ({ ...e, [r.id]: !open }))} className="mt-2 text-sm rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5">{open ? 'Hide' : 'View'}</button>
                           <div className="collapsible mt-3 text-sm" data-open={open ? 'true' : 'false'}>
