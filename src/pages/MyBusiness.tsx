@@ -1049,12 +1049,12 @@ export default function MyBusinessPage() {
       const { error } = await supabase
         .from('provider_job_posts')
         .insert([{
-          provider_id: providerId,
+          provider_id: _providerId,
           owner_user_id: auth.userId,
-          title: jobData.title,
-          description: jobData.description,
-          apply_url: jobData.apply_url,
-          salary_range: jobData.salary_range,
+          title: _jobData.title,
+          description: _jobData.description,
+          apply_url: _jobData.apply_url,
+          salary_range: _jobData.salary_range,
           status: 'pending'
         }])
 
