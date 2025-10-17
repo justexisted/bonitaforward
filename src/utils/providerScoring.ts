@@ -371,15 +371,16 @@ function scoreRestaurants(providers: Provider[], answers: Record<string, string>
   return providers
     .map((p) => {
       let score = 0
+      const providerTags = p.tags || [] // Handle null/undefined tags
       
       // CUISINE MATCHING: Check for exact cuisine match first, then synonyms
       if (cuisine) {
         // Exact match gets highest score
-        if (p.tags.some(t => t.toLowerCase() === cuisine)) {
+        if (providerTags.some(t => t.toLowerCase() === cuisine)) {
           score += 4
         } else {
           // Check for cuisine synonyms
-          const cuisineMatch = p.tags.some(t => {
+          const cuisineMatch = providerTags.some(t => {
             const tagLower = t.toLowerCase()
             return cuisineSynonyms.some(synonym => 
               tagLower === synonym || 
@@ -392,12 +393,12 @@ function scoreRestaurants(providers: Provider[], answers: Record<string, string>
       }
       
       // OTHER MATCHES: Occasion, price, service
-      if (occasion && p.tags.some(t => t.toLowerCase() === occasion)) score += 2
-      if (price && p.tags.some(t => t.toLowerCase() === price)) score += 2
-      if (service && p.tags.some(t => t.toLowerCase() === service)) score += 2
+      if (occasion && providerTags.some(t => t.toLowerCase() === occasion)) score += 2
+      if (price && providerTags.some(t => t.toLowerCase() === price)) score += 2
+      if (service && providerTags.some(t => t.toLowerCase() === service)) score += 2
       
       // GENERAL TAG MATCHES: Check all answer values and cuisine terms
-      p.tags.forEach((t) => { 
+      providerTags.forEach((t) => { 
         const tagLower = t.toLowerCase()
         if (allCuisineTerms.has(tagLower)) score += 1
       })
@@ -410,9 +411,12 @@ function scoreRestaurants(providers: Provider[], answers: Record<string, string>
       const bIsFeatured = isFeaturedProvider(b.p)
       
       // Check if featured providers match the selected cuisine
+      const aTags = a.p.tags || []
+      const bTags = b.p.tags || []
+      
       const aFeaturedMatchesCuisine = aIsFeatured && cuisine ? 
-        (a.p.tags.some(t => t.toLowerCase() === cuisine) || 
-         a.p.tags.some(t => {
+        (aTags.some(t => t.toLowerCase() === cuisine) || 
+         aTags.some(t => {
            const tagLower = t.toLowerCase()
            return cuisineSynonyms.some(synonym => 
              tagLower === synonym || 
@@ -422,8 +426,8 @@ function scoreRestaurants(providers: Provider[], answers: Record<string, string>
          })) : false
          
       const bFeaturedMatchesCuisine = bIsFeatured && cuisine ? 
-        (b.p.tags.some(t => t.toLowerCase() === cuisine) || 
-         b.p.tags.some(t => {
+        (bTags.some(t => t.toLowerCase() === cuisine) || 
+         bTags.some(t => {
            const tagLower = t.toLowerCase()
            return cuisineSynonyms.some(synonym => 
              tagLower === synonym || 
