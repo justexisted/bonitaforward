@@ -355,16 +355,59 @@ export type ContactLead = {
 
 // Re-export all admin-specific types from admin.ts
 export type {
+  // Database row types
   ProviderRow,
   FunnelRow,
   BookingRow,
+  BookingEventRow,
   BusinessApplicationRow,
   ContactLeadRow,
   ProfileRow,
+  FlaggedEventRow,
+  
+  // Extended types with joined data
   ProviderChangeRequestWithDetails,
   ProviderJobPostWithDetails,
+  
+  // Admin section & status
   AdminSection,
   AdminStatus,
+  
+  // Form & draft types
   AdminBlogPost,
+  CalendarEventFormData,
+  NewProviderFormData,
+  
+  // Filter types
+  FeaturedProviderFilter,
+  ProviderFilterCriteria,
+  FunnelFilterCriteria,
+  
+  // Edit state types
+  FunnelEditState,
+  BookingEditState,
+  BusinessDetailsState,
+  
+  // Import/export types
+  CalendarEventWithZip,
+  ZipFilterModalState,
+  CSVImportState,
+  
+  // UI state types
+  ExpandedState,
+  LoadingState,
+  ConfirmationDialogState,
+  MessageState,
+  
+  // Component prop types
+  ProvidersSectionProps,
+  BusinessApplicationsSectionProps,
+  ChangeRequestsSectionProps,
+  JobPostsSectionProps,
+  CalendarEventsSectionProps,
+  
+  // Helper types
+  ProviderWithRetry,
+  AdminStatistics,
 } from './admin'
 
