@@ -52,6 +52,10 @@ export const ADMIN_SECTIONS: Record<AdminSection, { label: string; description: 
     label: 'Bookings',
     description: 'Manage booking requests'
   },
+  'booking-events': {
+    label: 'Booking Events',
+    description: 'Manage provider booking events'
+  },
   'blog': {
     label: 'Blog Manager',
     description: 'Manage blog posts'

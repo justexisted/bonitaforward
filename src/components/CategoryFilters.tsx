@@ -237,7 +237,7 @@ export default function CategoryFilters({
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement
                                 console.error('[CategoryFilters] Image failed to load:', img.src, 'for provider:', provider.name)
-                                console.error('[CategoryFilters] Original image URL from data:', details.images[0])
+                                console.error('[CategoryFilters] Original image URL from data:', details.images?.[0])
                                 img.style.display = 'none'
                                 img.parentElement!.innerHTML = `
                                   <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
