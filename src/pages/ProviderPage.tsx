@@ -280,13 +280,15 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
         ) : (
           <div>
             {/* Hero Image Section - Show for any image */}
-            {provider.images && provider.images.length > 0 ? (
-              <div className="relative w-full h-[50vh] max-h-96 mb-6 rounded-2xl overflow-hidden">
-                <img
-                  src={fixImageUrl(provider.images[0])}
-                  alt={`${provider.name} - Main Image`}
-                  className="w-full h-full object-cover"
-                />
+            {(() => {
+              const imageUrl = provider.images && provider.images.length > 0 ? fixImageUrl(provider.images[0]) : ''
+              return imageUrl ? (
+                <div className="relative w-full h-[50vh] max-h-96 mb-6 rounded-2xl overflow-hidden">
+                  <img
+                    src={imageUrl}
+                    alt={`${provider.name} - Main Image`}
+                    className="w-full h-full object-cover"
+                  />
                 {/* Enhanced gradient overlay for better text readability and button visibility */}
                 <div className="absolute inset-0 bg-gradient-to-br from-black/0 via-black/10 to-black/25"></div>
                 {/* Additional gradient from bottom for Save Business button area */}
@@ -335,9 +337,9 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                   </div>
                 )}
               </div>
-            ) : (
-              /* Fallback header when no image */
-              <div className="mb-6">
+              ) : (
+                /* Fallback header when no image */
+                <div className="mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <h1 className="text-3xl md:text-4xl font-bold text-neutral-900">
@@ -373,7 +375,8 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                   </div>
                 )}
               </div>
-            )}
+              )
+            })()}
 
             {/* Main content container */}
             <div className="rounded-2xl border border-neutral-100 p-5 bg-white">

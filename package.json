@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "seed:providers": "tsx scripts/seed-providers.ts",
     "seed:realty": "tsx scripts/seed-realty-report.ts",
-    "seed:calendar": "tsx scripts/seed-calendar-events.ts"
+    "seed:calendar": "tsx scripts/seed-calendar-events.ts",
+    "migrate:images": "tsx scripts/migrate-google-images.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
 import { getLocalStorageJSON, isFeaturedProvider as isProviderFeatured, type Provider as HelperProvider, type CategoryKey } from '../utils/helpers'
+import { fixImageUrl } from '../utils/imageUtils'
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
@@ -63,48 +63,6 @@ function getProviderDetails(p: Provider): ProviderDetails {
   }
 }
 
-/**
- * Fix and normalize image URLs
- * Images from the database come in various formats:
- * 1. Full URLs (http/https) - return as-is
- * 2. Supabase storage paths (business-images/...) - convert to public URL
- * 3. Relative paths - convert to Supabase public URL
- */
-function fixImageUrl(url: string): string {
-  if (!url || typeof url !== 'string') {
-    console.log('[BookPage] fixImageUrl: empty or invalid URL', url)
-    return ''
-  }
-  
-  // If it's already a full URL, return as-is
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    console.log('[BookPage] fixImageUrl: returning full URL', url)
-    return url
-  }
-  
-  // For relative paths or storage bucket paths, convert to public URL
-  // This handles paths like:
-  // - "business-images/some-file.jpg"
-  // - "some-file.jpg"
-  // - "/business-images/some-file.jpg"
-  let path = url
-  
-  // Remove leading slash if present
-  if (path.startsWith('/')) {
-    path = path.substring(1)
-  }
-  
-  // If path doesn't start with bucket name, prepend it
-  if (!path.startsWith('business-images/')) {
-    path = `business-images/${path}`
-  }
-  
-  // Get public URL from Supabase
-  const { data } = supabase.storage.from('business-images').getPublicUrl(path)
-  console.log('[BookPage] fixImageUrl: converted to Supabase URL', path, '→', data.publicUrl)
-  return data.publicUrl
-}
-
 export default function BookPage(props: {
   categories: { key: CategoryKey; name: string }[]
   scoreProviders: (key: CategoryKey, answers: Record<string, string>) => Provider[]
@@ -154,12 +112,14 @@ export default function BookPage(props: {
                 {results.slice(0, 3).map((r) => {
                   const d = getProviderDetails(r)
                   const canShowRich = Boolean(r.isMember)
+                  const imageUrl = d.images && d.images.length > 0 ? fixImageUrl(d.images[0]) : ''
+                  
                   return (
                     <div key={r.id} className="rounded-xl border border-neutral-200 p-3">
                       <div className="relative mb-3">
-                        {d.images && d.images.length > 0 ? (
+                        {imageUrl ? (
                           <img 
-                            src={fixImageUrl(d.images?.[0] || '')} 
+                            src={imageUrl} 
                             alt={`${r.name} business photo`} 
                             className="w-full h-40 object-cover rounded-lg border border-neutral-100"
                             loading="lazy"
@@ -167,28 +127,28 @@ export default function BookPage(props: {
                             referrerPolicy="no-referrer"
                             onError={(e) => {
                               const img = e.currentTarget as HTMLImageElement
-                              console.error('[BookPage] Image failed to load:', img.src, 'for provider:', r.name)
-                              console.error('[BookPage] Original image URL from data:', d.images?.[0])
                               img.style.display = 'none'
                               img.parentElement!.innerHTML = `
-                                <div class="w-full h-40 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
-                                  <div class="text-center text-neutral-500">
-                                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                <div class="w-full h-40 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border-2 border-dashed border-blue-200 flex items-center justify-center">
+                                  <div class="text-center text-blue-600 px-4">
+                                    <svg class="w-10 h-10 mx-auto mb-2 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
-                                    <p class="text-xs">No image available</p>
+                                    <p class="text-xs font-medium">${r.name}</p>
+                                    <p class="text-[10px] mt-1 opacity-70">Photo coming soon</p>
                                   </div>
                                 </div>
                               `
                             }}
                           />
                         ) : (
-                          <div className="w-full h-40 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
-                            <div className="text-center text-neutral-500">
-                              <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          <div className="w-full h-40 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border-2 border-dashed border-blue-200 flex items-center justify-center">
+                            <div className="text-center text-blue-600 px-4">
+                              <svg className="w-10 h-10 mx-auto mb-2 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                               </svg>
-                              <p className="text-xs">No image available</p>
+                              <p className="text-xs font-medium">{r.name}</p>
+                              <p className="text-[10px] mt-1 opacity-70">Photo coming soon</p>
                             </div>
                           </div>
                         )}

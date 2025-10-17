@@ -181,15 +181,18 @@ export default function CategoryFilters({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {filteredProviders.slice(0, 8).map((provider) => {
                 const details = getProviderDetails(provider)
+                // Check if we have a valid image URL after processing
+                const imageUrl = details.images && details.images.length > 0 ? fixImageUrl(details.images[0]) : ''
+                
                 return (
                   <Link key={provider.id} to={`/provider/${provider.slug}`} className="block">
                     <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                       {/* Provider Image with Overlays */}
                       <div className="relative">
-                        {details.images && details.images.length > 0 ? (
+                        {imageUrl ? (
                           <div className="aspect-video bg-neutral-100">
                             <img
-                              src={fixImageUrl(details.images[0])}
+                              src={imageUrl}
                               alt={`${provider.name} business photo`}
                               className="w-full h-full object-cover"
                               loading="lazy"
@@ -197,16 +200,15 @@ export default function CategoryFilters({
                               referrerPolicy="no-referrer"
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement
-                                console.error('[CategoryFilters] Image failed to load:', img.src, 'for provider:', provider.name)
-                                console.error('[CategoryFilters] Original image URL from data:', details.images?.[0])
                                 img.style.display = 'none'
                                 img.parentElement!.innerHTML = `
-                                  <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                                    <div class="text-center text-neutral-500">
-                                      <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                  <div class="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border-2 border-dashed border-blue-200">
+                                    <div class="text-center text-blue-600 px-4">
+                                      <svg class="w-12 h-12 mx-auto mb-2 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                       </svg>
-                                      <p class="text-xs">No image available</p>
+                                      <p class="text-xs font-medium">${provider.name}</p>
+                                      <p class="text-[10px] mt-1 opacity-70">Photo coming soon</p>
                                     </div>
                                   </div>
                                 `
@@ -214,12 +216,13 @@ export default function CategoryFilters({
                             />
                           </div>
                         ) : (
-                          <div className="aspect-video bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                            <div className="text-center text-neutral-500">
-                              <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          <div className="aspect-video bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border-2 border-dashed border-blue-200">
+                            <div className="text-center text-blue-600 px-4">
+                              <svg className="w-12 h-12 mx-auto mb-2 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                               </svg>
-                              <p className="text-xs">No image available</p>
+                              <p className="text-xs font-medium">{provider.name}</p>
+                              <p className="text-[10px] mt-1 opacity-70">Photo coming soon</p>
                             </div>
                           </div>
                         )}

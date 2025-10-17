@@ -1,34 +1,50 @@
 /**
  * Image URL utilities
  * 
- * Handles normalization and proxying of image URLs from various sources:
- * - Google user content (proxied through Netlify function)
+ * Handles normalization of image URLs from various sources:
  * - Supabase storage paths
  * - External URLs
  * - Relative paths
+ * 
+ * Note: Google user content images (lh3.googleusercontent.com) cannot be
+ * reliably displayed due to hot-linking restrictions. These will return
+ * empty string and should be handled with fallback UI.
  */
 
 import { supabase } from '../lib/supabase'
 
+// Track which Google image URLs we've already warned about to reduce console noise
+const warnedUrls = new Set<string>()
+
 /**
  * Fix and normalize image URLs
- * Handles full URLs, Supabase storage paths, relative paths, and Google user content
+ * Handles full URLs, Supabase storage paths, and relative paths
  * 
  * @param url - The image URL to normalize
- * @returns Normalized URL ready for display
+ * @returns Normalized URL ready for display, or empty string for unsupported URLs
  */
 export function fixImageUrl(url: string): string {
   if (!url || typeof url !== 'string') {
-    console.log('[imageUtils] fixImageUrl: empty or invalid URL', url)
     return ''
   }
   
-  // If it's a Google user content URL, proxy it through our Netlify function
-  // to bypass CORS and hot-linking restrictions
+  // Google user content images cannot be reliably hot-linked
+  // Return empty to trigger fallback UI
   if (url.startsWith('https://lh3.googleusercontent.com/')) {
-    const proxyUrl = `/.netlify/functions/image-proxy?url=${encodeURIComponent(url)}`
-    console.log('[imageUtils] fixImageUrl: proxying Google image', url, '→', proxyUrl)
-    return proxyUrl
+    // Only warn once per unique URL to reduce console noise
+    if (!warnedUrls.has(url)) {
+      warnedUrls.add(url)
+      if (warnedUrls.size === 1) {
+        // Show helpful message on first Google image encountered
+        console.info(
+          '%c🖼️ Google Images Notice',
+          'background: #4285f4; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold',
+          '\nGoogle blocks hot-linking of their images. Showing placeholders instead.',
+          '\n💡 Run "npm run migrate:images" to permanently fix this by uploading images to Supabase.'
+        )
+      }
+    }
+    return ''
   }
   
   // If it's already a full URL (non-Google), return as-is
