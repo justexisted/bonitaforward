@@ -166,3 +166,37 @@ export type AdminBlogPost = {
   content: string
   images?: string[]
 }
+
+// Booking event type
+export type BookingEventRow = {
+  id: string
+  provider_id: string
+  customer_email: string
+  customer_name: string | null
+  booking_date: string
+  booking_duration_minutes: number | null
+  booking_notes: string | null
+  status: string | null
+  created_at: string
+  providers?: {
+    name: string
+    category_key: string
+    address: string | null
+  }
+}
+
+// Flagged event type
+export type FlaggedEventRow = {
+  id: string
+  event_id: string
+  user_id: string | null
+  reason: string | null
+  created_at: string
+  resolved: boolean
+  events?: {
+    id: string
+    title: string
+    date: string
+    category: string
+  }
+}
