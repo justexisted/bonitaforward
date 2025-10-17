@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
-import Funnel, { type CategoryKey, getFunnelQuestions } from '../components/Funnel'
+import Funnel from '../components/Funnel'
+import { type CategoryKey } from '../utils/helpers'
+import { getFunnelQuestions } from '../utils/funnelQuestions'
 import CategoryFilters from '../components/CategoryFilters'
 import { getLocalStorageJSON } from '../utils/helpers'
 
