@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getLocalStorageJSON, type CategoryKey } from '../utils/helpers'
-import { getFunnelQuestions, type FunnelOption, type FunnelQuestion } from '../utils/funnelQuestions'
+import { getFunnelQuestions, type FunnelOption } from '../utils/funnelQuestions'
 
 // ============================================================================
 // TYPES
