@@ -248,8 +248,9 @@ const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
 
 /**
  * Get funnel questions for a specific category
+ * EXPORTED for use in CategoryPage and CategoryFilters
  */
-function getFunnelQuestions(categoryKey: CategoryKey, _answers: Record<string, string>): FunnelQuestion[] {
+export function getFunnelQuestions(categoryKey: CategoryKey, _answers: Record<string, string>): FunnelQuestion[] {
   if (categoryKey === 'real-estate') {
     const list = [
       { id: 'need', prompt: 'What do you need help with?', options: [ { id: 'buy', label: 'Buying' }, { id: 'sell', label: 'Selling' }, { id: 'rent', label: 'Renting' } ] },
@@ -283,14 +284,29 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
 
   try {
     const { supabase } = await import('../lib/supabase')
-    await supabase
+    
+    // Check if a record already exists for this user and category
+    const { data: existing } = await supabase
       .from('funnel_responses')
-      .upsert(
-        { user_email: email, category_key: category, responses: answers, updated_at: new Date().toISOString() },
-        { onConflict: 'user_email,category_key' }
-      )
+      .select('id')
+      .eq('user_email', email)
+      .eq('category', category)
+      .maybeSingle()
+
+    if (existing) {
+      // Update existing record
+      await supabase
+        .from('funnel_responses')
+        .update({ answers })
+        .eq('id', existing.id)
+    } else {
+      // Insert new record
+      await supabase
+        .from('funnel_responses')
+        .insert({ user_email: email, category, answers })
+    }
   } catch (err) {
-    console.warn('[Supabase] upsert funnel_responses failed (safe to ignore if table missing)', err)
+    console.warn('[Supabase] persist funnel_responses failed (safe to ignore if table missing)', err)
   }
 }
 
