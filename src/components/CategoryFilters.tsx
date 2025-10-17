@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 // ============================================================================
 // TYPES
@@ -38,6 +39,40 @@ interface CategoryFiltersProps {
   getFunnelQuestions: (categoryKey: CategoryKey, answers: Record<string, string>) => any[]
   getProviderDetails: (provider: Provider) => ProviderDetails
   isFeaturedProvider: (provider: Provider) => boolean
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Fix and normalize image URLs
+ * Handles full URLs, Supabase storage paths, and relative paths
+ */
+function fixImageUrl(url: string): string {
+  if (!url || typeof url !== 'string') return ''
+  
+  // If it's already a full URL, return as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  // For relative paths or storage bucket paths, convert to public URL
+  let path = url
+  
+  // Remove leading slash if present
+  if (path.startsWith('/')) {
+    path = path.substring(1)
+  }
+  
+  // If path doesn't start with bucket name, prepend it
+  if (!path.startsWith('business-images/')) {
+    path = `business-images/${path}`
+  }
+  
+  // Get public URL from Supabase
+  const { data } = supabase.storage.from('business-images').getPublicUrl(path)
+  return data.publicUrl
 }
 
 // ============================================================================
@@ -188,7 +223,7 @@ export default function CategoryFilters({
                         {details.images && details.images.length > 0 ? (
                           <div className="aspect-video bg-neutral-100">
                             <img
-                              src={details.images[0]}
+                              src={fixImageUrl(details.images[0])}
                               alt={`${provider.name} business photo`}
                               className="w-full h-full object-cover"
                               loading="lazy"

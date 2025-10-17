@@ -34,15 +34,54 @@ BEGIN
   END IF;
 END $$;
 
--- Step 2: Drop the existing view
+-- Step 2: Create a helper function to check if current user is admin
+-- This function is SECURITY DEFINER (allowed for helper functions)
+-- and prevents the view from directly accessing auth.users
+DO $$
+BEGIN
+  -- Drop function if it exists
+  DROP FUNCTION IF EXISTS public.is_current_user_admin();
+  
+  -- Create the function
+  CREATE OR REPLACE FUNCTION public.is_current_user_admin()
+  RETURNS BOOLEAN
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path = public
+  AS $func$
+  DECLARE
+    user_email TEXT;
+  BEGIN
+    -- Get the current user's email from auth.users
+    SELECT email INTO user_email
+    FROM auth.users
+    WHERE id = auth.uid()
+    LIMIT 1;
+    
+    -- Check if that email exists in admin_emails
+    IF user_email IS NULL THEN
+      RETURN FALSE;
+    END IF;
+    
+    RETURN EXISTS (
+      SELECT 1 FROM admin_emails WHERE email = user_email
+    );
+  END;
+  $func$;
+  
+  RAISE NOTICE '✓ Created helper function is_current_user_admin()';
+END $$;
+
+-- Step 3: Drop the existing view
 DO $$
 BEGIN
   DROP VIEW IF EXISTS public.v_bookings_with_provider CASCADE;
   RAISE NOTICE '✓ Dropped existing view (if it existed)';
 END $$;
 
--- Step 3: Recreate the view WITHOUT SECURITY DEFINER
--- This view joins booking_events with provider information
+-- Step 4: Recreate the view WITHOUT SECURITY DEFINER and WITHOUT exposing auth.users
+-- SECURITY FIX: Uses helper function instead of directly querying auth.users
+-- This prevents the view from exposing auth.users schema to anon/authenticated roles
 CREATE VIEW public.v_bookings_with_provider AS
 SELECT 
   -- All booking event columns
@@ -66,30 +105,24 @@ SELECT
 FROM booking_events b
 LEFT JOIN providers p ON p.id = b.provider_id
 
--- Only show bookings for published providers OR the provider's own bookings OR admin users
+-- SECURITY: Filter based on user permissions WITHOUT exposing auth.users
 WHERE 
   p.published = true  -- Published providers visible to all
   OR p.owner_user_id = auth.uid()  -- Provider owners can see their bookings
-  OR p.email = (SELECT email FROM auth.users WHERE id = auth.uid())  -- Provider owners can see their bookings
-  OR (
-    -- Admin users can see all bookings (check if user email is in admin_emails table)
-    SELECT email FROM auth.users WHERE id = auth.uid()
-  ) IN (
-    SELECT email FROM admin_emails
-  );
+  OR is_current_user_admin() = true;  -- Admin users can see all (uses helper function, doesn't expose auth.users)
 
--- Step 4: Grant appropriate permissions
+-- Step 5: Grant appropriate permissions
 DO $$
 BEGIN
   -- Public users should be able to query this view
   GRANT SELECT ON public.v_bookings_with_provider TO authenticated;
   GRANT SELECT ON public.v_bookings_with_provider TO anon;
   
-  RAISE NOTICE '✓ Recreated view without SECURITY DEFINER';
+  RAISE NOTICE '✓ Recreated view without SECURITY DEFINER and without exposing auth.users';
   RAISE NOTICE '✓ Granted SELECT permissions to authenticated and anon roles';
 END $$;
 
--- Step 5: Verify the fix
+-- Step 6: Verify the fix
 DO $$
 DECLARE
   view_security TEXT;
