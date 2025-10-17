@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
 import Hero from '../components/Hero'
 import GlareHover from '../components/GlareHover'
 import ScrollFloat from '../components/ScrollFloat'
-import Calendar from '../components/Calendar'
-import { fetchCalendarEvents, type CalendarEvent } from './Calendar'
-
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+import CategoryCard, { type Category, type CategoryKey } from '../components/CategoryCard'
+import CalendarSection from '../components/CalendarSection'
 
 // Import Provider type from App.tsx to ensure consistency
 type Provider = {
@@ -49,12 +46,7 @@ type Provider = {
   bonita_resident_discount?: string | null
 }
 
-const categories: {
-  key: CategoryKey
-  name: string
-  description: string
-  icon: string
-}[] = [
+const categories: Category[] = [
   {
     key: 'restaurants-cafes',
     name: 'Restaurants & Cafés',
@@ -97,85 +89,17 @@ function Container(props: { children: React.ReactNode; className?: string }) {
 /**
  * Reusable loading spinner component
  */
-function LoadingSpinner({ message = 'Loading...', className = '' }: { message?: string; className?: string }) {
-  return (
-    <div className={`text-center ${className}`}>
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900 mx-auto"></div>
-      <p className="mt-4 text-neutral-600">{message}</p>
-    </div>
-  )
-}
+// LoadingSpinner moved to src/components/CalendarSection.tsx
 
 /**
  * Category card component for the home page
  */
-function CategoryCard({ cat }: { cat: typeof categories[number] }) {
-  return (
-    <GlareHover
-      width="auto"
-      height="auto"
-      background="#ffffff"
-      glareColor="#999999"
-      glareOpacity={0.3}
-      glareAngle={-33}
-      glareSize={300}
-      transitionDuration={800}
-      playOnce={false}
-    >
-    <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex h-20 w-25 items-center justify-center rounded-2xl bg-neutral-50">
-          <img 
-            src={cat.icon} 
-            alt={`${cat.name} icon`}
-            className="h-20 w-25 object-contain"
-          />
-        </span>
-        <div className="flex-1">
-          <h3 className="font-medium text-neutral-900">{cat.name}</h3>
-          <p className="text-sm text-neutral-600 mt-1">{cat.description}</p>
-        </div>
-        <ArrowRight className="h-5 w-5 text-neutral-400" />
-      </div>
-    </Link>
-    </GlareHover>
-  )
-}
+// CategoryCard moved to src/components/CategoryCard.tsx
 
 /**
  * Calendar section component
  */
-function CalendarSection() {
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const calendarEvents = await fetchCalendarEvents()
-        setEvents(calendarEvents)
-      } catch (error) {
-        console.error('Error loading calendar events:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    loadEvents()
-  }, [])
-
-  if (loading) {
-    return (
-      <section className="py-16 bg-gradient-to-b from-neutral-50 to-white">
-        <div className="container-px mx-auto max-w-6xl">
-          <LoadingSpinner message="Loading calendar events..." />
-        </div>
-      </section>
-    )
-  }
-
-  return <Calendar events={events} />
-}
+// CalendarSection moved to src/components/CalendarSection.tsx
 
 /**
  * Community section component

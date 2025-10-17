@@ -356,14 +356,6 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
 
         {/* Legend */}
         <div className="mt-8 space-y-4">
-          <h4 className="text-center text-xs md:text-sm font-semibold text-neutral-700">Event Sources</h4>
-          <div className="flex flex-wrap justify-center gap-2 md:gap-4 text-xs">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-neutral-100 rounded-full border border-neutral-200"></div>
-              <span className="text-neutral-600">Local Events</span>
-            </div>
-          </div>
-          
           <h4 className="text-center text-xs md:text-sm font-semibold text-neutral-700 mt-4">Event Categories</h4>
           <div className="flex flex-wrap justify-center gap-2 md:gap-4 text-xs">
             <div className="flex items-center space-x-2">
