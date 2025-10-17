@@ -11,7 +11,6 @@ export default function AccountPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [pendingApps, setPendingApps] = useState<{ id: string; business_name: string | null; created_at: string }[]>([])
-  const [role, setRole] = useState<string>('')
   const [bookings, setBookings] = useState<Array<{ 
     id: string; 
     provider_id?: string | null; 
@@ -96,13 +95,11 @@ export default function AccountPage() {
         // Load profile role for account type display
         const { data: prof } = await supabase.from('profiles').select('role').eq('id', auth.userId).maybeSingle()
         const userRole = String((prof as any)?.role || '')
-        setRole(userRole)
         console.log('[Account] Loaded role:', userRole)
         
       } catch (error) {
         console.error('[Account] Error loading user data:', error)
         setPendingApps([])
-        setRole('')
       }
     }
     

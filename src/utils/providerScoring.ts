@@ -23,18 +23,6 @@
 import { type CategoryKey, type Provider, isFeaturedProvider } from './helpers'
 
 // ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-/**
- * Scored provider with score value
- */
-interface ScoredProvider {
-  p: Provider
-  score: number
-}
-
-// ============================================================================
 // SYNONYM MAPPINGS
 // ============================================================================
 
