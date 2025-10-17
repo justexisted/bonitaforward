@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { fixImageUrl } from '../utils/imageUtils'
 
 // ============================================================================
 // TYPES
@@ -39,45 +39,6 @@ interface CategoryFiltersProps {
   getFunnelQuestions: (categoryKey: CategoryKey, answers: Record<string, string>) => any[]
   getProviderDetails: (provider: Provider) => ProviderDetails
   isFeaturedProvider: (provider: Provider) => boolean
-}
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Fix and normalize image URLs
- * Handles full URLs, Supabase storage paths, and relative paths
- */
-function fixImageUrl(url: string): string {
-  if (!url || typeof url !== 'string') {
-    console.log('[CategoryFilters] fixImageUrl: empty or invalid URL', url)
-    return ''
-  }
-  
-  // If it's already a full URL, return as-is
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    console.log('[CategoryFilters] fixImageUrl: returning full URL', url)
-    return url
-  }
-  
-  // For relative paths or storage bucket paths, convert to public URL
-  let path = url
-  
-  // Remove leading slash if present
-  if (path.startsWith('/')) {
-    path = path.substring(1)
-  }
-  
-  // If path doesn't start with bucket name, prepend it
-  if (!path.startsWith('business-images/')) {
-    path = `business-images/${path}`
-  }
-  
-  // Get public URL from Supabase
-  const { data } = supabase.storage.from('business-images').getPublicUrl(path)
-  console.log('[CategoryFilters] fixImageUrl: converted to Supabase URL', path, '→', data.publicUrl)
-  return data.publicUrl
 }
 
 // ============================================================================

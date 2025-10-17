@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { fixImageUrl } from '../utils/imageUtils'
 
 // ============================================================================
 // TYPES
@@ -282,7 +283,7 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
             {provider.images && provider.images.length > 0 ? (
               <div className="relative w-full h-[50vh] max-h-96 mb-6 rounded-2xl overflow-hidden">
                 <img
-                  src={provider.images[0]}
+                  src={fixImageUrl(provider.images[0])}
                   alt={`${provider.name} - Main Image`}
                   className="w-full h-full object-cover"
                 />

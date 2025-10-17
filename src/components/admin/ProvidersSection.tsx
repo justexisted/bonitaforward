@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useAdminProviders } from '../../hooks/useAdminProviders'
 import type { AdminSection } from '../../types/admin'
+import { fixImageUrl } from '../../utils/imageUtils'
 
 interface ProvidersSectionProps {
   isAdmin: boolean
@@ -136,7 +137,7 @@ export default function ProvidersSection({ isAdmin, section }: ProvidersSectionP
                         {provider.images && provider.images.length > 0 ? (
                           <img
                             className="h-10 w-10 rounded-full object-cover"
-                            src={provider.images[0]}
+                            src={fixImageUrl(provider.images[0])}
                             alt={provider.name}
                           />
                         ) : (
