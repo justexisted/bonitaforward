@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { getLocalStorageJSON, isFeaturedProvider as isProviderFeatured, type Provider as HelperProvider, type CategoryKey } from '../utils/helpers'
 
 function Container(props: { children: React.ReactNode; className?: string }) {
@@ -66,21 +67,37 @@ function getProviderDetails(p: Provider): ProviderDetails {
  * Fix and normalize image URLs
  * Images from the database come in various formats:
  * 1. Full URLs (http/https) - return as-is
- * 2. Supabase storage bucket paths - return as-is (they're already public URLs from the database)
- * 3. Relative paths - shouldn't happen but handle gracefully
+ * 2. Supabase storage paths (business-images/...) - convert to public URL
+ * 3. Relative paths - convert to Supabase public URL
  */
 function fixImageUrl(url: string): string {
   if (!url || typeof url !== 'string') return ''
   
-  // If it's already a full URL (including Supabase storage URLs), return as-is
-  // Database stores full public URLs like: https://bfsspdvdwgakolivwuko.supabase.co/storage/v1/object/public/business-images/...
+  // If it's already a full URL, return as-is
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url
   }
   
-  // For any other format, return as-is and let the browser handle it
-  // This allows for local development paths or other URL schemes
-  return url
+  // For relative paths or storage bucket paths, convert to public URL
+  // This handles paths like:
+  // - "business-images/some-file.jpg"
+  // - "some-file.jpg"
+  // - "/business-images/some-file.jpg"
+  let path = url
+  
+  // Remove leading slash if present
+  if (path.startsWith('/')) {
+    path = path.substring(1)
+  }
+  
+  // If path doesn't start with bucket name, prepend it
+  if (!path.startsWith('business-images/')) {
+    path = `business-images/${path}`
+  }
+  
+  // Get public URL from Supabase
+  const { data } = supabase.storage.from('business-images').getPublicUrl(path)
+  return data.publicUrl
 }
 
 export default function BookPage(props: {
