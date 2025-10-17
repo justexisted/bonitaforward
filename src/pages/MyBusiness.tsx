@@ -1266,7 +1266,7 @@ export default function MyBusinessPage() {
       const { error } = await supabase
         .from('provider_job_posts')
         .delete()
-        .eq('id', jobId)
+        .eq('id', _jobId)
         .eq('owner_user_id', auth.userId) // Ensure user owns this job post
 
       if (error) throw error
