@@ -50,10 +50,14 @@ interface CategoryFiltersProps {
  * Handles full URLs, Supabase storage paths, and relative paths
  */
 function fixImageUrl(url: string): string {
-  if (!url || typeof url !== 'string') return ''
+  if (!url || typeof url !== 'string') {
+    console.log('[CategoryFilters] fixImageUrl: empty or invalid URL', url)
+    return ''
+  }
   
   // If it's already a full URL, return as-is
   if (url.startsWith('http://') || url.startsWith('https://')) {
+    console.log('[CategoryFilters] fixImageUrl: returning full URL', url)
     return url
   }
   
@@ -72,6 +76,7 @@ function fixImageUrl(url: string): string {
   
   // Get public URL from Supabase
   const { data } = supabase.storage.from('business-images').getPublicUrl(path)
+  console.log('[CategoryFilters] fixImageUrl: converted to Supabase URL', path, '→', data.publicUrl)
   return data.publicUrl
 }
 
@@ -231,6 +236,8 @@ export default function CategoryFilters({
                               referrerPolicy="no-referrer"
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement
+                                console.error('[CategoryFilters] Image failed to load:', img.src, 'for provider:', provider.name)
+                                console.error('[CategoryFilters] Original image URL from data:', details.images[0])
                                 img.style.display = 'none'
                                 img.parentElement!.innerHTML = `
                                   <div class="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">

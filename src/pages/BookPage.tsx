@@ -71,10 +71,14 @@ function getProviderDetails(p: Provider): ProviderDetails {
  * 3. Relative paths - convert to Supabase public URL
  */
 function fixImageUrl(url: string): string {
-  if (!url || typeof url !== 'string') return ''
+  if (!url || typeof url !== 'string') {
+    console.log('[BookPage] fixImageUrl: empty or invalid URL', url)
+    return ''
+  }
   
   // If it's already a full URL, return as-is
   if (url.startsWith('http://') || url.startsWith('https://')) {
+    console.log('[BookPage] fixImageUrl: returning full URL', url)
     return url
   }
   
@@ -97,6 +101,7 @@ function fixImageUrl(url: string): string {
   
   // Get public URL from Supabase
   const { data } = supabase.storage.from('business-images').getPublicUrl(path)
+  console.log('[BookPage] fixImageUrl: converted to Supabase URL', path, '→', data.publicUrl)
   return data.publicUrl
 }
 
@@ -162,6 +167,8 @@ export default function BookPage(props: {
                             referrerPolicy="no-referrer"
                             onError={(e) => {
                               const img = e.currentTarget as HTMLImageElement
+                              console.error('[BookPage] Image failed to load:', img.src, 'for provider:', r.name)
+                              console.error('[BookPage] Original image URL from data:', d.images?.[0])
                               img.style.display = 'none'
                               img.parentElement!.innerHTML = `
                                 <div class="w-full h-40 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-lg border border-neutral-200 flex items-center justify-center">
