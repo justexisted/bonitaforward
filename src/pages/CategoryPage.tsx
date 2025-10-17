@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import Funnel, { type CategoryKey, type FunnelOption, type FunnelQuestion } from '../components/Funnel'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+// CategoryKey type imported from Funnel component
 
 type Provider = {
   id: string
@@ -42,16 +43,7 @@ type Provider = {
   bonita_resident_discount?: string | null
 }
 
-type FunnelOption = {
-  id: string
-  label: string
-}
-
-type FunnelQuestion = {
-  id: string
-  prompt: string
-  options: FunnelOption[]
-}
+// FunnelOption and FunnelQuestion types imported from Funnel component
 
 type ProviderDetails = {
   phone?: string
@@ -72,19 +64,7 @@ function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
 }
 
-/**
- * Get JSON from localStorage with error handling
- */
-function getLocalStorageJSON<T>(key: string, defaultValue: T): T {
-  try {
-    const item = localStorage.getItem(key)
-    if (!item) return defaultValue
-    return JSON.parse(item) as T
-  } catch (e) {
-    console.warn(`Failed to parse localStorage key "${key}":`, e)
-    return defaultValue
-  }
-}
+// getLocalStorageJSON function moved to Funnel component
 
 
 function isFeaturedProvider(p: Provider): boolean {
@@ -109,198 +89,15 @@ function getProviderDetails(p: Provider): ProviderDetails {
 // FUNNEL CONFIGURATION
 // ============================================================================
 
-const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
-  'real-estate': [
-    { id: 'need', prompt: 'What do you need help with?', options: [ { id: 'buy', label: 'Buying' }, { id: 'sell', label: 'Selling' }, { id: 'rent', label: 'Renting' } ] },
-    { id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] },
-    { id: 'budget', prompt: 'Approximate budget?', options: [ { id: 'entry', label: '$' }, { id: 'mid', label: '$$' }, { id: 'high', label: '$$$' } ] },
-    { id: 'beds', prompt: 'Bedrooms', options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4', label: '4+' } ] },
-  ],
-  'home-services': [
-    {
-      id: 'type',
-      prompt: 'Which service do you need?',
-      options: [
-        { id: 'landscaping', label: 'Landscaping' },
-        { id: 'cleaning', label: 'Cleaning' },
-        { id: 'solar', label: 'Solar' },
-        { id: 'remodeling', label: 'Remodeling' },
-        { id: 'plumbing', label: 'Plumbing' },
-        { id: 'electrical', label: 'Electrical' },
-        { id: 'hvac', label: 'HVAC' },
-        { id: 'roofing', label: 'Roofing' },
-        { id: 'flooring', label: 'Flooring' },
-        { id: 'painting', label: 'Painting' },
-        { id: 'handyman', label: 'Handyman' },
-        { id: 'pool', label: 'Pool Service' },
-      ],
-    },
-    {
-      id: 'urgency',
-      prompt: 'How urgent is this?',
-      options: [
-        { id: 'emergency', label: 'Emergency (ASAP)' },
-        { id: 'week', label: 'This week' },
-        { id: 'month', label: 'This month' },
-        { id: 'flexible', label: 'Flexible' },
-      ],
-    },
-    {
-      id: 'budget',
-      prompt: 'Budget range?',
-      options: [
-        { id: 'low', label: 'Under $500' },
-        { id: 'med', label: '$500 - $2000' },
-        { id: 'high', label: '$2000+' },
-      ],
-    },
-  ],
-  'health-wellness': [
-    {
-      id: 'type',
-      prompt: 'What type of service?',
-      options: [
-        { id: 'dental', label: 'Dental' },
-        { id: 'medical', label: 'Medical' },
-        { id: 'mental', label: 'Mental Health' },
-        { id: 'fitness', label: 'Fitness' },
-        { id: 'wellness', label: 'Wellness' },
-        { id: 'specialist', label: 'Specialist' },
-      ],
-    },
-    {
-      id: 'insurance',
-      prompt: 'Insurance type?',
-      options: [
-        { id: 'private', label: 'Private' },
-        { id: 'medicare', label: 'Medicare' },
-        { id: 'medicaid', label: 'Medicaid' },
-        { id: 'none', label: 'No insurance' },
-      ],
-    },
-    {
-      id: 'urgency',
-      prompt: 'How urgent?',
-      options: [
-        { id: 'urgent', label: 'Urgent' },
-        { id: 'soon', label: 'Within a week' },
-        { id: 'routine', label: 'Routine checkup' },
-      ],
-    },
-  ],
-  'restaurants-cafes': [
-    {
-      id: 'cuisine',
-      prompt: 'What sounds good?',
-      options: [
-        { id: 'mexican', label: 'Mexican' },
-        { id: 'asian', label: 'Asian' },
-        { id: 'american', label: 'American' },
-        { id: 'cafes', label: 'Cafés' },
-      ],
-    },
-    {
-      id: 'occasion',
-      prompt: 'Occasion?',
-      options: [
-        { id: 'family', label: 'Family' },
-        { id: 'casual', label: 'Casual' },
-        { id: 'date', label: 'Date' },
-      ],
-    },
-    {
-      id: 'price',
-      prompt: 'Price range?',
-      options: [
-        { id: 'low', label: '$' },
-        { id: 'med', label: '$$' },
-        { id: 'high', label: '$$$' },
-      ],
-    },
-    {
-      id: 'mode',
-      prompt: 'Dine‑in or takeout?',
-      options: [
-        { id: 'dine', label: 'Dine‑in' },
-        { id: 'takeout', label: 'Takeout' },
-      ],
-    },
-  ],
-  'professional-services': [
-    {
-      id: 'type',
-      prompt: 'What service do you need?',
-      options: [
-        { id: 'legal', label: 'Legal' },
-        { id: 'accounting', label: 'Accounting' },
-        { id: 'consulting', label: 'Consulting' },
-        { id: 'marketing', label: 'Marketing' },
-        { id: 'design', label: 'Design' },
-        { id: 'tech', label: 'Technology' },
-      ],
-    },
-    {
-      id: 'project',
-      prompt: 'Project type?',
-      options: [
-        { id: 'one-time', label: 'One-time project' },
-        { id: 'ongoing', label: 'Ongoing service' },
-        { id: 'consultation', label: 'Consultation' },
-      ],
-    },
-    {
-      id: 'budget',
-      prompt: 'Budget?',
-      options: [
-        { id: 'low', label: '$' },
-        { id: 'med', label: '$$' },
-        { id: 'high', label: '$$$' },
-      ],
-    },
-  ],
-}
+// Funnel configuration moved to Funnel component
 
-function getFunnelQuestions(categoryKey: CategoryKey, _answers: Record<string, string>): FunnelQuestion[] {
-  if (categoryKey === 'real-estate') {
-    const list = [
-      { id: 'need', prompt: 'What do you need help with?', options: [ { id: 'buy', label: 'Buying' }, { id: 'sell', label: 'Selling' }, { id: 'rent', label: 'Renting' } ] },
-      { id: 'timeline', prompt: "What's your timeline?", options: [ { id: '0-3', label: '0–3 months' }, { id: '3-6', label: '3–6 months' }, { id: '6+', label: '6+ months' } ] },
-      { id: 'budget', prompt: 'Approximate budget?', options: [ { id: 'entry', label: '$' }, { id: 'mid', label: '$$' }, { id: 'high', label: '$$$' } ] },
-      { id: 'beds', prompt: 'Bedrooms', options: [ { id: '2', label: '2+' }, { id: '3', label: '3+' }, { id: '4', label: '4+' } ] },
-    ]
-    return list.slice(0, 4)
-  }
-  return funnelConfig[categoryKey].slice(0, 4)
-}
+// getFunnelQuestions function moved to Funnel component
 
-function trackChoice(category: CategoryKey, questionId: string, optionId: string) {
-  try {
-    const key = `bf-tracking-${category}`
-    const existing = getLocalStorageJSON<Record<string, string>>(key, {})
-    existing[questionId] = optionId
-    localStorage.setItem(key, JSON.stringify(existing))
-  } catch {}
-}
+// trackChoice function moved to Funnel component
 
 // scoreProviders function is passed as a prop from the parent component
 
-// Persist funnel answers per user to Supabase (if tables exist)
-async function persistFunnelForUser(params: { email?: string | null; category: CategoryKey; answers: Record<string, string> }) {
-  const { email, category, answers } = params
-  if (!email || !answers || !Object.keys(answers).length) return
-
-  try {
-    const { supabase } = await import('../lib/supabase')
-    await supabase
-      .from('funnel_responses')
-      .upsert(
-        { user_email: email, category_key: category, responses: answers, updated_at: new Date().toISOString() },
-        { onConflict: 'user_email,category_key' }
-      )
-  } catch (err) {
-    console.warn('[Supabase] upsert funnel_responses failed (safe to ignore if table missing)', err)
-  }
-}
+// persistFunnelForUser function moved to Funnel component
 
 // ============================================================================
 // COMPONENTS
@@ -309,120 +106,7 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
 /**
  * Funnel component for collecting user preferences
  */
-function Funnel({ category }: { category: { key: CategoryKey; name: string; description: string; icon: string } }) {
-  const [step, setStep] = useState<number>(0)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [anim, setAnim] = useState<'in' | 'out'>('in')
-  const questions = useMemo(() => getFunnelQuestions(category.key, answers), [category.key, answers])
-  const current = questions[step]
-  const auth = useAuth()
-  const initializedRef = useRef(false)
-
-  // On mount, hydrate answers from localStorage so users never re-enter
-  useEffect(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
-    try {
-      const key = `bf-tracking-${category.key}`
-      const existing = getLocalStorageJSON<Record<string, string>>(key, {})
-      if (existing && typeof existing === 'object') {
-        setAnswers(existing)
-        // fast-forward step to first unanswered question
-        const qs = getFunnelQuestions(category.key, existing)
-        const firstUnanswered = qs.findIndex((q) => !existing[q.id])
-        if (firstUnanswered >= 0) setStep(firstUnanswered)
-        else setStep(qs.length)
-      }
-    } catch {}
-  }, [category.key])
-
-  function choose(option: FunnelOption) {
-    trackChoice(category.key, current.id, option.id)
-    setAnswers((a: Record<string, string>) => ({ ...a, [current.id]: option.id }))
-    setAnim('out')
-    setTimeout(() => {
-      setStep((s: number) => Math.min(s + 1, questions.length))
-      setAnim('in')
-    }, 120)
-  }
-
-  // Whenever answers change and user is authenticated, persist to Supabase
-  useEffect(() => {
-    if (!auth.email) return
-    persistFunnelForUser({ email: auth.email, category: category.key, answers })
-  }, [auth.email, category.key, answers])
-
-  const done = step >= questions.length
-
-  return (
-    <div className="w-full flex justify-center">
-      <div className="w-full max-w-md text-center">
-        {!done ? (
-          <div key={current.id} className={`rounded-2xl border border-neutral-100 p-5 bg-white elevate transition-all duration-200 ${anim === 'in' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}>
-            <div className="text-sm text-neutral-500">Step {step + 1} of {questions.length}</div>
-            <h3 className="mt-1 text-lg font-semibold tracking-tight text-neutral-900">{current.prompt}</h3>
-            <div className="mt-4 grid grid-cols-1 gap-2">
-              {current.options.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => choose(opt)}
-                  className="btn btn-secondary sparkle border border-neutral-200"
-                >
-                  {opt.label}
-        </button>
-              ))}
-      </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-            <h3 className="text-lg font-semibold tracking-tight text-neutral-900">Great! Here's your summary</h3>
-            <ul className="mt-3 text-sm text-neutral-700 text-left">
-              {questions.map((q) => (
-                <li key={q.id} className="flex justify-between border-b border-neutral-100 py-2">
-                  <span className="text-neutral-500">{q.prompt}</span>
-                  <span>{q.options.find((o) => o.id === answers[q.id])?.label || '-'}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4">
-              <div className="flex flex-col gap-2">
-                <Link
-                  to={`/book?category=${category.key}`}
-                  onClick={(e) => {
-                    const card = (e.currentTarget.closest('section') as HTMLElement) || document.body
-                    card.classList.add('slide-out-right')
-                    setTimeout(() => {
-                      // allow navigation after animation; Link will handle it
-                    }, 160)
-                  }}
-                  className="btn btn-primary"
-                >
-                  Find Best Match
-                </Link>
-                <button
-                  onClick={() => {
-                    const container = (document.querySelector('section') as HTMLElement)
-                    if (container) container.classList.add('slide-out-left')
-                    setTimeout(() => {
-                      try { localStorage.removeItem(`bf-tracking-${category.key}`) } catch {}
-                      setAnswers({})
-                      setStep(0)
-                      setAnim('in')
-                      if (container) container.classList.remove('slide-out-left')
-                    }, 160)
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Edit Answers
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+// Funnel component moved to src/components/Funnel.tsx
 
 /**
  * CategoryFilters component for displaying filtered results

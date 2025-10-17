@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
@@ -69,9 +70,31 @@ function getProviderDetails(p: Provider): ProviderDetails {
 }
 
 function fixImageUrl(url: string): string {
-  if (!url) return ''
-  if (url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) return url
-  if (url.includes('/business-images/')) return url + '.jpg'
+  if (!url || typeof url !== 'string') return ''
+  
+  // If it's already a full URL, return as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  // If it's a Supabase storage path, convert to public URL
+  if (url.startsWith('business-images/') || url.startsWith('blog-images/')) {
+    const { data } = supabase.storage.from('business-images').getPublicUrl(url)
+    return data.publicUrl
+  }
+  
+  // If it's a relative path, assume it's in business-images bucket
+  if (url.startsWith('/') || !url.includes('/')) {
+    const { data } = supabase.storage.from('business-images').getPublicUrl(url)
+    return data.publicUrl
+  }
+  
+  // If it has a file extension, return as-is
+  if (url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+    return url
+  }
+  
+  // Return as-is if we can't determine the format
   return url
 }
 
@@ -132,6 +155,9 @@ export default function BookPage(props: {
                             src={fixImageUrl(d.images?.[0] || '')} 
                             alt={`${r.name} business photo`} 
                             className="w-full h-40 object-cover rounded-lg border border-neutral-100"
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
                             onError={(e) => {
                               const img = e.currentTarget as HTMLImageElement
                               img.style.display = 'none'
@@ -271,6 +297,9 @@ export default function BookPage(props: {
                                 src={fixImageUrl(d.images?.[0] || '')} 
                                 alt={`${r.name} business photo`} 
                                 className="w-full h-24 object-cover rounded-lg border border-neutral-100"
+                                loading="lazy"
+                                decoding="async"
+                                referrerPolicy="no-referrer"
                                 onError={(e) => {
                                   const img = e.currentTarget as HTMLImageElement
                                   img.style.display = 'none'
