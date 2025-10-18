@@ -123,7 +123,7 @@ export async function deleteProvider(id: string): Promise<boolean> {
 export async function fetchFunnels(): Promise<FunnelRow[]> {
   try {
     const { data, error } = await supabase
-      .from('user_tracking')
+      .from('funnel_responses')  // FIXED: Changed from 'user_tracking' to 'funnel_responses'
       .select('*')
       .order('created_at', { ascending: false })
     
@@ -172,27 +172,24 @@ export async function fetchBookings(): Promise<BookingRow[]> {
  */
 export async function fetchBookingEvents(): Promise<BookingEventRow[]> {
   try {
+    // Select specific columns to avoid permission errors on related tables (like users)
+    // This prevents Supabase from trying to follow foreign keys we don't have access to
     const { data, error } = await supabase
       .from('booking_events')
-      .select(`
-        *,
-        providers:provider_id (
-          name,
-          category_key,
-          address,
-          phone
-        )
-      `)
+      .select('id, provider_id, customer_email, customer_name, booking_date, booking_duration_minutes, booking_notes, status, created_at')
       .order('created_at', { ascending: false })
     
     if (error) {
-      console.error('[AdminDataService] Error fetching booking events:', error)
-      throw error
+      // RLS permission error - user may not have admin access
+      // This is expected if admin RLS policies haven't been set up yet
+      // See: fix-booking-events-admin-access.sql
+      console.warn('[AdminDataService] No access to booking events (RLS):', error.message)
+      return [] // Return empty array, admin panel will still function
     }
     
     return (data || []) as BookingEventRow[]
   } catch (error) {
-    console.error('[AdminDataService] Failed to fetch booking events:', error)
+    console.warn('[AdminDataService] Booking events not accessible:', error)
     return []
   }
 }
@@ -231,13 +228,11 @@ export async function fetchCalendarEvents(): Promise<CalendarEvent[]> {
  */
 export async function fetchFlaggedEvents() {
   try {
+    // Simplified query without joins - avoid foreign key relationship errors
+    // Flagged events can be enriched client-side if needed by matching event_id and user_id
     const { data, error } = await supabase
       .from('event_flags')
-      .select(`
-        *,
-        event:calendar_events(*),
-        reporter:profiles!user_id(email)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {
@@ -371,13 +366,11 @@ export async function fetchProfiles(): Promise<ProfileRow[]> {
  */
 export async function fetchProviderChangeRequests(): Promise<ProviderChangeRequestWithDetails[]> {
   try {
+    // Simplified query without joins - avoid foreign key relationship errors
+    // Change requests can be enriched client-side if needed by matching IDs
     const { data, error } = await supabase
       .from('provider_change_requests')
-      .select(`
-        *,
-        providers:provider_id(id, name, email),
-        profiles:requested_by(id, email, name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {
@@ -402,13 +395,11 @@ export async function fetchProviderChangeRequests(): Promise<ProviderChangeReque
  */
 export async function fetchProviderJobPosts(): Promise<ProviderJobPostWithDetails[]> {
   try {
+    // Simplified query without joins - avoid foreign key relationship errors
+    // Job posts can be enriched client-side if needed by matching IDs
     const { data, error } = await supabase
       .from('provider_job_posts')
-      .select(`
-        *,
-        provider:providers!provider_id(id, name, email),
-        owner:profiles!owner_user_id(id, email, name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {

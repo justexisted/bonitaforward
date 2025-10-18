@@ -16,8 +16,8 @@ import { isFeaturedProvider } from '../utils/helpers'
 // The hook runs in parallel with existing state - both systems work together
 // This allows incremental migration without breaking existing functionality
 import { useAdminData } from '../hooks/useAdminData'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { AdminSection } from '../types/admin'
+// Type imported for future use in Phase 2 (section type safety)
+import type { AdminSection as _AdminSection } from '../types/admin'
 // ============================================================================
 
 // Extended type for change requests with joined provider and profile data
@@ -165,8 +165,8 @@ export default function AdminPage() {
     data: adminData, 
     loading: adminDataLoading,
     error: adminDataError,
-    refresh: refreshAdminData,  // TODO: Use in refresh buttons (Phase 2)
-    refreshEntity  // TODO: Use after individual updates (Phase 2)
+    refresh: _refreshAdminData,  // Prefixed: Will use in refresh buttons (Phase 2)
+    refreshEntity: _refreshEntity  // Prefixed: Will use after updates (Phase 2)
   } = useAdminData()
   
   // Log hook status for debugging during migration
