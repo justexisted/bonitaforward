@@ -9,6 +9,16 @@ import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { isFeaturedProvider } from '../utils/helpers'
 
+// ============================================================================
+// GRADUAL MIGRATION: New Service Layer
+// ============================================================================
+// Importing new data management infrastructure for gradual migration
+// The hook runs in parallel with existing state - both systems work together
+// This allows incremental migration without breaking existing functionality
+import { useAdminData } from '../hooks/useAdminData'
+import type { AdminSection } from '../types/admin'
+// ============================================================================
+
 // Extended type for change requests with joined provider and profile data
 type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
   providers?: {
@@ -135,9 +145,50 @@ type ProfileRow = {
 /**
  * Admin page (per-user): Lists the authenticated user's saved funnel responses and bookings.
  * Requires RLS policies to allow users to select their own rows.
+ * 
+ * GRADUAL MIGRATION STATUS:
+ * - Phase 1: ✅ NEW service layer running in parallel with existing code
+ * - Phase 2: 🔄 Gradually replacing old state with new hook data
+ * - Phase 3: ⏳ Replace Supabase calls with AdminDataService
+ * - Phase 4: ⏳ Remove old state and data loading code
  */
 export default function AdminPage() {
   const auth = useAuth()
+  
+  // ============================================================================
+  // NEW: Service-Based Data Management (Phase 1)
+  // ============================================================================
+  // This hook loads all admin data in parallel and provides refresh capabilities
+  // Currently running alongside existing state - both systems work together
+  // TODO: Gradually replace old state variables with adminData from this hook
+  const { 
+    data: adminData, 
+    loading: adminDataLoading, 
+    error: adminDataError,
+    refresh: refreshAdminData,
+    refreshEntity
+  } = useAdminData()
+  
+  // Log hook status for debugging during migration
+  useEffect(() => {
+    if (adminData) {
+      console.log('[Admin Migration] New data service loaded:', {
+        providers: adminData.providers?.length || 0,
+        bookings: adminData.bookings?.length || 0,
+        funnels: adminData.funnels?.length || 0,
+        calendarEvents: adminData.calendarEvents?.length || 0
+      })
+    }
+    if (adminDataError) {
+      console.error('[Admin Migration] Data service error:', adminDataError)
+    }
+  }, [adminData, adminDataError])
+  
+  // ============================================================================
+  // OLD: Legacy State Management (To be phased out)
+  // ============================================================================
+  // These state variables will be gradually replaced with adminData from the hook above
+  // Keeping them for now to ensure existing functionality continues to work
   const [funnels, setFunnels] = useState<FunnelRow[]>([])
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [bookingEvents, setBookingEvents] = useState<Array<{
