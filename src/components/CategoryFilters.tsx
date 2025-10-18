@@ -200,11 +200,6 @@ export default function CategoryFilters({
                               referrerPolicy="no-referrer"
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement
-                                console.error(`[Image Load Failed] ${provider.name} (${provider.category_key})`, {
-                                  url: img.src,
-                                  provider: provider.id,
-                                  originalUrl: imageUrl
-                                })
                                 img.style.display = 'none'
                                 img.parentElement!.innerHTML = `
                                   <div class="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border-2 border-dashed border-blue-200">
