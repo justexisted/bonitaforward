@@ -14,7 +14,6 @@ import { CATEGORY_OPTIONS } from '../../hooks/useAdminProviders'
 
 interface ProviderEditFormProps {
   provider: ProviderRow
-  providers: ProviderRow[]
   setProviders: React.Dispatch<React.SetStateAction<ProviderRow[]>>
   onSave: (provider: ProviderRow) => void
   onDelete: (providerId: string) => void
@@ -40,7 +39,6 @@ interface ProviderEditFormProps {
  */
 export default function ProviderEditForm({
   provider,
-  providers,
   setProviders,
   onSave,
   onDelete,

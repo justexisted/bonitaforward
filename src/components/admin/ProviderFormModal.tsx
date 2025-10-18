@@ -6,7 +6,6 @@
  */
 
 import BusinessHoursEditor from './BusinessHoursEditor'
-import ProviderImageUpload from './ProviderImageUpload'
 import type { ProviderRow } from '../../types/admin'
 import { CATEGORY_OPTIONS } from '../../hooks/useAdminProviders'
 
@@ -16,9 +15,6 @@ interface ProviderFormModalProps {
   onSave: () => void
   onCancel: () => void
   savingProvider: boolean
-  uploadingImages: boolean
-  onImageUpload: (event: React.ChangeEvent<HTMLInputElement>) => void
-  onImageRemove: (imageUrl: string) => void
 }
 
 /**
@@ -32,10 +28,7 @@ export default function ProviderFormModal({
   setNewProviderForm,
   onSave,
   onCancel,
-  savingProvider,
-  uploadingImages,
-  onImageUpload,
-  onImageRemove
+  savingProvider
 }: ProviderFormModalProps) {
   // Helper to update form fields
   const updateField = (field: keyof ProviderRow, value: any) => {
