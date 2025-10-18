@@ -429,6 +429,7 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
               
 
               {/* Contact Information */}
+              <div className="space-y-8">
                 <div>
                   <h3 className="text-lg font-semibold text-neutral-900 mb-3">Contact Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -532,13 +533,29 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                 {provider.business_hours && Object.keys(provider.business_hours).length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 mb-3">Business Hours</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {Object.entries(provider.business_hours).map(([day, hours]) => (
-                        <div key={day} className="flex justify-between items-center py-1">
-                          <span className="font-medium text-neutral-700 capitalize">{day}</span>
-                          <span className="text-neutral-600">{hours}</span>
-                        </div>
-                      ))}
+                    <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden inline-block">
+                      {/* Business hours in proper day order */}
+                      {[
+                        { key: 'monday', label: 'Monday' },
+                        { key: 'tuesday', label: 'Tuesday' },
+                        { key: 'wednesday', label: 'Wednesday' },
+                        { key: 'thursday', label: 'Thursday' },
+                        { key: 'friday', label: 'Friday' },
+                        { key: 'saturday', label: 'Saturday' },
+                        { key: 'sunday', label: 'Sunday' }
+                      ]
+                        .filter(({ key }) => provider.business_hours?.[key]) // Only show days that are set
+                        .map(({ key, label }, index, array) => (
+                          <div 
+                            key={key} 
+                            className={`flex items-center gap-4 px-4 py-3 ${
+                              index !== array.length - 1 ? 'border-b border-neutral-100' : ''
+                            } hover:bg-neutral-50 transition-colors`}
+                          >
+                            <span className="font-medium text-neutral-800 w-24">{label}</span>
+                            <span className="text-neutral-600 font-mono text-sm">{provider.business_hours?.[key]}</span>
+                          </div>
+                        ))}
                     </div>
                   </div>
                 )}
@@ -565,7 +582,6 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                     </div>
                   </div>
                 )}
-
               </div>
 
               {/* Exclusive Coupon Display - Moved to bottom after Follow Us */}
@@ -761,6 +777,7 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                   </div>
                 </div>
               )}
+            </div>
           </div>
         )}
       </Container>

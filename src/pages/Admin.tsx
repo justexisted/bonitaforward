@@ -77,6 +77,11 @@ type ProviderRow = {
   enable_calendar_booking?: boolean | null
   enable_call_contact?: boolean | null
   enable_email_contact?: boolean | null
+  // Coupon system fields
+  coupon_code?: string | null
+  coupon_discount?: string | null
+  coupon_description?: string | null
+  coupon_expires_at?: string | null
 }
 
 type FunnelRow = {
@@ -1594,7 +1599,7 @@ export default function AdminPage() {
         // Enhanced providers query with all featured tracking fields
         const provQuery = isAdmin ? supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url, enable_calendar_booking, enable_call_contact, enable_email_contact, coupon_code, coupon_discount, coupon_description, coupon_expires_at')
           .order('name', { ascending: true }) : null
         const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
           fExec,
@@ -2053,6 +2058,15 @@ export default function AdminPage() {
         booking_type: p.booking_type || null,
         booking_instructions: p.booking_instructions || null,
         booking_url: p.booking_url || null,
+        // Contact method toggles for booking
+        enable_calendar_booking: p.enable_calendar_booking ?? false,
+        enable_call_contact: p.enable_call_contact ?? false,
+        enable_email_contact: p.enable_email_contact ?? false,
+        // Coupon system fields
+        coupon_code: p.coupon_code || null,
+        coupon_discount: p.coupon_discount || null,
+        coupon_description: p.coupon_description || null,
+        coupon_expires_at: p.coupon_expires_at || null,
         updated_at: new Date().toISOString()
       }
       
@@ -2116,7 +2130,7 @@ export default function AdminPage() {
         try {
           const { data: pData } = await supabase
             .from('providers')
-            .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+            .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url, enable_calendar_booking, enable_call_contact, enable_email_contact, coupon_code, coupon_discount, coupon_description, coupon_expires_at')
             .order('name', { ascending: true })
           setProviders((pData as ProviderRow[]) || [])
           // console.log('[Admin] Provider data refreshed after save')
@@ -2337,7 +2351,7 @@ export default function AdminPage() {
       try {
         const { data: pData, error: pErr } = await supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url, enable_calendar_booking, enable_call_contact, enable_email_contact, coupon_code, coupon_discount, coupon_description, coupon_expires_at')
           .order('name', { ascending: true })
         if (!pErr) setProviders((pData as ProviderRow[]) || [])
       } catch {}
@@ -4477,21 +4491,127 @@ Bonita Forward Team`}
                           </div>
                         </div>
 
-                        {/* Bonita Residents Discount */}
-                        <div>
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">
-                              Special Discount for Bonita Residents
-                            </label>
-                            <input 
-                              value={editingProvider.bonita_resident_discount || ''} 
-                              onChange={(e) => setProviders((arr) => arr.map(p => 
-                                p.id === editingProvider.id ? { ...p, bonita_resident_discount: e.target.value } : p
-                              ))} 
-                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                              placeholder="e.g., 10% off for Bonita residents, Free consultation for locals"
-                            />
+                        {/* Coupon System - Featured Only */}
+                        <div className={!editingProvider.is_member ? 'opacity-50 pointer-events-none' : ''}>
+                          <h4 className="text-md font-medium text-neutral-800 mb-4">
+                            Coupon System
+                            {!editingProvider.is_member && (
+                              <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
+                            )}
+                          </h4>
+                          
+                          {!editingProvider.is_member && (
+                            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                              <p className="text-sm text-amber-800">
+                                <strong>Upgrade to Featured</strong> to create exclusive coupon codes for your customers.
+                              </p>
+                            </div>
+                          )}
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Coupon Code */}
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Coupon Code
+                              </label>
+                              <input 
+                                value={editingProvider.coupon_code || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, coupon_code: e.target.value.toUpperCase() } : p
+                                ))} 
+                                disabled={!editingProvider.is_member}
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 font-mono disabled:bg-neutral-100" 
+                                placeholder="e.g., SAVE20, WELCOME10"
+                              />
+                              <p className="text-xs text-neutral-500 mt-1">The code customers will use</p>
+                            </div>
+
+                            {/* Coupon Discount */}
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Discount Amount/Type
+                              </label>
+                              <input 
+                                value={editingProvider.coupon_discount || ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, coupon_discount: e.target.value } : p
+                                ))} 
+                                disabled={!editingProvider.is_member}
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 disabled:bg-neutral-100" 
+                                placeholder="e.g., 20% Off, $50 Off, Free Consultation"
+                              />
+                              <p className="text-xs text-neutral-500 mt-1">What customers will get</p>
+                            </div>
+
+                            {/* Coupon Expiration */}
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Expiration Date (Optional)
+                              </label>
+                              <input 
+                                type="datetime-local"
+                                value={editingProvider.coupon_expires_at ? new Date(editingProvider.coupon_expires_at).toISOString().slice(0, 16) : ''} 
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, coupon_expires_at: e.target.value ? new Date(e.target.value).toISOString() : null } : p
+                                ))} 
+                                disabled={!editingProvider.is_member}
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 disabled:bg-neutral-100" 
+                              />
+                              <p className="text-xs text-neutral-500 mt-1">When the coupon expires</p>
+                            </div>
+
+                            {/* Coupon Description - Full Width */}
+                            <div className="md:col-span-2">
+                              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                                Coupon Description
+                              </label>
+                              <textarea
+                                value={editingProvider.coupon_description || ''}
+                                onChange={(e) => setProviders((arr) => arr.map(p => 
+                                  p.id === editingProvider.id ? { ...p, coupon_description: e.target.value } : p
+                                ))}
+                                disabled={!editingProvider.is_member}
+                                rows={2}
+                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 disabled:bg-neutral-100"
+                                placeholder="Additional details about the coupon (terms, conditions, etc.)"
+                              />
+                              <p className="text-xs text-neutral-500 mt-1">Additional details about the offer</p>
+                            </div>
                           </div>
+
+                          {/* Coupon Preview */}
+                          {editingProvider.coupon_code && (
+                            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-dashed border-blue-300 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-xs font-semibold text-blue-600 uppercase">Preview</div>
+                                  <div className="text-2xl font-bold text-neutral-900 font-mono mt-1">
+                                    {editingProvider.coupon_code}
+                                  </div>
+                                  <div className="text-lg font-semibold text-green-700 mt-1">
+                                    {editingProvider.coupon_discount || 'Discount not set'}
+                                  </div>
+                                  {editingProvider.coupon_description && (
+                                    <div className="text-sm text-neutral-600 mt-2">
+                                      {editingProvider.coupon_description}
+                                    </div>
+                                  )}
+                                  {editingProvider.coupon_expires_at && (
+                                    <div className="text-xs text-red-600 mt-2 font-medium">
+                                      Expires: {new Date(editingProvider.coupon_expires_at).toLocaleDateString('en-US', { 
+                                        month: 'long', 
+                                        day: 'numeric', 
+                                        year: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit'
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-6xl">🎟️</div>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Specialties */}
@@ -4592,38 +4712,64 @@ Bonita Forward Team`}
                           </h4>
                           
                           <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="checkbox"
-                                id={`enable-business-hours-${editingProvider.id}`}
-                                checked={editingProvider.business_hours !== null}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    // Initialize with default hours if enabling
-                                    const defaultHours = {
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  id={`enable-business-hours-${editingProvider.id}`}
+                                  checked={editingProvider.business_hours !== null}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      // Initialize with default hours if enabling
+                                      const defaultHours = {
+                                        monday: '9:00 AM - 5:00 PM',
+                                        tuesday: '9:00 AM - 5:00 PM',
+                                        wednesday: '9:00 AM - 5:00 PM',
+                                        thursday: '9:00 AM - 5:00 PM',
+                                        friday: '9:00 AM - 5:00 PM',
+                                        saturday: '10:00 AM - 4:00 PM',
+                                        sunday: 'Closed'
+                                      }
+                                      setProviders((arr) => arr.map(p => 
+                                        p.id === editingProvider.id ? { ...p, business_hours: defaultHours } : p
+                                      ))
+                                    } else {
+                                      setProviders((arr) => arr.map(p => 
+                                        p.id === editingProvider.id ? { ...p, business_hours: null } : p
+                                      ))
+                                    }
+                                  }}
+                                  disabled={!editingProvider.is_member}
+                                  className="rounded border-neutral-300 text-neutral-600 focus:ring-neutral-500"
+                                />
+                                <label htmlFor={`enable-business-hours-${editingProvider.id}`} className="text-sm font-medium text-neutral-700">
+                                  Set Business Hours
+                                </label>
+                              </div>
+                              
+                              {/* Quick Fill Button - Only show when business hours are enabled */}
+                              {editingProvider.is_member && editingProvider.business_hours && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const quickFillHours = {
                                       monday: '9:00 AM - 5:00 PM',
                                       tuesday: '9:00 AM - 5:00 PM',
                                       wednesday: '9:00 AM - 5:00 PM',
                                       thursday: '9:00 AM - 5:00 PM',
                                       friday: '9:00 AM - 5:00 PM',
-                                      saturday: '10:00 AM - 4:00 PM',
-                                      sunday: 'Closed'
+                                      saturday: '9:00 AM - 5:00 PM',
+                                      sunday: '9:00 AM - 5:00 PM'
                                     }
                                     setProviders((arr) => arr.map(p => 
-                                      p.id === editingProvider.id ? { ...p, business_hours: defaultHours } : p
+                                      p.id === editingProvider.id ? { ...p, business_hours: quickFillHours } : p
                                     ))
-                                  } else {
-                                    setProviders((arr) => arr.map(p => 
-                                      p.id === editingProvider.id ? { ...p, business_hours: null } : p
-                                    ))
-                                  }
-                                }}
-                                disabled={!editingProvider.is_member}
-                                className="rounded border-neutral-300 text-neutral-600 focus:ring-neutral-500"
-                              />
-                              <label htmlFor={`enable-business-hours-${editingProvider.id}`} className="text-sm font-medium text-neutral-700">
-                                Set Business Hours
-                              </label>
+                                  }}
+                                  className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors font-medium"
+                                >
+                                  🕐 Quick Fill All (9 AM - 5 PM)
+                                </button>
+                              )}
                             </div>
                             
                             {editingProvider.is_member && editingProvider.business_hours && (
@@ -4807,6 +4953,135 @@ Bonita Forward Team`}
                                   }`}
                                 />
                               </button>
+                            </div>
+
+                            {/* Contact Methods for Booking */}
+                            <div>
+                              <label className="block text-sm font-medium text-neutral-700 mb-3">
+                                Contact Methods for Booking
+                              </label>
+                              <div className="space-y-3">
+                                <p className="text-xs text-neutral-600 mb-3">
+                                  Choose how customers can contact you for bookings:
+                                </p>
+                                
+                                {/* Calendar Booking Toggle */}
+                                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-neutral-800">📅 Calendar Booking</span>
+                                      {editingProvider.enable_calendar_booking && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          Enabled
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-neutral-600 mt-1">
+                                      Allow customers to book through your calendar system
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setProviders((arr) => arr.map(p => 
+                                        p.id === editingProvider.id ? { ...p, enable_calendar_booking: !p.enable_calendar_booking } : p
+                                      ))
+                                    }}
+                                    disabled={!editingProvider.is_member || !editingProvider.booking_enabled}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                      editingProvider.enable_calendar_booking ? 'bg-blue-600' : 'bg-neutral-300'
+                                    }`}
+                                    aria-label="Toggle calendar booking"
+                                  >
+                                    <span
+                                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        editingProvider.enable_calendar_booking ? 'translate-x-6' : 'translate-x-1'
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+
+                                {/* Phone Contact Toggle */}
+                                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-neutral-800">📞 Phone Contact</span>
+                                      {editingProvider.enable_call_contact && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          Enabled
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-neutral-600 mt-1">
+                                      Display your phone number for booking calls
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setProviders((arr) => arr.map(p => 
+                                        p.id === editingProvider.id ? { ...p, enable_call_contact: !p.enable_call_contact } : p
+                                      ))
+                                    }}
+                                    disabled={!editingProvider.is_member || !editingProvider.booking_enabled}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                      editingProvider.enable_call_contact ? 'bg-blue-600' : 'bg-neutral-300'
+                                    }`}
+                                    aria-label="Toggle phone contact"
+                                  >
+                                    <span
+                                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        editingProvider.enable_call_contact ? 'translate-x-6' : 'translate-x-1'
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+
+                                {/* Email Contact Toggle */}
+                                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-neutral-800">✉️ Email Contact</span>
+                                      {editingProvider.enable_email_contact && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          Enabled
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-neutral-600 mt-1">
+                                      Allow customers to email you for bookings
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setProviders((arr) => arr.map(p => 
+                                        p.id === editingProvider.id ? { ...p, enable_email_contact: !p.enable_email_contact } : p
+                                      ))
+                                    }}
+                                    disabled={!editingProvider.is_member || !editingProvider.booking_enabled}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                      editingProvider.enable_email_contact ? 'bg-blue-600' : 'bg-neutral-300'
+                                    }`}
+                                    aria-label="Toggle email contact"
+                                  >
+                                    <span
+                                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        editingProvider.enable_email_contact ? 'translate-x-6' : 'translate-x-1'
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+
+                                {/* Info message when booking is disabled */}
+                                {!editingProvider.booking_enabled && (
+                                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-sm text-blue-800">
+                                      💡 Enable the booking system above to activate these contact methods
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
                             {/* Booking Type */}
