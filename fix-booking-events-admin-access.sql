@@ -1,6 +1,16 @@
--- Fix booking_events RLS to allow admin access
+-- ⚠️ CRITICAL: Fix booking_events RLS to allow admin access
 -- Run this in Supabase SQL Editor
-
+--
+-- ⚠️ BUSINESS REQUIREMENT:
+-- The admin user MUST be able to see ALL bookings from all customers and providers.
+-- This is essential for managing the platform and monitoring business activity.
+--
+-- Without this, the admin panel will show a warning and no booking events will be visible.
+--
+-- BEFORE RUNNING:
+-- 1. Update line 13 with your actual admin email address
+-- 2. Add any additional admin emails on new lines
+--
 -- Add admin policy for booking_events
 -- This allows admin users to view all booking events in the admin panel
 
@@ -10,8 +20,7 @@ RETURNS BOOLEAN AS $$
 BEGIN
   -- Check if current user is in the admin emails list
   RETURN (SELECT email FROM auth.users WHERE id = auth.uid()) IN (
-    'justexisted@gmail.com',  -- Your admin email
-    'your-admin@example.com'  -- Add more as needed
+    'justexisted@gmail.com'  -- Your admin email
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

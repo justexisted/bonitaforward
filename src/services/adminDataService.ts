@@ -168,6 +168,14 @@ export async function fetchBookings(): Promise<BookingRow[]> {
 
 /**
  * Fetch all booking events with provider details
+ * 
+ * ⚠️ CRITICAL ADMIN REQUIREMENT:
+ * The admin user MUST be able to see ALL bookings from all customers and providers.
+ * This is essential for managing the platform and monitoring business activity.
+ * 
+ * If you see RLS permission errors, you MUST run fix-booking-events-admin-access.sql
+ * to add the admin policies to the booking_events table.
+ * 
  * @returns Promise<BookingEventRow[]>
  */
 export async function fetchBookingEvents(): Promise<BookingEventRow[]> {
@@ -180,10 +188,12 @@ export async function fetchBookingEvents(): Promise<BookingEventRow[]> {
       .order('created_at', { ascending: false })
     
     if (error) {
-      // RLS permission error - user may not have admin access
-      // This is expected if admin RLS policies haven't been set up yet
-      // See: fix-booking-events-admin-access.sql
-      console.warn('[AdminDataService] No access to booking events (RLS):', error.message)
+      // ⚠️ RLS PERMISSION ERROR - ADMIN CANNOT SEE BOOKINGS
+      // This means the database RLS policies are not set up correctly
+      // REQUIRED ACTION: Run fix-booking-events-admin-access.sql in Supabase SQL Editor
+      // The admin MUST have access to view all bookings - this is a business requirement
+      console.warn('[AdminDataService] ⚠️ ADMIN CANNOT ACCESS BOOKING EVENTS (RLS):', error.message)
+      console.warn('[AdminDataService] ⚠️ REQUIRED: Run fix-booking-events-admin-access.sql to grant admin access')
       return [] // Return empty array, admin panel will still function
     }
     
