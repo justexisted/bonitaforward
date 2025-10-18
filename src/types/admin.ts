@@ -241,3 +241,287 @@ export type AdminData = {
   changeRequests: ProviderChangeRequestWithDetails[]
   jobPosts: ProviderJobPostWithDetails[]
 }
+
+// ============================================================================
+// FORM & DRAFT TYPES
+// ============================================================================
+
+/**
+ * Blog post type for admin blog management
+ */
+export type AdminBlogPost = {
+  id: string
+  title: string
+  slug: string
+  content: string
+  excerpt: string | null
+  author_id: string | null
+  published: boolean
+  featured_image: string | null
+  created_at: string
+  updated_at: string
+  category: string | null
+  tags: string[] | null
+}
+
+/**
+ * Calendar event form data
+ */
+export type CalendarEventFormData = {
+  title: string
+  date: string
+  time?: string
+  location?: string
+  description?: string
+  category?: string
+  organizer?: string
+  contact_email?: string
+  contact_phone?: string
+  website_url?: string
+  image_url?: string
+  is_featured?: boolean
+  zip_codes?: string[]
+}
+
+/**
+ * New provider form data for creating providers
+ */
+export type NewProviderFormData = {
+  name: string
+  category_key: string
+  phone?: string
+  email?: string
+  website?: string
+  address?: string
+  description?: string
+  tags?: string[]
+  images?: string[]
+  owner_user_id?: string
+  is_member?: boolean
+  is_featured?: boolean
+  featured_since?: string
+  subscription_type?: 'monthly' | 'yearly' | null
+  business_hours?: Record<string, string>
+  specialties?: string[]
+  social_links?: Record<string, string>
+}
+
+// ============================================================================
+// FILTER TYPES
+// ============================================================================
+
+/**
+ * Featured provider filter options
+ */
+export type FeaturedProviderFilter = 'all' | 'featured' | 'non-featured'
+
+/**
+ * Provider filter criteria
+ */
+export type ProviderFilterCriteria = {
+  category?: string
+  featured?: FeaturedProviderFilter
+  searchTerm?: string
+  hasOwner?: boolean
+}
+
+/**
+ * Funnel filter criteria
+ */
+export type FunnelFilterCriteria = {
+  category?: string
+  dateFrom?: string
+  dateTo?: string
+  searchTerm?: string
+}
+
+// ============================================================================
+// EDIT STATE TYPES
+// ============================================================================
+
+/**
+ * Funnel edit state
+ */
+export type FunnelEditState = {
+  editingId: string | null
+  editingAnswers: Record<string, string>
+}
+
+/**
+ * Booking edit state
+ */
+export type BookingEditState = {
+  editingId: string | null
+  editingData: Partial<BookingRow>
+}
+
+/**
+ * Business application details state
+ */
+export type BusinessDetailsState = {
+  expandedId: string | null
+  details: Record<string, any> | null
+}
+
+// ============================================================================
+// IMPORT/EXPORT TYPES
+// ============================================================================
+
+/**
+ * Calendar event with zip code data
+ */
+export type CalendarEventWithZip = {
+  id: string
+  title: string
+  date: string
+  location?: string
+  zip?: string | null
+  reason?: string
+}
+
+/**
+ * Zip code filter modal state
+ */
+export type ZipFilterModalState = {
+  show: boolean
+  toDelete: CalendarEventWithZip[]
+  toKeep: CalendarEventWithZip[]
+}
+
+/**
+ * CSV import state
+ */
+export type CSVImportState = {
+  file: File | null
+  importing: boolean
+  error: string | null
+  success: boolean
+}
+
+// ============================================================================
+// UI STATE TYPES
+// ============================================================================
+
+/**
+ * Generic expanded state (for accordions, etc.)
+ */
+export type ExpandedState = Record<string, boolean> | Set<string>
+
+/**
+ * Loading state for async operations
+ */
+export type LoadingState = {
+  [key: string]: boolean
+}
+
+/**
+ * Confirmation dialog state
+ */
+export type ConfirmationDialogState = {
+  show: boolean
+  title: string
+  message: string
+  confirmText?: string
+  cancelText?: string
+  onConfirm: () => void
+  onCancel?: () => void
+}
+
+/**
+ * Message/notification state
+ */
+export type MessageState = {
+  show: boolean
+  type: 'success' | 'error' | 'warning' | 'info'
+  message: string
+  duration?: number
+}
+
+// ============================================================================
+// COMPONENT PROP TYPES
+// ============================================================================
+
+/**
+ * Props for ProvidersSection component
+ */
+export type ProvidersSectionProps = {
+  isAdmin: boolean
+  section: AdminSection
+  providers?: ProviderRow[]
+  onUpdate?: () => void
+  onDelete?: (id: string) => void
+}
+
+/**
+ * Props for BusinessApplicationsSection component
+ */
+export type BusinessApplicationsSectionProps = {
+  isAdmin: boolean
+  applications: BusinessApplicationRow[]
+  onApprove?: (id: string) => void
+  onReject?: (id: string) => void
+  onUpdate?: () => void
+}
+
+/**
+ * Props for ChangeRequestsSection component
+ */
+export type ChangeRequestsSectionProps = {
+  isAdmin: boolean
+  changeRequests: ProviderChangeRequestWithDetails[]
+  onApprove?: (id: string) => void
+  onReject?: (id: string) => void
+  onUpdate?: () => void
+}
+
+/**
+ * Props for JobPostsSection component
+ */
+export type JobPostsSectionProps = {
+  isAdmin: boolean
+  jobPosts: ProviderJobPostWithDetails[]
+  onUpdate?: () => void
+  onDelete?: (id: string) => void
+}
+
+/**
+ * Props for CalendarEventsSection component
+ */
+export type CalendarEventsSectionProps = {
+  isAdmin: boolean
+  events: any[] // CalendarEvent[]
+  flaggedEvents?: any[]
+  onUpdate?: () => void
+  onDelete?: (id: string) => void
+}
+
+// ============================================================================
+// HELPER TYPES
+// ============================================================================
+
+/**
+ * Provider with retry information for failed operations
+ */
+export type ProviderWithRetry = ProviderRow & {
+  retryCount?: number
+  lastError?: string
+  lastAttempt?: string
+}
+
+/**
+ * Admin statistics/metrics
+ */
+export type AdminStatistics = {
+  totalProviders: number
+  featuredProviders: number
+  totalBookings: number
+  pendingApplications: number
+  totalUsers: number
+  activeEvents: number
+  flaggedEvents: number
+  recentActivity: {
+    newProviders: number
+    newBookings: number
+    newApplications: number
+  }
+}
