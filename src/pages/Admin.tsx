@@ -16,6 +16,7 @@ import { isFeaturedProvider } from '../utils/helpers'
 // The hook runs in parallel with existing state - both systems work together
 // This allows incremental migration without breaking existing functionality
 import { useAdminData } from '../hooks/useAdminData'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { AdminSection } from '../types/admin'
 // ============================================================================
 
@@ -160,13 +161,12 @@ export default function AdminPage() {
   // ============================================================================
   // This hook loads all admin data in parallel and provides refresh capabilities
   // Currently running alongside existing state - both systems work together
-  // TODO: Gradually replace old state variables with adminData from this hook
   const { 
     data: adminData, 
-    loading: adminDataLoading, 
+    loading: adminDataLoading,
     error: adminDataError,
-    refresh: refreshAdminData,
-    refreshEntity
+    refresh: refreshAdminData,  // TODO: Use in refresh buttons (Phase 2)
+    refreshEntity  // TODO: Use after individual updates (Phase 2)
   } = useAdminData()
   
   // Log hook status for debugging during migration
@@ -221,6 +221,10 @@ export default function AdminPage() {
     reporter_email?: string
   }>>([])
   const [loading, setLoading] = useState(true)
+  
+  // PHASE 1 IMPROVEMENT: Combine loading states for better UX
+  // Show loading if EITHER system is still loading data
+  const isLoading = loading || adminDataLoading
   
   // Form states for calendar events
   const [showAddEventForm, setShowAddEventForm] = useState(false)
@@ -3012,7 +3016,7 @@ export default function AdminPage() {
             <button onClick={() => window.location.reload()} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200 text-sm">Refresh</button>
           </div>
         </div>
-        {loading && (
+        {isLoading && (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="skeleton">

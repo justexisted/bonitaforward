@@ -587,41 +587,50 @@ function scoreHomeServices(providers: Provider[], answers: Record<string, string
 /**
  * Generic scoring for professional-services and other categories
  * Uses simple tag matching without synonym expansion
+ * 
+ * FIXED: Featured providers now get bonus points to appear higher in results
+ * even if they don't perfectly match all criteria
  */
 function scoreGeneric(providers: Provider[], answers: Record<string, string>): Provider[] {
   const values = new Set<string>(Object.values(answers))
   const withScores = providers.map((p) => {
-    const matches = p.tags.reduce((acc, t) => acc + (values.has(t) ? 1 : 0), 0)
-    return { p, score: matches }
+    // Base score from tag matches
+    let score = p.tags.reduce((acc, t) => acc + (values.has(t) ? 1 : 0), 0)
+    
+    // IMPROVEMENT: Give all providers a base score so everyone shows
+    if (score === 0) {
+      score = 1 // Base visibility score
+    }
+    
+    // IMPROVEMENT: Featured providers get bonus points to rank higher
+    // This ensures they appear in the top section even with fewer exact matches
+    if (isFeaturedProvider(p)) {
+      score += 5 // Featured bonus - pushes them up significantly
+      
+      // Additional bonus if they match any criteria
+      if (values.size > 0 && p.tags.some(t => values.has(t))) {
+        score += 3 // Matching featured bonus
+      }
+    }
+    
+    return { p, score }
   })
   
   withScores.sort((a, b) => {
-    // Featured providers first, but ONLY if they match the selected criteria
+    // Sort by score first (highest first)
+    if (b.score !== a.score) return b.score - a.score
+    
+    // Within same score tier, featured providers go first
     const aIsFeatured = isFeaturedProvider(a.p)
     const bIsFeatured = isFeaturedProvider(b.p)
+    if (aIsFeatured !== bIsFeatured) return bIsFeatured ? 1 : -1
     
-    // For generic categories, check if featured providers match any selected criteria
-    const aFeaturedMatchesCriteria = aIsFeatured && values.size > 0 ? 
-      a.p.tags.some(t => values.has(t)) : false
-    const bFeaturedMatchesCriteria = bIsFeatured && values.size > 0 ? 
-      b.p.tags.some(t => values.has(t)) : false
-    
-    // Only prioritize featured providers that match the criteria
-    const am = aFeaturedMatchesCriteria ? 1 : 0
-    const bm = bFeaturedMatchesCriteria ? 1 : 0
-    if (bm !== am) return bm - am
-    
-    // If no specific criteria selected, fall back to original featured logic
-    if (values.size === 0) {
-      const amFallback = aIsFeatured ? 1 : 0
-      const bmFallback = bIsFeatured ? 1 : 0
-      if (bmFallback !== amFallback) return bmFallback - amFallback
-    }
-    
-    if (b.score !== a.score) return b.score - a.score
+    // Then by rating (highest first)
     const ar = a.p.rating ?? 0
     const br = b.p.rating ?? 0
     if (br !== ar) return br - ar
+    
+    // Finally alphabetically
     return a.p.name.localeCompare(b.p.name)
   })
   
