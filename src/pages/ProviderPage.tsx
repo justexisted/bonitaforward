@@ -529,130 +529,136 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                   </div>
                 )}
 
-                {/* Business Hours */}
-                {provider.business_hours && Object.keys(provider.business_hours).length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Business Hours</h3>
-                    <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden inline-block">
-                      {/* Business hours in proper day order */}
-                      {[
-                        { key: 'monday', label: 'Monday' },
-                        { key: 'tuesday', label: 'Tuesday' },
-                        { key: 'wednesday', label: 'Wednesday' },
-                        { key: 'thursday', label: 'Thursday' },
-                        { key: 'friday', label: 'Friday' },
-                        { key: 'saturday', label: 'Saturday' },
-                        { key: 'sunday', label: 'Sunday' }
-                      ]
-                        .filter(({ key }) => provider.business_hours?.[key]) // Only show days that are set
-                        .map(({ key, label }, index, array) => (
-                          <div 
-                            key={key} 
-                            className={`flex items-center gap-4 px-4 py-3 ${
-                              index !== array.length - 1 ? 'border-b border-neutral-100' : ''
-                            } hover:bg-neutral-50 transition-colors`}
-                          >
-                            <span className="font-medium text-neutral-800 w-24">{label}</span>
-                            <span className="text-neutral-600 font-mono text-sm">{provider.business_hours?.[key]}</span>
-                          </div>
-                        ))}
+                {/* Business Hours & Follow Us Grid - Side by side on desktop */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Business Hours - Left Column */}
+                  {provider.business_hours && Object.keys(provider.business_hours).length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-3">Business Hours</h3>
+                      <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+                        {/* Business hours in proper day order */}
+                        {[
+                          { key: 'monday', label: 'Monday' },
+                          { key: 'tuesday', label: 'Tuesday' },
+                          { key: 'wednesday', label: 'Wednesday' },
+                          { key: 'thursday', label: 'Thursday' },
+                          { key: 'friday', label: 'Friday' },
+                          { key: 'saturday', label: 'Saturday' },
+                          { key: 'sunday', label: 'Sunday' }
+                        ]
+                          .filter(({ key }) => provider.business_hours?.[key]) // Only show days that are set
+                          .map(({ key, label }, index, array) => (
+                            <div 
+                              key={key} 
+                              className={`flex items-center gap-4 px-4 py-3 ${
+                                index !== array.length - 1 ? 'border-b border-neutral-100' : ''
+                              } hover:bg-neutral-50 transition-colors`}
+                            >
+                              <span className="font-medium text-neutral-800 w-24">{label}</span>
+                              <span className="text-neutral-600 font-mono text-sm">{provider.business_hours?.[key]}</span>
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Social Media Links */}
-                {provider.social_links && Object.keys(provider.social_links).length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 mb-3">Follow Us</h3>
-                    <div className="flex flex-wrap gap-3">
-                      {Object.entries(provider.social_links).map(([platform, url]) => (
-                        <a
-                          key={platform}
-                          href={url.startsWith('http') ? url : `https://${url}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-                        >
-                          <span className="capitalize">{platform}</span>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Exclusive Coupon Display - Moved to bottom after Follow Us */}
-              {provider.coupon_code && provider.coupon_discount && (
-                <div className="relative mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 shadow-md">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-green-900">Exclusive Coupon</h3>
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                      </svg>
-                      <span className="text-lg font-bold text-green-700">{provider.coupon_discount}</span>
-                    </div>
-                    {provider.coupon_expires_at && new Date(provider.coupon_expires_at) > new Date() && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
-                        Expires {new Date(provider.coupon_expires_at).toLocaleDateString()}
-                      </span>
+                  {/* Right Column - Follow Us + Coupon */}
+                  <div className="space-y-6">
+                    {/* Social Media Links */}
+                    {provider.social_links && Object.keys(provider.social_links).length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-neutral-900 mb-3">Follow Us</h3>
+                        <div className="flex flex-wrap gap-3">
+                          {Object.entries(provider.social_links).map(([platform, url]) => (
+                            <a
+                              key={platform}
+                              href={url.startsWith('http') ? url : `https://${url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+                            >
+                              <span className="capitalize">{platform}</span>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </div>
-                  
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-sm text-green-800 font-medium">Code:</span>
-                    <code className="bg-white border border-green-300 px-3 py-1 rounded text-green-900 font-mono font-semibold text-sm">
-                      {provider.coupon_code}
-                    </code>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(provider.coupon_code || '')
-                        alert('Coupon code copied to clipboard!')
-                      }}
-                      className="text-xs text-green-700 hover:text-green-900 underline"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  
-                  {/* Description and Save Button Row */}
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    {auth.isAuthed && (
-                      <button
-                        onClick={saveCoupon}
-                        disabled={couponBusy}
-                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 flex-shrink-0"
-                      >
-                        {couponBusy ? (
-                          'Saving…'
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+
+                    {/* Exclusive Coupon Display - Below Follow Us */}
+                    {provider.coupon_code && provider.coupon_discount && (
+                      <div className="relative bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 shadow-md">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-green-900">Exclusive Coupon</h3>
+                            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                             </svg>
-                            Save to My Account
-                          </>
+                            <span className="text-lg font-bold text-green-700">{provider.coupon_discount}</span>
+                          </div>
+                          {provider.coupon_expires_at && new Date(provider.coupon_expires_at) > new Date() && (
+                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                              Expires {new Date(provider.coupon_expires_at).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-sm text-green-800 font-medium">Code:</span>
+                          <code className="bg-white border border-green-300 px-3 py-1 rounded text-green-900 font-mono font-semibold text-sm">
+                            {provider.coupon_code}
+                          </code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(provider.coupon_code || '')
+                              alert('Coupon code copied to clipboard!')
+                            }}
+                            className="text-xs text-green-700 hover:text-green-900 underline"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                        
+                        {/* Description and Save Button Row */}
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          {auth.isAuthed && (
+                            <button
+                              onClick={saveCoupon}
+                              disabled={couponBusy}
+                              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 flex-shrink-0"
+                            >
+                              {couponBusy ? (
+                                'Saving…'
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                  </svg>
+                                  Save to My Account
+                                </>
+                              )}
+                            </button>
+                          )}
+                          
+                          {provider.coupon_description && (
+                            <div className="text-right flex-shrink">
+                              <p className="text-xs text-green-700 bg-green-100 border border-green-300 rounded-full px-2 py-1 inline-block">
+                                {provider.coupon_description}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {auth.isAuthed && couponMsg && (
+                          <p className="text-xs text-green-700 mt-2">{couponMsg}</p>
                         )}
-                      </button>
-                    )}
-                    
-                    {provider.coupon_description && (
-                      <div className="text-right flex-shrink">
-                        <p className="text-xs text-green-700 bg-green-100 border border-green-300 rounded-full px-2 py-1 inline-block">
-                          {provider.coupon_description}
-                        </p>
                       </div>
                     )}
                   </div>
-                  
-                  {auth.isAuthed && couponMsg && (
-                    <p className="text-xs text-green-700 mt-2">{couponMsg}</p>
-                  )}
                 </div>
-              )}
+              </div>
 
               {/* Booking System - Featured Providers Only */}
               {provider.isMember && (provider.booking_enabled || provider.enable_calendar_booking || provider.enable_call_contact || provider.enable_email_contact) && (
