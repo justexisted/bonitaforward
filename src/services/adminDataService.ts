@@ -32,7 +32,6 @@ import type {
   ProviderJobPostWithDetails
 } from '../types/admin'
 import type { CalendarEvent } from '../pages/Calendar'
-import type { BlogPost } from '../lib/supabaseData'
 
 // ============================================================================
 // PROVIDER QUERIES

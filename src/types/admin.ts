@@ -8,6 +8,40 @@
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 // ============================================================================
+// ADMIN SECTION TYPES
+// ============================================================================
+
+/**
+ * Admin section identifiers
+ * Defines all available sections in the admin panel
+ */
+export type AdminSection = 
+  | 'providers'
+  | 'business-applications'
+  | 'contact-leads'
+  | 'customer-users'
+  | 'business-accounts'
+  | 'business-owners'
+  | 'users'
+  | 'owner-change-requests'
+  | 'job-posts'
+  | 'funnel-responses'
+  | 'bookings'
+  | 'booking-events'
+  | 'blog'
+  | 'calendar-events'
+  | 'flagged-events'
+
+/**
+ * Admin status for verification
+ */
+export type AdminStatus = {
+  isAdmin: boolean
+  loading: boolean
+  verified: boolean
+}
+
+// ============================================================================
 // PROVIDER TYPES
 // ============================================================================
 
