@@ -23,7 +23,7 @@
 import type { CategoryKey, Provider } from '../types'
 import { fetchProvidersFromSupabase } from '../lib/supabaseData'
 import { fetchSheetRows, mapRowsToProviders, type SheetProvider } from '../lib/sheets'
-import { generateSlug, ensureDemoMembers } from '../utils/helpers'
+import { generateSlug, ensureDemoMembers, coerceBoolean } from '../utils/helpers'
 
 // ============================================================================
 // PROVIDER LOADING - SUPABASE
@@ -31,20 +31,17 @@ import { generateSlug, ensureDemoMembers } from '../utils/helpers'
 
 /**
  * Coerce provider featured/member status from database fields
- * Matches Admin page logic exactly for consistency
+ * Uses the shared coerceBoolean helper for consistency across the app
  * 
  * @param r Raw provider record from database
  * @returns True if provider is featured or a member
  */
 function coerceIsMember(r: any): boolean {
-  // CRITICAL FIX: Match Admin page logic EXACTLY - only check for boolean true values
-  // Admin page uses: provider.is_featured === true || provider.is_member === true
-  // This ensures perfect consistency between admin page and provider page featured status
-  // We only check for boolean true, not string 'true' or numeric 1, to match admin page exactly
-  const isFeatured = r.is_featured === true
-  const isMember = r.is_member === true
+  // Check both is_featured and is_member fields using shared helper
+  const isFeatured = coerceBoolean(r.is_featured)
+  const isMember = coerceBoolean(r.is_member)
   
-  // Return true if EITHER field indicates featured status (matching Admin page logic exactly)
+  // Return true if EITHER field indicates featured status
   return isFeatured || isMember
 }
 

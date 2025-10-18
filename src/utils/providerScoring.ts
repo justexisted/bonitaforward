@@ -8,16 +8,23 @@
  * Categories with custom scoring:
  * - Health & Wellness (comprehensive synonym matching for medical/fitness/salon)
  * - Real Estate (property type, buying/selling, staging)
- * - Restaurants & Cafes (cuisine types, occasion, price, service)
+ * - Restaurants & Cafes (cuisine, occasion, price-range, dietary restrictions, service)
  * - Home Services (service types, urgency, budget)
  * - Professional Services (generic tag matching)
  * 
  * Scoring Features:
- * - Synonym mapping for better matching
- * - Featured provider prioritization (only when matching criteria)
- * - Multi-criteria weighting
- * - Rating-based secondary sorting
+ * - Synonym mapping for better matching (cuisine, price-range, dietary)
+ * - Featured provider prioritization (within same score tier)
+ * - Multi-criteria weighting (all providers show, best matches score higher)
+ * - Rating-based sorting (within same score/featured tier)
  * - Alphabetical tertiary sorting
+ * 
+ * RECENT FIXES (for restaurants-cafes):
+ * - Fixed price-range filter (was incorrectly using 'price' key)
+ * - Added dietary filter support with synonym matching
+ * - Fixed featured restaurant logic (now always prioritized within score tier)
+ * - All restaurants now show with base score (not filtered out)
+ * - Added price range synonym mapping (budget→$, moderate→$$, etc.)
  */
 
 import { type CategoryKey, type Provider, isFeaturedProvider } from './helpers'
@@ -100,6 +107,35 @@ function getCuisineSynonyms(cuisineType: string): string[] {
     'fine dining': ['fine dining', 'upscale', 'gourmet', 'fine restaurant', 'elegant dining']
   }
   return synonyms[cuisineType] || [cuisineType]
+}
+
+/**
+ * Get synonyms for price range values
+ * Maps filter values to actual tag values used in database
+ */
+function getPriceRangeSynonyms(priceRange: string): string[] {
+  const synonyms: Record<string, string[]> = {
+    'budget': ['budget', '$', 'budget-friendly', 'cheap', 'affordable', 'inexpensive'],
+    'moderate': ['moderate', '$$', 'mid-range', 'reasonable'],
+    'upscale': ['upscale', '$$$', 'expensive', 'high-end', 'premium'],
+    'fine-dining': ['fine-dining', 'fine dining', '$$$$', 'luxury', 'exclusive', 'gourmet']
+  }
+  return synonyms[priceRange] || [priceRange]
+}
+
+/**
+ * Get synonyms for dietary restrictions
+ */
+function getDietarySynonyms(dietary: string): string[] {
+  const synonyms: Record<string, string[]> = {
+    'vegetarian': ['vegetarian', 'veggie', 'vegetarian options', 'vegetarian-friendly'],
+    'vegan': ['vegan', 'plant-based', 'vegan options', 'vegan-friendly'],
+    'gluten-free': ['gluten-free', 'gluten free', 'gf', 'celiac', 'gluten-free options'],
+    'keto': ['keto', 'low-carb', 'ketogenic', 'keto-friendly', 'keto options'],
+    'halal': ['halal', 'halal meat', 'halal certified'],
+    'kosher': ['kosher', 'kosher certified']
+  }
+  return synonyms[dietary] || [dietary]
 }
 
 /**
@@ -356,28 +392,37 @@ function scoreRealEstate(providers: Provider[], answers: Record<string, string>)
 /**
  * Score providers for restaurants-cafes category
  * Focuses on cuisine types, occasion, price range, and service style
+ * 
+ * FIXED: Changed 'price' to 'price-range' to match funnel question ID
+ * FIXED: Added dietary filter support
+ * FIXED: Featured restaurants now always get priority boost (matching or not)
+ * FIXED: All restaurants show with base score (not filtered out)
  */
 function scoreRestaurants(providers: Provider[], answers: Record<string, string>): Provider[] {
   const cuisine = answers['cuisine']?.toLowerCase()
   const occasion = answers['occasion']?.toLowerCase()
-  const price = answers['price']?.toLowerCase()
+  const priceRange = answers['price-range']?.toLowerCase() // FIXED: Was 'price'
   const service = answers['service']?.toLowerCase()
+  const dietary = answers['dietary']?.toLowerCase() // ADDED: Dietary filter support
   
-  // Get all related terms for the selected cuisine
+  // Get all related terms for the selected filters
   const cuisineSynonyms = cuisine ? getCuisineSynonyms(cuisine) : []
-  const values = new Set<string>(Object.values(answers).map(v => v.toLowerCase()))
-  const allCuisineTerms = new Set([...cuisineSynonyms, ...values])
+  const priceRangeSynonyms = priceRange ? getPriceRangeSynonyms(priceRange) : []
+  const dietarySynonyms = dietary && dietary !== 'none' ? getDietarySynonyms(dietary) : []
   
   return providers
     .map((p) => {
       let score = 0
       const providerTags = p.tags || [] // Handle null/undefined tags
       
-      // CUISINE MATCHING: Check for exact cuisine match first, then synonyms
+      // Give all providers a base score so they all show up
+      score = 1
+      
+      // CUISINE MATCHING: Highest weight (most important filter)
       if (cuisine) {
         // Exact match gets highest score
         if (providerTags.some(t => t.toLowerCase() === cuisine)) {
-          score += 4
+          score += 8
         } else {
           // Check for cuisine synonyms
           const cuisineMatch = providerTags.some(t => {
@@ -388,70 +433,76 @@ function scoreRestaurants(providers: Provider[], answers: Record<string, string>
               synonym.includes(tagLower)
             )
           })
-          if (cuisineMatch) score += 3
+          if (cuisineMatch) score += 6
         }
       }
       
-      // OTHER MATCHES: Occasion, price, service
-      if (occasion && providerTags.some(t => t.toLowerCase() === occasion)) score += 2
-      if (price && providerTags.some(t => t.toLowerCase() === price)) score += 2
-      if (service && providerTags.some(t => t.toLowerCase() === service)) score += 2
+      // OCCASION MATCHING: High weight (important for user intent)
+      if (occasion && providerTags.some(t => t.toLowerCase() === occasion || t.toLowerCase().includes(occasion))) {
+        score += 4
+      }
       
-      // GENERAL TAG MATCHES: Check all answer values and cuisine terms
-      providerTags.forEach((t) => { 
-        const tagLower = t.toLowerCase()
-        if (allCuisineTerms.has(tagLower)) score += 1
-      })
+      // PRICE RANGE MATCHING: Medium-high weight with synonym support
+      if (priceRange) {
+        // Check for exact match
+        if (providerTags.some(t => t.toLowerCase() === priceRange)) {
+          score += 4
+        } else {
+          // Check for price range synonyms (e.g., 'budget' matches '$')
+          const priceMatch = providerTags.some(t => {
+            const tagLower = t.toLowerCase()
+            return priceRangeSynonyms.some(synonym => 
+              tagLower === synonym || 
+              tagLower.includes(synonym)
+            )
+          })
+          if (priceMatch) score += 3
+        }
+      }
+      
+      // SERVICE STYLE MATCHING: Medium weight
+      if (service && providerTags.some(t => t.toLowerCase() === service || t.toLowerCase().includes(service))) {
+        score += 3
+      }
+      
+      // DIETARY MATCHING: Medium weight (important for restrictions)
+      if (dietary && dietary !== 'none') {
+        // Check for exact match
+        if (providerTags.some(t => t.toLowerCase() === dietary)) {
+          score += 3
+        } else {
+          // Check for dietary synonyms
+          const dietaryMatch = providerTags.some(t => {
+            const tagLower = t.toLowerCase()
+            return dietarySynonyms.some(synonym => 
+              tagLower === synonym || 
+              tagLower.includes(synonym)
+            )
+          })
+          if (dietaryMatch) score += 2
+        }
+      }
       
       return { p, score }
     })
     .sort((a, b) => {
-      // Featured providers first, but ONLY if they match the selected cuisine
+      // FIXED FEATURED LOGIC: Featured restaurants ALWAYS get priority
+      // They appear first in their score tier, regardless of filter matching
       const aIsFeatured = isFeaturedProvider(a.p)
       const bIsFeatured = isFeaturedProvider(b.p)
       
-      // Check if featured providers match the selected cuisine
-      const aTags = a.p.tags || []
-      const bTags = b.p.tags || []
-      
-      const aFeaturedMatchesCuisine = aIsFeatured && cuisine ? 
-        (aTags.some(t => t.toLowerCase() === cuisine) || 
-         aTags.some(t => {
-           const tagLower = t.toLowerCase()
-           return cuisineSynonyms.some(synonym => 
-             tagLower === synonym || 
-             tagLower.includes(synonym) || 
-             synonym.includes(tagLower)
-           )
-         })) : false
-         
-      const bFeaturedMatchesCuisine = bIsFeatured && cuisine ? 
-        (bTags.some(t => t.toLowerCase() === cuisine) || 
-         bTags.some(t => {
-           const tagLower = t.toLowerCase()
-           return cuisineSynonyms.some(synonym => 
-             tagLower === synonym || 
-             tagLower.includes(synonym) || 
-             synonym.includes(tagLower)
-           )
-         })) : false
-      
-      // Only prioritize featured providers that match the cuisine
-      const am = aFeaturedMatchesCuisine ? 1 : 0
-      const bm = bFeaturedMatchesCuisine ? 1 : 0
-      if (bm !== am) return bm - am
-      
-      // If no cuisine selected, fall back to original featured logic
-      if (!cuisine) {
-        const amFallback = aIsFeatured ? 1 : 0
-        const bmFallback = bIsFeatured ? 1 : 0
-        if (bmFallback !== amFallback) return bmFallback - amFallback
-      }
-      
+      // Sort by score first (highest first)
       if (b.score !== a.score) return b.score - a.score
+      
+      // Within same score tier, featured goes first
+      if (aIsFeatured !== bIsFeatured) return bIsFeatured ? 1 : -1
+      
+      // Then by rating (highest first)
       const ar = a.p.rating ?? 0
       const br = b.p.rating ?? 0
       if (br !== ar) return br - ar
+      
+      // Finally by name (alphabetical)
       return a.p.name.localeCompare(b.p.name)
     })
     .map((s) => s.p)

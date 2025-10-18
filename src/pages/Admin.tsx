@@ -7,6 +7,7 @@ import { type CalendarEvent } from './Calendar'
 // import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { isFeaturedProvider } from '../utils/helpers'
 
 // Extended type for change requests with joined provider and profile data
 type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
@@ -981,9 +982,9 @@ export default function AdminPage() {
     if (featuredProviderFilter === 'all') {
       return providers
     } else if (featuredProviderFilter === 'featured') {
-      return providers.filter(provider => provider.is_featured === true || provider.is_member === true)
+      return providers.filter(provider => isFeaturedProvider(provider))
     } else {
-      return providers.filter(provider => !provider.is_featured && !provider.is_member)
+      return providers.filter(provider => !isFeaturedProvider(provider))
     }
   }, [providers, featuredProviderFilter])
 
@@ -3161,7 +3162,7 @@ export default function AdminPage() {
                           : 'text-neutral-600 hover:text-neutral-900'
                       }`}
                     >
-                      Featured ({providers.filter(p => p.is_featured === true || p.is_member === true).length})
+                      Featured ({providers.filter(p => isFeaturedProvider(p)).length})
                     </button>
                     <button
                       onClick={() => setFeaturedProviderFilter('non-featured')}

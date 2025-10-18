@@ -118,12 +118,33 @@ export function generateSlug(name: string): string {
 // ============================================================================
 
 /**
+ * Coerce a value to boolean, handling multiple data types
+ * 
+ * PostgreSQL boolean fields can be returned as:
+ * - true/false (boolean)
+ * - 1/0 (number)
+ * - 'true'/'false' (string)
+ * - null/undefined
+ * 
+ * @param val - Value to coerce to boolean
+ * @returns true or false
+ */
+export function coerceBoolean(val: any): boolean {
+  if (val === true || val === 1 || val === '1' || val === 'true') return true
+  if (val === false || val === 0 || val === '0' || val === 'false') return false
+  return false
+}
+
+/**
  * Check if a provider is a featured business
  * 
  * Featured businesses are those with active memberships (isMember === true).
  * This provides a consistent way to identify featured providers across the app.
  * 
- * @param provider - The provider to check
+ * Works with both processed Provider objects (with isMember field) and
+ * raw database records (with is_member or is_featured fields).
+ * 
+ * @param provider - The provider to check (can be Provider or raw DB record)
  * @returns true if the provider is featured, false otherwise
  * 
  * @example
@@ -131,8 +152,17 @@ export function generateSlug(name: string): string {
  *   // Show featured badge
  * }
  */
-export function isFeaturedProvider(provider: Provider): boolean {
-  return Boolean(provider.isMember)
+export function isFeaturedProvider(provider: Provider | any): boolean {
+  // Check processed isMember field first
+  if ('isMember' in provider) {
+    return Boolean(provider.isMember)
+  }
+  
+  // Fall back to checking raw database fields with type coercion
+  const isFeatured = coerceBoolean(provider.is_featured)
+  const isMember = coerceBoolean(provider.is_member)
+  
+  return isFeatured || isMember
 }
 
 /**
