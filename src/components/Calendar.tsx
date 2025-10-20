@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, MapPin, Clock, BookOpen, Sparkles, Check, ThumbsUp, ThumbsDown, AlertCircle } from 'lucide-react'
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, MapPin, Clock, BookOpen, Sparkles, Check, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { type CalendarEvent } from '../pages/Calendar'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
