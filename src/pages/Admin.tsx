@@ -12,6 +12,7 @@ import { ProviderCoreInfoFields } from '../components/admin/ProviderCoreInfoFiel
 import { ProviderDescriptionField } from '../components/admin/ProviderDescriptionField-2025-10-19'
 import { ProviderCouponFields } from '../components/admin/ProviderCouponFields-2025-10-19'
 import { ProviderMetadataFields } from '../components/admin/ProviderMetadataFields-2025-10-19'
+import { ProviderTagsEditor } from '../components/admin/ProviderTagsEditor-2025-10-19'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -4982,23 +4983,14 @@ Bonita Forward Team`}
                         </div>
 
                         {/* Tags */}
-                        <div>
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">Tags</label>
-                            <input 
-                              defaultValue={(editingProvider.tags || []).join(', ')} 
-                              key={`tags-${editingProvider.id}`}
-                              onBlur={(e) => setProviders((arr) => arr.map(p => 
-                                p.id === editingProvider.id ? { ...p, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
-                              ))} 
-                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                              placeholder="professional, reliable, local, certified"
-                            />
-                            <p className="text-xs text-neutral-500 mt-1">
-                              Type comma-separated values. Changes save when you click outside the field.
-                            </p>
-                          </div>
-                        </div>
+                        <ProviderTagsEditor
+                          provider={editingProvider}
+                          onUpdate={(tags) => {
+                            setProviders((arr) => arr.map(p => 
+                              p.id === editingProvider.id ? { ...p, tags } : p
+                            ))
+                          }}
+                        />
                       </div>
                       {/* Action Buttons */}
                       <div className="flex items-center justify-between mt-8 pt-6 border-t border-neutral-200">
