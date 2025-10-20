@@ -1,8 +1,9 @@
 # Coupon System - Featured Accounts Only
 **Date:** October 19, 2025  
 **Files:** 
-- `src/pages/ProviderPage.tsx`
-- `src/pages/MyBusiness.tsx`
+- `src/pages/ProviderPage.tsx` - Customer-facing provider page
+- `src/pages/MyBusiness.tsx` - Business owner edit page + pricing comparison
+- `src/pages/Pricing.tsx` - Dedicated pricing page
 
 ## 🎯 Problem
 
@@ -166,6 +167,24 @@ Restricted coupon creation and display to **featured accounts only** (`is_member
 └──────────────────────────────────────────────┘
 ```
 
+#### 3. Pricing Pages - Feature Comparison (Pricing.tsx & MyBusiness.tsx, Lines ~204 & ~1649)
+
+**Added to Featured Account Benefits:**
+```tsx
+<li className="flex items-start">
+  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+  <strong>Exclusive coupons</strong> - create special offers for customers
+</li>
+```
+
+**Impact:**
+- ✅ Coupons now listed as a featured account benefit
+- ✅ Clear value proposition for potential upgraders
+- ✅ Consistent messaging across pricing and edit pages
+- ✅ Helps justify the $97/year featured price point
+
 ## 🔧 Technical Details
 
 ### Condition Checks
@@ -240,16 +259,25 @@ Coupons now follow the same pattern as other featured-only features:
   - Coupon section not displayed
   - No empty space where coupon would be
   
+- [x] **Free Account - Pricing Comparison**
+  - Coupons listed under Featured benefits
+  - Not listed under Free benefits
+  
 - [x] **Featured Account - My Business Page**
   - Coupon section fully interactive
   - Can edit all coupon fields
   - No upgrade messages shown
+  - Pricing comparison shows coupons as included
   
 - [x] **Featured Account - Provider Page (Customer View)**
   - Coupon displayed in green banner
   - Copy button works
   - Save to account button works
   - Expiration date shown if set
+  
+- [x] **Pricing Page (/pricing)**
+  - Coupons listed as Featured account benefit
+  - Consistent with My Business pricing comparison
 
 ## 📝 Notes
 
@@ -268,5 +296,30 @@ Coupons now follow the same pattern as other featured-only features:
 
 ---
 
-**Result**: Coupons are now a premium feature exclusive to featured accounts, providing clear value differentiation and encouraging upgrades! 🎟️
+## 📊 Summary of Changes
+
+### Updated Pages:
+1. **Provider Page** (`src/pages/ProviderPage.tsx`)
+   - Added `provider.isMember` check to coupon display
+   - Only featured businesses show coupons to customers
+
+2. **My Business Page** (`src/pages/MyBusiness.tsx`)
+   - Grayed out coupon section for free accounts
+   - Added upgrade message and feature badge
+   - Disabled all coupon input fields for free accounts
+   - Added "Exclusive coupons" to Featured benefits in pricing comparison
+
+3. **Pricing Page** (`src/pages/Pricing.tsx`)
+   - Added "Exclusive coupons" to Featured benefits list
+   - Consistent messaging with My Business page
+
+### Key Metrics:
+- **3 files modified** (ProviderPage.tsx, MyBusiness.tsx, Pricing.tsx)
+- **7 UI elements** restricted (4 input fields, 1 section, 2 pricing lists)
+- **2 pricing comparisons** updated (My Business + Pricing page)
+- **100% consistency** across all customer touchpoints
+
+---
+
+**Result**: Coupons are now a premium feature exclusive to featured accounts, clearly communicated across all pages, providing strong value differentiation and encouraging upgrades! 🎟️✨
 

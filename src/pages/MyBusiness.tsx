@@ -1650,6 +1650,12 @@ export default function MyBusinessPage() {
                   <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
+                  <strong>Exclusive coupons</strong> - create special offers for customers
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
                   <strong>Analytics</strong> - view customer interactions
                 </li>
                 <li className="flex items-start">
