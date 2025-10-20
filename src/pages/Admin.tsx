@@ -23,6 +23,7 @@ import { ContactLeadsSection } from '../components/admin/sections/ContactLeadsSe
 import { BusinessAccountsSection } from '../components/admin/sections/BusinessAccountsSection-2025-10-19'
 import { UsersSection } from '../components/admin/sections/UsersSection-2025-10-19'
 import { FunnelResponsesSection } from '../components/admin/sections/FunnelResponsesSection-2025-10-19'
+import { BookingsSection } from '../components/admin/sections/BookingsSection-2025-10-19'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -287,7 +288,7 @@ export default function AdminPage() {
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
   // STEP 12: expandedChangeRequestIds and expandedBusinessDropdowns deleted - moved to ChangeRequestsSection
   // STEP 19: editFunnel and funnelUserFilter deleted - moved to FunnelResponsesSection
-  const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
+  // STEP 20: editBooking deleted - moved to BookingsSection
   const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
   const [loadingBusinessDetails, setLoadingBusinessDetails] = useState<Record<string, boolean>>({})
   // Featured provider filter moved to ContactLeadsSection component (Step 16)
@@ -2330,30 +2331,12 @@ export default function AdminPage() {
           )}
 
           {section === 'bookings' && (
-          <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
-            <div className="font-medium">Bookings</div>
-            <div className="mt-2 space-y-2 text-sm">
-              {bookings.length === 0 && <div className="text-neutral-500">No entries yet.</div>}
-              {bookings.map((row) => (
-                <div key={row.id} className="rounded-xl border border-neutral-200 p-3 hover-gradient interactive-card">
-                  <div className="text-neutral-800 font-medium">{row.category_key}</div>
-                  <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
-                  <input className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" defaultValue={row.name || ''} placeholder="Name" onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), name: e.target.value } }))} />
-                  <textarea className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" defaultValue={row.notes || ''} placeholder="Notes" onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), notes: e.target.value } }))} />
-                  {row.answers && <textarea className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs" defaultValue={JSON.stringify(row.answers, null, 2)} onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), answers: e.target.value } }))} />}
-                  <select className="mt-1 rounded-xl border border-neutral-200 px-3 py-2 text-xs bg-white" defaultValue={row.status || 'new'} onChange={(e) => setEditBooking((m) => ({ ...m, [row.id]: { ...(m[row.id] || {}), status: e.target.value } }))}>
-                    <option value="new">new</option>
-                    <option value="in_progress">in_progress</option>
-                    <option value="closed">closed</option>
-                  </select>
-                  <div className="mt-2 flex items-center gap-2">
-                    <button onClick={async () => { const edit = editBooking[row.id] || {}; const payload: any = { name: edit.name ?? row.name, notes: edit.notes ?? row.notes, status: edit.status ?? row.status }; if (typeof edit.answers === 'string') { try { payload.answers = JSON.parse(edit.answers) } catch {} } const { error } = await supabase.from('bookings').update(payload).eq('id', row.id); if (error) setError(error.message); else setMessage('Booking saved') }} className="btn btn-secondary text-xs">Save</button>
-                    <button onClick={async () => { const { error } = await supabase.from('bookings').delete().eq('id', row.id); if (error) setError(error.message); else { setBookings((arr) => arr.filter((b) => b.id !== row.id)); setMessage('Booking deleted') } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+            <BookingsSection
+              bookings={bookings}
+              onMessage={setMessage}
+              onError={setError}
+              onBookingsUpdate={setBookings}
+            />
           )}
 
           {isAdmin && section === 'booking-events' && (
