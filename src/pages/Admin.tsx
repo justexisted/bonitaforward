@@ -450,21 +450,23 @@ export default function AdminPage() {
       console.log('[Admin] STARTING loadChangeRequests')  // KEPT: Change request logging
       // console.log('========================================')
       
-      // Get auth session
-      const { data: { session } } = await supabase.auth.getSession()
-      // console.log('[Admin] Session check:', {
-      //   hasSession: !!session,
-      //   hasToken: !!session?.access_token,
-      //   tokenLength: session?.access_token?.length
-      // })
+      // CRITICAL FIX: Refresh session to ensure token is valid
+      // This prevents "Invalid token" / "fetch failed" errors
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
+      
+      if (sessionError) {
+        console.error('[Admin] ❌ Session refresh failed:', sessionError)
+        setError('Session expired. Please refresh the page and sign in again.')
+        return
+      }
       
       if (!session?.access_token) {
-        console.error('[Admin] ❌ No auth token available')
-        setError('Not authenticated')
+        console.error('[Admin] ❌ No auth token available after refresh')
+        setError('Not authenticated. Please refresh the page and sign in again.')
         return
       }
 
-      // console.log('[Admin] ✓ Auth token acquired, calling Netlify function...')
+      console.log('[Admin] ✓ Session refreshed, auth token acquired')
 
       // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
       // Use relative URL for Netlify functions (works in both dev and production)
@@ -530,12 +532,12 @@ export default function AdminPage() {
     try {
       console.log('[Admin] STARTING loadJobPosts')
       
-      // Get auth session
-      const { data: { session } } = await supabase.auth.getSession()
+      // CRITICAL FIX: Refresh session to ensure token is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
       
-      if (!session?.access_token) {
+      if (sessionError || !session?.access_token) {
         console.error('[Admin] No session token available for job posts')
-        setError('Not authenticated')
+        setError('Session expired. Please refresh the page.')
         return
       }
 
@@ -582,11 +584,11 @@ export default function AdminPage() {
     try {
       console.log('[Admin] STARTING loadBookingEvents')
       
-      // Get auth session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
+      // CRITICAL FIX: Refresh session to ensure token is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
+      if (sessionError || !session?.access_token) {
         console.error('[Admin] No session token available for booking events')
-        setError('Not authenticated')
+        setError('Session expired. Please refresh the page.')
         return
       }
 
