@@ -629,42 +629,64 @@ export default function AdminPage() {
         return
       }
 
-      // Call Netlify function with service role to bypass RLS
-      // For development, use relative URL since local Netlify functions may not be running
+      // Try to call Netlify function with service role to bypass RLS
+      // Fall back to direct query if function not available (local dev)
       const url = '/.netlify/functions/admin-list-booking-events'
       
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({}) // No customer email filter - get all bookings
-      })
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({}) // No customer email filter - get all bookings
+        })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('[Admin] Booking events function error:', response.status, errorText)
-        throw new Error(`Function call failed: ${response.status}`)
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.warn('[Admin] Booking events function error:', response.status, errorText)
+          throw new Error(`Function call failed: ${response.status}`)
+        }
+
+        const result = await response.json()
+
+        if (result.error) {
+          console.warn('[Admin] Function returned error:', result.error)
+          throw new Error(result.error)
+        }
+
+        // Process the booking events data
+        const bookingEventsData = result.bookingEvents || []
+        console.log('[Admin] ✓ Received', bookingEventsData.length, 'booking events from function')
+        
+        // Update state with the fetched data
+        setBookingEvents(bookingEventsData)
+      } catch (fetchError: any) {
+        // Fallback: Try direct Supabase query (may hit RLS in production)
+        console.warn('[Admin] Netlify function unavailable, trying direct query:', fetchError.message)
+        
+        try {
+          const { data, error: directError } = await supabase
+            .from('booking_events')
+            .select('*')
+            .order('created_at', { ascending: false })
+          
+          if (directError) {
+            console.warn('[Admin] Direct query also failed (expected if RLS not configured):', directError.message)
+            setBookingEvents([])
+          } else {
+            console.log('[Admin] ✓ Loaded', data?.length || 0, 'booking events via direct query')
+            setBookingEvents(data || [])
+          }
+        } catch (directQueryError) {
+          console.warn('[Admin] Direct query error:', directQueryError)
+          setBookingEvents([])
+        }
       }
-
-      const result = await response.json()
-
-      if (result.error) {
-        console.error('[Admin] Function returned error:', result.error)
-        throw new Error(result.error)
-      }
-
-      // Process the booking events data
-      const bookingEventsData = result.bookingEvents || []
-      console.log('[Admin] ✓ Received', bookingEventsData.length, 'booking events from function')
-      
-      // Update state with the fetched data
-      setBookingEvents(bookingEventsData)
       
     } catch (error: any) {
       console.error('[Admin] ❌ EXCEPTION in loadBookingEvents:', error)
-      setError(`Failed to load booking events: ${error.message}`)
       setBookingEvents([])
     }
   }

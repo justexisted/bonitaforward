@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { type CalendarEvent } from '../../../lib/supabaseData'
+import { type CalendarEvent } from '../../../pages/Calendar'
 
 interface CalendarEventsSectionProps {
   onMessage: (msg: string | null) => void
@@ -62,7 +62,7 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
         ? eventData.date.toISOString() 
         : new Date(eventData.date).toISOString()
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('calendar_events')
         .insert([{ ...eventData, date: isoDate }])
         .select()
@@ -283,7 +283,7 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
     onError(null)
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('calendar_events')
         .insert(events)
         .select()
