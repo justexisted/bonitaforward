@@ -14,11 +14,11 @@ Gradually extract components from the 7000+ line `Admin.tsx` to:
 | 1 | Core Business Info | ✅ Done | ~90 | `ProviderCoreInfoFields.tsx` |
 | 2 | Description Field | ✅ Done | ~30 | `ProviderDescriptionField-2025-10-19.tsx` |
 | 3 | Coupon System | ✅ Done | ~120 | `ProviderCouponFields-2025-10-19.tsx` |
-| 4 | Social Media & Specialties | ⏳ Next | ~100 | TBD |
-| 5 | Local State (Performance) | ⏳ Pending | 0 | All components |
+| 4 | Social Media & Specialties | ✅ Done | ~85 | `ProviderMetadataFields-2025-10-19.tsx` |
+| 5 | Local State (Performance) | ⏳ Next | 0 | All components |
 
-**Total Lines Removed:** ~240 / ~1000  
-**Admin.tsx Size:** 7259 lines → 7019 lines (estimated)
+**Total Lines Removed:** ~325 / ~1000  
+**Admin.tsx Size:** 7259 lines → 6934 lines (estimated)
 
 ---
 

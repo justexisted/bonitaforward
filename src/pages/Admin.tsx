@@ -11,6 +11,7 @@ import { isFeaturedProvider } from '../utils/helpers'
 import { ProviderCoreInfoFields } from '../components/admin/ProviderCoreInfoFields'
 import { ProviderDescriptionField } from '../components/admin/ProviderDescriptionField-2025-10-19'
 import { ProviderCouponFields } from '../components/admin/ProviderCouponFields-2025-10-19'
+import { ProviderMetadataFields } from '../components/admin/ProviderMetadataFields-2025-10-19'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -4496,93 +4497,15 @@ Bonita Forward Team`}
                           }}
                         />
 
-                        {/* Specialties */}
-                        <div>
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">
-                              Specialties
-                              <span className="text-xs text-neutral-500 ml-2">
-                                (Comma-separated)
-                              </span>
-                            </label>
-                            <input 
-                              defaultValue={(editingProvider.specialties || []).join(', ')} 
-                              key={`specialties-${editingProvider.id}`}
-                              onBlur={(e) => setProviders((arr) => arr.map(p => 
-                                p.id === editingProvider.id ? { ...p, specialties: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
-                              ))} 
-                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                              placeholder="e.g., Kitchen Remodeling, Solar Installation, Wedding Photography, Tax Planning"
-                            />
-                            <p className="text-xs text-neutral-500 mt-1">
-                              Type freely and press Tab or click outside to save. Changes apply when you leave the field.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Service Areas */}
-                        <div>
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">
-                              Areas You Serve
-                            </label>
-                            <input 
-                              defaultValue={(editingProvider.service_areas || []).join(', ')} 
-                              key={`service-areas-${editingProvider.id}`}
-                              onBlur={(e) => setProviders((arr) => arr.map(p => 
-                                p.id === editingProvider.id ? { ...p, service_areas: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } : p
-                              ))} 
-                              className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                              placeholder="Bonita, Chula Vista, San Diego, National City"
-                            />
-                            <p className="text-xs text-neutral-500 mt-1">
-                              Type comma-separated areas. Changes save when you leave the field.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Social Media Links - Featured Only */}
-                        <div className={!editingProvider.is_member ? 'opacity-50 pointer-events-none' : ''}>
-                          <h4 className="text-md font-medium text-neutral-800 mb-4">
-                            Social Media Links
-                            {!editingProvider.is_member && (
-                              <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
-                            )}
-                          </h4>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">Facebook</label>
-                              <input 
-                                value={editingProvider.social_links?.facebook || ''} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { 
-                                    ...p, 
-                                    social_links: { ...p.social_links, facebook: e.target.value } 
-                                  } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                                placeholder="https://facebook.com/yourbusiness"
-                                disabled={!editingProvider.is_member}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">Instagram</label>
-                              <input 
-                                value={editingProvider.social_links?.instagram || ''} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { 
-                                    ...p, 
-                                    social_links: { ...p.social_links, instagram: e.target.value } 
-                                  } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                                placeholder="https://instagram.com/yourbusiness"
-                                disabled={!editingProvider.is_member}
-                              />
-                            </div>
-                          </div>
-                        </div>
+                        {/* Specialties, Service Areas, Social Media */}
+                        <ProviderMetadataFields
+                          provider={editingProvider}
+                          onUpdate={(field, value) => {
+                            setProviders((arr) => arr.map(p => 
+                              p.id === editingProvider.id ? { ...p, [field]: value } : p
+                            ))
+                          }}
+                        />
 
                         {/* Business Hours - Featured Only */}
                         <div className={!editingProvider.is_member ? 'opacity-50 pointer-events-none' : ''}>
