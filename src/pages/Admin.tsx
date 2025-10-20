@@ -982,8 +982,9 @@ export default function AdminPage() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
-  const [expandedChangeRequestIds, setExpandedChangeRequestIds] = useState<Set<string>>(new Set())
-  const [expandedBusinessDropdowns, setExpandedBusinessDropdowns] = useState<Set<string>>(new Set())
+  // STEP 12: DELETE these 2 state variables - Moved to ChangeRequestsSection
+  const [expandedChangeRequestIds, setExpandedChangeRequestIds] = useState<Set<string>>(new Set()) // [TO DELETE]
+  const [expandedBusinessDropdowns, setExpandedBusinessDropdowns] = useState<Set<string>>(new Set()) // [TO DELETE]
   const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
   const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
@@ -2377,6 +2378,18 @@ export default function AdminPage() {
     try { await supabase.from('user_notifications').insert([{ user_id, subject, body: body || null, data: data || null }]) } catch {}
   }
 
+  // ============================================================================
+  // STEP 12: DELETE CHANGE REQUEST FUNCTIONS (START)
+  // ============================================================================
+  // These 6 functions have been moved to ChangeRequestsSection component
+  // DELETE: computeChangeDiff (lines 2390-2458)
+  // DELETE: formatValueForDisplay (lines 2460-2467)
+  // DELETE: toggleChangeRequestExpansion (lines 2472-2482)
+  // DELETE: toggleBusinessDropdown (lines 2487-2497)
+  // DELETE: approveChangeRequest (lines 2589-2620)
+  // DELETE: rejectChangeRequest (lines 2622-2633)
+  // ============================================================================
+
   /**
    * HELPER FUNCTION: Compute field-by-field differences between old and new values
    * 
@@ -2386,6 +2399,8 @@ export default function AdminPage() {
    * @param currentProvider - The current provider data from the database
    * @param proposedChanges - The proposed changes from the change request
    * @returns An object containing only fields that changed, with old and new values
+   * 
+   * [TO DELETE - Moved to ChangeRequestsSection]
    */
   function computeChangeDiff(currentProvider: ProviderRow | undefined, proposedChanges: Record<string, any> | null) {
     if (!currentProvider || !proposedChanges) return []
@@ -2631,6 +2646,9 @@ export default function AdminPage() {
       setError(err?.message || 'Failed to reject request')
     }
   }
+  // ============================================================================
+  // STEP 12: DELETE CHANGE REQUEST FUNCTIONS (END)
+  // ============================================================================
 
   // Job post functions moved to JobPostsSection component (Step 11)
 
@@ -4827,6 +4845,26 @@ Bonita Forward Team`}
           </div>
         )}
 
+        {/* 
+        ============================================================================
+        STEP 12: DELETE OLD CHANGE REQUESTS SECTION (START)
+        ============================================================================
+        DELETE FROM HERE (line 4830) to line 5466 (636 lines total)
+        
+        REPLACE WITH:
+        
+        {isAdmin && section === 'owner-change-requests' && (
+          <ChangeRequestsSection
+            providers={providers}
+            onMessage={(msg) => setMessage(msg)}
+            onError={(err) => setError(err)}
+          />
+        )}
+        
+        ============================================================================
+        OLD CODE BELOW - TO BE DELETED (keeping for reference until verified)
+        ============================================================================
+        */}
         {isAdmin && section === 'owner-change-requests' && (
           <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
             <div className="font-medium">Owner Change Requests & Logs</div>
@@ -5464,7 +5502,15 @@ Bonita Forward Team`}
             </div>
           </div>
         )}
-          {isAdmin && section === 'job-posts' && (
+        {/* 
+        ============================================================================
+        STEP 12: DELETE OLD CHANGE REQUESTS SECTION (END)
+        ============================================================================
+        DELETE TO HERE - End of old change requests section (636 lines deleted)
+        ============================================================================
+        */}
+
+        {isAdmin && section === 'job-posts' && (
           <JobPostsSection
             onMessage={(msg) => setMessage(msg)}
             onError={(err) => setError(err)}
