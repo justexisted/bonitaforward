@@ -982,9 +982,7 @@ export default function AdminPage() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
-  // STEP 12: DELETE these 2 state variables - Moved to ChangeRequestsSection
-  const [expandedChangeRequestIds, setExpandedChangeRequestIds] = useState<Set<string>>(new Set()) // [TO DELETE]
-  const [expandedBusinessDropdowns, setExpandedBusinessDropdowns] = useState<Set<string>>(new Set()) // [TO DELETE]
+  // STEP 12: expandedChangeRequestIds and expandedBusinessDropdowns deleted - moved to ChangeRequestsSection
   const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
   const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
