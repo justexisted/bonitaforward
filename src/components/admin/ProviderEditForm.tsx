@@ -48,13 +48,8 @@ export function ProviderEditForm({ provider, catOptions, onSave, onCancel }: Pro
     }))
   }
 
-  // Helper to update business hours
-  const updateBusinessHours = (day: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      business_hours: { ...prev.business_hours, [day]: value }
-    }))
-  }
+  // Note: Business hours editor not yet implemented in this component
+  // Will be added in a future step of the gradual extraction
 
   return (
     <div className="rounded-xl border border-neutral-200 p-6 bg-white">

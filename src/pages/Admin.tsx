@@ -2553,7 +2553,15 @@ export default function AdminPage() {
     setMessage(null)
     setError(null)
     
+    // Debug: Log what we're trying to do
+    console.log('[Admin] Toggling booking_enabled:', { 
+      providerId, 
+      currentlyEnabled, 
+      newValue: !currentlyEnabled 
+    })
+    
     try {
+      // Update without .select() to avoid RLS issues
       const { error } = await supabase
         .from('providers')
         .update({ 
@@ -2563,10 +2571,13 @@ export default function AdminPage() {
         .eq('id', providerId)
       
       if (error) {
-        console.error('[Admin] Error toggling booking:', error)
+        console.error('[Admin] ❌ Error toggling booking:', error)
         setError(`Failed to toggle booking: ${error.message}`)
         return
       }
+      
+      // Debug: Log success (we'll verify via refresh)
+      console.log('[Admin] ✅ Booking toggle update sent to database')
       
       setMessage(`Booking system ${!currentlyEnabled ? 'enabled' : 'disabled'} successfully!`)
       
@@ -2577,14 +2588,41 @@ export default function AdminPage() {
           : p
       ))
       
-      // Refresh providers list
+      // Refresh providers list - using select('*') to get all fields
       try {
-        const { data: pData } = await supabase
+        const { data: pData, error: refreshError } = await supabase
           .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+          .select('*')
           .order('name', { ascending: true })
-        setProviders((pData as ProviderRow[]) || [])
-      } catch {}
+        
+        if (refreshError) {
+          console.error('[Admin] Error refreshing after booking toggle:', refreshError)
+        } else {
+          // Verify the update actually persisted
+          const updatedProvider = pData?.find(p => p.id === providerId)
+          const actualValue = updatedProvider?.booking_enabled
+          const expectedValue = !currentlyEnabled
+          
+          console.log('[Admin] Providers refreshed after booking toggle')
+          console.log('[Admin] Verification:', {
+            providerId,
+            expectedValue,
+            actualValue,
+            matched: actualValue === expectedValue,
+            provider: updatedProvider?.name
+          })
+          
+          if (actualValue !== expectedValue) {
+            console.warn('[Admin] ⚠️ WARNING: Database value does not match expected value!')
+            console.warn('[Admin] This could be a database trigger, constraint, or RLS issue')
+            setError(`Warning: Booking toggle may not have persisted. Expected: ${expectedValue}, Got: ${actualValue}`)
+          }
+          
+          setProviders((pData as ProviderRow[]) || [])
+        }
+      } catch (refreshErr) {
+        console.error('[Admin] Exception during refresh:', refreshErr)
+      }
       
       // Dispatch refresh event
       try { 
@@ -2592,7 +2630,7 @@ export default function AdminPage() {
       } catch {}
       
     } catch (err: any) {
-      console.error('[Admin] Unexpected error toggling booking:', err)
+      console.error('[Admin] ❌ Unexpected error toggling booking:', err)
       setError(`Unexpected error: ${err.message}`)
     }
   }
@@ -4916,7 +4954,15 @@ Bonita Forward Team`}
                                 onClick={async () => {
                                   if (!editingProvider.is_member) return
                                   // Use dedicated toggle function that only updates booking_enabled
-                                  await toggleBookingEnabled(editingProvider.id, editingProvider.booking_enabled === true)
+                                  // Coerce to boolean to handle null/undefined
+                                  const isCurrentlyEnabled = Boolean(editingProvider.booking_enabled)
+                                  console.log('[Admin UI] Toggle clicked:', { 
+                                    providerId: editingProvider.id,
+                                    currentValue: editingProvider.booking_enabled,
+                                    isCurrentlyEnabled,
+                                    willSetTo: !isCurrentlyEnabled
+                                  })
+                                  await toggleBookingEnabled(editingProvider.id, isCurrentlyEnabled)
                                 }}
                                 disabled={!editingProvider.is_member}
                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
