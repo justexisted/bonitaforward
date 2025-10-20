@@ -8,6 +8,7 @@ import { type CalendarEvent } from './Calendar'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { isFeaturedProvider } from '../utils/helpers'
+import { ProviderCoreInfoFields } from '../components/admin/ProviderCoreInfoFields'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -48,7 +49,7 @@ type ProviderJobPostWithDetails = ProviderJobPost & {
   }
 }
 
-type ProviderRow = {
+export type ProviderRow = {
   id: string
   name: string
   category_key: string
@@ -1091,10 +1092,10 @@ export default function AdminPage() {
       // console.log('[Admin] Featured status updated successfully')
       setMessage(`Provider ${!currentStatus ? 'featured' : 'unfeatured'} successfully!`)
       
-      // Refresh providers data
+      // Refresh providers data - using select('*') to get all fields including newly added ones
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('*')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -1129,10 +1130,10 @@ export default function AdminPage() {
 
       setMessage(`Subscription type updated to ${subscriptionType}!`)
       
-      // Refresh providers data
+      // Refresh providers data - using select('*') to get all fields including newly added ones
       const { data: pData } = await supabase
         .from('providers')
-        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .select('*')
         .order('name', { ascending: true })
       setProviders((pData as ProviderRow[]) || [])
     } catch (error: any) {
@@ -4425,95 +4426,15 @@ Bonita Forward Team`}
 
                       {/* Core Business Information */}
                       <div className="space-y-6">
-                        <div>
-                          <h4 className="text-md font-medium text-neutral-800 mb-4">Core Business Information</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Business Name *
-                              </label>
-                              <input 
-                                value={editingProvider.name || ''} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { ...p, name: e.target.value } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                                placeholder="Enter business name"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Category *
-                              </label>
-                              <select 
-                                value={editingProvider.category_key} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { ...p, category_key: e.target.value } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-500"
-                              >
-                          {catOptions.map((opt) => (
-                            <option key={opt.key} value={opt.key}>{opt.name}</option>
-                          ))}
-                        </select>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Phone Number
-                        </label>
-                              <input 
-                                value={editingProvider.phone || ''} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { ...p, phone: e.target.value } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                                placeholder="(619) 123-4567"
-                              />
-                      </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Email Address
-                              </label>
-                              <input 
-                                value={editingProvider.email || ''} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { ...p, email: e.target.value } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                                placeholder="business@example.com"
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Website
-                              </label>
-                              <input 
-                                value={editingProvider.website || ''} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { ...p, website: e.target.value } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                                placeholder="https://www.example.com"
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Address
-                              </label>
-                              <input 
-                                value={editingProvider.address || ''} 
-                                onChange={(e) => setProviders((arr) => arr.map(p => 
-                                  p.id === editingProvider.id ? { ...p, address: e.target.value } : p
-                                ))} 
-                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
-                                placeholder="123 Main St, Bonita, CA 91902"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                        <ProviderCoreInfoFields
+                          provider={editingProvider}
+                          catOptions={catOptions}
+                          onUpdate={(field, value) => {
+                            setProviders((arr) => arr.map(p => 
+                              p.id === editingProvider.id ? { ...p, [field]: value } : p
+                            ))
+                          }}
+                        />
 
                         {/* Business Description */}
                         <div>

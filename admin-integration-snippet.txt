@@ -1,0 +1,75 @@
+// ============================================================================
+// INTEGRATION SNIPPET FOR Admin.tsx
+// ============================================================================
+// This shows the exact code to replace in Admin.tsx around line 4335-5340
+// to integrate the ProviderEditForm component and fix the typing lag.
+//
+// STEP 1: Add import at top of file (around line 11):
+import { ProviderEditForm } from '../components/admin/ProviderEditForm'
+
+// STEP 2: Export the ProviderRow type (around line 51):
+export type ProviderRow = {  // Add 'export' keyword
+  // ... rest of type stays the same
+}
+
+// STEP 3: Replace the inline provider edit form
+// 
+// FIND THIS SECTION (around line 4335):
+// ==========================================
+                    // Existing logic for editing
+                    const editingProvider = selectedProviderId
+                      ? providers.find(p => p.id === selectedProviderId)
+                      : providers[0]
+                    
+                    if (!editingProvider) return null
+                    
+                    return (
+                    <div className="rounded-xl border border-neutral-200 p-6 bg-white">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-lg font-semibold text-neutral-900">Editing: {editingProvider.name}</h3>
+                          {/* ... HUNDREDS OF LINES OF FORM CODE ... */}
+                        </div>
+                      </div>
+                    </div>
+                    )
+
+// REPLACE WITH THIS (much simpler!):
+// ==========================================
+                    // Existing logic for editing
+                    const editingProvider = selectedProviderId
+                      ? providers.find(p => p.id === selectedProviderId)
+                      : providers[0]
+                    
+                    if (!editingProvider) return null
+                    
+                    // PERFORMANCE FIX: Use separate component with local state
+                    // This prevents the entire 7000+ line Admin component from re-rendering on every keystroke
+                    return (
+                      <ProviderEditForm
+                        provider={editingProvider}
+                        catOptions={catOptions}
+                        onSave={(updatedProvider) => {
+                          // Update local state
+                          setProviders((arr) => arr.map(p => 
+                            p.id === updatedProvider.id ? updatedProvider : p
+                          ))
+                          // Save to database
+                          saveProvider(updatedProvider)
+                        }}
+                        onCancel={() => {
+                          // Just close - no changes needed since we're using local state in the form
+                        }}
+                      />
+                    )
+                    
+                    // Note: The old inline form has been removed (~1000 lines deleted)
+
+// ============================================================================
+// That's it! The fix is complete.
+// ============================================================================
+// The ProviderEditForm component handles all the form fields internally
+// with local state, so typing is instant. Only when Save is clicked does
+// it update the parent Admin component and save to the database.
+// ============================================================================
+
