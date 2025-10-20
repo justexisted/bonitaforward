@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { type CalendarEvent } from '../../../pages/Calendar'
 
@@ -35,6 +35,14 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
   })
   const [uploadingCsv, setUploadingCsv] = useState(false)
   const [loading, setLoading] = useState(true)
+  
+  // PERFORMANCE OPTIMIZATION: Search and filter state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
+  const [dateRangeFilter, setDateRangeFilter] = useState<'all' | 'upcoming' | 'past' | 'this-month'>('all')
+  const [showCount, setShowCount] = useState(30) // Show 30 events initially
+  const [isEventsListExpanded, setIsEventsListExpanded] = useState(true) // Start expanded for easy access
 
   useEffect(() => {
     loadCalendarEvents()
@@ -52,6 +60,64 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
       setLoading(false)
     }
   }
+
+  // PERFORMANCE OPTIMIZATION: Get unique categories and sources for filters
+  const { categories, sources } = useMemo(() => {
+    const uniqueCategories = new Set(calendarEvents.map(e => e.category || 'Community'))
+    const uniqueSources = new Set(calendarEvents.map(e => e.source || 'Local'))
+    return {
+      categories: Array.from(uniqueCategories).sort(),
+      sources: Array.from(uniqueSources).sort()
+    }
+  }, [calendarEvents])
+
+  // PERFORMANCE OPTIMIZATION: Memoized filtered and searched events
+  const filteredEvents = useMemo(() => {
+    let filtered = calendarEvents
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = filtered.filter(e => 
+        e.title?.toLowerCase().includes(query) ||
+        e.description?.toLowerCase().includes(query) ||
+        e.location?.toLowerCase().includes(query) ||
+        e.address?.toLowerCase().includes(query)
+      )
+    }
+
+    // Category filter
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(e => (e.category || 'Community') === categoryFilter)
+    }
+
+    // Source filter
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(e => (e.source || 'Local') === sourceFilter)
+    }
+
+    // Date range filter
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+    if (dateRangeFilter === 'upcoming') {
+      filtered = filtered.filter(e => new Date(e.date) >= now)
+    } else if (dateRangeFilter === 'past') {
+      filtered = filtered.filter(e => new Date(e.date) < now)
+    } else if (dateRangeFilter === 'this-month') {
+      filtered = filtered.filter(e => {
+        const eventDate = new Date(e.date)
+        return eventDate >= startOfMonth && eventDate <= endOfMonth
+      })
+    }
+
+    // Sort by date (upcoming first)
+    return filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [calendarEvents, searchQuery, categoryFilter, sourceFilter, dateRangeFilter])
+
+  // PERFORMANCE OPTIMIZATION: Displayed events (limited by showCount)
+  const displayedEvents = filteredEvents.slice(0, showCount)
 
   const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at'>) => {
     onMessage(null)
@@ -999,19 +1065,165 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
         </div>
       )}
 
-      {/* Events List */}
-      <div className="mt-4 space-y-3">
-        <div className="text-sm font-medium text-neutral-700">
-          Total Events: {calendarEvents.length}
+      {/* PERFORMANCE OPTIMIZATION: Search and Filter Controls */}
+      <div className="mt-6 space-y-4 border-t border-neutral-200 pt-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-neutral-700">Event Search & Filters</h3>
+          {(searchQuery || categoryFilter !== 'all' || sourceFilter !== 'all' || dateRangeFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setSearchQuery('')
+                setCategoryFilter('all')
+                setSourceFilter('all')
+                setDateRangeFilter('all')
+                setShowCount(30)
+              }}
+              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+            >
+              Clear All Filters
+            </button>
+          )}
         </div>
 
-        {calendarEvents.length === 0 && (
-          <div className="text-neutral-500 text-sm text-center py-8 bg-neutral-50 rounded-lg">
-            No events yet. Add events manually or import from CSV/iCal feeds.
+        {/* Search Bar */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">Search Events</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setShowCount(30)
+              }}
+              placeholder="Search by title, description, location, or address..."
+              className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <svg 
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
-        )}
+        </div>
 
-        {calendarEvents.map((event) => {
+        {/* Filter Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Category Filter */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Category</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value)
+                setShowCount(30)
+              }}
+              className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Source Filter */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Source</label>
+            <select
+              value={sourceFilter}
+              onChange={(e) => {
+                setSourceFilter(e.target.value)
+                setShowCount(30)
+              }}
+              className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Sources</option>
+              {sources.map(src => (
+                <option key={src} value={src}>{src}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Range Filter */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Date Range</label>
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => {
+                setDateRangeFilter(e.target.value as any)
+                setShowCount(30)
+              }}
+              className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Dates</option>
+              <option value="upcoming">Upcoming Events</option>
+              <option value="this-month">This Month</option>
+              <option value="past">Past Events</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Results Summary */}
+        <div className="flex items-center justify-between text-xs text-neutral-600 bg-neutral-50 px-4 py-2 rounded-lg">
+          <div>
+            Showing <span className="font-medium">{displayedEvents.length}</span> of <span className="font-medium">{filteredEvents.length}</span> events
+            {filteredEvents.length !== calendarEvents.length && (
+              <span className="ml-1">
+                (<span className="font-medium">{calendarEvents.length}</span> total)
+              </span>
+            )}
+          </div>
+          {filteredEvents.length > 0 && (
+            <button
+              onClick={() => setIsEventsListExpanded(!isEventsListExpanded)}
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              {isEventsListExpanded ? 'Collapse List' : 'Expand List'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Events List - Collapsible */}
+      {isEventsListExpanded && (
+        <div className="mt-4 space-y-3">
+          {filteredEvents.length === 0 && (
+            <div className="text-neutral-500 text-sm text-center py-8 bg-neutral-50 rounded-lg">
+              {calendarEvents.length === 0 ? (
+                <>
+                  <svg className="mx-auto h-12 w-12 text-neutral-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="font-medium">No events yet</p>
+                  <p className="text-xs mt-1">Add events manually or import from CSV/iCal feeds</p>
+                </>
+              ) : (
+                <>
+                  <svg className="mx-auto h-12 w-12 text-neutral-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <p className="font-medium">No events found</p>
+                  <p className="text-xs mt-1">Try adjusting your search or filters</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {displayedEvents.map((event) => {
           const isExpanded = expandedEventIds.has(event.id)
           const isEditing = eventEdit.id === event.id
 
@@ -1165,7 +1377,40 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
             </div>
           )
         })}
-      </div>
+
+          {/* PERFORMANCE OPTIMIZATION: Pagination Controls */}
+          {displayedEvents.length < filteredEvents.length && (
+            <div className="text-center py-6 space-y-3">
+              <div className="text-sm text-neutral-600">
+                Showing {displayedEvents.length} of {filteredEvents.length} events
+              </div>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => setShowCount(prev => prev + 30)}
+                  className="px-6 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  Show 30 More
+                </button>
+                {filteredEvents.length > 50 && (
+                  <button
+                    onClick={() => setShowCount(filteredEvents.length)}
+                    className="px-6 py-2 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors"
+                  >
+                    Show All {filteredEvents.length}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Success message when all events are shown */}
+          {displayedEvents.length > 0 && displayedEvents.length === filteredEvents.length && filteredEvents.length > 30 && (
+            <div className="text-center py-4 text-sm text-green-600 bg-green-50 rounded-lg">
+              ✓ All {filteredEvents.length} events loaded
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

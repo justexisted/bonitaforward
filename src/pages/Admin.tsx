@@ -913,7 +913,13 @@ export default function AdminPage() {
         const bQuery = supabase.from('bookings').select('*').order('created_at', { ascending: false })
         const fExec = isAdmin ? (selectedUser ? fQuery.eq('user_email', selectedUser) : fQuery) : fQuery.eq('user_email', auth.email!)
         const bExec = isAdmin ? (selectedUser ? bQuery.eq('user_email', selectedUser) : bQuery) : bQuery.eq('user_email', auth.email!)
-        const bizQuery = supabase.from('business_applications').select('*').order('created_at', { ascending: false })
+        // CRITICAL: Only load PENDING applications (not approved/rejected)
+        // This prevents showing already-processed applications in the admin panel
+        const bizQuery = supabase
+          .from('business_applications')
+          .select('*')
+          .or('status.eq.pending,status.is.null')  // Include pending OR null (legacy apps)
+          .order('created_at', { ascending: false })
         const conQuery = supabase.from('contact_leads').select('*').order('created_at', { ascending: false })
         // Enhanced providers query with all featured tracking fields
         const provQuery = isAdmin ? supabase
@@ -1107,8 +1113,16 @@ export default function AdminPage() {
 
   async function approveApplication(appId: string) {
     setMessage(null)
+    setError(null)
+    
     const app = bizApps.find((b) => b.id === appId)
     if (!app) return
+    
+    // CRITICAL: Check if this application was already approved
+    if (app.status === 'approved') {
+      setError('This application has already been approved. Please refresh the page.')
+      return
+    }
     
     // Parse the challenge field which contains all the business details as JSON
     let challengeData: any = {}
@@ -1118,6 +1132,44 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error('[Admin] Error parsing challenge data:', err)
+      setError('Failed to parse application data. Please contact support.')
+      return
+    }
+    
+    const businessName = app.business_name || 'Unnamed Business'
+    
+    // DUPLICATE PREVENTION: Check if a provider with this name already exists
+    try {
+      const { data: existingProviders, error: checkError } = await supabase
+        .from('providers')
+        .select('id, name')
+        .ilike('name', businessName)
+        .limit(5)
+      
+      if (checkError) {
+        console.error('[Admin] Error checking for duplicates:', checkError)
+        setError('Failed to check for duplicate businesses. Please try again.')
+        return
+      }
+      
+      if (existingProviders && existingProviders.length > 0) {
+        // Found potential duplicates - warn the admin
+        const duplicateNames = existingProviders.map(p => p.name).join(', ')
+        const confirmed = window.confirm(
+          `⚠️ WARNING: A business with a similar name already exists:\n\n${duplicateNames}\n\n` +
+          `Are you sure you want to create "${businessName}"?\n\n` +
+          `Click OK to create anyway, or Cancel to prevent duplicate.`
+        )
+        
+        if (!confirmed) {
+          setMessage('Application approval cancelled to prevent duplicate.')
+          return
+        }
+      }
+    } catch (err: any) {
+      console.error('[Admin] Exception checking duplicates:', err)
+      setError(`Failed to verify duplicates: ${err.message}`)
+      return
     }
     
     // Get admin-edited category and tags, or fall back to application's category
@@ -1139,11 +1191,16 @@ export default function AdminPage() {
           .limit(1)
         ownerUserId = ((profRows as any[])?.[0]?.id as string | undefined) || null
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[Admin] Could not find owner user:', err)
+    }
+    
+    // IMMEDIATELY remove from UI to prevent double-approval
+    setBizApps((rows) => rows.filter((r) => r.id !== appId))
     
     // Create provider with ALL data from the application
     const payload: Partial<ProviderRow> = {
-      name: (app.business_name || 'Unnamed Business') as any,
+      name: businessName as any,
       category_key: draft.category as any,
       tags: allTags as any,
       phone: (app.phone || null) as any,
@@ -1165,25 +1222,41 @@ export default function AdminPage() {
     
     console.log('[Admin] Approving application with payload:', payload)  // KEPT: Business application logging
     
-    const { error } = await supabase.from('providers').insert([payload as any])
-    if (error) {
-      setError(error.message)
-    } else {
-      setMessage('Application approved and provider created')
-      // Update status to approved before deleting the application
-      try {
-        await supabase.from('business_applications').update({ status: 'approved' }).eq('id', appId)
-        // Keep the application visible for a short time to show approved status, then remove from admin view
-        setBizApps((rows) => rows.filter((r) => r.id !== appId))
-      } catch {}
-      // Refresh providers with enhanced fields
-      try {
-        const { data: pData } = await supabase
-          .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
-          .order('name', { ascending: true })
-        setProviders((pData as ProviderRow[]) || [])
-      } catch {}
+    // Create the provider
+    const { error: insertError } = await supabase.from('providers').insert([payload as any])
+    
+    if (insertError) {
+      console.error('[Admin] Error creating provider:', insertError)
+      setError(`Failed to create provider: ${insertError.message}`)
+      
+      // ROLLBACK: Re-add the application to the UI since creation failed
+      setBizApps((rows) => [app, ...rows])
+      return
+    }
+    
+    // Update application status to approved
+    const { error: updateError } = await supabase
+      .from('business_applications')
+      .update({ status: 'approved' })
+      .eq('id', appId)
+    
+    if (updateError) {
+      console.error('[Admin] Error updating application status:', updateError)
+      // Don't rollback here - the provider was created successfully
+      // Just log the error and continue
+    }
+    
+    setMessage(`✅ Application approved! "${businessName}" has been created as a new provider.`)
+    
+    // Refresh providers list
+    try {
+      const { data: pData } = await supabase
+        .from('providers')
+        .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
+        .order('name', { ascending: true })
+      setProviders((pData as ProviderRow[]) || [])
+    } catch (err) {
+      console.error('[Admin] Error refreshing providers:', err)
     }
   }
 
