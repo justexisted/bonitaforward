@@ -235,35 +235,7 @@ export default function AdminPage() {
   // Show loading if EITHER system is still loading data
   const isLoading = loading || adminDataLoading
 
-  // ============================================================================
-  // STEP 13: DELETE CALENDAR EVENT FUNCTIONS (START)
-  // ============================================================================
-  // These 18 calendar event functions have been moved to CalendarEventsSection component
-  // DELETE: addCalendarEvent (lines ~259-285)
-  // DELETE: deleteCalendarEvent (lines ~287-311)
-  // DELETE: startEditingEvent (lines ~313-317)
-  // DELETE: cancelEditingEvent (lines ~319-323)
-  // DELETE: toggleEventExpansion (lines ~325-340)
-  // DELETE: extractZipCode (lines ~342-357)
-  // DELETE: openZipFilterModal (lines ~359-395)
-  // DELETE: executeZipFilterDeletion (lines ~397-452)
-  // DELETE: toggleEventSelection (lines ~454-467)
-  // DELETE: toggleAllEventSelection (lines ~469-478)
-  // DELETE: saveCalendarEvent (lines ~480-538)
-  // DELETE: addMultipleEvents (lines ~540-570)
-  // DELETE: parseCSVLine (lines ~572-603)
-  // DELETE: handleCsvUpload (lines ~605-822)
-  // DELETE: addSampleBonitaEvents (lines ~824-870)
-  // DELETE: refreshICalFeedsServer (lines ~872-897)
-  // DELETE: refreshVosdEvents (lines ~899-926)
-  // DELETE: refreshKpbsEvents (lines ~928-952)
-  // ============================================================================
-
-  // Function to add a new calendar event [TO DELETE]
-
-  // ============================================================================
-  // STEP 13: DELETE CALENDAR EVENT FUNCTIONS (END)
-  // ============================================================================
+  // Calendar event functions moved to CalendarEventsSection component (Step 13)
   
   // Old client-side refresh kept as fallback (CORS issues make this unreliable)
   // Use refreshICalFeedsServer() instead
@@ -1712,47 +1684,7 @@ export default function AdminPage() {
     }
   }
 
-  // ============================================================================
-  // STEP 12: DELETE CHANGE REQUEST FUNCTIONS (START)
-  // ============================================================================
-  // notifyUser function deleted - moved to ChangeRequestsSection component
-  // These 6 functions have been moved to ChangeRequestsSection component
-  // DELETE: computeChangeDiff (lines 2390-2458)
-  // DELETE: formatValueForDisplay (lines 2460-2467)
-  // DELETE: toggleChangeRequestExpansion (lines 2472-2482)
-  // DELETE: toggleBusinessDropdown (lines 2487-2497)
-  // DELETE: approveChangeRequest (lines 2589-2620)
-  // DELETE: rejectChangeRequest (lines 2622-2633)
-  // ============================================================================
-
-  /**
-   * HELPER FUNCTION: Compute field-by-field differences between old and new values
-   * 
-   * This function compares the current provider data with the proposed changes
-   * and returns an object with only the fields that actually changed.
-   * 
-   * @param currentProvider - The current provider data from the database
-   * @param proposedChanges - The proposed changes from the change request
-   * @returns An object containing only fields that changed, with old and new values
-   * 
-   * [TO DELETE - Moved to ChangeRequestsSection]
-   */
-  
-
-  /**
-   * Format a value for display in the change request UI
-   */
-  
-
-  /**
-   * Toggle expansion of a change request to show all details
-   */
-  
-
-  /**
-   * Toggle expansion of a business dropdown
-   */
-  
+  // Change request functions moved to ChangeRequestsSection component (Step 12)
 
   /**
    * Toggle booking system on/off (Admin quick action)
@@ -4046,14 +3978,6 @@ Bonita Forward Team`}
           </div>
         )}
 
-        {/* 
-        ============================================================================
-        STEP 12: DELETE OLD CHANGE REQUESTS SECTION (START)
-        ============================================================================
-        DELETE FROM HERE (line 4830) to line 5466 (636 lines total)
-        
-        REPLACE WITH:
-        
         {isAdmin && section === 'owner-change-requests' && (
           <ChangeRequestsSection
             providers={providers}
@@ -4061,19 +3985,6 @@ Bonita Forward Team`}
             onError={(err) => setError(err)}
           />
         )}
-        
-        ============================================================================
-        OLD CODE BELOW - TO BE DELETED (keeping for reference until verified)
-        ============================================================================
-        */}
-        
-        {/* 
-        ============================================================================
-        STEP 12: DELETE OLD CHANGE REQUESTS SECTION (END)
-        ============================================================================
-        DELETE TO HERE - End of old change requests section (636 lines deleted)
-        ============================================================================
-        */}
 
         {isAdmin && section === 'job-posts' && (
           <JobPostsSection
@@ -4089,40 +4000,13 @@ Bonita Forward Team`}
             onError={(err) => setError(err)}
           />
         )}
-        {isAdmin && section === 'calendar-events' && (
-          <CalendarEventsSection
-            onMessage={(msg) => setMessage(msg)}
-            onError={(err) => setError(err)}
-          />
-        )}
 
-        {/* 
-        ============================================================================
-        STEP 13: DELETE OLD CALENDAR EVENTS SECTION (START)
-        ============================================================================
-        DELETE FROM HERE (line 4753) to line 5433 (681 lines total)
-        
-        REPLACE WITH:
-        
         {isAdmin && section === 'calendar-events' && (
           <CalendarEventsSection
             onMessage={(msg) => setMessage(msg)}
             onError={(err) => setError(err)}
           />
         )}
-        
-        ============================================================================
-        OLD CODE BELOW - TO BE DELETED (keeping for reference until verified)
-        ============================================================================
-        */}
-        
-        {/* 
-        ============================================================================
-        STEP 13: DELETE OLD CALENDAR EVENTS SECTION (END)
-        ============================================================================
-        DELETE TO HERE - End of old calendar events section (681 lines deleted)
-        ============================================================================
-        */}
 
         {/* Flagged Events Section */}
         {isAdmin && section === 'flagged-events' && (
