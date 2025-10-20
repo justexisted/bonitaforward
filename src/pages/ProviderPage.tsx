@@ -587,8 +587,8 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                       </div>
                     )}
 
-                    {/* Exclusive Coupon Display - Below Follow Us */}
-                    {provider.coupon_code && provider.coupon_discount && (
+                    {/* Exclusive Coupon Display - Below Follow Us (Featured Accounts Only) */}
+                    {provider.isMember && provider.coupon_code && provider.coupon_discount && (
                       <div className="relative bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 shadow-md">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2">

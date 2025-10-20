@@ -3799,12 +3799,35 @@ function BusinessListingForm({
               )}
             </div>
 
-            {/* Exclusive Coupon Settings */}
-            <div className="border-2 border-green-200 rounded-xl p-4 bg-green-50">
+            {/* Exclusive Coupon Settings - Featured Accounts Only */}
+            <div className={`border-2 border-green-200 rounded-xl p-4 bg-green-50 ${!formData.is_member ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-2xl">🎟️</span>
                 <h3 className="text-sm font-semibold text-green-900">Exclusive Coupon for Bonita Forward Users</h3>
+                {!formData.is_member && (
+                  <span className="text-xs text-amber-600 ml-2">
+                    (Featured accounts only)
+                  </span>
+                )}
               </div>
+              
+              {/* Free account restriction notice */}
+              {!formData.is_member && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-amber-900">Featured Accounts Only</p>
+                      <p className="text-xs text-amber-800 mt-1">
+                        Upgrade to a Featured account to create exclusive coupons for Bonita Forward users. Coupons appear prominently on your business page and help drive more customers to your business!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <p className="text-xs text-green-800 mb-4">
                 Offer a special coupon that users can save to their account. This appears prominently on your business page!
               </p>
@@ -3819,9 +3842,10 @@ function BusinessListingForm({
                     type="text"
                     value={formData.coupon_code || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, coupon_code: e.target.value.toUpperCase() }))}
-                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-neutral-100 disabled:cursor-not-allowed"
                     placeholder="BONITA10"
                     maxLength={20}
+                    disabled={!formData.is_member}
                   />
                 </div>
 
@@ -3834,9 +3858,10 @@ function BusinessListingForm({
                     type="text"
                     value={formData.coupon_discount || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, coupon_discount: e.target.value }))}
-                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-neutral-100 disabled:cursor-not-allowed"
                     placeholder="10% off entire service"
                     maxLength={50}
+                    disabled={!formData.is_member}
                   />
                 </div>
 
@@ -3848,10 +3873,11 @@ function BusinessListingForm({
                   <textarea
                     value={formData.coupon_description || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, coupon_description: e.target.value }))}
-                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white resize-none"
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white resize-none disabled:bg-neutral-100 disabled:cursor-not-allowed"
                     placeholder="Valid for first-time customers only. Cannot be combined with other offers."
                     rows={2}
                     maxLength={200}
+                    disabled={!formData.is_member}
                   />
                 </div>
 
@@ -3867,7 +3893,8 @@ function BusinessListingForm({
                       ...prev, 
                       coupon_expires_at: e.target.value ? new Date(e.target.value).toISOString() : null 
                     }))}
-                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                    className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                    disabled={!formData.is_member}
                   />
                 </div>
 
