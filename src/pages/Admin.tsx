@@ -13,6 +13,7 @@ import { ProviderDescriptionField } from '../components/admin/ProviderDescriptio
 import { ProviderCouponFields } from '../components/admin/ProviderCouponFields-2025-10-19'
 import { ProviderMetadataFields } from '../components/admin/ProviderMetadataFields-2025-10-19'
 import { ProviderTagsEditor } from '../components/admin/ProviderTagsEditor-2025-10-19'
+import { ProviderBusinessHours } from '../components/admin/ProviderBusinessHours-2025-10-19'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -4508,116 +4509,15 @@ Bonita Forward Team`}
                           }}
                         />
 
-                        {/* Business Hours - Featured Only */}
-                        <div className={!editingProvider.is_member ? 'opacity-50 pointer-events-none' : ''}>
-                          <h4 className="text-md font-medium text-neutral-800 mb-4">
-                            Business Hours
-                            {!editingProvider.is_member && (
-                              <span className="text-sm text-amber-600 ml-2">(Featured accounts only)</span>
-                            )}
-                          </h4>
-                          
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="checkbox"
-                                  id={`enable-business-hours-${editingProvider.id}`}
-                                  checked={editingProvider.business_hours !== null}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      // Initialize with default hours if enabling
-                                      const defaultHours = {
-                                        monday: '9:00 AM - 5:00 PM',
-                                        tuesday: '9:00 AM - 5:00 PM',
-                                        wednesday: '9:00 AM - 5:00 PM',
-                                        thursday: '9:00 AM - 5:00 PM',
-                                        friday: '9:00 AM - 5:00 PM',
-                                        saturday: '10:00 AM - 4:00 PM',
-                                        sunday: 'Closed'
-                                      }
-                                      setProviders((arr) => arr.map(p => 
-                                        p.id === editingProvider.id ? { ...p, business_hours: defaultHours } : p
-                                      ))
-                                    } else {
-                                      setProviders((arr) => arr.map(p => 
-                                        p.id === editingProvider.id ? { ...p, business_hours: null } : p
-                                      ))
-                                    }
-                                  }}
-                                  disabled={!editingProvider.is_member}
-                                  className="rounded border-neutral-300 text-neutral-600 focus:ring-neutral-500"
-                                />
-                                <label htmlFor={`enable-business-hours-${editingProvider.id}`} className="text-sm font-medium text-neutral-700">
-                                  Set Business Hours
-                                </label>
-                              </div>
-                              
-                              {/* Quick Fill Button - Only show when business hours are enabled */}
-                              {editingProvider.is_member && editingProvider.business_hours && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const quickFillHours = {
-                                      monday: '9:00 AM - 5:00 PM',
-                                      tuesday: '9:00 AM - 5:00 PM',
-                                      wednesday: '9:00 AM - 5:00 PM',
-                                      thursday: '9:00 AM - 5:00 PM',
-                                      friday: '9:00 AM - 5:00 PM',
-                                      saturday: '9:00 AM - 5:00 PM',
-                                      sunday: '9:00 AM - 5:00 PM'
-                                    }
-                                    setProviders((arr) => arr.map(p => 
-                                      p.id === editingProvider.id ? { ...p, business_hours: quickFillHours } : p
-                                    ))
-                                  }}
-                                  className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors font-medium"
-                                >
-                                  🕐 Quick Fill All (9 AM - 5 PM)
-                                </button>
-                              )}
-                            </div>
-                            
-                            {editingProvider.is_member && editingProvider.business_hours && (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {[
-                                  { key: 'monday', label: 'Monday' },
-                                  { key: 'tuesday', label: 'Tuesday' },
-                                  { key: 'wednesday', label: 'Wednesday' },
-                                  { key: 'thursday', label: 'Thursday' },
-                                  { key: 'friday', label: 'Friday' },
-                                  { key: 'saturday', label: 'Saturday' },
-                                  { key: 'sunday', label: 'Sunday' }
-                                ].map(({ key, label }) => (
-                                  <div key={key} className="flex items-center gap-2">
-                                    <label className="text-sm font-medium text-neutral-700 w-20">
-                                      {label}:
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={editingProvider.business_hours?.[key] || ''}
-                                      onChange={(e) => setProviders((arr) => arr.map(p => 
-                                        p.id === editingProvider.id ? { 
-                                          ...p, 
-                                          business_hours: { ...p.business_hours, [key]: e.target.value } 
-                                        } : p
-                                      ))}
-                                      className="flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-500"
-                                      placeholder="e.g., 9:00 AM - 5:00 PM"
-                                      disabled={!editingProvider.is_member}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            
-                            {!editingProvider.is_member && (
-                              <p className="text-xs text-neutral-500 bg-neutral-50 p-2 rounded">
-                                Business hours are only available for featured accounts. Upgrade to a featured plan to set business hours.
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                        {/* Business Hours */}
+                        <ProviderBusinessHours
+                          provider={editingProvider}
+                          onUpdate={(field, value) => {
+                            setProviders((arr) => arr.map(p => 
+                              p.id === editingProvider.id ? { ...p, [field]: value } : p
+                            ))
+                          }}
+                        />
 
                         {/* Image Upload Section */}
                         <div>
