@@ -58,8 +58,8 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
     onError(null)
     try {
       // Convert date to ISO string if it isn't already
-      const isoDate = eventData.date instanceof Date 
-        ? eventData.date.toISOString() 
+      const isoDate = typeof eventData.date === 'string' && eventData.date.includes('T')
+        ? eventData.date
         : new Date(eventData.date).toISOString()
 
       const { error } = await supabase
@@ -247,8 +247,8 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
       // Convert date to ISO string if it isn't already
       let isoDate = eventEdit.date
       if (isoDate) {
-        isoDate = isoDate instanceof Date 
-          ? isoDate.toISOString() 
+        isoDate = typeof isoDate === 'string' && isoDate.includes('T')
+          ? isoDate
           : new Date(isoDate).toISOString()
       }
 
