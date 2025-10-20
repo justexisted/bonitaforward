@@ -22,11 +22,13 @@ Gradually extract components from the 7000+ line `Admin.tsx` to:
 | 9 | Providers Section | ❌ Skipped | 0 | Too complex, already handled by Phase 2 |
 | 10 | Blog Section | ✅ Done | ~165 | `BlogSection-2025-10-19.tsx` |
 | 11 | Job Posts Section | ✅ Done | ~280 | `JobPostsSection-2025-10-19.tsx` |
-| **12** | **Change Requests Section** | **✅ Component Ready** | **~636** | **`ChangeRequestsSection-2025-10-19.tsx`** |
+| 12 | Change Requests Section | ✅ Component Ready | ~636 | `ChangeRequestsSection-2025-10-19.tsx` |
+| **13** | **Calendar Events Section** | **✅ Component Ready** | **~681** | **`CalendarEventsSection-2025-10-19.tsx`** |
 
-**Total Lines Removed:** ~1081 / ~2000 (Step 12: 636 lines marked for deletion, not yet removed)  
-**Admin.tsx Size:** 7259 lines → 6178 lines (after manual cleanup: ~5457 lines)  
-**Status:** Component created with 0 errors. Old code marked with clear deletion boundaries. See STEP_12_CLEANUP_GUIDE-2025-10-19.md
+**Total Lines Removed (UI):** ~1762 / ~2000 (Steps 12-13: 1317 lines marked for deletion, not yet removed)  
+**Total Lines Removed (with functions/state):** ~3200 lines marked  
+**Admin.tsx Size:** 5635 lines (after manual cleanup: ~4237 lines estimated)  
+**Status:** Calendar Events component created with 0 errors. Old code marked with clear deletion boundaries. See STEP_13_CLEANUP_GUIDE-2025-10-19.md
 
 ## 🎉 PHASE 2 COMPLETE!
 
