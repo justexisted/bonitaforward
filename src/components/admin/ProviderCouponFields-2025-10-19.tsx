@@ -1,19 +1,20 @@
+import { useState, useEffect } from 'react'
 import { type ProviderRow } from '../../pages/Admin'
 
 /**
- * PROVIDER COUPON FIELDS
+ * PROVIDER COUPON FIELDS - OPTIMIZED ⚡
  * 
- * Step 3 of gradual Admin.tsx extraction.
- * Renders the complete coupon system for featured providers.
+ * Step 5: Performance optimization complete!
+ * Uses local state for instant typing with no lag.
+ * Only updates parent component on blur/save events.
  * 
  * Features:
  * - Coupon code (auto-uppercase)
  * - Discount amount/type
  * - Expiration date
  * - Description
- * - Live preview
+ * - Live preview (updates instantly with local state)
  * - Featured-only (disabled for free accounts)
- * - Still uses parent state (performance optimization in Step 5)
  */
 
 interface ProviderCouponFieldsProps {
@@ -26,6 +27,18 @@ export function ProviderCouponFields({
   onUpdate 
 }: ProviderCouponFieldsProps) {
   const isFeatured = provider.is_member
+
+  // Local state for instant typing
+  const [localCouponCode, setLocalCouponCode] = useState(provider.coupon_code || '')
+  const [localCouponDiscount, setLocalCouponDiscount] = useState(provider.coupon_discount || '')
+  const [localCouponDescription, setLocalCouponDescription] = useState(provider.coupon_description || '')
+
+  // Sync local state when provider changes
+  useEffect(() => {
+    setLocalCouponCode(provider.coupon_code || '')
+    setLocalCouponDiscount(provider.coupon_discount || '')
+    setLocalCouponDescription(provider.coupon_description || '')
+  }, [provider.id])
 
   return (
     <div className={!isFeatured ? 'opacity-50 pointer-events-none' : ''}>
@@ -51,8 +64,9 @@ export function ProviderCouponFields({
             Coupon Code
           </label>
           <input 
-            value={provider.coupon_code || ''} 
-            onChange={(e) => onUpdate('coupon_code', e.target.value.toUpperCase())}
+            value={localCouponCode} 
+            onChange={(e) => setLocalCouponCode(e.target.value.toUpperCase())}
+            onBlur={(e) => onUpdate('coupon_code', e.target.value.toUpperCase())}
             disabled={!isFeatured}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 font-mono disabled:bg-neutral-100" 
             placeholder="e.g., SAVE20, WELCOME10"
@@ -66,8 +80,9 @@ export function ProviderCouponFields({
             Discount Amount/Type
           </label>
           <input 
-            value={provider.coupon_discount || ''} 
-            onChange={(e) => onUpdate('coupon_discount', e.target.value)}
+            value={localCouponDiscount} 
+            onChange={(e) => setLocalCouponDiscount(e.target.value)}
+            onBlur={(e) => onUpdate('coupon_discount', e.target.value)}
             disabled={!isFeatured}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 disabled:bg-neutral-100" 
             placeholder="e.g., 20% Off, $50 Off, Free Consultation"
@@ -75,7 +90,7 @@ export function ProviderCouponFields({
           <p className="text-xs text-neutral-500 mt-1">What customers will get</p>
         </div>
 
-        {/* Coupon Expiration */}
+        {/* Coupon Expiration - Date picker updates immediately (fast) */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-1">
             Expiration Date (Optional)
@@ -96,8 +111,9 @@ export function ProviderCouponFields({
             Coupon Description
           </label>
           <textarea
-            value={provider.coupon_description || ''}
-            onChange={(e) => onUpdate('coupon_description', e.target.value)}
+            value={localCouponDescription}
+            onChange={(e) => setLocalCouponDescription(e.target.value)}
+            onBlur={(e) => onUpdate('coupon_description', e.target.value)}
             disabled={!isFeatured}
             rows={2}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 disabled:bg-neutral-100"
@@ -107,21 +123,21 @@ export function ProviderCouponFields({
         </div>
       </div>
 
-      {/* Coupon Preview */}
-      {provider.coupon_code && (
+      {/* Coupon Preview - Uses local state for instant updates */}
+      {localCouponCode && (
         <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-dashed border-blue-300 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-semibold text-blue-600 uppercase">Preview</div>
               <div className="text-2xl font-bold text-neutral-900 font-mono mt-1">
-                {provider.coupon_code}
+                {localCouponCode}
               </div>
               <div className="text-lg font-semibold text-green-700 mt-1">
-                {provider.coupon_discount || 'Discount not set'}
+                {localCouponDiscount || 'Discount not set'}
               </div>
-              {provider.coupon_description && (
+              {localCouponDescription && (
                 <div className="text-sm text-neutral-600 mt-2">
-                  {provider.coupon_description}
+                  {localCouponDescription}
                 </div>
               )}
               {provider.coupon_expires_at && (

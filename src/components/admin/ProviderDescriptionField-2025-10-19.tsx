@@ -1,16 +1,18 @@
+import { useState, useEffect } from 'react'
 import { type ProviderRow } from '../../pages/Admin'
 
 /**
- * PROVIDER DESCRIPTION FIELD
+ * PROVIDER DESCRIPTION FIELD - OPTIMIZED ⚡
  * 
- * Step 2 of gradual Admin.tsx extraction.
- * Renders the business description textarea with character counter.
+ * Step 5: Performance optimization complete!
+ * Uses local state for instant typing with no lag.
+ * Only updates parent component on blur/save events.
  * 
  * Features:
  * - Character limit: 200 for free, 500 for featured
  * - Real-time character counter
  * - Red border when exceeding limit
- * - Still uses parent state (performance optimization in Step 5)
+ * - Local state prevents parent re-renders on every keystroke
  */
 
 interface ProviderDescriptionFieldProps {
@@ -22,8 +24,16 @@ export function ProviderDescriptionField({
   provider, 
   onUpdate 
 }: ProviderDescriptionFieldProps) {
+  // Local state for instant typing
+  const [localDescription, setLocalDescription] = useState(provider.description || '')
+
+  // Sync local state when provider changes
+  useEffect(() => {
+    setLocalDescription(provider.description || '')
+  }, [provider.id])
+
   const maxLength = provider.is_member ? 500 : 200
-  const currentLength = provider.description?.length || 0
+  const currentLength = localDescription.length
   const isOverLimit = !provider.is_member && currentLength > 200
 
   return (
@@ -35,15 +45,16 @@ export function ProviderDescriptionField({
         </span>
       </label>
       <textarea
-        value={provider.description || ''}
+        value={localDescription}
         onChange={(e) => {
           const newDescription = e.target.value
           // Prevent typing if over limit for free accounts
           if (!provider.is_member && newDescription.length > 200) {
             return
           }
-          onUpdate(newDescription)
+          setLocalDescription(newDescription) // Update local state instantly
         }}
+        onBlur={(e) => onUpdate(e.target.value)} // Save to parent on blur
         rows={4}
         className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
           isOverLimit

@@ -1,16 +1,18 @@
+import { useState, useEffect } from 'react'
 import { type ProviderRow } from '../../pages/Admin'
 
 /**
- * PROVIDER METADATA FIELDS
+ * PROVIDER METADATA FIELDS - OPTIMIZED ⚡
  * 
- * Step 4 of gradual Admin.tsx extraction.
- * Renders specialties, service areas, and social media links.
+ * Step 5: Performance optimization complete!
+ * Uses local state for instant typing with no lag.
+ * Only updates parent component on blur/save events.
  * 
  * Features:
  * - Specialties (comma-separated, saves on blur)
  * - Service Areas (comma-separated, saves on blur)
  * - Social Media Links (Facebook, Instagram - featured only)
- * - Still uses parent state (performance optimization in Step 5)
+ * - Local state prevents parent re-renders on every keystroke
  */
 
 interface ProviderMetadataFieldsProps {
@@ -24,9 +26,19 @@ export function ProviderMetadataFields({
 }: ProviderMetadataFieldsProps) {
   const isFeatured = provider.is_member
 
+  // Local state for instant typing
+  const [localFacebook, setLocalFacebook] = useState(provider.social_links?.facebook || '')
+  const [localInstagram, setLocalInstagram] = useState(provider.social_links?.instagram || '')
+
+  // Sync local state when provider changes
+  useEffect(() => {
+    setLocalFacebook(provider.social_links?.facebook || '')
+    setLocalInstagram(provider.social_links?.instagram || '')
+  }, [provider.id])
+
   return (
     <div className="space-y-6">
-      {/* Specialties */}
+      {/* Specialties - Already uses defaultValue + onBlur pattern (optimized) */}
       <div>
         <label className="block text-sm font-medium text-neutral-700 mb-1">
           Specialties
@@ -52,7 +64,7 @@ export function ProviderMetadataFields({
         </p>
       </div>
 
-      {/* Service Areas */}
+      {/* Service Areas - Already uses defaultValue + onBlur pattern (optimized) */}
       <div>
         <label className="block text-sm font-medium text-neutral-700 mb-1">
           Areas You Serve
@@ -89,8 +101,9 @@ export function ProviderMetadataFields({
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Facebook</label>
             <input 
-              value={provider.social_links?.facebook || ''} 
-              onChange={(e) => {
+              value={localFacebook} 
+              onChange={(e) => setLocalFacebook(e.target.value)}
+              onBlur={(e) => {
                 onUpdate('social_links', { 
                   ...provider.social_links, 
                   facebook: e.target.value 
@@ -106,8 +119,9 @@ export function ProviderMetadataFields({
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Instagram</label>
             <input 
-              value={provider.social_links?.instagram || ''} 
-              onChange={(e) => {
+              value={localInstagram} 
+              onChange={(e) => setLocalInstagram(e.target.value)}
+              onBlur={(e) => {
                 onUpdate('social_links', { 
                   ...provider.social_links, 
                   instagram: e.target.value 

@@ -1,11 +1,15 @@
+import { useState, useEffect } from 'react'
 import { type ProviderRow } from '../../pages/Admin'
 
 /**
- * PROVIDER CORE INFO FIELDS
+ * PROVIDER CORE INFO FIELDS - OPTIMIZED ⚡
  * 
- * Step 1 of gradual Admin.tsx extraction.
- * This component renders the core business information fields (name, category, contact info).
- * Still uses parent state via props - performance optimization comes in Step 5.
+ * Step 5: Performance optimization complete!
+ * Uses local state for instant typing with no lag.
+ * Only updates parent component on blur/save events.
+ * 
+ * This prevents the massive Admin.tsx component from re-rendering
+ * on every keystroke, fixing the typing lag issue.
  */
 
 interface ProviderCoreInfoFieldsProps {
@@ -19,6 +23,22 @@ export function ProviderCoreInfoFields({
   catOptions, 
   onUpdate 
 }: ProviderCoreInfoFieldsProps) {
+  // Local state for instant typing (no parent re-renders!)
+  const [localName, setLocalName] = useState(provider.name || '')
+  const [localPhone, setLocalPhone] = useState(provider.phone || '')
+  const [localEmail, setLocalEmail] = useState(provider.email || '')
+  const [localWebsite, setLocalWebsite] = useState(provider.website || '')
+  const [localAddress, setLocalAddress] = useState(provider.address || '')
+
+  // Sync local state when provider changes (e.g., switching between providers)
+  useEffect(() => {
+    setLocalName(provider.name || '')
+    setLocalPhone(provider.phone || '')
+    setLocalEmail(provider.email || '')
+    setLocalWebsite(provider.website || '')
+    setLocalAddress(provider.address || '')
+  }, [provider.id]) // Only update when switching to a different provider
+
   return (
     <div>
       <h4 className="text-md font-medium text-neutral-800 mb-4">Core Business Information</h4>
@@ -29,14 +49,15 @@ export function ProviderCoreInfoFields({
             Business Name *
           </label>
           <input 
-            value={provider.name || ''} 
-            onChange={(e) => onUpdate('name', e.target.value)}
+            value={localName} 
+            onChange={(e) => setLocalName(e.target.value)} // Instant local update
+            onBlur={(e) => onUpdate('name', e.target.value)} // Parent update on blur
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
             placeholder="Enter business name"
           />
         </div>
 
-        {/* Category */}
+        {/* Category - Updates immediately (dropdowns are fast) */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-1">
             Category *
@@ -58,8 +79,9 @@ export function ProviderCoreInfoFields({
             Phone Number
           </label>
           <input 
-            value={provider.phone || ''} 
-            onChange={(e) => onUpdate('phone', e.target.value)}
+            value={localPhone} 
+            onChange={(e) => setLocalPhone(e.target.value)}
+            onBlur={(e) => onUpdate('phone', e.target.value)}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
             placeholder="(619) 123-4567"
           />
@@ -71,8 +93,9 @@ export function ProviderCoreInfoFields({
             Email Address
           </label>
           <input 
-            value={provider.email || ''} 
-            onChange={(e) => onUpdate('email', e.target.value)}
+            value={localEmail} 
+            onChange={(e) => setLocalEmail(e.target.value)}
+            onBlur={(e) => onUpdate('email', e.target.value)}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
             placeholder="business@example.com"
           />
@@ -84,8 +107,9 @@ export function ProviderCoreInfoFields({
             Website
           </label>
           <input 
-            value={provider.website || ''} 
-            onChange={(e) => onUpdate('website', e.target.value)}
+            value={localWebsite} 
+            onChange={(e) => setLocalWebsite(e.target.value)}
+            onBlur={(e) => onUpdate('website', e.target.value)}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
             placeholder="https://www.example.com"
           />
@@ -97,8 +121,9 @@ export function ProviderCoreInfoFields({
             Address
           </label>
           <input 
-            value={provider.address || ''} 
-            onChange={(e) => onUpdate('address', e.target.value)}
+            value={localAddress} 
+            onChange={(e) => setLocalAddress(e.target.value)}
+            onBlur={(e) => onUpdate('address', e.target.value)}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500" 
             placeholder="123 Main St, Bonita, CA 91902"
           />
