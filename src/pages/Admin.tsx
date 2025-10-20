@@ -22,6 +22,7 @@ import { CustomerUsersSection } from '../components/admin/sections/CustomerUsers
 import { ContactLeadsSection } from '../components/admin/sections/ContactLeadsSection-2025-10-19'
 import { BusinessAccountsSection } from '../components/admin/sections/BusinessAccountsSection-2025-10-19'
 import { UsersSection } from '../components/admin/sections/UsersSection-2025-10-19'
+import { FunnelResponsesSection } from '../components/admin/sections/FunnelResponsesSection-2025-10-19'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -285,12 +286,10 @@ export default function AdminPage() {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
   // STEP 12: expandedChangeRequestIds and expandedBusinessDropdowns deleted - moved to ChangeRequestsSection
-  const [editFunnel, setEditFunnel] = useState<Record<string, string>>({})
+  // STEP 19: editFunnel and funnelUserFilter deleted - moved to FunnelResponsesSection
   const [editBooking, setEditBooking] = useState<Record<string, { name?: string; notes?: string; answers?: string; status?: string }>>({})
   const [expandedBusinessDetails, setExpandedBusinessDetails] = useState<Record<string, any>>({})
   const [loadingBusinessDetails, setLoadingBusinessDetails] = useState<Record<string, boolean>>({})
-  // Filter state for funnel responses - allows filtering by specific user email
-  const [funnelUserFilter, setFunnelUserFilter] = useState<string>('')
   // Featured provider filter moved to ContactLeadsSection component (Step 16)
   // Loading state for provider save operations
   const [savingProvider, setSavingProvider] = useState(false)
@@ -1068,20 +1067,7 @@ export default function AdminPage() {
       .sort()
   }, [funnels, bookings, bookingEvents, profiles, businessEmails])
 
-  // Filtered funnel responses based on user email filter
-  // This allows admins to view responses from specific users to avoid overwhelming display
-  const filteredFunnels = useMemo(() => {
-    if (!funnelUserFilter.trim()) {
-      // If no filter is set, show all funnel responses
-      return funnels
-    }
-    // Filter funnels by user email (case-insensitive partial match)
-    const filterLower = funnelUserFilter.toLowerCase().trim()
-    return funnels.filter(funnel => 
-      funnel.user_email.toLowerCase().includes(filterLower)
-    )
-  }, [funnels, funnelUserFilter])
-
+  // STEP 19: filteredFunnels deleted - moved to FunnelResponsesSection component
   // Removed legacy businessAccounts (email-derived). Business accounts now come from profiles.role === 'business'.
 
   // Inline helpers for admin edits
@@ -2335,71 +2321,12 @@ export default function AdminPage() {
             />
           )}
           {section === 'funnel-responses' && (
-          <div className="rounded-2xl border border-neutral-100 p-4 bg-white hover-gradient interactive-card">
-            <div className="font-medium">Funnel Responses</div>
-            
-            {/* User Filter Section - allows filtering by specific user email to avoid overwhelming display */}
-            <div className="mt-3 mb-4">
-              <div className="flex items-center gap-3">
-                <label htmlFor="funnel-user-filter" className="text-sm font-medium text-neutral-700">
-                  Filter by user email:
-                </label>
-                <div className="flex-1 relative">
-                  <input
-                    id="funnel-user-filter"
-                    type="text"
-                    value={funnelUserFilter}
-                    onChange={(e) => setFunnelUserFilter(e.target.value)}
-                    placeholder="Enter user email to filter..."
-                    className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm placeholder:text-neutral-400"
-                    list="funnel-user-emails"
-                  />
-                  {/* Dropdown with existing user emails for quick selection */}
-                  <datalist id="funnel-user-emails">
-                    {Array.from(new Set(funnels.map(f => f.user_email).filter(Boolean))).sort().map(email => (
-                      <option key={email} value={email} />
-                    ))}
-                  </datalist>
-                </div>
-                {funnelUserFilter && (
-                  <button
-                    onClick={() => setFunnelUserFilter('')}
-                    className="rounded-full bg-neutral-100 text-neutral-600 px-3 py-1.5 text-xs hover:bg-neutral-200"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {/* Show filter status and count */}
-              <div className="mt-2 text-xs text-neutral-500">
-                {funnelUserFilter ? (
-                  <>Showing {filteredFunnels.length} of {funnels.length} responses</>
-                ) : (
-                  <>Showing all {funnels.length} responses</>
-                )}
-              </div>
-            </div>
-            
-            <div className="mt-2 space-y-2 text-sm">
-              {filteredFunnels.length === 0 && (
-                <div className="text-neutral-500">
-                  {funnelUserFilter ? 'No responses found for this user.' : 'No entries yet.'}
-                </div>
-              )}
-              {filteredFunnels.map((row) => (
-                <div key={row.id} className="rounded-xl border border-neutral-200 p-3 hover-gradient interactive-card">
-                  <div className="text-neutral-800 font-medium">{row.category_key}</div>
-                  <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
-                  <div className="mt-1 text-xs text-neutral-600">User: {row.user_email}</div>
-                  <textarea className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs" style={{ height: '14vh' }} defaultValue={JSON.stringify(row.answers, null, 2)} onChange={(e) => setEditFunnel((m) => ({ ...m, [row.id]: e.target.value }))} />
-                  <div className="mt-2 flex items-center gap-2">
-                    <button onClick={async () => { try { const next = (() => { try { return JSON.parse(editFunnel[row.id] || JSON.stringify(row.answers || {})) } catch { return row.answers } })(); const { error } = await supabase.from('funnel_responses').update({ answers: next as any }).eq('id', row.id); if (error) setError(error.message); else setMessage('Funnel updated') } catch {} }} className="btn btn-secondary text-xs">Save</button>
-                    <button onClick={async () => { const { error } = await supabase.from('funnel_responses').delete().eq('id', row.id); if (error) setError(error.message); else { setFunnels((arr) => arr.filter((f) => f.id !== row.id)); setMessage('Funnel deleted') } }} className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs">Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+            <FunnelResponsesSection
+              funnels={funnels}
+              onMessage={setMessage}
+              onError={setError}
+              onFunnelsUpdate={setFunnels}
+            />
           )}
 
           {section === 'bookings' && (
