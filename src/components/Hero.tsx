@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Search } from 'lucide-react'
 import SplitText from './SplitText'
 
 // ============================================================================
@@ -172,7 +173,7 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
             <div className="mt-4 mx-auto max-w-md text-left" style={{ position: 'relative', zIndex: 2 }}>
               <div className="relative">
                 <div className="flex items-center rounded-full bg-white border-2 border-blue-400 px-4 py-3 shadow-lg focus-within:border-blue-500 focus-within:shadow-xl transition-all duration-300 hover:border-blue-300 search-bar-shine">
-                  <span className="mr-3 select-none text-lg">🔎</span>
+                  <Search className="w-5 h-5 text-neutral-500 mr-3 flex-shrink-0" />
                   <input
                     value={query}
                     onChange={(e) => { 

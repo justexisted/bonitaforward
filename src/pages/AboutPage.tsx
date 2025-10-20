@@ -1,4 +1,5 @@
 import Prism from '../components/Prism'
+import { Handshake, Scale, Users, Lightbulb, Home, TrendingUp } from 'lucide-react'
 
 // Container component (copied from App.tsx)
 function Container(props: { children: React.ReactNode; className?: string }) {
@@ -9,7 +10,7 @@ export default function AboutPage() {
   return (
     <section className="relative min-h-screen py-12">
       {/* Prism Background - Top Section */}
-      <div className="absolute top-0 left-0 right-0 h-96 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0)' }}>
+      <div className="absolute top-0 left-0 right-0 h-96 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0) rotate(180deg)' }}>
         <Prism
           height={6}
           baseWidth={18}
@@ -17,7 +18,7 @@ export default function AboutPage() {
           glow={0.6}
           noise={0}
           transparent={true}
-          scale={1.8}
+          scale={1.2}
           hueShift={0.3}
           colorFrequency={0.6}
           timeScale={0.08}
@@ -77,7 +78,9 @@ export default function AboutPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
               {/* Community First */}
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-                <div className="text-4xl mb-4">🤝</div>
+                <div className="mb-4 flex justify-center">
+                  <Handshake className="w-12 h-12 text-blue-600" />
+                </div>
                 <h3 className="text-xl font-bold text-black mb-3">Community First</h3>
                 <p className="text-black/80 text-sm">
                   Every decision we make prioritizes the well-being and growth of our local community.
@@ -86,7 +89,9 @@ export default function AboutPage() {
 
               {/* Integrity */}
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-                <div className="text-4xl mb-4">⚖️</div>
+                <div className="mb-4 flex justify-center">
+                  <Scale className="w-12 h-12 text-purple-600" />
+                </div>
                 <h3 className="text-xl font-bold text-black mb-3">Integrity</h3>
                 <p className="text-black/80 text-sm">
                   We operate with honesty, transparency, and ethical practices in everything we do.
@@ -95,7 +100,9 @@ export default function AboutPage() {
 
               {/* Collaboration */}
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-                <div className="text-4xl mb-4">🤝</div>
+                <div className="mb-4 flex justify-center">
+                  <Users className="w-12 h-12 text-green-600" />
+                </div>
                 <h3 className="text-xl font-bold text-black mb-3">Collaboration</h3>
                 <p className="text-black/80 text-sm">
                   We believe in the power of working together to achieve common goals.
@@ -104,7 +111,9 @@ export default function AboutPage() {
 
               {/* Innovation */}
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-                <div className="text-4xl mb-4">💡</div>
+                <div className="mb-4 flex justify-center">
+                  <Lightbulb className="w-12 h-12 text-yellow-600" />
+                </div>
                 <h3 className="text-xl font-bold text-black mb-3">Innovation</h3>
                 <p className="text-black/80 text-sm">
                   We continuously seek creative solutions to support our local businesses.
@@ -113,7 +122,9 @@ export default function AboutPage() {
 
               {/* Local Pride */}
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-                <div className="text-4xl mb-4">🏠</div>
+                <div className="mb-4 flex justify-center">
+                  <Home className="w-12 h-12 text-red-600" />
+                </div>
                 <h3 className="text-xl font-bold text-black mb-3">Local Pride</h3>
                 <p className="text-black/80 text-sm">
                   We celebrate and promote the unique character and businesses of Bonita.
@@ -122,7 +133,9 @@ export default function AboutPage() {
 
               {/* Growth */}
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-                <div className="text-4xl mb-4">📈</div>
+                <div className="mb-4 flex justify-center">
+                  <TrendingUp className="w-12 h-12 text-emerald-600" />
+                </div>
                 <h3 className="text-xl font-bold text-black mb-3">Growth</h3>
                 <p className="text-black/80 text-sm">
                   We're committed to fostering sustainable economic growth for our community.

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, MapPin, Clock } from 'lucide-react'
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, MapPin, Clock, BookOpen, Sparkles, Check, ThumbsUp, ThumbsDown, AlertCircle } from 'lucide-react'
 import { type CalendarEvent } from '../pages/Calendar'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -333,7 +333,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                     <CalendarIcon className="w-10 h-10 md:w-12 md:h-12 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-2xl md:text-3xl font-bold text-blue-900 mb-2">Welcome to Our Community Calendar! 📅</h3>
+                    <h3 className="text-2xl md:text-3xl font-bold text-blue-900 mb-2">Welcome to Our Community Calendar!</h3>
                     <p className="text-sm md:text-base text-neutral-700">All events are family-friendly and within 20 minutes of Bonita</p>
                   </div>
                 </div>
@@ -341,20 +341,22 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                 {/* How It Works Section */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 md:p-5">
                   <h4 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2">
-                    <span>📖</span> How the Calendar Works
+                    <BookOpen className="w-5 h-5" />
+                    <span>How the Calendar Works</span>
                   </h4>
                   <div className="text-sm md:text-base text-blue-800 space-y-2">
                     <p>• <strong>Click any event</strong> to see full details (time, location, description)</p>
                     <p className="md:hidden">• <strong>Tap a day</strong> to see all events for that date</p>
                     <p className="hidden md:block">• <strong>Hover over events</strong> to preview their titles</p>
-                    <p>• <strong>Vote with 👍 or 👎</strong> to help curate the best community events</p>
+                    <p>• <strong>Vote with</strong> <ThumbsUp className="w-4 h-4 inline-block" /> <strong>or</strong> <ThumbsDown className="w-4 h-4 inline-block" /> to help curate the best community events</p>
                   </div>
                 </div>
 
                 {/* Community Guidelines Section */}
                 <div className="bg-green-50 border border-green-200 rounded-xl p-4 md:p-5">
                   <h4 className="text-lg font-bold text-green-900 mb-3 flex items-center gap-2">
-                    <span>✨</span> Share Your Events
+                    <Sparkles className="w-5 h-5" />
+                    <span>Share Your Events</span>
                   </h4>
                   <div className="text-sm md:text-base text-green-800 space-y-2">
                     <p>• <strong>Post your own events</strong> to share with the community</p>
@@ -370,7 +372,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                     onClick={dismissInfoCard}
                     className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 text-base md:text-lg"
                   >
-                    <span className="text-2xl">✓</span>
+                    <Check className="w-6 h-6" />
                     <span>I'll Post Relevant & Family-Friendly Content</span>
                   </button>
                   <p className="text-center text-xs text-neutral-500 mt-3">
