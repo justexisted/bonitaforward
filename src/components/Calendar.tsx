@@ -201,7 +201,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
         </div>
 
         {/* Calendar Grid */}
-        <div className={`bg-white rounded-2xl shadow-lg border border-neutral-200 relative ${showInfoCard ? 'blur-sm' : ''}`}>
+        <div className={`bg-white rounded-2xl shadow-lg border border-neutral-200 relative ${showInfoCard ? 'blur-[2px]' : ''}`}>
           {/* Month Navigation */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <button
@@ -317,26 +317,65 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
         {/* Info Card Overlay */}
         {showInfoCard && (
           <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-2xl p-6 md:p-8 relative max-w-2xl w-full shadow-2xl">
+            <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50 border-2 border-blue-400 rounded-2xl p-6 md:p-8 relative max-w-3xl w-full shadow-2xl">
               <button
                 onClick={dismissInfoCard}
-                className="absolute top-4 right-4 bg-blue-200 hover:bg-blue-300 rounded-full p-2 transition-colors"
+                className="absolute top-3 right-3 text-neutral-400 hover:text-neutral-600 transition-colors"
                 aria-label="Dismiss info card"
               >
-                <X className="w-5 h-5 text-blue-800" />
+                <X className="w-5 h-5" />
               </button>
-              <div className="flex items-start space-x-4 pr-10">
-                <div className="flex-shrink-0">
-                  <CalendarIcon className="w-8 h-8 md:w-10 md:h-10 text-blue-600 mt-0.5" />
-                </div>
-                <div>
-                  <h3 className="text-xl md:text-2xl font-bold text-blue-900 mb-4">How the Calendar Works</h3>
-                  <div className="text-sm md:text-base text-blue-800 space-y-2.5">
-                    <p>• <strong>Click on any event</strong> to see full details including time, location, and description</p>
-                    <p className="md:hidden">• <strong>Tap a day</strong> to see all events for that date</p>
-                    <p className="hidden md:block">• <strong>Hover over events</strong> to see their titles</p>
-                    <p>• All events are within 20 minutes of Chula Vista and curated for Bonita</p>
+              
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-start space-x-4 pr-8">
+                  <div className="flex-shrink-0">
+                    <CalendarIcon className="w-10 h-10 md:w-12 md:h-12 text-blue-600" />
                   </div>
+                  <div>
+                    <h3 className="text-2xl md:text-3xl font-bold text-blue-900 mb-2">Welcome to Our Community Calendar! 📅</h3>
+                    <p className="text-sm md:text-base text-neutral-700">All events are family-friendly and within 20 minutes of Bonita</p>
+                  </div>
+                </div>
+
+                {/* How It Works Section */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 md:p-5">
+                  <h4 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    <span>📖</span> How the Calendar Works
+                  </h4>
+                  <div className="text-sm md:text-base text-blue-800 space-y-2">
+                    <p>• <strong>Click any event</strong> to see full details (time, location, description)</p>
+                    <p className="md:hidden">• <strong>Tap a day</strong> to see all events for that date</p>
+                    <p className="hidden md:block">• <strong>Hover over events</strong> to preview their titles</p>
+                    <p>• <strong>Vote with 👍 or 👎</strong> to help curate the best community events</p>
+                  </div>
+                </div>
+
+                {/* Community Guidelines Section */}
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 md:p-5">
+                  <h4 className="text-lg font-bold text-green-900 mb-3 flex items-center gap-2">
+                    <span>✨</span> Share Your Events
+                  </h4>
+                  <div className="text-sm md:text-base text-green-800 space-y-2">
+                    <p>• <strong>Post your own events</strong> to share with the community</p>
+                    <p>• <strong>Keep it family-friendly</strong> - appropriate for all ages</p>
+                    <p>• <strong>Stay relevant</strong> - events must be within 20 min of Bonita/Chula Vista</p>
+                    <p>• <strong>Flag inappropriate content</strong> - help keep our calendar safe</p>
+                  </div>
+                </div>
+
+                {/* CTA Button */}
+                <div className="pt-2">
+                  <button
+                    onClick={dismissInfoCard}
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 text-base md:text-lg"
+                  >
+                    <span className="text-2xl">✓</span>
+                    <span>I'll Post Relevant & Family-Friendly Content</span>
+                  </button>
+                  <p className="text-center text-xs text-neutral-500 mt-3">
+                    By using this calendar, you agree to keep content appropriate for our family-oriented community
+                  </p>
                 </div>
               </div>
             </div>
