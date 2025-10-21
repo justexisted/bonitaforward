@@ -1626,7 +1626,7 @@ export default function AdminPage() {
     )
   }
   
-  console.log('[Admin] ✅ Auth checks passed - rendering admin panel')
+  /* console.log('[Admin] ✅ Auth checks passed - rendering admin panel') */
 
   return (
     <section className="py-8">

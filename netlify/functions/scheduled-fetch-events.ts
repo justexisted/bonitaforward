@@ -21,7 +21,7 @@ const ICAL_FEEDS = [
     url: 'https://thinkplaycreate.org/?post_type=tribe_events&ical=1&eventDisplay=list',
     source: 'Think Play Create',
     category: 'Education',
-    enabled: true
+    enabled: false  // Disabled - set to true to re-enable
   },
   // Disabled feeds (404 errors - URLs no longer exist)
   // {
