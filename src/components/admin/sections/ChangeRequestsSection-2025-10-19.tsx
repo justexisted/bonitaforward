@@ -436,7 +436,7 @@ export function ChangeRequestsSection({
                                       ? 'FEATURED UPGRADE ($97/YEAR)'
                                       : r.type === 'claim'
                                       ? 'BUSINESS CLAIM'
-                                      : r.type.toUpperCase()}
+                                      : String(r.type).toUpperCase()}
                                   </span>
                                   {/* Debug: Show raw type value */}
                                   <span className="text-[10px] text-neutral-400 font-mono">
