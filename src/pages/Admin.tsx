@@ -6,6 +6,8 @@ import { type CalendarEvent } from './Calendar'
 // iCalendar parsing moved to server-side Netlify function for reliability
 // import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
+// Provider management utilities (extracted for better organization)
+import * as ProviderUtils from '../utils/adminProviderUtils'
 import { BlogSection } from '../components/admin/sections/BlogSection-2025-10-19'
 import { JobPostsSection } from '../components/admin/sections/JobPostsSection-2025-10-19'
 import { ChangeRequestsSection } from '../components/admin/sections/ChangeRequestsSection-2025-10-19'
@@ -167,6 +169,17 @@ type ProfileRow = {
  */
 export default function AdminPage() {
   const auth = useAuth()
+  
+  // DEBUG: Log on mount
+  useEffect(() => {
+    console.log('=== ADMIN PAGE MOUNTED ===')
+    console.log('[Admin] Initial auth state:', {
+      email: auth.email,
+      loading: auth.loading,
+      isAuthed: auth.isAuthed,
+      userId: auth.userId
+    })
+  }, [])
   
   // ============================================================================
   // NEW: Service-Based Data Management (Phase 1)
@@ -334,102 +347,13 @@ export default function AdminPage() {
 
   // Filtered providers logic moved to ContactLeadsSection component (Step 16)
 
-  /**
-   * TOGGLE FEATURED STATUS
-   * 
-   * This function allows admins to toggle a provider's featured status.
-   * It handles both is_featured and is_member fields to ensure proper toggling.
-   * When making featured, it sets both is_featured=true and featured_since timestamp.
-   * When removing featured, it sets both is_featured=false and is_member=false.
-   */
-  const toggleFeaturedStatus = async (providerId: string, currentStatus: boolean) => {
-    // ADD THIS: Check if session is still valid before updating featured status
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      setError('Session expired. Please refresh the page and try again.')
-      return
-    }
-    try {
-      setMessage('Updating featured status...')
-      
-      // Always update both is_featured and is_member to ensure consistent state
-      const updateData: Partial<ProviderRow> = {
-        is_featured: !currentStatus,
-        is_member: !currentStatus, // Keep both fields in sync
-        updated_at: new Date().toISOString()
-      }
-      
-      // If making featured, set the featured_since timestamp
-      if (!currentStatus) {
-        updateData.featured_since = new Date().toISOString()
-      } else {
-        // If removing featured status, clear the featured_since timestamp
-        updateData.featured_since = null
-      }
-      
-      // console.log('[Admin] Toggling featured status:', { providerId, currentStatus, updateData })
-      
-      const { error } = await supabase
-        .from('providers')
-        .update(updateData)
-        .eq('id', providerId)
+  // REFACTORED: Moved to adminProviderUtils.ts
+  const toggleFeaturedStatus = (providerId: string, currentStatus: boolean) => 
+    ProviderUtils.toggleFeaturedStatus(providerId, currentStatus, setMessage, setError, setProviders)
 
-      if (error) {
-        console.error('[Admin] Error updating featured status:', error)
-        throw error
-      }
-
-      // console.log('[Admin] Featured status updated successfully')
-      setMessage(`Provider ${!currentStatus ? 'featured' : 'unfeatured'} successfully!`)
-      
-      // Refresh providers data - using select('*') to get all fields including newly added ones
-      const { data: pData } = await supabase
-        .from('providers')
-        .select('*')
-        .order('name', { ascending: true })
-      setProviders((pData as ProviderRow[]) || [])
-    } catch (error: any) {
-      console.error('[Admin] Error in toggleFeaturedStatus:', error)
-      setMessage(`Error updating featured status: ${error.message}`)
-    }
-  }
-
-  /**
-   * UPDATE SUBSCRIPTION TYPE
-   * 
-   * This function allows admins to update a provider's subscription type (monthly/yearly).
-   */
-  const updateSubscriptionType = async (providerId: string, subscriptionType: 'monthly' | 'yearly') => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      setError('Session expired. Please refresh the page and try again.')
-      return
-    }
-    try {
-      setMessage('Updating subscription type...')
-      
-      const { error } = await supabase
-        .from('providers')
-        .update({
-          subscription_type: subscriptionType,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', providerId)
-
-      if (error) throw error
-
-      setMessage(`Subscription type updated to ${subscriptionType}!`)
-      
-      // Refresh providers data - using select('*') to get all fields including newly added ones
-      const { data: pData } = await supabase
-        .from('providers')
-        .select('*')
-        .order('name', { ascending: true })
-      setProviders((pData as ProviderRow[]) || [])
-    } catch (error: any) {
-      setMessage(`Error updating subscription type: ${error.message}`)
-    }
-  }
+  // REFACTORED: Moved to adminProviderUtils.ts
+  const updateSubscriptionType = (providerId: string, subscriptionType: 'monthly' | 'yearly') =>
+    ProviderUtils.updateSubscriptionType(providerId, subscriptionType, setMessage, setError, setProviders)
 
   /**
    * LOAD CHANGE REQUESTS
@@ -446,27 +370,25 @@ export default function AdminPage() {
    */
   const loadChangeRequests = async () => {
     try {
-      // console.log('========================================')
-      console.log('[Admin] STARTING loadChangeRequests')  // KEPT: Change request logging
-      // console.log('========================================')
+      console.log('[Admin] STARTING loadChangeRequests')
       
-      // CRITICAL FIX: Refresh session to ensure token is valid
-      // This prevents "Invalid token" / "fetch failed" errors
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
+      // FIXED: Use getSession() instead of refreshSession() to avoid clearing auth
+      // refreshSession() was causing the auth state to be cleared, signing out the user
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError) {
-        console.error('[Admin] ❌ Session refresh failed:', sessionError)
-        setError('Session expired. Please refresh the page and sign in again.')
+        console.error('[Admin] ❌ Session get failed:', sessionError)
+        setError('Session error. Please refresh the page and sign in again.')
         return
       }
       
       if (!session?.access_token) {
-        console.error('[Admin] ❌ No auth token available after refresh')
+        console.error('[Admin] ❌ No auth token available')
         setError('Not authenticated. Please refresh the page and sign in again.')
         return
       }
 
-      console.log('[Admin] ✓ Session refreshed, auth token acquired')
+      console.log('[Admin] ✓ Session acquired, auth token obtained')
 
       // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
       // Use relative URL for Netlify functions (works in both dev and production)
@@ -532,12 +454,12 @@ export default function AdminPage() {
     try {
       console.log('[Admin] STARTING loadJobPosts')
       
-      // CRITICAL FIX: Refresh session to ensure token is valid
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
+      // FIXED: Use getSession() instead of refreshSession() to avoid clearing auth
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError || !session?.access_token) {
         console.error('[Admin] No session token available for job posts')
-        setError('Session expired. Please refresh the page.')
+        setError('Session error. Please refresh the page.')
         return
       }
 
@@ -584,11 +506,11 @@ export default function AdminPage() {
     try {
       console.log('[Admin] STARTING loadBookingEvents')
       
-      // CRITICAL FIX: Refresh session to ensure token is valid
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
+      // FIXED: Use getSession() instead of refreshSession() to avoid clearing auth
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       if (sessionError || !session?.access_token) {
         console.error('[Admin] No session token available for booking events')
-        setError('Session expired. Please refresh the page.')
+        setError('Session error. Please refresh the page.')
         return
       }
 
@@ -781,12 +703,21 @@ export default function AdminPage() {
   }>({ isAdmin: false, loading: true, verified: false })
   
   // Legacy client-side check for fallback
-  const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
-    .split(',')
-    .map((s: string) => s.trim().toLowerCase())
-    .filter(Boolean)
-  const adminList = adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
-  const isClientAdmin = useMemo(() => !!auth.email && adminList.includes(auth.email.toLowerCase()), [auth.email, adminList])
+  // CRITICAL FIX: Memoize adminList to prevent unnecessary recalculations
+  // Without this, adminList gets a new reference on every render, causing isClientAdmin 
+  // to recalculate and potentially trigger auth state changes that sign out the user
+  const adminList = useMemo(() => {
+    const adminEnv = (import.meta.env.VITE_ADMIN_EMAILS || '')
+      .split(',')
+      .map((s: string) => s.trim().toLowerCase())
+      .filter(Boolean)
+    return adminEnv.length > 0 ? adminEnv : ['justexisted@gmail.com']
+  }, []) // Empty deps - admin emails don't change during runtime
+  
+  const isClientAdmin = useMemo(
+    () => !!auth.email && adminList.includes(auth.email.toLowerCase()), 
+    [auth.email, adminList]
+  )
 
   /**
    * CRITICAL FIX: Admin verification race condition
@@ -800,43 +731,57 @@ export default function AdminPage() {
    */
   useEffect(() => {
     async function verifyAdmin() {
-      // console.log('[Admin] Admin verification triggered for:', auth.email, 'loading:', auth.loading)
+      console.log('=== ADMIN VERIFICATION START ===')
+      console.log('[Admin] Auth state:', { 
+        email: auth.email, 
+        loading: auth.loading,
+        isAuthed: auth.isAuthed,
+        userId: auth.userId
+      })
+      console.log('[Admin] Current adminStatus:', adminStatus)
+      console.log('[Admin] isClientAdmin:', isClientAdmin)
       
       if (!auth.email) {
-        // console.log('[Admin] No email, setting admin status to false')
+        console.log('[Admin] ❌ No email, setting admin status to false')
         setAdminStatus({ isAdmin: false, loading: false, verified: false })
         return
       }
 
       // CRITICAL: Don't re-verify if already verified for this email
       if (adminStatus.verified && adminStatus.isAdmin && auth.email) {
-        // console.log('[Admin] Already verified as admin for this email, skipping re-verification')
+        console.log('[Admin] ✓ Already verified as admin, skipping re-verification')
         return
       }
 
       // CRITICAL: Don't verify during auth loading to prevent race conditions
       if (auth.loading) {
-        // console.log('[Admin] Auth still loading, skipping verification')
+        console.log('[Admin] ⏳ Auth still loading, skipping verification')
         return
       }
 
-      // console.log('[Admin] Starting admin verification for:', auth.email)
+      console.log('[Admin] 🔍 Starting admin verification for:', auth.email)
       setAdminStatus(prev => ({ ...prev, loading: true }))
 
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        console.log('[Admin] Getting session...')
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log('[Admin] Session result:', { 
+          hasSession: !!session, 
+          hasToken: !!session?.access_token,
+          sessionError: sessionError?.message 
+        })
+        
         const token = session?.access_token
         
         if (!token) {
-          // console.log('[Admin] No auth token, using client-side admin check:', isClientAdmin)
+          console.log('[Admin] ⚠️ No auth token, using client-side admin check:', isClientAdmin)
           setAdminStatus({ isAdmin: isClientAdmin, loading: false, verified: false })
           return
         }
 
         // Use relative URL for Netlify functions (works in both dev and production)
         const url = '/.netlify/functions/admin-verify'
-      
-      // console.log('[Admin] Making server verification request to:', url)
+        console.log('[Admin] 📡 Making server verification request to:', url)
         
         const response = await fetch(url, {
           method: 'POST',
@@ -846,18 +791,27 @@ export default function AdminPage() {
         }
       })
       
-      // console.log('[Admin] Server verification response:', response.status, response.ok)
+        console.log('[Admin] Server response:', {
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText
+        })
 
         if (response.ok) {
           const result = await response.json()
-          // console.log('[Admin] Server verification result:', result)
+          console.log('[Admin] ✅ Server verification SUCCESS:', result)
           setAdminStatus({
             isAdmin: result.isAdmin,
             loading: false,
             verified: true
           })
         } else {
-          // console.log('[Admin] Server verification failed, using client-side check:', isClientAdmin)
+          const errorText = await response.text()
+          console.log('[Admin] ❌ Server verification FAILED:', {
+            status: response.status,
+            error: errorText
+          })
+          console.log('[Admin] Falling back to client-side check:', isClientAdmin)
           // Fallback to client-side check if server verification fails
           setAdminStatus({
             isAdmin: isClientAdmin,
@@ -866,8 +820,13 @@ export default function AdminPage() {
             error: 'Server verification unavailable'
           })
         }
-      } catch (err) {
-        // console.log('[Admin] Server verification error, using client-side check:', isClientAdmin, 'Error:', err)
+      } catch (err: any) {
+        console.log('[Admin] ❌ Exception during verification:', err)
+        console.log('[Admin] Error details:', {
+          message: err?.message,
+          stack: err?.stack
+        })
+        console.log('[Admin] Falling back to client-side check:', isClientAdmin)
         // Fallback to client-side check on error
         setAdminStatus({
           isAdmin: isClientAdmin,
@@ -876,6 +835,7 @@ export default function AdminPage() {
           error: 'Server verification failed'
         })
       }
+      console.log('=== ADMIN VERIFICATION END ===')
     }
 
     /**
@@ -898,6 +858,12 @@ export default function AdminPage() {
   }, [auth.email, auth.loading]) // Removed isClientAdmin dependency
 
   const isAdmin = adminStatus.isAdmin
+  
+  // DEBUG: Log when isAdmin changes
+  useEffect(() => {
+    console.log('[Admin] 🔐 isAdmin changed to:', isAdmin, 'adminStatus:', adminStatus)
+  }, [isAdmin, adminStatus])
+  
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1279,553 +1245,71 @@ export default function AdminPage() {
     }
   }
 
-  /**
-   * SAVE PROVIDER - Enhanced Admin Provider Update
-   * 
-   * This function saves all provider fields including the enhanced business management fields.
-   * It includes all the same fields that are available in the My Business page editing form.
-   * 
-   * Features:
-   * - Updates all core business fields (name, category, contact info)
-   * - Updates enhanced fields (description, specialties, social links, etc.)
-   * - Handles free vs featured plan restrictions
-   * - Provides clear success/error feedback
-   * - Refreshes provider data after successful update
-   */
-  async function saveProvider(p: ProviderRow) {
-    setMessage(null)
-    setError(null)
-    setSavingProvider(true)
+  // REFACTORED: Moved to adminProviderUtils.ts
+  const saveProvider = (p: ProviderRow) =>
+    ProviderUtils.saveProvider(
+      p,
+      setMessage,
+      setError,
+      setSavingProvider,
+      setProviders,
+      setRetryProvider,
+      clearSavedState,
+      setIsCreatingNewProvider,
+      setSelectedProviderId
+    )
 
-    // Check if this is a new provider being created
-    if (p.id === 'new') {
-      // Create new provider logic
-      try {
-        // Validate required fields
-        if (!p.name?.trim()) {
-          setError('Business name is required')
-          setSavingProvider(false)
-          return
-        }
-
-        // Check if session is still valid
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          setError('Session expired. Please refresh the page and try again.')
-          setSavingProvider(false)
-          return
-        }
-
-        // Create the provider (remove the temporary 'new' id)
-        const { id, ...providerData } = p
-        const { error } = await supabase
-          .from('providers')
-          .insert([{
-            ...providerData,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
-
-        if (error) {
-          console.error('[Admin] Error creating provider:', error)
-          setError(`Failed to create provider: ${error.message}`)
-          setSavingProvider(false)
-          return
-        }
-
-        setMessage('New provider created successfully!')
-        
-        // Refresh providers data
-        const { data: pData } = await supabase
-          .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
-          .order('name', { ascending: true })
-        setProviders((pData as ProviderRow[]) || [])
-        
-        // Exit create mode
-        setIsCreatingNewProvider(false)
-        setSelectedProviderId(null)
-
-      } catch (err: any) {
-        console.error('[Admin] Unexpected error creating provider:', err)
-        setError(`Unexpected error: ${err.message}`)
-      } finally {
-        setSavingProvider(false)
-      }
-      return
-    }
-
-    // ADD THIS: Check if session is still valid before saving
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      setError('Session expired. Please refresh the page and try again.')
-      setSavingProvider(false)
-      return
-    }
-      
-    // ADD THIS: Force refresh the Supabase client before making the request
-    try {
-      await supabase.from('providers').select('id').limit(1)
-    } catch (err) {
-      console.error('[Admin] Connection test failed:', err)
-    }
-    
-    // CRITICAL FIX: Add timeout to prevent infinite loading state
-    // This ensures the loading state is always reset even if the request hangs
-    const timeoutId = setTimeout(() => {
-      console.error('[Admin] Save provider timeout - resetting loading state')
-      setSavingProvider(false)
-      setError('Save operation timed out. Please try again.')
-    }, 10000) // 10 second timeout
-    
-    // ADDITIONAL SAFETY: Add a backup timeout that runs regardless of the main timeout
-    // This provides a failsafe in case the main timeout doesn't work as expected
-    /* const backupTimeoutId = setTimeout(() => {
-      console.error('[Admin] Backup timeout triggered - forcing loading state reset')
-      setSavingProvider(false)
-      setError('Save operation failed. Please refresh the page and try again.')
-    }, 15000) // 15 second backup timeout (reduced since we removed connection test) */
-    
-    try {
-      // console.log('[Admin] Saving provider:', p.id, 'with data:', p)
-      
-      // Prepare update data with all enhanced business fields
-      const updateData = {
-        // Core business fields
-        name: p.name,
-        category_key: p.category_key,
-        tags: p.tags || [],
-        rating: p.rating ?? undefined,
-        phone: p.phone,
-        email: p.email,
-        website: p.website,
-        address: p.address,
-        images: p.images || [],
-        // IMPORTANT: Persist membership/featured flags as explicitly set by admin
-        // Do NOT override based on subscription_type; admins' changes must be permanent
-        is_member: p.is_member === true,
-        
-        // PLAN TRACKING FIELDS: Handle the new plan system properly
-        // This ensures the database reflects the correct plan status and tracking
-        // Keep featured flags independent from subscription_type as well
-        is_featured: p.is_featured === true,
-        featured_since: p.featured_since || null,
-        subscription_type: p.subscription_type || null,
-        // REMOVED: tier: p.tier || null, - This field doesn't exist in database
-        // REMOVED: paid: p.subscription_type ? p.paid === true : false, - This field doesn't exist in database
-        // Using subscription_type instead to track plan (monthly/yearly/free)
-        
-        // Enhanced business management fields (matching My Business page)
-        description: p.description || null,
-        specialties: p.specialties || null,
-        social_links: p.social_links || null,
-        business_hours: p.business_hours || null,
-        service_areas: p.service_areas || null,
-        google_maps_url: p.google_maps_url || null,
-        bonita_resident_discount: p.bonita_resident_discount || null,
-        published: p.published ?? true,
-        // Booking system fields
-        booking_enabled: p.booking_enabled ?? false,
-        booking_type: p.booking_type || null,
-        booking_instructions: p.booking_instructions || null,
-        booking_url: p.booking_url || null,
-        // Contact method toggles for booking
-        enable_calendar_booking: p.enable_calendar_booking ?? false,
-        enable_call_contact: p.enable_call_contact ?? false,
-        enable_email_contact: p.enable_email_contact ?? false,
-        // Coupon system fields
-        coupon_code: p.coupon_code || null,
-        coupon_discount: p.coupon_discount || null,
-        coupon_description: p.coupon_description || null,
-        coupon_expires_at: p.coupon_expires_at || null,
-        updated_at: new Date().toISOString()
-      }
-      
-      // console.log('[Admin] Update data prepared:', updateData)
-      
-      // SIMPLIFIED APPROACH: Direct database update without connection test
-      // The connection test was causing timeouts and preventing saves
-      // We'll handle errors directly from the update operation
-      // console.log('[Admin] Starting database update...')
-      const startTime = Date.now()
-      
-      try {
-        // Use Netlify function to bypass RLS issues
-        const url = '/.netlify/functions/admin-update-provider'
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            providerId: p.id,
-            updates: updateData
-          })
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error('[Admin] Provider update function error:', response.status, errorText)
-          
-          // IMPROVED ERROR HANDLING: Provide specific error messages based on error type
-          if (response.status === 403) {
-            setError(`Permission denied. Please check your admin access and try again.`)
-          } else if (response.status === 401) {
-            setError(`Authentication failed. Please refresh the page and try again.`)
-          } else if (response.status >= 500) {
-            setError(`Server error. Please try again in a moment.`)
-            setRetryProvider(p) // Store provider for retry
-          } else {
-            setError(`Failed to save provider: ${errorText}`)
-          }
-          return
-        }
-
-        const result = await response.json()
-
-        if (result.error) {
-          console.error('[Admin] Function returned error:', result.error)
-          setError(`Failed to save provider: ${result.error}`)
-          return
-        }
-        
-        // console.log('[Admin] Provider saved successfully')
-        setMessage('Provider updated successfully! Changes have been saved to the database.')
-        setRetryProvider(null) // Clear retry state on success
-        clearSavedState() // Clear saved state after successful save
-        
-        // CRITICAL FIX: Refresh admin page provider data immediately after save
-        // This ensures the admin page shows the updated data without requiring a page refresh
-        try {
-          const { data: pData } = await supabase
-            .from('providers')
-            .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url, enable_calendar_booking, enable_call_contact, enable_email_contact, coupon_code, coupon_discount, coupon_description, coupon_expires_at')
-            .order('name', { ascending: true })
-          setProviders((pData as ProviderRow[]) || [])
-          // console.log('[Admin] Provider data refreshed after save')
-        } catch (refreshError) {
-          console.error('[Admin] Failed to refresh provider data after save:', refreshError)
-        }
-        
-        // Also dispatch refresh event for main app
-        try { 
-          window.dispatchEvent(new CustomEvent('bf-refresh-providers')) 
-        } catch (refreshError) {
-          console.warn('[Admin] Failed to dispatch refresh event:', refreshError)
-        }
-        
-      } catch (requestError: any) {
-        const duration = Date.now() - startTime
-        console.error(`[Admin] Database request failed after ${duration}ms:`, requestError)
-        
-        // Handle different types of errors
-        if (requestError.message.includes('timeout') || requestError.message.includes('aborted')) {
-          setError(`Database operation timed out after ${duration}ms. Please check your connection and try again.`)
-          setRetryProvider(p) // Store provider for retry
-        } else if (requestError.message.includes('network') || requestError.message.includes('fetch')) {
-          setError(`Network error: ${requestError.message}. Please check your internet connection.`)
-          setRetryProvider(p) // Store provider for retry
-        } else {
-          setError(`Database request failed: ${requestError.message}`)
-        }
-        return
-      }
-      
-    } catch (err: any) {
-      console.error('[Admin] Unexpected error saving provider:', err)
-      setError(`Unexpected error: ${err.message}`)
-    } finally {
-      // CRITICAL FIX: Always clear both timeouts and reset loading state
-      // This ensures the UI never gets stuck in loading state
-      clearTimeout(timeoutId)
-      // clearTimeout(backupTimeoutId)
-      setSavingProvider(false)
-    }
-  }
-
-  // RETRY FUNCTION: Allows users to retry failed save operations
-  // This is particularly useful for timeout errors that might be temporary
+  // REFACTORED: Retry function - calls utility after wrapping saveProvider
   const retrySaveProvider = () => {
     if (retryProvider) {
-      // console.log('[Admin] Retrying save for provider:', retryProvider.id)
       saveProvider(retryProvider)
     }
   }
 
-  // Image upload functionality for admin provider editing
-  // Handles both free (1 image) and featured (multiple images) accounts
-  async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>, providerId: string) {
-    const files = event.target.files
-    if (!files || files.length === 0) return
+  // REFACTORED: Moved to adminProviderUtils.ts
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, providerId: string) =>
+    ProviderUtils.handleImageUpload(
+      event,
+      providerId,
+      providers,
+      setUploadingImages,
+      setError,
+      setProviders,
+      setMessage
+    )
 
-    setUploadingImages(true)
-    setError(null)
+  // REFACTORED: Moved to adminProviderUtils.ts
+  const removeImage = (providerId: string, imageUrl: string) =>
+    ProviderUtils.removeImage(
+      providerId,
+      imageUrl,
+      providers,
+      setProviders,
+      setMessage,
+      setError
+    )
 
-    try {
-      const currentProvider = providers.find(p => p.id === providerId)
-      if (!currentProvider) {
-        setError('Provider not found')
-        return
-      }
-
-      const isFeatured = currentProvider.is_member === true
-      const currentImages = currentProvider.images || []
-      const maxImages = isFeatured ? 10 : 1 // Free accounts: 1 image, Featured: up to 10
-
-      // Check if adding these files would exceed the limit
-      if (currentImages.length + files.length > maxImages) {
-        setError(`Maximum ${maxImages} image${maxImages === 1 ? '' : 's'} allowed for ${isFeatured ? 'featured' : 'free'} accounts`)
-        return
-      }
-
-      const uploadPromises = Array.from(files).map(async (file) => {
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-          throw new Error(`${file.name} is not a valid image file`)
-        }
-
-        // Validate file size (5MB max)
-        if (file.size > 5 * 1024 * 1024) {
-          throw new Error(`${file.name} is too large. Maximum size is 5MB`)
-        }
-
-        // Create unique filename
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${providerId}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-        
-        // Upload to Supabase Storage
-        const { error } = await supabase.storage
-          .from('business-images')
-          .upload(fileName, file)
-
-        if (error) {
-          throw new Error(`Failed to upload ${file.name}: ${error.message}`)
-        }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('business-images')
-          .getPublicUrl(fileName)
-
-        return urlData.publicUrl
-      })
-
-      const uploadedUrls = await Promise.all(uploadPromises)
-      const newImages = [...currentImages, ...uploadedUrls]
-
-      // Update the provider with new images
-      setProviders(prev => prev.map(p => 
-        p.id === providerId 
-          ? { ...p, images: newImages }
-          : p
-      ))
-
-      setMessage(`Successfully uploaded ${uploadedUrls.length} image${uploadedUrls.length === 1 ? '' : 's'}`)
-
-    } catch (err: any) {
-      console.error('[Admin] Image upload error:', err)
-      setError(err.message || 'Failed to upload images')
-    } finally {
-      setUploadingImages(false)
-      // Clear the file input
-      event.target.value = ''
-    }
-  }
-
-  // Remove image from provider
-  async function removeImage(providerId: string, imageUrl: string) {
-    try {
-      const currentProvider = providers.find(p => p.id === providerId)
-      if (!currentProvider) return
-
-      // Extract filename from URL for storage deletion
-      const urlParts = imageUrl.split('/')
-      const fileName = urlParts[urlParts.length - 1]
-      
-      // Delete from storage
-      const { error } = await supabase.storage
-        .from('business-images')
-        .remove([fileName])
-
-      if (error) {
-        console.warn('[Admin] Failed to delete image from storage:', error)
-        // Continue anyway - we'll still remove it from the provider
-      }
-
-      // Update provider images
-      const newImages = (currentProvider.images || []).filter(img => img !== imageUrl)
-      setProviders(prev => prev.map(p => 
-        p.id === providerId 
-          ? { ...p, images: newImages }
-          : p
-      ))
-
-      setMessage('Image removed successfully')
-
-    } catch (err: any) {
-      console.error('[Admin] Image removal error:', err)
-      setError('Failed to remove image')
-    }
-  }
-
-  async function deleteProvider(providerId: string) {
-    setMessage(null)
-    setConfirmDeleteProviderId(null)
-    
-    try {
-      // console.log('[Admin] Deleting provider:', providerId)
-      
-      // Get auth session for Netlify function
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-      
-      // Use Netlify function to delete provider (handles all FK constraints and related data)
-      // For production: use relative URL (/.netlify/functions/...)
-      // Use relative URL for Netlify functions (works in both dev and production)
-      const url = '/.netlify/functions/delete-business-listingdelete-business-listing'
-      
-      // console.log('[Admin] Calling delete function:', url)
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({ listing_id: providerId })  // Function expects 'listing_id' not 'listingId'
-      })
-      
-      // console.log('[Admin] Delete response status:', response.status)
-      
-      if (!response.ok) {
-        // Try to parse detailed error
-        const errorData = await response.json().catch(() => ({}))
-        const errorMsg = errorData.details || errorData.error || `HTTP ${response.status}`
-        throw new Error(errorMsg)
-      }
-      
-      const result = await response.json()
-      
-      if (!result.success) {
-        throw new Error(result.details || result.error || 'Delete failed')
-      }
-      
-      setMessage('Provider deleted successfully')
-      setProviders((arr) => arr.filter((p) => p.id !== providerId))
-      
-      // Refresh providers list
-      try {
-        const { data: pData, error: pErr } = await supabase
-          .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url, enable_calendar_booking, enable_call_contact, enable_email_contact, coupon_code, coupon_discount, coupon_description, coupon_expires_at')
-          .order('name', { ascending: true })
-        if (!pErr) setProviders((pData as ProviderRow[]) || [])
-      } catch {}
-      
-      try { window.dispatchEvent(new CustomEvent('bf-refresh-providers')) } catch {}
-      
-    } catch (err: any) {
-      console.error('[Admin] Error deleting provider:', err)
-      setError(`Failed to delete provider: ${err.message}`)
-    }
-  }
+  // REFACTORED: Moved to adminProviderUtils.ts
+  const deleteProvider = (providerId: string) =>
+    ProviderUtils.deleteProvider(
+      providerId,
+      setMessage,
+      setError,
+      setConfirmDeleteProviderId,
+      setProviders
+    )
 
   // Change request functions moved to ChangeRequestsSection component (Step 12)
 
-  /**
-   * Toggle booking system on/off (Admin quick action)
-   * This function ONLY updates booking_enabled field without touching other fields
-   */
-  async function toggleBookingEnabled(providerId: string, currentlyEnabled: boolean) {
-    setMessage(null)
-    setError(null)
-    
-    // Debug: Log what we're trying to do
-    console.log('[Admin] Toggling booking_enabled:', { 
-      providerId, 
-      currentlyEnabled, 
-      newValue: !currentlyEnabled 
-    })
-    
-    try {
-      // Update without .select() to avoid RLS issues
-      const { error } = await supabase
-        .from('providers')
-        .update({ 
-          booking_enabled: !currentlyEnabled,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', providerId)
-      
-      if (error) {
-        console.error('[Admin] ❌ Error toggling booking:', error)
-        setError(`Failed to toggle booking: ${error.message}`)
-        return
-      }
-      
-      // Debug: Log success (we'll verify via refresh)
-      console.log('[Admin] ✅ Booking toggle update sent to database')
-      
-      setMessage(`Booking system ${!currentlyEnabled ? 'enabled' : 'disabled'} successfully!`)
-      
-      // Update local state
-      setProviders(prev => prev.map(p => 
-        p.id === providerId 
-          ? { ...p, booking_enabled: !currentlyEnabled } 
-          : p
-      ))
-      
-      // Refresh providers list - using select('*') to get all fields
-      try {
-        const { data: pData, error: refreshError } = await supabase
-          .from('providers')
-          .select('*')
-          .order('name', { ascending: true })
-        
-        if (refreshError) {
-          console.error('[Admin] Error refreshing after booking toggle:', refreshError)
-        } else {
-          // Verify the update actually persisted
-          const updatedProvider = pData?.find(p => p.id === providerId)
-          const actualValue = updatedProvider?.booking_enabled
-          const expectedValue = !currentlyEnabled
-          
-          console.log('[Admin] Providers refreshed after booking toggle')
-          console.log('[Admin] Verification:', {
-            providerId,
-            expectedValue,
-            actualValue,
-            matched: actualValue === expectedValue,
-            provider: updatedProvider?.name
-          })
-          
-          if (actualValue !== expectedValue) {
-            console.warn('[Admin] ⚠️ WARNING: Database value does not match expected value!')
-            console.warn('[Admin] This could be a database trigger, constraint, or RLS issue')
-            setError(`Warning: Booking toggle may not have persisted. Expected: ${expectedValue}, Got: ${actualValue}`)
-          }
-          
-          setProviders((pData as ProviderRow[]) || [])
-        }
-      } catch (refreshErr) {
-        console.error('[Admin] Exception during refresh:', refreshErr)
-      }
-      
-      // Dispatch refresh event
-      try { 
-        window.dispatchEvent(new CustomEvent('bf-refresh-providers')) 
-      } catch {}
-      
-    } catch (err: any) {
-      console.error('[Admin] ❌ Unexpected error toggling booking:', err)
-      setError(`Unexpected error: ${err.message}`)
-    }
-  }
+  // REFACTORED: Moved to adminProviderUtils.ts
+  const toggleBookingEnabled = (providerId: string, currentlyEnabled: boolean) =>
+    ProviderUtils.toggleBookingEnabled(
+      providerId,
+      currentlyEnabled,
+      setMessage,
+      setError,
+      setProviders
+    )
 
   
 
@@ -2086,8 +1570,16 @@ export default function AdminPage() {
    * Fix: Check auth.loading state to prevent premature "sign in" message.
    */
   if (!auth.email) {
+    console.log('[Admin] 🚫 NO EMAIL - Rendering auth check UI')
+    console.log('[Admin] Auth state:', { 
+      email: auth.email, 
+      loading: auth.loading, 
+      isAuthed: auth.isAuthed 
+    })
+    
     // Don't show "please sign in" message while auth is still loading
     if (auth.loading) {
+      console.log('[Admin] ⏳ Auth loading - showing skeleton')
       return (
         <section className="py-8">
           <div className="container-px mx-auto max-w-3xl">
@@ -2102,6 +1594,7 @@ export default function AdminPage() {
       )
     }
     
+    console.log('[Admin] 🚫 Auth not loading but no email - showing "Please sign in"')
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-3xl">
@@ -2117,16 +1610,23 @@ export default function AdminPage() {
   }
 
   if (!isAdmin) {
+    console.log('[Admin] 🚫 NOT ADMIN - Showing unauthorized message')
+    console.log('[Admin] isAdmin:', isAdmin, 'adminStatus:', adminStatus)
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-3xl">
           <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
             Unauthorized. This page is restricted to administrators.
+            <div className="mt-2 text-sm text-neutral-600">
+              Debug: isAdmin={String(isAdmin)}, email={auth.email}, adminStatus={JSON.stringify(adminStatus)}
+            </div>
           </div>
         </div>
       </section>
     )
   }
+  
+  console.log('[Admin] ✅ Auth checks passed - rendering admin panel')
 
   return (
     <section className="py-8">
