@@ -12,9 +12,10 @@
  * - normalizeRole: Normalize role strings for comparison
  * - getBusinessEmails: Get set of business owner emails
  * - getCustomerUsers: Get list of customer user emails
+ * - formatAdminDate: Format dates for admin panel display
  */
 
-import type { ProviderRow } from './adminProviderUtils'
+import type { ProviderRow } from '../pages/Admin'
 
 // Type definitions
 type FunnelRow = {
@@ -255,4 +256,29 @@ export function getCustomerUsers(
   return Array.from(set)
     .filter((e) => !businessEmails.has(normalizeEmail(e)))
     .sort()
+}
+
+/**
+ * FORMAT ADMIN DATE
+ * 
+ * Formats a date string for display in the admin panel.
+ * Shows both date and time in a readable format.
+ * 
+ * @param dateString - ISO date string to format
+ * @returns Formatted date string (e.g., "10/21/2025, 1:46 PM")
+ */
+export function formatAdminDate(dateString: string): string {
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  } catch {
+    return dateString
+  }
 }
