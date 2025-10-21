@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-// Blog imports moved to BlogSection component (Step 10)
-import { type CalendarEvent } from './Calendar'
 // iCalendar parsing moved to server-side Netlify function for reliability
 // import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
@@ -18,6 +15,10 @@ import * as BusinessAppUtils from '../utils/adminBusinessApplicationUtils'
 import * as AdminHelpers from '../utils/adminHelpers'
 // Admin verification hook (extracted for better organization)
 import { useAdminVerification } from '../hooks/useAdminVerification'
+// Admin data loader hook (extracted for better organization)
+import { useAdminDataLoader } from '../hooks/useAdminDataLoader'
+// Category constants (extracted for consistency)
+import { CATEGORY_OPTIONS } from '../constants/categories'
 import { BlogSection } from '../components/admin/sections/BlogSection-2025-10-19'
 import { JobPostsSection } from '../components/admin/sections/JobPostsSection-2025-10-19'
 import { ChangeRequestsSection } from '../components/admin/sections/ChangeRequestsSection-2025-10-19'
@@ -72,6 +73,7 @@ type ProviderJobPostWithDetails = ProviderJobPost & {
   }
 }
 
+// REFACTORED: All type definitions moved to hook files or removed (now sourced from hooks)
 export type ProviderRow = {
   id: string
   name: string
@@ -86,14 +88,9 @@ export type ProviderRow = {
   images: string[] | null
   owner_user_id: string | null
   is_member?: boolean | null
-  // Enhanced featured provider tracking fields
   is_featured?: boolean | null
   featured_since?: string | null
-  subscription_type?: string | null // 'monthly' or 'yearly'
-  // REMOVED: tier?: string | null - This column doesn't exist in the database
-  // REMOVED: paid?: boolean | null - This column doesn't exist in the database
-  // Using existing subscription_type, is_member, is_featured fields instead
-  // Enhanced business management fields (matching My Business page)
+  subscription_type?: string | null
   description?: string | null
   specialties?: string[] | null
   social_links?: Record<string, string> | null
@@ -104,67 +101,17 @@ export type ProviderRow = {
   published?: boolean | null
   created_at?: string | null
   updated_at?: string | null
-  // Booking system fields
   booking_enabled?: boolean | null
   booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
   booking_instructions?: string | null
   booking_url?: string | null
-  // Contact method toggles
   enable_calendar_booking?: boolean | null
   enable_call_contact?: boolean | null
   enable_email_contact?: boolean | null
-  // Coupon system fields
   coupon_code?: string | null
   coupon_discount?: string | null
   coupon_description?: string | null
   coupon_expires_at?: string | null
-}
-
-type FunnelRow = {
-  id: string
-  user_email: string
-  category_key: string
-  answers: Record<string, string>
-  created_at: string
-}
-
-type BookingRow = {
-  id: string
-  user_email: string
-  category_key: string
-  name: string | null
-  notes: string | null
-  answers: Record<string, string> | null
-  status: string | null
-  created_at: string
-}
-
-type BusinessApplicationRow = {
-  id: string
-  full_name: string | null
-  business_name: string | null
-  email: string | null
-  phone: string | null
-  category: string | null          // ⚠️ Database uses 'category' NOT 'category_key'
-  challenge: string | null         // Contains JSON string with all business details
-  created_at: string
-  tier_requested: string | null    // 'free' or 'featured'
-  status: string | null            // 'pending', 'approved', or 'rejected'
-}
-
-type ContactLeadRow = {
-  id: string
-  business_name: string | null
-  contact_email: string | null
-  details: string | null
-  created_at: string
-}
-
-type ProfileRow = {
-  id: string
-  email: string | null
-  name: string | null
-  role?: string | null
 }
 
 /**
@@ -220,56 +167,14 @@ export default function AdminPage() {
   }, [adminData, adminDataError])
   
   // ============================================================================
-  // OLD: Legacy State Management (To be phased out)
+  // REFACTORED: Data loading extracted to useAdminDataLoader hook
   // ============================================================================
-  // These state variables will be gradually replaced with adminData from the hook above
-  // Keeping them for now to ensure existing functionality continues to work
-  const [funnels, setFunnels] = useState<FunnelRow[]>([])
-  const [bookings, setBookings] = useState<BookingRow[]>([])
-  const [bookingEvents, setBookingEvents] = useState<Array<{
-    id: string
-    provider_id: string
-    customer_email: string
-    customer_name: string | null
-    booking_date: string
-    booking_duration_minutes: number | null
-    booking_notes: string | null
-    status: string | null
-    created_at: string
-    providers?: {
-      name: string
-      category_key: string
-      address: string | null
-      phone: string | null
-    }
-  }>>([])
-  const [providers, setProviders] = useState<ProviderRow[]>([])
-  const [flaggedEvents, setFlaggedEvents] = useState<Array<{
-    id: string
-    event_id: string
-    user_id: string
-    reason: string
-    details: string | null
-    created_at: string
-    event?: CalendarEvent
-    reporter_email?: string
-  }>>([])
-  const [loading, setLoading] = useState(true)
-  
-  // PHASE 1 IMPROVEMENT: Combine loading states for better UX
-  // Show loading if EITHER system is still loading data
-  const isLoading = loading || adminDataLoading
+  // Note: Data loader is initialized below after admin verification
 
-
+  // Local UI state
   const [error, setError] = useState<string | null>(null)
-  const [bizApps, setBizApps] = useState<BusinessApplicationRow[]>([])
-  const [contactLeads, setContactLeads] = useState<ContactLeadRow[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [confirmDeleteProviderId, setConfirmDeleteProviderId] = useState<string | null>(null)
-  // Blog state moved to BlogSection component (Step 10)
-  const [changeRequests, setChangeRequests] = useState<ProviderChangeRequestWithDetails[]>([])
-  const [jobPosts, setJobPosts] = useState<ProviderJobPostWithDetails[]>([])
-  const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [deletingCustomerEmail, setDeletingCustomerEmail] = useState<string | null>(null)
   // STEP 12: expandedChangeRequestIds and expandedBusinessDropdowns deleted - moved to ChangeRequestsSection
@@ -319,33 +224,41 @@ export default function AdminPage() {
     booking_instructions: null,
     booking_url: null
   })
-  // State for selected section
-  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'booking-events' | 'blog' | 'calendar-events' | 'flagged-events'>('providers')
+  // REFACTORED: Section state moved up to useAdminDataLoader dependencies
 
   // Filtered providers logic moved to ContactLeadsSection component (Step 16)
 
-  // REFACTORED: Moved to adminProviderUtils.ts
-  const toggleFeaturedStatus = (providerId: string, currentStatus: boolean) => 
-    ProviderUtils.toggleFeaturedStatus(providerId, currentStatus, setMessage, setError, setProviders)
-
-  // REFACTORED: Moved to adminProviderUtils.ts
-  const updateSubscriptionType = (providerId: string, subscriptionType: 'monthly' | 'yearly') =>
-    ProviderUtils.updateSubscriptionType(providerId, subscriptionType, setMessage, setError, setProviders)
-
-  // REFACTORED: Moved to adminDataLoadingUtils.ts
-  const loadChangeRequests = () => 
-    DataLoadingUtils.loadChangeRequests(setError, setChangeRequests)
-
-  // REFACTORED: Moved to adminDataLoadingUtils.ts
-  const loadJobPosts = () => 
-    DataLoadingUtils.loadJobPosts(setError, setJobPosts)
-
-  // REFACTORED: Moved to adminDataLoadingUtils.ts
-  const loadBookingEvents = () => 
-    DataLoadingUtils.loadBookingEvents(setError, setBookingEvents)
-
   // Blog editor effects moved to BlogSection component (Step 10)
 
+  // REFACTORED: Moved to adminHelpers.ts
+  const clearSavedState = () => AdminHelpers.clearSavedState(setSelectedProviderId)
+
+  // REFACTORED: Moved to adminHelpers.ts
+  const startCreateNewProvider = () => 
+    AdminHelpers.startCreateNewProvider(
+      setIsCreatingNewProvider,
+      setSelectedProviderId,
+      setMessage,
+      setError,
+      setNewProviderForm
+    )
+
+  // REFACTORED: Moved to adminHelpers.ts
+  const cancelCreateProvider = () => 
+    AdminHelpers.cancelCreateProvider(
+      setIsCreatingNewProvider,
+      setSelectedProviderId,
+      setMessage,
+      setError,
+      setNewProviderForm
+    )
+
+  // Blog editor functions moved to BlogSection component (Step 10)
+  
+  // State for section and user filtering (declared BEFORE verification hook to avoid ordering issues)
+  const [selectedUser, setSelectedUser] = useState<string | null>(null)
+  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'booking-events' | 'blog' | 'calendar-events' | 'flagged-events'>('providers')
+  
   // Restore admin state when page loads
   useEffect(() => {
     const savedState = localStorage.getItem('admin-state')
@@ -374,31 +287,6 @@ export default function AdminPage() {
       }))
     }
   }, [section, selectedProviderId])
-
-  // REFACTORED: Moved to adminHelpers.ts
-  const clearSavedState = () => AdminHelpers.clearSavedState(setSelectedProviderId)
-
-  // REFACTORED: Moved to adminHelpers.ts
-  const startCreateNewProvider = () => 
-    AdminHelpers.startCreateNewProvider(
-      setIsCreatingNewProvider,
-      setSelectedProviderId,
-      setMessage,
-      setError,
-      setNewProviderForm
-    )
-
-  // REFACTORED: Moved to adminHelpers.ts
-  const cancelCreateProvider = () => 
-    AdminHelpers.cancelCreateProvider(
-      setIsCreatingNewProvider,
-      setSelectedProviderId,
-      setMessage,
-      setError,
-      setNewProviderForm
-    )
-
-  // Blog editor functions moved to BlogSection component (Step 10)
   
   // REFACTORED: Admin verification moved to useAdminVerification hook
   const { isAdmin, adminStatus } = useAdminVerification({
@@ -408,141 +296,91 @@ export default function AdminPage() {
     userId: auth.userId ?? null
   })
   
-  const [selectedUser, setSelectedUser] = useState<string | null>(null)
+  // State for change requests and job posts (loaded via Netlify functions)
+  const [changeRequests, setChangeRequests] = useState<ProviderChangeRequestWithDetails[]>([])
+  const [jobPosts, setJobPosts] = useState<ProviderJobPostWithDetails[]>([])
+  const [bookingEvents, setBookingEvents] = useState<Array<{
+    id: string
+    provider_id: string
+    customer_email: string
+    customer_name: string | null
+    booking_date: string
+    booking_duration_minutes: number | null
+    booking_notes: string | null
+    status: string | null
+    created_at: string
+    providers?: {
+      name: string
+      category_key: string
+      address: string | null
+      phone: string | null
+    }
+  }>>([])
+  
+  // Netlify function loaders for RLS-protected data
+  // CRITICAL: Wrapped in useCallback to prevent infinite loop in useAdminDataLoader
+  // State setters are stable and don't need to be in dependencies
+  const loadChangeRequests = useCallback(() => 
+    DataLoadingUtils.loadChangeRequests(setError, setChangeRequests), 
+    [] // Empty deps: state setters are stable
+  )
+  const loadJobPosts = useCallback(() => 
+    DataLoadingUtils.loadJobPosts(setError, setJobPosts), 
+    [] // Empty deps: state setters are stable
+  )
+  const loadBookingEvents = useCallback(() => 
+    DataLoadingUtils.loadBookingEvents(setError, setBookingEvents), 
+    [] // Empty deps: state setters are stable
+  )
+  
+  // REFACTORED: Large data loading useEffect moved to useAdminDataLoader hook
+  // Note: Setters from this hook are typed correctly but may cause type errors
+  // when passed to utility functions that expect simpler setter signatures
+  const {
+    funnels,
+    bookings,
+    bizApps,
+    contactLeads,
+    providers,
+    flaggedEvents,
+    profiles,
+    loading,
+    error: dataLoadError,
+    setFunnels,
+    setBookings,
+    setBizApps,
+    setContactLeads,
+    setProviders,
+    setFlaggedEvents: _setFlaggedEvents,  // Prefix unused setters
+    setProfiles,
+    setError: _setDataLoadError  // Prefix unused setters
+  } = useAdminDataLoader({
+    userEmail: auth.email ?? null,
+    isAdmin,
+    selectedUser,
+    section,
+    loadChangeRequests,
+    loadJobPosts,
+    loadBookingEvents
+  })
+  
+  // Combine error and loading states
+  const combinedError = error || dataLoadError
+  const isLoading = loading || adminDataLoading
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      if (!auth.email) {
-        setLoading(false)
-        return
-      }
-      setLoading(true)
-      setError(null)
-      try {
-        // console.log('[Admin] loading data. isAdmin?', isAdmin, 'selectedUser', selectedUser)
-        const fQuery = supabase.from('funnel_responses').select('*').order('created_at', { ascending: false })
-        const bQuery = supabase.from('bookings').select('*').order('created_at', { ascending: false })
-        const fExec = isAdmin ? (selectedUser ? fQuery.eq('user_email', selectedUser) : fQuery) : fQuery.eq('user_email', auth.email!)
-        const bExec = isAdmin ? (selectedUser ? bQuery.eq('user_email', selectedUser) : bQuery) : bQuery.eq('user_email', auth.email!)
-        // CRITICAL: Only load PENDING applications (not approved/rejected)
-        // This prevents showing already-processed applications in the admin panel
-        const bizQuery = supabase
-          .from('business_applications')
-          .select('*')
-          .or('status.eq.pending,status.is.null')  // Include pending OR null (legacy apps)
-          .order('created_at', { ascending: false })
-        const conQuery = supabase.from('contact_leads').select('*').order('created_at', { ascending: false })
-        // Enhanced providers query with all featured tracking fields
-        const provQuery = isAdmin ? supabase
-          .from('providers')
-          .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url, enable_calendar_booking, enable_call_contact, enable_email_contact, coupon_code, coupon_discount, coupon_description, coupon_expires_at')
-          .order('name', { ascending: true }) : null
-        const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
-          fExec,
-          bExec,
-          bizQuery,
-          conQuery,
-          provQuery as any,
-        ])
-        if (cancelled) return
-        if (fErr) { console.error('[Admin] funnels error', fErr); setError(fErr.message) }
-        if (bErr) { console.error('[Admin] bookings error', bErr); setError((prev) => prev ?? bErr.message) }
-        if (bizErr) { console.error('[Admin] business_applications error', bizErr); setError((prev) => prev ?? bizErr.message) }
-        if (conErr) { console.error('[Admin] contact_leads error', conErr); setError((prev) => prev ?? conErr.message) }
-        // console.log('[Admin] funnels', fData)
-        // console.log('[Admin] bookings', bData)
-        console.log('[Admin] business_applications', bizData)  // KEPT: Business application logging
-        // console.log('[Admin] contact_leads', conData)
-        setFunnels((fData as FunnelRow[]) || [])
-        setBookings((bData as BookingRow[]) || [])
-        setBizApps((bizData as BusinessApplicationRow[]) || [])
-        setContactLeads((conData as ContactLeadRow[]) || [])
-        if (provRes && 'data' in (provRes as any)) {
-          const { data: pData, error: pErr } = (provRes as any)
-          if (pErr) { console.error('[Admin] providers error', pErr); setError((prev) => prev ?? pErr.message) }
-          setProviders((pData as ProviderRow[]) || [])
-        }
-        // Blog posts loading moved to BlogSection component (Step 10)
-        // Calendar events loading moved to CalendarEventsSection component (Step 13)
-        try {
-          // Load flagged events for admin panel (always load for pending approvals notification)
-          if (isAdmin) {
-            const { data: flags, error: flagsError } = await supabase
-              .from('event_flags')
-              .select('*, calendar_events(*), profiles(email)')
-              .order('created_at', { ascending: false })
-            
-            if (flagsError) {
-              // Table might not exist yet or foreign key issue - log detailed error
-              console.warn('[Admin] Could not load flagged events (table may not exist yet):', flagsError.message, flagsError.code)
-              // Set empty array so the UI doesn't break
-              setFlaggedEvents([])
-            } else {
-              // Transform the data to include event and reporter info
-              const transformedFlags = (flags || []).map((flag: any) => ({
-                id: flag.id,
-                event_id: flag.event_id,
-                user_id: flag.user_id,
-                reason: flag.reason,
-                details: flag.details,
-                created_at: flag.created_at,
-                event: flag.calendar_events,
-                reporter_email: flag.profiles?.email || 'Unknown'
-              }))
-              setFlaggedEvents(transformedFlags)
-            }
-          }
-        } catch (err) {
-          console.warn('[Admin] Exception loading flagged events:', err)
-          setFlaggedEvents([])
-        }
-        try {
-          if (isAdmin) {
-            const { data: { session } } = await supabase.auth.getSession()
-            const token = session?.access_token
-            
-          if (token) {
-            // Use relative URL for Netlify functions (works in both dev and production)
-            const url = '/.netlify/functions/admin-list-profiles'
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              })
-              if (res.ok) {
-                const payload = await res.json() as { profiles?: ProfileRow[] }
-                if (payload?.profiles) setProfiles(payload.profiles)
-              }
-            }
-          }
-        } catch {}
-        try {
-          // Load change requests using Netlify function (bypasses RLS with SERVICE_ROLE_KEY)
-          await loadChangeRequests()
-        } catch {}
-        try {
-          // Load job posts using Netlify function (bypasses RLS with SERVICE_ROLE_KEY)
-          await loadJobPosts()
-        } catch {}
-        try {
-          // Load booking events using Netlify function (bypasses RLS with SERVICE_ROLE_KEY)
-          await loadBookingEvents()
-        } catch {}
-      } catch (err: any) {
-        console.error('[Admin] unexpected failure', err)
-        if (!cancelled) setError(err?.message || 'Failed to load')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [auth.email, isAdmin, selectedUser, section])
+  // Type-safe setter wrappers (hooks return Dispatch<SetStateAction<T>>, utilities expect (T) => void)
+  // Using type casts to bridge type compatibility between hooks and utility functions
+  const setProvidersSimple = ((providers: ProviderRow[]) => setProviders(providers)) as (providers: ProviderRow[]) => void
+  const setBizAppsSimple = ((apps: any[]) => setBizApps(apps)) as (apps: any[]) => void
+  const setProfilesSimple = ((profiles: any[]) => setProfiles(profiles)) as (profiles: any[]) => void
+
+  // REFACTORED: Moved to adminProviderUtils.ts (defined after wrappers)
+  const toggleFeaturedStatus = (providerId: string, currentStatus: boolean) => 
+    ProviderUtils.toggleFeaturedStatus(providerId, currentStatus, setMessage, setError, setProvidersSimple as any)
+
+  // REFACTORED: Moved to adminProviderUtils.ts (defined after wrappers)
+  const updateSubscriptionType = (providerId: string, subscriptionType: 'monthly' | 'yearly') =>
+    ProviderUtils.updateSubscriptionType(providerId, subscriptionType, setMessage, setError, setProvidersSimple as any)
 
   // REFACTORED: Moved to adminHelpers.ts
   // Emails of business owners (from profiles)
@@ -591,13 +429,8 @@ export default function AdminPage() {
     }
   }, [bizApps])
 
-  const catOptions: { key: string; name: string }[] = [
-    { key: 'real-estate', name: 'Real Estate' },
-    { key: 'home-services', name: 'Home Services' },
-    { key: 'health-wellness', name: 'Health & Wellness' },
-    { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
-    { key: 'professional-services', name: 'Professional Services' },
-  ]
+  // REFACTORED: Category options moved to constants/categories.ts
+  const catOptions = CATEGORY_OPTIONS
 
   // REFACTORED: Moved to adminBusinessApplicationUtils.ts
   const approveApplication = (appId: string) =>
@@ -607,13 +440,13 @@ export default function AdminPage() {
       appEdits,
       setMessage,
       setError,
-      setBizApps,
-      setProviders
+      setBizAppsSimple as any,
+      setProvidersSimple as any
     )
 
   // REFACTORED: Moved to adminBusinessApplicationUtils.ts
   const deleteApplication = (appId: string) =>
-    BusinessAppUtils.deleteApplication(appId, setMessage, setError, setBizApps)
+    BusinessAppUtils.deleteApplication(appId, setMessage, setError, setBizAppsSimple as any)
 
   // REFACTORED: Moved to adminProviderUtils.ts
   const saveProvider = (p: ProviderRow) =>
@@ -622,7 +455,7 @@ export default function AdminPage() {
       setMessage,
       setError,
       setSavingProvider,
-      setProviders,
+      setProvidersSimple as any,
       setRetryProvider,
       clearSavedState,
       setIsCreatingNewProvider,
@@ -644,7 +477,7 @@ export default function AdminPage() {
       providers,
       setUploadingImages,
       setError,
-      setProviders,
+      setProvidersSimple as any,
       setMessage
     )
 
@@ -654,7 +487,7 @@ export default function AdminPage() {
       providerId,
       imageUrl,
       providers,
-      setProviders,
+      setProvidersSimple as any,
       setMessage,
       setError
     )
@@ -666,7 +499,7 @@ export default function AdminPage() {
       setMessage,
       setError,
       setConfirmDeleteProviderId,
-      setProviders
+      setProvidersSimple as any
     )
 
   // Change request functions moved to ChangeRequestsSection component (Step 12)
@@ -678,7 +511,7 @@ export default function AdminPage() {
       currentlyEnabled,
       setMessage,
       setError,
-      setProviders
+      setProvidersSimple as any
     )
 
   
@@ -698,9 +531,9 @@ export default function AdminPage() {
       setMessage,
       setError,
       setDeletingUserId,
-      setProfiles,
-      setFunnels,
-      setBookings
+      setProfilesSimple as any,
+      setFunnels as any,
+      setBookings as any
     )
 
   // REFACTORED: Moved to adminUserUtils.ts
@@ -710,9 +543,9 @@ export default function AdminPage() {
       setMessage,
       setError,
       setDeletingCustomerEmail,
-      setProfiles,
-      setFunnels,
-      setBookings
+      setProfilesSimple as any,
+      setFunnels as any,
+      setBookings as any
     )
 
   // REFACTORED: Moved to adminUserUtils.ts
@@ -853,7 +686,7 @@ export default function AdminPage() {
             ))}
           </div>
         )}
-        {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+        {combinedError && <div className="mt-3 text-sm text-red-600">{combinedError}</div>}
         {message && <div className="mt-3 text-sm text-green-700">{message}</div>}
 
         {/* Pending Approvals Notification Section */}
@@ -1127,7 +960,7 @@ export default function AdminPage() {
             onHandleImageUpload={handleImageUpload}
             onRemoveImage={removeImage}
             onToggleBookingEnabled={toggleBookingEnabled}
-            onSetProviders={setProviders}
+            onSetProviders={setProvidersSimple as any}
             onSetConfirmDeleteProviderId={setConfirmDeleteProviderId}
           />
         )}
