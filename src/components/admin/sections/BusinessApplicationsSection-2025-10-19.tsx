@@ -60,7 +60,29 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
       ) : (
         <div className="space-y-4">
           {bizApps.map((app) => (
-            <div key={app.id} className="rounded-xl border border-neutral-200 p-4 bg-neutral-50">
+            <div 
+              key={app.id} 
+              className={`rounded-xl border-2 p-4 ${
+                app.tier_requested === 'featured' 
+                  ? 'border-yellow-400 bg-yellow-50' 
+                  : 'border-green-300 bg-white'
+              }`}
+            >
+              {/* TIER REQUESTED - CRITICAL INFORMATION */}
+              <div className="mb-3">
+                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold ${
+                  app.tier_requested === 'featured'
+                    ? 'bg-yellow-200 text-yellow-900 border-2 border-yellow-400'
+                    : 'bg-green-100 text-green-900 border-2 border-green-400'
+                }`}>
+                  {app.tier_requested === 'featured' ? '⭐ FEATURED TIER REQUESTED ($97/YEAR)' : '🆓 FREE TIER REQUESTED (NO PAYMENT)'}
+                </span>
+                {/* Debug: Show raw value */}
+                <span className="ml-2 text-[10px] text-neutral-400 font-mono">
+                  tier_requested={app.tier_requested || 'null'}
+                </span>
+              </div>
+
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="font-medium text-neutral-900 text-lg">
@@ -118,6 +140,41 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                   />
                 </div>
               </div>
+
+              {/* TIER INFORMATION PANEL */}
+              {app.tier_requested === 'featured' && (
+                <div className="mb-4 p-3 bg-yellow-100 border-2 border-yellow-400 rounded-lg">
+                  <div className="text-sm font-bold text-yellow-900 mb-2">
+                    ⭐ FEATURED TIER APPLICATION ⭐
+                  </div>
+                  <div className="text-xs text-yellow-900 space-y-1">
+                    <div className="font-bold">💰 PRICING: $97/year (PAYMENT REQUIRED)</div>
+                    <div className="font-semibold mt-2">What They Get:</div>
+                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                      <li>Priority placement in search results</li>
+                      <li>Enhanced business description</li>
+                      <li>Multiple images support</li>
+                      <li>Social media integration</li>
+                      <li>Booking system</li>
+                      <li>Analytics and insights</li>
+                    </ul>
+                    <div className="mt-2 font-bold text-red-800">
+                      ⚠️ COLLECT PAYMENT BEFORE ACTIVATING FEATURED STATUS
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {app.tier_requested !== 'featured' && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded-lg">
+                  <div className="text-sm font-bold text-green-900 mb-1">
+                    🆓 FREE TIER APPLICATION
+                  </div>
+                  <div className="text-xs text-green-800">
+                    ✅ No payment required. This is a standard free listing request.
+                  </div>
+                </div>
+              )}
 
               {app.challenge && (
                 <div className="mb-4">
