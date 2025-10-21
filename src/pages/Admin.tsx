@@ -10,6 +10,8 @@ import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData
 import * as ProviderUtils from '../utils/adminProviderUtils'
 // User management utilities (extracted for better organization)
 import * as UserUtils from '../utils/adminUserUtils'
+// Data loading utilities (extracted for better organization)
+import * as DataLoadingUtils from '../utils/adminDataLoadingUtils'
 import { BlogSection } from '../components/admin/sections/BlogSection-2025-10-19'
 import { JobPostsSection } from '../components/admin/sections/JobPostsSection-2025-10-19'
 import { ChangeRequestsSection } from '../components/admin/sections/ChangeRequestsSection-2025-10-19'
@@ -252,40 +254,7 @@ export default function AdminPage() {
   // Show loading if EITHER system is still loading data
   const isLoading = loading || adminDataLoading
 
-  // Calendar event functions moved to CalendarEventsSection component (Step 13)
-  
-  // Old client-side refresh kept as fallback (CORS issues make this unreliable)
-  // Use refreshICalFeedsServer() instead
-  /* const refreshICalFeeds = async () => {
-    try {
-      // console.log('Refreshing iCalendar feeds (client-side)...')
-      const icalEvents = await parseMultipleICalFeeds(ICAL_FEEDS)
-      const calendarEvents = icalEvents.map(convertICalToCalendarEvent)
-      
-      if (calendarEvents.length === 0) {
-        setMessage('No events found in iCalendar feeds')
-        return
-      }
-      
-      // Clear existing iCalendar events (those with source matching our feeds)
-      const icalSources = ICAL_FEEDS.map(feed => feed.source)
-      const { error: deleteError } = await supabase
-        .from('calendar_events')
-        .delete()
-        .in('source', icalSources)
-      
-      if (deleteError) {
-        console.warn('Error clearing existing iCalendar events:', deleteError)
-      }
-      
-      // Add new iCalendar events
-      await addMultipleEvents(calendarEvents)
-      setMessage(`Successfully refreshed ${calendarEvents.length} events from iCalendar feeds!`)
-    } catch (error) {
-      console.error('Error refreshing iCalendar feeds:', error)
-      setError('Failed to refresh iCalendar feeds: ' + error)
-    }
-  } */
+
   const [error, setError] = useState<string | null>(null)
   const [bizApps, setBizApps] = useState<BusinessApplicationRow[]>([])
   const [contactLeads, setContactLeads] = useState<ContactLeadRow[]>([])
@@ -357,226 +326,17 @@ export default function AdminPage() {
   const updateSubscriptionType = (providerId: string, subscriptionType: 'monthly' | 'yearly') =>
     ProviderUtils.updateSubscriptionType(providerId, subscriptionType, setMessage, setError, setProviders)
 
-  /**
-   * LOAD CHANGE REQUESTS
-   * 
-   * This function loads all change requests from the database for admin review.
-   * It fetches all change requests ordered by creation date (newest first).
-   * 
-   * How it works:
-   * 1. Queries the provider_change_requests table
-   * 2. Orders by created_at descending to show newest requests first
-   * 3. Updates the changeRequests state with the fetched data
-   * 
-   * This provides the admin with a complete list of all pending change requests.
-   */
-  const loadChangeRequests = async () => {
-    try {
-      console.log('[Admin] STARTING loadChangeRequests')
-      
-      // FIXED: Use getSession() instead of refreshSession() to avoid clearing auth
-      // refreshSession() was causing the auth state to be cleared, signing out the user
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError) {
-        console.error('[Admin] ❌ Session get failed:', sessionError)
-        setError('Session error. Please refresh the page and sign in again.')
-        return
-      }
-      
-      if (!session?.access_token) {
-        console.error('[Admin] ❌ No auth token available')
-        setError('Not authenticated. Please refresh the page and sign in again.')
-        return
-      }
+  // REFACTORED: Moved to adminDataLoadingUtils.ts
+  const loadChangeRequests = () => 
+    DataLoadingUtils.loadChangeRequests(setError, setChangeRequests)
 
-      console.log('[Admin] ✓ Session acquired, auth token obtained')
+  // REFACTORED: Moved to adminDataLoadingUtils.ts
+  const loadJobPosts = () => 
+    DataLoadingUtils.loadJobPosts(setError, setJobPosts)
 
-      // Call Netlify function that uses service role to bypass RLS and auto-create missing profiles
-      // Use relative URL for Netlify functions (works in both dev and production)
-      const url = '/.netlify/functions/admin-list-change-requests'
-      // console.log('[Admin] Fetching from:', url)
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      // console.log('[Admin] Response received:', {
-      //   status: response.status,
-      //   statusText: response.statusText,
-      //   ok: response.ok
-      // })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('[Admin] ❌ Error response body:', errorText)
-        setError(`Failed to load change requests (HTTP ${response.status}): ${errorText}`)
-        return
-      }
-
-      const result = await response.json()
-      // console.log('[Admin] ✓ JSON parsed successfully')
-      // console.log('[Admin] Result structure:', {
-      //   hasRequests: !!result.requests,
-      //   requestCount: result.requests?.length || 0,
-      //   firstRequest: result.requests?.[0] ? {
-      //     id: result.requests[0].id,
-      //     type: result.requests[0].type,
-      //     hasProfiles: !!result.requests[0].profiles,
-      //     profileEmail: result.requests[0].profiles?.email,
-      //     profileName: result.requests[0].profiles?.name
-      //   } : 'No requests'
-      // })
-      
-      if (!result.requests) {
-        console.error('[Admin] ❌ Result has no requests property:', result)
-        setError('Invalid response from server')
-        return
-      }
-      
-      console.log('[Admin] ✓ Setting changeRequests state with', result.requests.length, 'items')  // KEPT: Change request logging
-      setChangeRequests(result.requests)
-      // console.log('[Admin] ✓ State updated successfully')
-      // console.log('========================================')
-      
-    } catch (error: any) {
-      console.error('========================================')
-      console.error('[Admin] ❌ EXCEPTION in loadChangeRequests:', error)
-      console.error('[Admin] Error stack:', error.stack)
-      console.error('========================================')
-      setError(`Failed to load change requests: ${error.message}`)
-    }
-  }
-
-  const loadJobPosts = async () => {
-    try {
-      console.log('[Admin] STARTING loadJobPosts')
-      
-      // FIXED: Use getSession() instead of refreshSession() to avoid clearing auth
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError || !session?.access_token) {
-        console.error('[Admin] No session token available for job posts')
-        setError('Session error. Please refresh the page.')
-        return
-      }
-
-      // Call Netlify function with service role to bypass RLS
-      // For development, use relative URL since local Netlify functions may not be running
-      const url = '/.netlify/functions/admin-list-job-posts'
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('[Admin] Job posts function error:', response.status, errorText)
-        throw new Error(`Function call failed: ${response.status}`)
-      }
-
-      const result = await response.json()
-
-      if (result.error) {
-        console.error('[Admin] Function returned error:', result.error)
-        throw new Error(result.error)
-      }
-
-      // Process the job posts data
-      const jobPostsData = result.jobPosts || []
-      console.log('[Admin] ✓ Received', jobPostsData.length, 'job posts from function')
-      
-      // Update state with the fetched data
-      setJobPosts(jobPostsData)
-      
-    } catch (error: any) {
-      console.error('[Admin] ❌ EXCEPTION in loadJobPosts:', error)
-      setError(`Failed to load job posts: ${error.message}`)
-      setJobPosts([])
-    }
-  }
-
-  const loadBookingEvents = async () => {
-    try {
-      console.log('[Admin] STARTING loadBookingEvents')
-      
-      // FIXED: Use getSession() instead of refreshSession() to avoid clearing auth
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError || !session?.access_token) {
-        console.error('[Admin] No session token available for booking events')
-        setError('Session error. Please refresh the page.')
-        return
-      }
-
-      // Try to call Netlify function with service role to bypass RLS
-      // Fall back to direct query if function not available (local dev)
-      const url = '/.netlify/functions/admin-list-booking-events'
-      
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({}) // No customer email filter - get all bookings
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.warn('[Admin] Booking events function error:', response.status, errorText)
-          throw new Error(`Function call failed: ${response.status}`)
-        }
-
-        const result = await response.json()
-
-        if (result.error) {
-          console.warn('[Admin] Function returned error:', result.error)
-          throw new Error(result.error)
-        }
-
-        // Process the booking events data
-        const bookingEventsData = result.bookingEvents || []
-        console.log('[Admin] ✓ Received', bookingEventsData.length, 'booking events from function')
-        
-        // Update state with the fetched data
-        setBookingEvents(bookingEventsData)
-      } catch (fetchError: any) {
-        // Fallback: Try direct Supabase query (may hit RLS in production)
-        console.warn('[Admin] Netlify function unavailable, trying direct query:', fetchError.message)
-        
-        try {
-          const { data, error: directError } = await supabase
-            .from('booking_events')
-            .select('*')
-            .order('created_at', { ascending: false })
-          
-          if (directError) {
-            console.warn('[Admin] Direct query also failed (expected if RLS not configured):', directError.message)
-            setBookingEvents([])
-          } else {
-            console.log('[Admin] ✓ Loaded', data?.length || 0, 'booking events via direct query')
-            setBookingEvents(data || [])
-          }
-        } catch (directQueryError) {
-          console.warn('[Admin] Direct query error:', directQueryError)
-          setBookingEvents([])
-        }
-      }
-      
-    } catch (error: any) {
-      console.error('[Admin] ❌ EXCEPTION in loadBookingEvents:', error)
-      setBookingEvents([])
-    }
-  }
+  // REFACTORED: Moved to adminDataLoadingUtils.ts
+  const loadBookingEvents = () => 
+    DataLoadingUtils.loadBookingEvents(setError, setBookingEvents)
 
   // Blog editor effects moved to BlogSection component (Step 10)
 

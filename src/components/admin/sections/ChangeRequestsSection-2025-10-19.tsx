@@ -399,23 +399,58 @@ export function ChangeRequestsSection({
                           return (
                             <div
                               key={r.id}
-                              className="rounded-xl border border-neutral-200 p-3 bg-white shadow-sm"
+                              className={`rounded-xl border-2 p-3 shadow-sm ${
+                                r.type === 'feature_request' 
+                                  ? 'border-yellow-400 bg-yellow-50' 
+                                  : r.type === 'update'
+                                  ? 'border-blue-300 bg-white'
+                                  : r.type === 'delete'
+                                  ? 'border-red-300 bg-white'
+                                  : 'border-neutral-200 bg-white'
+                              }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="font-medium text-neutral-900">
-                                  {r.type === 'update'
-                                    ? 'Business Listing Update'
-                                    : r.type === 'delete'
-                                    ? 'Business Listing Deletion'
-                                    : r.type === 'feature_request'
-                                    ? 'Featured Upgrade Request'
-                                    : r.type === 'claim'
-                                    ? 'Business Claim Request'
-                                    : r.type}
+                              {/* Request Type Badge */}
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                                    r.type === 'feature_request'
+                                      ? 'bg-yellow-200 text-yellow-900 border-2 border-yellow-400'
+                                      : r.type === 'update'
+                                      ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                      : r.type === 'delete'
+                                      ? 'bg-red-100 text-red-900 border border-red-300'
+                                      : r.type === 'claim'
+                                      ? 'bg-green-100 text-green-900 border border-green-300'
+                                      : 'bg-neutral-100 text-neutral-900 border border-neutral-300'
+                                  }`}>
+                                    {r.type === 'update' && '📝'}
+                                    {r.type === 'feature_request' && '⭐'}
+                                    {r.type === 'delete' && '🗑️'}
+                                    {r.type === 'claim' && '✋'}
+                                    {' '}
+                                    {r.type === 'update'
+                                      ? 'LISTING UPDATE'
+                                      : r.type === 'delete'
+                                      ? 'DELETE REQUEST'
+                                      : r.type === 'feature_request'
+                                      ? 'FEATURED UPGRADE ($97/YEAR)'
+                                      : r.type === 'claim'
+                                      ? 'BUSINESS CLAIM'
+                                      : r.type.toUpperCase()}
+                                  </span>
+                                  {/* Debug: Show raw type value */}
+                                  <span className="text-[10px] text-neutral-400 font-mono">
+                                    type={r.type}
+                                  </span>
                                 </div>
-                                <div className="text-xs text-neutral-500">
+                                <div className="text-xs text-neutral-500 whitespace-nowrap">
                                   {new Date(r.created_at).toLocaleString()}
                                 </div>
+                              </div>
+                              
+                              {/* Business Name */}
+                              <div className="font-bold text-lg text-neutral-900 mb-2">
+                                {r.providers?.name || 'Unknown Business'}
                               </div>
 
                               {/* Owner Information */}
@@ -430,13 +465,54 @@ export function ChangeRequestsSection({
                                 </div>
                               </div>
 
-                              {/* Show what changed */}
-                              {r.type === 'update' && changeDiff.length > 0 && (
-                                <div className="mt-3">
-                                  <div className="text-xs font-semibold text-neutral-700 mb-2">
-                                    Changes Requested ({changeDiff.length} field
-                                    {changeDiff.length !== 1 ? 's' : ''}):
+                              {/* Feature Request Specific Info */}
+                              {r.type === 'feature_request' && (
+                                <div className="mt-3 p-3 bg-yellow-100 border-2 border-yellow-400 rounded-lg">
+                                  <div className="text-sm font-bold text-yellow-900 mb-2">
+                                    ⭐ FEATURED UPGRADE REQUEST ⭐
                                   </div>
+                                  <div className="text-xs text-yellow-900 space-y-1">
+                                    <div className="font-bold">💰 Pricing: $97/year</div>
+                                    <div className="font-semibold mt-2">Benefits Include:</div>
+                                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                                      <li>Priority placement in search results</li>
+                                      <li>Enhanced business description</li>
+                                      <li>Multiple images support</li>
+                                      <li>Social media links integration</li>
+                                      <li>Google Maps integration</li>
+                                      <li>Booking system integration</li>
+                                      <li>Analytics and insights</li>
+                                      <li>Premium customer support</li>
+                                    </ul>
+                                  </div>
+                                  {r.reason && (
+                                    <div className="mt-2 text-xs text-yellow-800">
+                                      <strong>Reason:</strong> {r.reason}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Show what changed for UPDATE requests */}
+                              {r.type === 'update' && (
+                                <div className="mt-3 p-3 bg-blue-50 border border-blue-300 rounded-lg">
+                                  <div className="text-sm font-bold text-blue-900 mb-2">
+                                    📝 LISTING UPDATE REQUEST
+                                  </div>
+                                  <div className="text-xs text-blue-800 mb-3">
+                                    This user wants to update their business information. No payment involved.
+                                  </div>
+                                  {r.reason && (
+                                    <div className="text-xs text-blue-800 mb-2">
+                                      <strong>Reason:</strong> {r.reason}
+                                    </div>
+                                  )}
+                                  {changeDiff.length > 0 && (
+                                    <>
+                                      <div className="text-xs font-semibold text-blue-900 mb-2">
+                                        Changes Requested ({changeDiff.length} field
+                                        {changeDiff.length !== 1 ? 's' : ''}):
+                                      </div>
                                   {changeDiff.map((diff, idx) => (
                                     <div
                                       key={diff.field}
@@ -461,6 +537,8 @@ export function ChangeRequestsSection({
                                       </div>
                                     </div>
                                   ))}
+                                    </>
+                                  )}
                                 </div>
                               )}
 
