@@ -10,19 +10,19 @@ export default function AboutPage() {
   return (
     <section className="relative min-h-screen py-12">
       {/* Prism Background - Top Section */}
-      <div className="absolute top-0 left-0 right-0 h-96 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0) rotate(180deg)' }}>
+      <div className="absolute top-0 left-0 right-0 h-99 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0) rotate(180deg)' }}>
         <Prism
-          height={6}
-          baseWidth={18}
+          height={2}
+          baseWidth={13}
           animationType="rotate"
-          glow={0.6}
+          glow={2}
           noise={0}
           transparent={true}
-          scale={1.2}
-          hueShift={0.3}
-          colorFrequency={0.6}
-          timeScale={0.08}
-          bloom={0.4}
+          scale={1}
+          hueShift={5.7}
+          colorFrequency={3.4}
+          timeScale={.4}
+          bloom={0.09}
           suspendWhenOffscreen={true}
         />
       </div>
@@ -38,7 +38,7 @@ export default function AboutPage() {
             <h1 className="text-4xl md:text-6xl font-bold text-black mb-6">
               For Bonita, By Bonita
             </h1>
-            <p className="text-xl md:text-2xl text-black/90 mb-8 max-w-4xl mx-auto">
+            <p className="text-xl md:text-2xl text-black/90 mx-auto">
               Connecting Our Community. Supporting Our Businesses.
             </p>
             <p className="text-lg text-black/80 max-w-3xl mx-auto">
