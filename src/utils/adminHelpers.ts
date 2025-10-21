@@ -1,222 +1,258 @@
 /**
- * ADMIN HELPER UTILITIES
+ * Admin Helper Utilities
  * 
- * Utility functions for admin panel operations
+ * This file contains small helper functions and utilities used throughout the admin panel.
+ * These functions were extracted from Admin.tsx to improve code organization.
+ * 
+ * Functions included:
+ * - clearSavedState: Clear localStorage admin state
+ * - startCreateNewProvider: Initialize new provider creation form
+ * - cancelCreateProvider: Cancel provider creation and reset form
+ * - normalizeEmail: Normalize email addresses for comparison
+ * - normalizeRole: Normalize role strings for comparison
+ * - getBusinessEmails: Get set of business owner emails
+ * - getCustomerUsers: Get list of customer user emails
  */
 
-import { STATUS_COLORS } from '../constants/adminConstants'
+import type { ProviderRow } from './adminProviderUtils'
 
-/**
- * Format date for admin display
- * @param dateString ISO date string
- * @returns Formatted date string
- */
-export function formatAdminDate(dateString: string): string {
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    })
-  } catch {
-    return dateString
-  }
+// Type definitions
+type FunnelRow = {
+  id: string
+  user_email: string
+  category_key: string
+  answers: Record<string, string>
+  created_at: string
+}
+
+type BookingRow = {
+  id: string
+  user_email: string
+  category_key: string
+  name: string | null
+  notes: string | null
+  answers: Record<string, string> | null
+  status: string | null
+  created_at: string
+}
+
+type BookingEvent = {
+  id: string
+  provider_id: string
+  customer_email: string
+  customer_name: string | null
+  booking_date: string
+  booking_duration_minutes: number | null
+  booking_notes: string | null
+  status: string | null
+  created_at: string
+}
+
+type ProfileRow = {
+  id: string
+  email: string | null
+  name: string | null
+  role?: string | null
 }
 
 /**
- * Get status badge color classes
- * @param status Status string
- * @returns Tailwind CSS classes for badge
+ * CLEAR SAVED STATE
+ * 
+ * Clears the admin state from localStorage and resets selected provider.
  */
-export function getStatusColor(status: string): string {
-  const normalizedStatus = status?.toLowerCase() || 'pending'
-  return STATUS_COLORS[normalizedStatus as keyof typeof STATUS_COLORS] || STATUS_COLORS.pending
+export function clearSavedState(
+  setSelectedProviderId: (id: string | null) => void
+) {
+  localStorage.removeItem('admin-state')
+  setSelectedProviderId(null)
 }
 
 /**
- * Parse JSON application details
- * @param challenge JSON string from application
- * @returns Parsed object or null
+ * START CREATE NEW PROVIDER
+ * 
+ * Initializes the new provider creation form with default values.
  */
-export function parseApplicationDetails(challenge: string | null): Record<string, any> | null {
-  if (!challenge) return null
-  try {
-    return JSON.parse(challenge)
-  } catch {
-    return null
-  }
-}
-
-/**
- * Validate provider data before save
- * @param provider Provider data object
- * @returns Validation result with errors
- */
-export function validateProviderData(provider: any): { valid: boolean; errors: string[] } {
-  const errors: string[] = []
-  
-  if (!provider.name || provider.name.trim().length === 0) {
-    errors.push('Provider name is required')
-  }
-  
-  if (!provider.category_key) {
-    errors.push('Category is required')
-  }
-  
-  if (provider.email && !isValidEmail(provider.email)) {
-    errors.push('Invalid email format')
-  }
-  
-  if (provider.website && !isValidUrl(provider.website)) {
-    errors.push('Invalid website URL')
-  }
-  
-  return {
-    valid: errors.length === 0,
-    errors
-  }
-}
-
-/**
- * Validate email format
- * @param email Email string
- * @returns True if valid
- */
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
-/**
- * Validate URL format
- * @param url URL string
- * @returns True if valid
- */
-function isValidUrl(url: string): boolean {
-  try {
-    new URL(url.startsWith('http') ? url : `https://${url}`)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
- * Truncate text to specified length
- * @param text Text to truncate
- * @param maxLength Maximum length
- * @returns Truncated text with ellipsis
- */
-export function truncateText(text: string, maxLength: number = 100): string {
-  if (!text || text.length <= maxLength) return text
-  return text.substring(0, maxLength) + '...'
-}
-
-/**
- * Format phone number for display
- * @param phone Phone number string
- * @returns Formatted phone number
- */
-export function formatPhoneNumber(phone: string | null): string {
-  if (!phone) return 'N/A'
-  // Remove all non-numeric characters
-  const cleaned = phone.replace(/\D/g, '')
-  // Format as (XXX) XXX-XXXX for 10-digit numbers
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
-  }
-  return phone
-}
-
-/**
- * Get initials from name
- * @param name Full name
- * @returns Initials (e.g., "John Doe" -> "JD")
- */
-export function getInitials(name: string | null): string {
-  if (!name) return '??'
-  const parts = name.trim().split(' ')
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-}
-
-/**
- * Count days since date
- * @param dateString ISO date string
- * @returns Number of days since the date
- */
-export function daysSince(dateString: string): number {
-  try {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffTime = Math.abs(now.getTime() - date.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  } catch {
-    return 0
-  }
-}
-
-/**
- * Format relative time (e.g., "2 days ago")
- * @param dateString ISO date string
- * @returns Relative time string
- */
-export function formatRelativeTime(dateString: string): string {
-  const days = daysSince(dateString)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days} days ago`
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`
-  if (days < 365) return `${Math.floor(days / 30)} months ago`
-  return `${Math.floor(days / 365)} years ago`
-}
-
-/**
- * Sort array by date field
- * @param array Array to sort
- * @param dateField Field name containing date
- * @param ascending Sort order
- * @returns Sorted array
- */
-export function sortByDate<T extends Record<string, any>>(
-  array: T[],
-  dateField: keyof T,
-  ascending: boolean = false
-): T[] {
-  return [...array].sort((a, b) => {
-    const dateA = new Date(a[dateField] as string).getTime()
-    const dateB = new Date(b[dateField] as string).getTime()
-    return ascending ? dateA - dateB : dateB - dateA
+export function startCreateNewProvider(
+  setIsCreatingNewProvider: (creating: boolean) => void,
+  setSelectedProviderId: (id: string | null) => void,
+  setMessage: (msg: string | null) => void,
+  setError: (err: string | null) => void,
+  setNewProviderForm: (form: Partial<ProviderRow>) => void
+) {
+  setIsCreatingNewProvider(true)
+  setSelectedProviderId(null) // Clear any selected provider
+  setMessage(null)
+  setError(null)
+  // Reset form to default values
+  setNewProviderForm({
+    name: '',
+    category_key: 'professional-services',
+    tags: [],
+    badges: [],
+    rating: null,
+    phone: null,
+    email: null,
+    website: null,
+    address: null,
+    images: [],
+    owner_user_id: null,
+    is_member: false,
+    is_featured: false,
+    featured_since: null,
+    subscription_type: null,
+    description: null,
+    specialties: null,
+    social_links: null,
+    business_hours: null,
+    service_areas: null,
+    google_maps_url: null,
+    bonita_resident_discount: null,
+    published: true,
+    created_at: null,
+    updated_at: null,
+    booking_enabled: false,
+    booking_type: null,
+    booking_instructions: null,
+    booking_url: null
   })
 }
 
 /**
- * Filter array by search term
- * @param array Array to filter
- * @param searchTerm Search term
- * @param searchFields Fields to search in
- * @returns Filtered array
+ * CANCEL CREATE PROVIDER
+ * 
+ * Cancels the new provider creation and resets the form.
  */
-export function filterBySearch<T extends Record<string, any>>(
-  array: T[],
-  searchTerm: string,
-  searchFields: (keyof T)[]
-): T[] {
-  if (!searchTerm || searchTerm.trim().length === 0) return array
-  
-  const term = searchTerm.toLowerCase().trim()
-  
-  return array.filter(item => {
-    return searchFields.some(field => {
-      const value = item[field]
-      if (value === null || value === undefined) return false
-      return String(value).toLowerCase().includes(term)
-    })
+export function cancelCreateProvider(
+  setIsCreatingNewProvider: (creating: boolean) => void,
+  setSelectedProviderId: (id: string | null) => void,
+  setMessage: (msg: string | null) => void,
+  setError: (err: string | null) => void,
+  setNewProviderForm: (form: Partial<ProviderRow>) => void
+) {
+  setIsCreatingNewProvider(false)
+  setSelectedProviderId(null)
+  setMessage(null)
+  setError(null)
+  // Reset form to default values
+  setNewProviderForm({
+    name: '',
+    category_key: 'professional-services',
+    tags: [],
+    badges: [],
+    rating: null,
+    phone: null,
+    email: null,
+    website: null,
+    address: null,
+    images: [],
+    owner_user_id: null,
+    is_member: false,
+    is_featured: false,
+    featured_since: null,
+    subscription_type: null,
+    description: null,
+    specialties: null,
+    social_links: null,
+    business_hours: null,
+    service_areas: null,
+    google_maps_url: null,
+    bonita_resident_discount: null,
+    published: true,
+    created_at: null,
+    updated_at: null,
+    booking_enabled: false,
+    booking_type: null,
+    booking_instructions: null,
+    booking_url: null
   })
 }
 
+/**
+ * NORMALIZE EMAIL
+ * 
+ * Normalizes email addresses for consistent comparison by:
+ * - Converting to lowercase
+ * - Trimming whitespace
+ * - Handling null/undefined
+ */
+export function normalizeEmail(e?: string | null): string {
+  return String(e || '').trim().toLowerCase()
+}
+
+/**
+ * NORMALIZE ROLE
+ * 
+ * Normalizes role strings for consistent comparison by:
+ * - Converting to lowercase
+ * - Trimming whitespace
+ * - Handling null/undefined
+ */
+export function normalizeRole(r?: string | null): string {
+  return String(r || '').trim().toLowerCase()
+}
+
+/**
+ * GET BUSINESS EMAILS
+ * 
+ * Returns a Set of normalized email addresses for all business owners.
+ * Used to distinguish business accounts from customer accounts.
+ */
+export function getBusinessEmails(profiles: ProfileRow[]): Set<string> {
+  return new Set(
+    profiles
+      .filter((p) => normalizeRole(p.role) === 'business')
+      .map((p) => normalizeEmail(p.email))
+      .filter(Boolean)
+  )
+}
+
+/**
+ * GET CUSTOMER USERS
+ * 
+ * Returns a sorted array of customer user emails.
+ * Collects emails from:
+ * - Funnel responses
+ * - Bookings
+ * - Booking events
+ * - Profiles (non-business users)
+ * 
+ * Excludes business owner emails.
+ */
+export function getCustomerUsers(
+  funnels: FunnelRow[],
+  bookings: BookingRow[],
+  bookingEvents: BookingEvent[],
+  profiles: ProfileRow[],
+  businessEmails: Set<string>
+): string[] {
+  const set = new Set<string>()
+  
+  // Add users from funnel responses
+  funnels.forEach((f) => { 
+    const e = normalizeEmail(f.user_email)
+    if (e) set.add(e)
+  })
+  
+  // Add users from bookings
+  bookings.forEach((b) => { 
+    const e = normalizeEmail(b.user_email)
+    if (e) set.add(e)
+  })
+  
+  // Add users from booking events
+  bookingEvents.forEach((be) => { 
+    const e = normalizeEmail(be.customer_email)
+    if (e) set.add(e)
+  })
+  
+  // Add users from profiles (non-business users)
+  profiles.forEach((p) => { 
+    const e = normalizeEmail(p.email)
+    if (e && p.role !== 'business') set.add(e)
+  })
+  
+  // Filter out business emails and sort
+  return Array.from(set)
+    .filter((e) => !businessEmails.has(normalizeEmail(e)))
+    .sort()
+}

@@ -14,6 +14,8 @@ import * as UserUtils from '../utils/adminUserUtils'
 import * as DataLoadingUtils from '../utils/adminDataLoadingUtils'
 // Business application utilities (extracted for better organization)
 import * as BusinessAppUtils from '../utils/adminBusinessApplicationUtils'
+// Helper utilities (extracted for better organization)
+import * as AdminHelpers from '../utils/adminHelpers'
 import { BlogSection } from '../components/admin/sections/BlogSection-2025-10-19'
 import { JobPostsSection } from '../components/admin/sections/JobPostsSection-2025-10-19'
 import { ChangeRequestsSection } from '../components/admin/sections/ChangeRequestsSection-2025-10-19'
@@ -371,91 +373,28 @@ export default function AdminPage() {
     }
   }, [section, selectedProviderId])
 
-  // Clear saved state function
-  const clearSavedState = () => {
-    localStorage.removeItem('admin-state')
-    setSelectedProviderId(null)
-  }
+  // REFACTORED: Moved to adminHelpers.ts
+  const clearSavedState = () => AdminHelpers.clearSavedState(setSelectedProviderId)
 
-  // Function to start creating a new provider
-  const startCreateNewProvider = () => {
-    setIsCreatingNewProvider(true)
-    setSelectedProviderId(null) // Clear any selected provider
-    setMessage(null)
-    setError(null)
-    // Reset form to default values
-    setNewProviderForm({
-      name: '',
-      category_key: 'professional-services',
-      tags: [],
-      badges: [],
-      rating: null,
-      phone: null,
-      email: null,
-      website: null,
-      address: null,
-      images: [],
-      owner_user_id: null,
-      is_member: false,
-      is_featured: false,
-      featured_since: null,
-      subscription_type: null,
-      description: null,
-      specialties: null,
-      social_links: null,
-      business_hours: null,
-      service_areas: null,
-      google_maps_url: null,
-      bonita_resident_discount: null,
-      published: true,
-      created_at: null,
-      updated_at: null,
-      booking_enabled: false,
-      booking_type: null,
-      booking_instructions: null,
-      booking_url: null
-    })
-  }
+  // REFACTORED: Moved to adminHelpers.ts
+  const startCreateNewProvider = () => 
+    AdminHelpers.startCreateNewProvider(
+      setIsCreatingNewProvider,
+      setSelectedProviderId,
+      setMessage,
+      setError,
+      setNewProviderForm
+    )
 
-  // Function to cancel creating new provider
-  const cancelCreateProvider = () => {
-    setIsCreatingNewProvider(false)
-    setSelectedProviderId(null)
-    setMessage(null)
-    setError(null)
-    // Reset form to default values
-    setNewProviderForm({
-      name: '',
-      category_key: 'professional-services',
-      tags: [],
-      badges: [],
-      rating: null,
-      phone: null,
-      email: null,
-      website: null,
-      address: null,
-      images: [],
-      owner_user_id: null,
-      is_member: false,
-      is_featured: false,
-      featured_since: null,
-      subscription_type: null,
-      description: null,
-      specialties: null,
-      social_links: null,
-      business_hours: null,
-      service_areas: null,
-      google_maps_url: null,
-      bonita_resident_discount: null,
-      published: true,
-      created_at: null,
-      updated_at: null,
-      booking_enabled: false,
-      booking_type: null,
-      booking_instructions: null,
-      booking_url: null
-    })
-  }
+  // REFACTORED: Moved to adminHelpers.ts
+  const cancelCreateProvider = () => 
+    AdminHelpers.cancelCreateProvider(
+      setIsCreatingNewProvider,
+      setSelectedProviderId,
+      setMessage,
+      setError,
+      setNewProviderForm
+    )
 
   // Blog editor functions moved to BlogSection component (Step 10)
   // Secure server-side admin verification with client-side fallback
@@ -764,43 +703,19 @@ export default function AdminPage() {
     }
   }, [auth.email, isAdmin, selectedUser, section])
 
-  // Normalizers
-  const normalizeEmail = (e?: string | null) => String(e || '').trim().toLowerCase()
-  const normalizeRole = (r?: string | null) => String(r || '').trim().toLowerCase()
-
+  // REFACTORED: Moved to adminHelpers.ts
   // Emails of business owners (from profiles)
-  const businessEmails = useMemo(() => {
-    return new Set(
-      profiles
-        .filter((p) => normalizeRole(p.role) === 'business')
-        .map((p) => normalizeEmail(p.email))
-        .filter(Boolean)
-    )
-  }, [profiles])
+  const businessEmails = useMemo(() => 
+    AdminHelpers.getBusinessEmails(profiles), 
+    [profiles]
+  )
 
+  // REFACTORED: Moved to adminHelpers.ts
   // Customer users: emails present in funnels/bookings/booking_events/profiles, excluding business owner emails
-  const customerUsers = useMemo(() => {
-    const set = new Set<string>()
-    
-    // Add users from funnel responses
-    funnels.forEach((f) => { const e = normalizeEmail(f.user_email); if (e) set.add(e) })
-    
-    // Add users from bookings
-    bookings.forEach((b) => { const e = normalizeEmail(b.user_email); if (e) set.add(e) })
-    
-    // Add users from booking events
-    bookingEvents.forEach((be) => { const e = normalizeEmail(be.customer_email); if (e) set.add(e) })
-    
-    // Add users from profiles (non-business users)
-    profiles.forEach((p) => { 
-      const e = normalizeEmail(p.email); 
-      if (e && p.role !== 'business') set.add(e) 
-    })
-    
-    return Array.from(set)
-      .filter((e) => !businessEmails.has(normalizeEmail(e)))
-      .sort()
-  }, [funnels, bookings, bookingEvents, profiles, businessEmails])
+  const customerUsers = useMemo(() => 
+    AdminHelpers.getCustomerUsers(funnels, bookings, bookingEvents, profiles, businessEmails), 
+    [funnels, bookings, bookingEvents, profiles, businessEmails]
+  )
 
   // STEP 19: filteredFunnels deleted - moved to FunnelResponsesSection component
   // Removed legacy businessAccounts (email-derived). Business accounts now come from profiles.role === 'business'.
