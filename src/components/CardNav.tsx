@@ -40,9 +40,11 @@ const CardNav: React.FC<CardNavProps> = ({
 }) => {
   const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isTimelineReady, setIsTimelineReady] = useState(false);
   const navRef = useRef<HTMLDivElement | null>(null);
   const cardsRef = useRef<HTMLDivElement[]>([]);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
+  const isAnimatingRef = useRef(false);
 
   const calculateHeight = () => {
     const navEl = navRef.current;
@@ -102,10 +104,17 @@ const CardNav: React.FC<CardNavProps> = ({
   useLayoutEffect(() => {
     const tl = createTimeline();
     tlRef.current = tl;
+    
+    // Mark timeline as ready after a small delay to ensure everything is properly initialized
+    const readyTimer = setTimeout(() => {
+      setIsTimelineReady(true);
+    }, 100);
 
     return () => {
+      clearTimeout(readyTimer);
       tl?.kill();
       tlRef.current = null;
+      setIsTimelineReady(false);
     };
   }, [ease, items]);
 
@@ -137,21 +146,43 @@ const CardNav: React.FC<CardNavProps> = ({
   }, [isExpanded]);
 
   const toggleMenu = () => {
+    // Prevent toggling if timeline isn't ready or if currently animating
+    if (!isTimelineReady || isAnimatingRef.current) {
+      return;
+    }
+    
     const tl = tlRef.current;
     if (!tl) return;
+    
+    // Mark as animating to prevent rapid clicks
+    isAnimatingRef.current = true;
+    
     if (!isExpanded) {
       setIsHamburgerOpen(true);
       setIsExpanded(true);
+      tl.eventCallback('onComplete', () => {
+        isAnimatingRef.current = false;
+      });
       tl.play(0);
     } else {
       setIsHamburgerOpen(false);
-      tl.eventCallback('onReverseComplete', () => setIsExpanded(false));
+      tl.eventCallback('onReverseComplete', () => {
+        setIsExpanded(false);
+        isAnimatingRef.current = false;
+      });
       tl.reverse();
     }
   };
 
   const setCardRef = (i: number) => (el: HTMLDivElement | null) => {
     if (el) cardsRef.current[i] = el;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleMenu();
+    }
   };
 
   return (
@@ -165,10 +196,14 @@ const CardNav: React.FC<CardNavProps> = ({
       >
         <div className="card-nav-top absolute inset-x-0 top-0 h-[60px] flex items-center justify-between p-1 pl-[1.5rem] z-[2]">
           <div
-            className={`hamburger-menu ${isHamburgerOpen ? 'open' : ''} group h-full flex flex-col items-center justify-center cursor-pointer gap-[6px] order-2 md:order-none`}
+            className={`hamburger-menu ${isHamburgerOpen ? 'open' : ''} group h-full flex flex-col items-center justify-center gap-[6px] order-2 md:order-none transition-opacity ${
+              !isTimelineReady ? 'cursor-wait opacity-50' : 'cursor-pointer opacity-100'
+            }`}
             onClick={toggleMenu}
+            onKeyDown={handleKeyDown}
             role="button"
             aria-label={isExpanded ? 'Close menu' : 'Open menu'}
+            aria-disabled={!isTimelineReady || isAnimatingRef.current}
             tabIndex={0}
             style={{ color: menuColor || '#000' }}
           >
