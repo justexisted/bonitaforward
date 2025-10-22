@@ -1676,8 +1676,9 @@ export default function MyBusinessPage() {
           </div>
         )}
 
-        {/* Change Requests Status Section - Shows pending, approved, and rejected requests */}
-        {changeRequests.length > 0 && (
+        {/* Change Requests Status Section - Shows pending, approved, and rejected requests 
+            ONLY for non-featured accounts. Featured accounts get instant updates without approval. */}
+        {changeRequests.length > 0 && listings.some(listing => !listing.is_member) && (
           <div className="mb-6 space-y-3">
             {/* Notification Summary */}
             <div className="text-center mb-4">
