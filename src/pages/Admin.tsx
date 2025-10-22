@@ -34,6 +34,7 @@ import { BusinessApplicationsSection } from '../components/admin/sections/Busine
 import { BookingEventsSection } from '../components/admin/sections/BookingEventsSection-2025-10-19'
 import { ProvidersSection } from '../components/admin/sections/ProvidersSection-2025-10-19'
 import { PendingApprovalsDashboard } from '../components/admin/PendingApprovalsDashboard'
+import { AdminHeader } from '../components/admin/AdminHeader'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -633,46 +634,16 @@ export default function AdminPage() {
   return (
     <section className="py-8">
       <div className="container-px mx-auto max-w-5xl">
-        <div className="flex flex-col lg:items-start md:flex-row md:items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{isAdmin ? 'Admin' : 'Your Data'}</h1>
-            {isAdmin && (
-              <div className="text-xs text-neutral-500 mt-1">
-                {adminStatus.verified ? '🔒 Server-verified admin' : '⚠️ Client-side admin (less secure)'}
-                {adminStatus.error && ` • ${adminStatus.error}`}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col lg:items-start md:flex-row md:items-center gap-2">
-            {isAdmin && (
-              <>
-                <select value={selectedUser || ''} onChange={(e) => setSelectedUser(e.target.value || null)} className="rounded-xl border border-neutral-200 px-3 py-1.5 text-sm bg-white">
-                  <option value="">All users</option>
-                  {customerUsers.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                <select value={section} onChange={(e) => setSection(e.target.value as any)} className="rounded-xl border border-neutral-200 px-3 py-1.5 text-sm bg-white">
-                  <option value="providers">Providers</option>
-                  <option value="contact-leads">Contact / Get Featured</option>
-                  <option value="customer-users">Customer Users</option>
-                  <option value="business-accounts">Business Accounts</option>
-                  <option value="users">Users</option>
-                  <option value="business-applications">Business Applications</option>
-                  <option value="owner-change-requests">Owner Change Requests</option>
-                  <option value="job-posts">Job Posts</option>
-                  <option value="funnel-responses">Funnel Responses</option>
-                  <option value="bookings">Bookings</option>
-                  <option value="booking-events">Calendar Bookings</option>
-                  <option value="blog">Blog Manager</option>
-                  <option value="calendar-events">Calendar Events</option>
-                  <option value="flagged-events">Flagged Events</option>
-                </select>
-              </>
-            )}
-            <button onClick={() => window.location.reload()} className="rounded-full bg-neutral-100 text-neutral-900 px-3 py-1.5 hover:bg-neutral-200 text-sm">Refresh</button>
-          </div>
-        </div>
+        {/* Admin header with title, status badge, and navigation controls - Extracted for better organization */}
+        <AdminHeader
+          isAdmin={isAdmin}
+          adminStatus={adminStatus}
+          selectedUser={selectedUser}
+          section={section}
+          customerUsers={customerUsers}
+          onUserChange={setSelectedUser}
+          onSectionChange={setSection}
+        />
         {isLoading && (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
