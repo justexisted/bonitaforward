@@ -622,12 +622,22 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                         </div>
                         
                         {/* Description and Save Button Row */}
-                        <div className="flex items-start justify-between gap-4 mb-3">
-                          {auth.isAuthed && (
+                        {/* Description (full width on mobile, aligned right on desktop) */}
+                        {provider.coupon_description && (
+                          <div className="mb-3">
+                            <p className="text-xs text-green-700 bg-green-100 border border-green-300 rounded-lg px-3 py-2 break-words">
+                              {provider.coupon_description}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Save button (full width on mobile) */}
+                        {auth.isAuthed && (
+                          <div className="mb-3">
                             <button
                               onClick={saveCoupon}
                               disabled={couponBusy}
-                              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 flex-shrink-0"
+                              className="w-full md:w-auto px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
                             >
                               {couponBusy ? (
                                 'Saving…'
@@ -640,16 +650,8 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                                 </>
                               )}
                             </button>
-                          )}
-                          
-                          {provider.coupon_description && (
-                            <div className="text-right flex-shrink">
-                              <p className="text-xs text-green-700 bg-green-100 border border-green-300 rounded-full px-2 py-1 inline-block">
-                                {provider.coupon_description}
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                         
                         {auth.isAuthed && couponMsg && (
                           <p className="text-xs text-green-700 mt-2">{couponMsg}</p>

@@ -427,7 +427,8 @@ export const ProvidersSection: React.FC<ProvidersSectionProps> = ({
               
               return (
                 <div className="rounded-xl border border-neutral-200 p-6 bg-white">
-                  <div className="flex items-center justify-between mb-6">
+                  {/* Header section - stacks on mobile, side-by-side on desktop */}
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                     <div>
                       <h3 className="text-lg font-semibold text-neutral-900">Editing: {editingProvider.name}</h3>
                       <p className="text-sm text-neutral-600 mt-1">
@@ -442,7 +443,7 @@ export const ProvidersSection: React.FC<ProvidersSectionProps> = ({
                         Category: {editingProvider.category_key}
                       </p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center gap-4">
                       {/* PLAN DROPDOWN: Replace checkbox with plan selection dropdown */}
                       {/* This allows admins to set providers as free, monthly, or yearly plans */}
                       <div className="flex items-center gap-2">
@@ -862,9 +863,9 @@ export const ProvidersSection: React.FC<ProvidersSectionProps> = ({
                       }}
                     />
                   </div>
-                  {/* Action Buttons */}
-                  <div className="flex items-center justify-between mt-8 pt-6 border-t border-neutral-200">
-                    <div className="flex items-center gap-4">
+                  {/* Action Buttons - stacks on mobile, side-by-side on desktop */}
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-8 pt-6 border-t border-neutral-200">
+                    <div className="flex flex-wrap items-center gap-4">
                       <button 
                         onClick={() => onSaveProvider(editingProvider)} 
                         disabled={savingProvider}
