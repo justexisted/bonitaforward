@@ -146,17 +146,17 @@ export function EventIcons({ title, description, className = 'w-5 h-5', showLabe
       {icons.map((mapping, index) => {
         const IconComponent = mapping.icon
         return (
-          <div key={index} className="flex flex-col items-center gap-1 relative group z-0 hover:z-50">
+          <div key={index} className="flex flex-col items-center gap-1 relative group z-10 hover:z-50">
             <IconComponent 
-              className={`${className} transition-colors group-hover:text-blue-600`} 
+              className={`${className} transition-colors group-hover:scale-110`} 
               aria-label={mapping.label}
             />
-            {/* Hover Tooltip */}
-            <div className="absolute bottom-full mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-50">
+            {/* Hover Tooltip - appears below icon with high z-index to avoid being covered */}
+            <div className="absolute top-full mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[100]">
               <div className="bg-neutral-900 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
                 {mapping.label}
-                {/* Arrow pointing down */}
-                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neutral-900"></div>
+                {/* Arrow pointing up */}
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-neutral-900"></div>
               </div>
             </div>
             {showLabel && (

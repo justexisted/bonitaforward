@@ -6,7 +6,7 @@ import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '
 import type { CalendarEvent } from '../types'
 import { EventIcons } from '../utils/eventIcons'
 import { extractEventUrl, cleanDescriptionFromUrls, getButtonTextForUrl } from '../utils/eventUrlUtils'
-import { getEventGradient, getEventHeaderImage } from '../utils/eventImageUtils'
+import { getEventGradient, preloadEventImages } from '../utils/eventImageUtils'
 
 // Re-export type for backward compatibility
 export type { CalendarEvent }
@@ -210,8 +210,8 @@ export default function CalendarPage() {
   // State for saved/bookmarked events
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set())
 
-  // Note: Event images now come from database (event.image_url, event.image_type)
-  // No need to fetch separately - they're included in the event data!
+  // State for dynamically loaded event images (Unsplash + gradients)
+  const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
 
   // Load saved events from localStorage
   useEffect(() => {
@@ -274,6 +274,12 @@ export default function CalendarPage() {
       try {
         const allEvents = await fetchCalendarEvents()
         setEvents(allEvents)
+        
+        // Load images dynamically after events are loaded
+        if (allEvents.length > 0) {
+          const images = await preloadEventImages(allEvents)
+          setEventImages(images)
+        }
       } catch (err) {
         console.error('Error loading events:', err)
         setError('Failed to load events')
@@ -634,6 +640,9 @@ export default function CalendarPage() {
   const displayEvents = showPastEvents 
     ? [...filteredUpcomingEvents, ...filteredPastEvents]
     : filteredUpcomingEvents
+  
+  // Get saved events
+  const savedEvents = events.filter(event => savedEventIds.has(event.id))
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -749,6 +758,155 @@ export default function CalendarPage() {
               </div>
             </div>
 
+            {/* Saved Events Section */}
+            {auth.isAuthed && savedEvents.length > 0 && (
+              <>
+                <h2 className="text-xl md:text-2xl font-semibold tracking-tight font-display mb-4 md:mb-6">
+                  Your Saved Events
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12">
+                  {savedEvents.map((event) => {
+                    const eventUrl = extractEventUrl(event)
+                    const cleanDescription = cleanDescriptionFromUrls(event.description)
+                    const buttonText = getButtonTextForUrl(eventUrl)
+                    
+                    // Get dynamically loaded image or use database image or fallback to gradient
+                    const dynamicImage = eventImages.get(event.id)
+                    const headerImage = dynamicImage
+                      ? dynamicImage
+                      : event.image_url && event.image_type
+                        ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                        : { type: 'gradient' as const, value: getEventGradient(event) }
+                    
+                    return (
+                      <div
+                        key={event.id}
+                        onClick={() => setSelectedEvent(event)}
+                        className="bg-white rounded-2xl border border-green-200 hover:shadow-lg transition-all text-left hover:border-green-300 group flex flex-col cursor-pointer overflow-hidden"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setSelectedEvent(event)
+                          }
+                        }}
+                      >
+                        {/* Header Image or Gradient */}
+                        <div className="w-full h-32 md:h-40 relative flex items-center justify-center">
+                          <div 
+                            className="absolute inset-0 rounded-t-2xl overflow-hidden"
+                            style={
+                              headerImage?.type === 'image'
+                                ? {
+                                    backgroundImage: `url(${headerImage.value})`,
+                                    backgroundSize: 'cover',
+                                    backgroundPosition: 'center'
+                                  }
+                                : {
+                                    background: headerImage?.value || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                  }
+                            }
+                          >
+                            {/* Overlay for better text visibility */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+                          </div>
+                          
+                          {/* Event icons on image */}
+                          <div className="absolute top-3 right-3 z-20">
+                            <EventIcons 
+                              title={event.title} 
+                              description={event.description} 
+                              className="w-6 h-6 text-white drop-shadow-lg" 
+                            />
+                          </div>
+                          
+                          {/* Saved badge */}
+                          <div className="absolute top-3 left-3 z-20">
+                            <div className="bg-green-600 text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
+                              <BookmarkCheck className="w-3 h-3" />
+                              <span>Saved</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="p-4 md:p-6">
+                          <div className="flex items-start justify-between mb-3 md:mb-4">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-base md:text-lg text-neutral-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                              {event.title}
+                            </h3>
+                            <div className="flex items-center text-xs md:text-sm text-neutral-500 mb-2">
+                              <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                              <span className="text-xs md:text-sm">{formatDate(event.date)}</span>
+                            </div>
+                            {event.time && (
+                              <div className="flex items-center text-xs md:text-sm text-neutral-500 mb-2">
+                                <Clock className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                                {event.time}
+                              </div>
+                            )}
+                            {event.location && (
+                              <div className="flex items-start text-xs md:text-sm text-neutral-500 mb-2 md:mb-3">
+                                <MapPin className="w-3 h-3 md:w-4 md:h-4 mr-2 mt-0.5 flex-shrink-0" />
+                                <span className="line-clamp-2">{event.location}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {cleanDescription && (
+                          <p className="text-xs md:text-sm text-neutral-600 mb-3 md:mb-4 line-clamp-3">
+                            {cleanDescription}
+                          </p>
+                        )}
+
+                        <div className="flex flex-col gap-3 mt-auto">
+                          {/* Learn More Button (if URL exists) or Unsave Button */}
+                          {eventUrl ? (
+                            <a
+                              href={eventUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                              <span>{buttonText}</span>
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          ) : null}
+                          
+                          {/* Unsave button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSaveEvent(event.id)
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-red-50 hover:bg-red-100 text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                            <span>Remove from Saved</span>
+                          </button>
+                          
+                          {/* Event source badge */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] md:text-xs text-neutral-400 bg-neutral-100 px-2 py-1 rounded-full">
+                              {event.source}
+                            </span>
+                            <span className="text-xs text-neutral-400">
+                              Click for details
+                            </span>
+                          </div>
+                        </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+
             {/* Regular Events Section */}
             {displayEvents.length > 0 && (
               <>
@@ -776,10 +934,13 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // Get header image from database, or fallback to gradient
-                    const headerImage = event.image_url && event.image_type
-                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
-                      : { type: 'gradient' as const, value: getEventGradient(event) }
+                    // Get dynamically loaded image or use database image or fallback to gradient
+                    const dynamicImage = eventImages.get(event.id)
+                    const headerImage = dynamicImage
+                      ? dynamicImage
+                      : event.image_url && event.image_type
+                        ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                        : { type: 'gradient' as const, value: getEventGradient(event) }
                     
                     return (
                       <div
@@ -927,10 +1088,13 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // Get header image from database, or fallback to gradient
-                    const headerImage = event.image_url && event.image_type
-                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
-                      : { type: 'gradient' as const, value: getEventGradient(event) }
+                    // Get dynamically loaded image or use database image or fallback to gradient
+                    const dynamicImage = eventImages.get(event.id)
+                    const headerImage = dynamicImage
+                      ? dynamicImage
+                      : event.image_url && event.image_type
+                        ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                        : { type: 'gradient' as const, value: getEventGradient(event) }
                     
                     return (
                       <div
