@@ -8,13 +8,14 @@ import {
   loadBookings, 
   loadSavedBusinesses, 
   loadMyEvents, 
-  loadPendingApplications 
+  loadPendingApplications,
+  loadMyBusinesses
 } from './account/dataLoader'
 import { AccountSettings, MyBookings, SavedBusinesses } from './account/components'
 
 export default function AccountPage() {
   const auth = useAuth()
-  const [activeSection, setActiveSection] = useState<DashboardSection>('account')
+  const [activeSection, setActiveSection] = useState<DashboardSection>('dashboard')
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<AccountData>({
@@ -22,6 +23,7 @@ export default function AccountPage() {
     savedBusinesses: [],
     myEvents: [],
     pendingApps: [],
+    myBusinesses: [],
   })
 
   // Load data when component mounts
@@ -31,14 +33,15 @@ export default function AccountPage() {
       
       setLoading(true)
       
-      const [bookings, savedBusinesses, myEvents, pendingApps] = await Promise.all([
+      const [bookings, savedBusinesses, myEvents, pendingApps, myBusinesses] = await Promise.all([
         loadBookings(auth.email || ''),
         loadSavedBusinesses(auth.userId),
         loadMyEvents(auth.userId),
         loadPendingApplications(auth.email || ''),
+        loadMyBusinesses(auth.userId),
       ])
       
-      setData({ bookings, savedBusinesses, myEvents, pendingApps })
+      setData({ bookings, savedBusinesses, myEvents, pendingApps, myBusinesses })
       setLoading(false)
     }
     
@@ -81,7 +84,7 @@ export default function AccountPage() {
     <div className="min-h-screen bg-neutral-50">
       {/* Mobile 4x2 Icon Grid Navigation */}
       <div className="lg:hidden">
-        <main className="container-px mx-auto max-w-6xl px-4 pt-12">
+        <main className="container-px mx-auto max-w-6xl px-4 pt-3">
           {/* Header */}
           <div className="mb-3">
             <h1 className="text-2xl font-bold text-neutral-900 mb-1">My Account</h1>
@@ -99,35 +102,35 @@ export default function AccountPage() {
               )}
 
           {/* 4x2 Icon Grid (Mobile Only) */}
-          {activeSection === 'account' && (
+          {activeSection === 'dashboard' && (
             <div className="grid grid-cols-2 gap-4 mb-8">
               {SIDEBAR_ITEMS.map((item) => {
                 const IconComponent = item.icon
                 
                 return (
-                            <button
+                  <button
                     key={item.id}
                     onClick={() => setActiveSection(item.id)}
                     className="flex flex-col items-center justify-center gap-3 p-6 bg-white rounded-xl border-2 border-neutral-200 hover:border-blue-500 hover:shadow-md transition-all group"
                   >
                     <IconComponent className="w-8 h-8 text-neutral-600 group-hover:text-blue-600 transition-colors" />
                     <span className="text-sm font-medium text-neutral-900 text-center">{item.label}</span>
-                            </button>
+                  </button>
                 )
               })}
             </div>
           )}
           
           {/* Back Button (when not on main view) */}
-          {activeSection !== 'account' && (
-                              <button
-              onClick={() => setActiveSection('account')}
+          {activeSection !== 'dashboard' && (
+            <button
+              onClick={() => setActiveSection('dashboard')}
               className="mb-6 flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
             >
               <span>←</span>
               <span>Back to Account</span>
-                              </button>
-                            )}
+            </button>
+          )}
 
           {/* Section Content (Mobile) */}
           <div className="max-w-4xl">
@@ -143,17 +146,78 @@ export default function AccountPage() {
             {activeSection === 'business' && (
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Business Management</h2>
-                <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                  <p className="text-neutral-600 mb-4">Manage your business listings and information.</p>
-                        <Link 
-                    to="/owner"
-                    className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                        >
-                    Go to Business Dashboard
-                        </Link>
+                
+                {loading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : data.myBusinesses.length === 0 ? (
+                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                    <p className="text-neutral-600 mb-4">You don't have any businesses yet. Create your first listing!</p>
+                    <Link 
+                      to="/business"
+                      className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      Add Your Business
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4 mb-6">
+                      {data.myBusinesses.map((business) => (
+                        <div key={business.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-semibold text-lg text-neutral-900">{business.name}</h3>
+                                {business.published ? (
+                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                    Published
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                                    Draft
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-1 text-sm text-neutral-600">
+                                <p className="capitalize">{business.category_key?.replace('-', ' ')}</p>
+                                {business.address && <p>📍 {business.address}</p>}
+                                {business.phone && <p>📞 {business.phone}</p>}
+                                {business.email && <p>✉️ {business.email}</p>}
+                                {business.website && (
+                                  <p>
+                                    🌐 <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                      {business.website}
+                                    </a>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <Link
+                              to="/my-business"
+                              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                            >
+                              Manage
+                            </Link>
                           </div>
-                          </div>
-                        )}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="bg-neutral-50 rounded-xl border border-neutral-200 p-6">
+                      <p className="text-neutral-600 mb-4">Need more control? Access the full business dashboard.</p>
+                      <Link 
+                        to="/owner"
+                        className="inline-block px-6 py-2 bg-neutral-900 text-white rounded-lg font-medium hover:bg-neutral-800 transition-colors"
+                      >
+                        Go to Business Dashboard
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             
             {activeSection === 'bookings' && (
               <MyBookings
@@ -379,15 +443,76 @@ export default function AccountPage() {
             {activeSection === 'business' && (
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Business Management</h2>
-                <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                  <p className="text-neutral-600 mb-4">Manage your business listings and information.</p>
-                  <Link 
-                    to="/owner"
-                    className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    Go to Business Dashboard
-                  </Link>
-                </div>
+                
+                {loading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : data.myBusinesses.length === 0 ? (
+                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                    <p className="text-neutral-600 mb-4">You don't have any businesses yet. Create your first listing!</p>
+                    <Link 
+                      to="/business"
+                      className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      Add Your Business
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4 mb-6">
+                      {data.myBusinesses.map((business) => (
+                        <div key={business.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-semibold text-lg text-neutral-900">{business.name}</h3>
+                                {business.published ? (
+                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                    Published
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                                    Draft
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-1 text-sm text-neutral-600">
+                                <p className="capitalize">{business.category_key?.replace('-', ' ')}</p>
+                                {business.address && <p>📍 {business.address}</p>}
+                                {business.phone && <p>📞 {business.phone}</p>}
+                                {business.email && <p>✉️ {business.email}</p>}
+                                {business.website && (
+                                  <p>
+                                    🌐 <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                      {business.website}
+                                    </a>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <Link
+                              to="/my-business"
+                              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                            >
+                              Manage
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="bg-neutral-50 rounded-xl border border-neutral-200 p-6">
+                      <p className="text-neutral-600 mb-4">Need more control? Access the full business dashboard.</p>
+                      <Link 
+                        to="/owner"
+                        className="inline-block px-6 py-2 bg-neutral-900 text-white rounded-lg font-medium hover:bg-neutral-800 transition-colors"
+                      >
+                        Go to Business Dashboard
+                      </Link>
+                    </div>
+                  </>
+                )}
               </div>
             )}
             

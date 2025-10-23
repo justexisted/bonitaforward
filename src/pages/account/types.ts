@@ -5,6 +5,7 @@
 import { type CalendarEvent } from '../Calendar'
 
 export type DashboardSection = 
+  | 'dashboard'
   | 'account' 
   | 'business' 
   | 'bookings' 
@@ -53,10 +54,23 @@ export interface PendingApplication {
   created_at: string
 }
 
+export interface MyBusiness {
+  id: string
+  name: string
+  category_key: string
+  address?: string | null
+  phone?: string | null
+  email?: string | null
+  website?: string | null
+  published?: boolean | null
+  created_at?: string | null
+}
+
 export interface AccountData {
   bookings: Booking[]
   savedBusinesses: SavedBusiness[]
   myEvents: CalendarEvent[]
   pendingApps: PendingApplication[]
+  myBusinesses: MyBusiness[]
 }
 

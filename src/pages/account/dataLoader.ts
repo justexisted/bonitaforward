@@ -3,7 +3,7 @@
  */
 
 import { supabase } from '../../lib/supabase'
-import type { Booking, SavedBusiness, PendingApplication } from './types'
+import type { Booking, SavedBusiness, PendingApplication, MyBusiness } from './types'
 import type { CalendarEvent } from '../Calendar'
 
 export async function loadBookings(email: string): Promise<Booking[]> {
@@ -167,6 +167,26 @@ export async function loadPendingApplications(email: string): Promise<PendingApp
     }))
   } catch (err) {
     console.log('[Account] Error loading applications:', err)
+    return []
+  }
+}
+
+export async function loadMyBusinesses(userId: string): Promise<MyBusiness[]> {
+  try {
+    const { data, error } = await supabase
+      .from('providers')
+      .select('id, name, category_key, address, phone, email, website, published, created_at')
+      .eq('owner_user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.log('[Account] Error loading user businesses:', error)
+      return []
+    }
+    
+    return (data || []) as MyBusiness[]
+  } catch (err) {
+    console.log('[Account] Error loading user businesses:', err)
     return []
   }
 }
