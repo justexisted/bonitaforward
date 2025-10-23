@@ -169,13 +169,10 @@ export default function MyBusinessPage() {
   const [connectingCalendar, setConnectingCalendar] = useState(false)
   // State to control subscription card visibility
   const [showSubscriptionCard, setShowSubscriptionCard] = useState(true)
-  // State to track user's plan choice and status (used for internal logic)
-  const [userPlanChoice, setUserPlanChoice] = useState<'free' | 'featured-pending' | 'featured-approved' | null>(null)
+  // State to track user's plan choice and status (database-backed)
+  const [userPlanChoice, setUserPlanChoice] = useState<PlanChoice>(null)
   // State to track dismissed notifications (database-based)
   const [dismissedNotifications, setDismissedNotifications] = useState<DismissedNotification[]>([])
-  
-  // Suppress unused warning - this state is used for internal tracking logic
-  void userPlanChoice
 
   /**
    * DOWNGRADE TO FREE (Owner request)
