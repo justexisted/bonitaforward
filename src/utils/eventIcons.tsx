@@ -95,7 +95,7 @@ const ICON_MAPPINGS: IconKeyword[] = [
  * Detects keywords in text and returns matching icon mappings
  * Limits to 2 icons maximum
  */
-export function detectEventIcons(title: string, description?: string): IconKeyword[] {
+export function detectEventIcons(title: string, description?: string | null): IconKeyword[] {
   const combinedText = `${title} ${description || ''}`.toLowerCase()
   const matches: IconKeyword[] = []
   const seenLabels = new Set<string>()
@@ -131,7 +131,7 @@ export function detectEventIcons(title: string, description?: string): IconKeywo
  */
 interface EventIconsProps {
   title: string
-  description?: string
+  description?: string | null
   className?: string
   showLabel?: boolean
 }
