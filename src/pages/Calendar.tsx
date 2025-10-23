@@ -6,7 +6,7 @@ import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '
 import type { CalendarEvent } from '../types'
 import { EventIcons } from '../utils/eventIcons'
 import { extractEventUrl, cleanDescriptionFromUrls, getButtonTextForUrl } from '../utils/eventUrlUtils'
-import { getEventGradient, preloadEventImages } from '../utils/eventImageUtils'
+import { getEventGradient, preloadEventImages, getEventHeaderImage } from '../utils/eventImageUtils'
 
 // Re-export type for backward compatibility
 export type { CalendarEvent }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { X, FileText, CalendarDays, Trash2, Shield } from 'lucide-react'
+import { X, FileText, CalendarDays, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { SIDEBAR_ITEMS } from './account/constants'
 import type { DashboardSection, AccountData } from './account/types'

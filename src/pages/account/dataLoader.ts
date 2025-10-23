@@ -126,7 +126,7 @@ export async function loadSavedBusinesses(userId: string): Promise<SavedBusiness
   }
 }
 
-export async function loadMyEvents(userId: string): Promise<CalendarEvent[]> {
+export async function loadMyEvents(_userId: string): Promise<CalendarEvent[]> {
   // Calendar events table doesn't have user association
   // Return empty array for now
   return []
