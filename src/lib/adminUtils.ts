@@ -23,9 +23,12 @@ export async function verifyAdminStatus(): Promise<AdminVerificationResult> {
       return { isAdmin: false, error: 'Not authenticated' }
     }
 
-    const fnBase = (import.meta.env.VITE_FN_BASE_URL as string) || 
-      (window.location.hostname === 'localhost' ? 'http://localhost:8888' : '')
-    const url = fnBase ? `${fnBase}/.netlify/functions/admin-verify` : '/.netlify/functions/admin-verify'
+    // Use consistent URL pattern for Netlify functions
+    // Local dev: http://localhost:8888 (Netlify Dev port)
+    // Production: relative URL (/.netlify/functions/...)
+    const isLocal = window.location.hostname === 'localhost'
+    const fnBase = isLocal ? 'http://localhost:8888' : ''
+    const url = `${fnBase}/.netlify/functions/admin-verify`
     
     const response = await fetch(url, {
       method: 'POST',

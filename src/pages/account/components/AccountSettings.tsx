@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { updateProfile } from '../dataLoader'
 
 interface AccountSettingsProps {
@@ -12,20 +12,32 @@ export function AccountSettings({ userId, initialEmail, initialName, onMessage }
   const [name, setName] = useState(initialName)
   const [busy, setBusy] = useState(false)
 
+  // Update local state if initialName changes (e.g., after auth refresh)
+  useEffect(() => {
+    setName(initialName)
+  }, [initialName])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    
+    if (name === initialName) {
+      onMessage('No changes to save')
+      return
+    }
     
     setBusy(true)
     const result = await updateProfile(userId, name)
     
     if (result.success) {
       onMessage('Profile updated successfully!')
-      setTimeout(() => window.location.reload(), 1000)
+      // Reload immediately - auth context now fetches fresh data from database
+      setTimeout(() => {
+        window.location.reload()
+      }, 300)
     } else {
       onMessage(result.error || 'Failed to update profile')
+      setBusy(false)
     }
-    
-    setBusy(false)
   }
 
   return (

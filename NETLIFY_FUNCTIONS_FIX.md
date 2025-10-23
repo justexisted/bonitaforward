@@ -85,6 +85,8 @@ netlify dev
 ## Files Modified
 
 - `src/pages/Admin.tsx` - 9 function call locations updated with consistent URL pattern and comments
+- `src/pages/Owner.tsx` - admin-verify function call fixed (2025-10-23)
+- `src/lib/adminUtils.ts` - admin-verify function call fixed (2025-10-23)
 
 ## Testing Checklist
 

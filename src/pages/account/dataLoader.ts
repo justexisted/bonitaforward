@@ -235,17 +235,38 @@ export async function updateEvent(eventId: string, event: Partial<CalendarEvent>
 
 export async function updateProfile(userId: string, name: string): Promise<{ success: boolean; error?: string }> {
   try {
+    // Update the profile
     const { error } = await supabase
       .from('profiles')
       .update({ name })
       .eq('id', userId)
     
     if (error) {
+      console.error('[Account] Profile update error:', error)
       return { success: false, error: error.message }
     }
     
+    // Verify the update succeeded
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', userId)
+      .single()
+    
+    if (verifyError || !verifyData) {
+      console.error('[Account] Could not verify update:', verifyError)
+      return { success: false, error: 'Update may not have saved' }
+    }
+    
+    if (verifyData.name !== name) {
+      console.error('[Account] Update verification failed. Expected:', name, 'Got:', verifyData.name)
+      return { success: false, error: 'Update did not persist' }
+    }
+    
+    console.log('[Account] Profile updated and verified successfully')
     return { success: true }
   } catch (error: any) {
+    console.error('[Account] Exception during update:', error)
     return { success: false, error: error.message }
   }
 }

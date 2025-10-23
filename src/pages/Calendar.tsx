@@ -7,6 +7,8 @@ import type { CalendarEvent } from '../types'
 import { EventIcons } from '../utils/eventIcons'
 import { extractEventUrl, cleanDescriptionFromUrls, getButtonTextForUrl } from '../utils/eventUrlUtils'
 import { getEventGradient, preloadEventImages, getEventHeaderImage } from '../utils/eventImageUtils'
+import { fetchSavedEvents, saveEvent, unsaveEvent, migrateLocalStorageToDatabase } from '../utils/savedEventsDb'
+import { hasAcceptedEventTerms, acceptEventTerms, migrateEventTermsToDatabase } from '../utils/eventTermsDb'
 
 // Re-export type for backward compatibility
 export type { CalendarEvent }
@@ -213,56 +215,99 @@ export default function CalendarPage() {
   // State for dynamically loaded event images (Unsplash + gradients)
   const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
 
-  // Load saved events from localStorage
+  // Load saved events from database and migrate localStorage data
   useEffect(() => {
-    if (auth.userId) {
+    async function loadSavedEvents() {
+      if (!auth.userId) return
+      
       try {
-        const saved = localStorage.getItem(`bf-saved-events-${auth.userId}`)
-        if (saved) {
-          setSavedEventIds(new Set(JSON.parse(saved)))
-        }
+        // Migrate localStorage data to database (one-time operation)
+        await migrateLocalStorageToDatabase(auth.userId)
+        
+        // Load saved events from database
+        const saved = await fetchSavedEvents(auth.userId)
+        setSavedEventIds(saved)
       } catch (error) {
-        console.error('Error loading saved events:', error)
+        console.error('[Calendar] Error loading saved events:', error)
       }
     }
+    
+    loadSavedEvents()
   }, [auth.userId])
 
-  // Check if user has accepted terms
+  // Check if user has accepted terms (from database)
   useEffect(() => {
-    if (auth.userId) {
+    async function checkTermsAcceptance() {
+      if (!auth.userId) return
+      
       try {
-        const accepted = localStorage.getItem(`bf-event-terms-${auth.userId}`) === 'true'
+        // Migrate localStorage to database
+        await migrateEventTermsToDatabase(auth.userId)
+        
+        // Load from database
+        const accepted = await hasAcceptedEventTerms(auth.userId)
         setHasAcceptedTerms(accepted)
-      } catch {
+      } catch (error) {
+        console.error('[Calendar] Error loading terms acceptance:', error)
         setHasAcceptedTerms(false)
       }
     }
+    
+    checkTermsAcceptance()
   }, [auth.userId])
 
   // Toggle save/bookmark event
-  const toggleSaveEvent = (eventId: string) => {
-    if (!auth.isAuthed) {
+  const toggleSaveEvent = async (eventId: string) => {
+    if (!auth.isAuthed || !auth.userId) {
       alert('Please sign in to save events')
       return
     }
 
+    const isCurrentlySaved = savedEventIds.has(eventId)
+    
+    // Optimistically update UI
     setSavedEventIds(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(eventId)) {
+      if (isCurrentlySaved) {
         newSet.delete(eventId)
       } else {
         newSet.add(eventId)
       }
-      
-      // Save to localStorage
-      try {
-        localStorage.setItem(`bf-saved-events-${auth.userId}`, JSON.stringify(Array.from(newSet)))
-      } catch (error) {
-        console.error('Error saving event to localStorage:', error)
-      }
-      
       return newSet
     })
+    
+    // Update database
+    try {
+      const result = isCurrentlySaved 
+        ? await unsaveEvent(auth.userId, eventId)
+        : await saveEvent(auth.userId, eventId)
+      
+      if (!result.success) {
+        // Revert on error
+        console.error('[Calendar] Error toggling save:', result.error)
+        setSavedEventIds(prev => {
+          const newSet = new Set(prev)
+          if (isCurrentlySaved) {
+            newSet.add(eventId) // Re-add if unsave failed
+          } else {
+            newSet.delete(eventId) // Remove if save failed
+          }
+          return newSet
+        })
+      }
+    } catch (error) {
+      console.error('[Calendar] Exception toggling save:', error)
+      // Revert on error
+      setSavedEventIds(prev => {
+        const newSet = new Set(prev)
+        if (isCurrentlySaved) {
+          newSet.add(eventId)
+        } else {
+          newSet.delete(eventId)
+        }
+        return newSet
+      })
+    }
   }
 
   // Load events from database
@@ -306,20 +351,31 @@ export default function CalendarPage() {
   }
 
   // Handle terms acceptance
-  const handleAcceptTerms = () => {
+  const handleAcceptTerms = async () => {
     if (!termsAccepted) {
       alert('Please check the box to accept the terms')
       return
     }
     
     try {
-      localStorage.setItem(`bf-event-terms-${auth.userId}`, 'true')
-      setHasAcceptedTerms(true)
-      setShowTermsModal(false)
-      setShowCreateEvent(true)
+      if (!auth.userId) {
+        alert('Please sign in to create events')
+        return
+      }
+      
+      const result = await acceptEventTerms(auth.userId)
+      
+      if (result.success) {
+        setHasAcceptedTerms(true)
+        setShowTermsModal(false)
+        setShowCreateEvent(true)
+      } else {
+        console.error('[Calendar] Error saving terms acceptance:', result.error)
+        alert('Failed to accept terms. Please try again.')
+      }
     } catch (error) {
-      console.error('Error saving terms acceptance:', error)
-      alert('Failed to save terms acceptance')
+      console.error('[Calendar] Exception saving terms acceptance:', error)
+      alert('Failed to accept terms. Please try again.')
     }
   }
 

@@ -49,6 +49,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { getUserPlanChoice, setUserPlanChoice as savePlanChoice, migratePlanChoiceToDatabase, type PlanChoice } from '../utils/planChoiceDb'
 import { Link, useLocation } from 'react-router-dom'
 import { createProviderChangeRequest, type ProviderChangeRequest, dismissNotification as dismissNotificationDB, getDismissedNotifications, getLatestActivityTimestamp, type DismissedNotification } from '../lib/supabaseData'
 
@@ -622,8 +623,11 @@ export default function MyBusinessPage() {
   const checkUserPlanChoice = async () => {
     if (!auth.userId) return
 
-    // Check localStorage for user's previous choice
-    const savedChoice = localStorage.getItem(`user_plan_choice_${auth.userId}`)
+    // Migrate localStorage choice to database
+    await migratePlanChoiceToDatabase(auth.userId)
+
+    // Check database for user's plan choice
+    const savedChoice = await getUserPlanChoice(auth.userId)
     
     if (savedChoice === 'free') {
       setUserPlanChoice('free')
@@ -631,7 +635,7 @@ export default function MyBusinessPage() {
       return
     }
     
-    if (savedChoice === 'featured-pending' || savedChoice === 'featured-approved') {
+    if (savedChoice === 'featured-pending' || savedChoice === 'featured') {
       // Check if there are any pending featured requests
       const { data: pendingRequests, error } = await supabase
         .from('provider_change_requests')
@@ -663,12 +667,12 @@ export default function MyBusinessPage() {
         }
         
         if (featuredListings && featuredListings.length > 0) {
-          setUserPlanChoice('featured-approved')
+          setUserPlanChoice('featured')
           setShowSubscriptionCard(false)
           // Don't show message for approved featured accounts
         } else {
           // No pending requests and no featured listings, reset choice
-          localStorage.removeItem(`user_plan_choice_${auth.userId}`)
+          await savePlanChoice(auth.userId, null)
           setUserPlanChoice(null)
           setShowSubscriptionCard(true)
         }
@@ -738,8 +742,8 @@ export default function MyBusinessPage() {
     setUserPlanChoice('free')
     setShowSubscriptionCard(false)
     
-    // Save choice to localStorage
-    localStorage.setItem(`user_plan_choice_${auth.userId}`, 'free')
+    // Save choice to database
+    savePlanChoice(auth.userId, 'free')
     
     // Auto-dismiss message after 30 seconds
     setTimeout(() => {
@@ -843,9 +847,9 @@ export default function MyBusinessPage() {
         setShowSubscriptionCard(false)
         setUserPlanChoice('featured-pending')
         
-        // Save choice to localStorage
+        // Save choice to database
         if (auth.userId) {
-          localStorage.setItem(`user_plan_choice_${auth.userId}`, 'featured-pending')
+          await savePlanChoice(auth.userId, 'featured-pending')
         }
       }
     } catch (error: any) {

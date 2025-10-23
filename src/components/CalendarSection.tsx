@@ -6,6 +6,15 @@ import { fetchCalendarEvents, type CalendarEvent } from '../pages/Calendar'
 import { useAuth } from '../contexts/AuthContext'
 import { extractEventUrl, cleanDescriptionFromUrls } from '../utils/eventUrlUtils'
 import { preloadEventImages } from '../utils/eventImageUtils'
+import { 
+  fetchSavedEvents, 
+  saveEvent, 
+  unsaveEvent, 
+  migrateLocalStorageToDatabase,
+  getLocalStorageSavedEvents,
+  saveEventToLocalStorage,
+  unsaveEventFromLocalStorage
+} from '../utils/savedEventsDb'
 
 interface LoadingSpinnerProps {
   message?: string
@@ -71,39 +80,90 @@ export default function CalendarSection() {
     loadEvents()
   }, [])
 
-  // Load saved events from localStorage
+  // Load saved events from database (authenticated) or localStorage (guest)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('bf-saved-events')
-      if (saved) {
-        setSavedEventIds(new Set(JSON.parse(saved)))
+    async function loadSavedEvents() {
+      try {
+        if (auth.userId) {
+          // Authenticated user - load from database
+          await migrateLocalStorageToDatabase(auth.userId)
+          const saved = await fetchSavedEvents(auth.userId)
+          setSavedEventIds(saved)
+        } else {
+          // Guest user - load from localStorage
+          const saved = getLocalStorageSavedEvents()
+          setSavedEventIds(saved)
+        }
+      } catch (error) {
+        console.error('[CalendarSection] Error loading saved events:', error)
       }
-    } catch (error) {
-      console.error('Error loading saved events:', error)
     }
-  }, [])
+    
+    loadSavedEvents()
+  }, [auth.userId])
 
   // Toggle save event
-  const toggleSaveEvent = (eventId: string) => {
+  const toggleSaveEvent = async (eventId: string) => {
     if (!auth.isAuthed) {
       alert('Please sign in to save events')
       return
     }
 
+    const isCurrentlySaved = savedEventIds.has(eventId)
+    
+    // Optimistically update UI
     setSavedEventIds(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(eventId)) {
+      if (isCurrentlySaved) {
         newSet.delete(eventId)
       } else {
         newSet.add(eventId)
       }
-      try {
-        localStorage.setItem('bf-saved-events', JSON.stringify([...newSet]))
-      } catch (error) {
-        console.error('Error saving event:', error)
-      }
       return newSet
     })
+    
+    // Update database (authenticated) or localStorage (guest)
+    try {
+      if (auth.userId) {
+        // Authenticated user - update database
+        const result = isCurrentlySaved 
+          ? await unsaveEvent(auth.userId, eventId)
+          : await saveEvent(auth.userId, eventId)
+        
+        if (!result.success) {
+          // Revert on error
+          console.error('[CalendarSection] Error toggling save:', result.error)
+          setSavedEventIds(prev => {
+            const newSet = new Set(prev)
+            if (isCurrentlySaved) {
+              newSet.add(eventId)
+            } else {
+              newSet.delete(eventId)
+            }
+            return newSet
+          })
+        }
+      } else {
+        // Guest user - update localStorage
+        if (isCurrentlySaved) {
+          unsaveEventFromLocalStorage(eventId)
+        } else {
+          saveEventToLocalStorage(eventId)
+        }
+      }
+    } catch (error) {
+      console.error('[CalendarSection] Exception toggling save:', error)
+      // Revert on error
+      setSavedEventIds(prev => {
+        const newSet = new Set(prev)
+        if (isCurrentlySaved) {
+          newSet.add(eventId)
+        } else {
+          newSet.delete(eventId)
+        }
+        return newSet
+      })
+    }
   }
 
   // Show loading spinner while events are being fetched

@@ -56,19 +56,35 @@ function saveReturnUrl(): void {
 }
 
 /**
- * Fetch user role from database
+ * Fetch user profile (name and role) from database
  */
-async function fetchUserRole(userId: string): Promise<'business' | 'community' | undefined> {
+async function fetchUserProfile(userId: string): Promise<{ name?: string; role?: 'business' | 'community' }> {
   try {
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
-    const dbRole = String((prof as any)?.role || '').toLowerCase()
-    if (dbRole === 'business' || dbRole === 'community') {
-      return dbRole as 'business' | 'community'
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('id', userId)
+      .maybeSingle()
+    
+    if (prof) {
+      const dbRole = String((prof as any)?.role || '').toLowerCase()
+      return {
+        name: (prof as any)?.name || undefined,
+        role: (dbRole === 'business' || dbRole === 'community') ? dbRole as 'business' | 'community' : undefined
+      }
     }
   } catch (error) {
-    console.error('Error fetching user role:', error)
+    console.error('Error fetching user profile:', error)
   }
-  return undefined
+  return {}
+}
+
+/**
+ * Fetch user role from database (legacy - use fetchUserProfile instead)
+ */
+async function fetchUserRole(userId: string): Promise<'business' | 'community' | undefined> {
+  const profile = await fetchUserProfile(userId)
+  return profile.role
 }
 
 /**
@@ -188,10 +204,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          */
         if (session?.user && mounted) {
           const email = session.user.email
-          const meta = session.user.user_metadata || {}
-          const name = meta?.name
-          let role = meta?.role as 'business' | 'community' | undefined
           const userId = session.user.id
+          
+          // Fetch fresh profile data from database (not stale session metadata)
+          let name: string | undefined
+          let role: 'business' | 'community' | undefined
 
           // console.log('[Auth] Processing existing session for:', email, 'userId:', userId)
           
@@ -205,21 +222,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           /**
-           * CRITICAL FIX: Proper role fetching and profile management
+           * CRITICAL FIX: Fetch name and role from database, not session metadata
            * 
-           * The issue is that role isn't being properly fetched and set,
-           * causing auth state to be incomplete and triggering sign-outs.
+           * Issue: session.user.user_metadata contains stale data from sign-up
+           * and doesn't update when profiles table is updated.
            * 
-           * Fix: Always fetch role from database and ensure profile is complete.
+           * Fix: Always fetch current name and role from profiles table.
            */
           if (userId) {
-            const fetchedRole = await fetchUserRole(userId)
-            if (fetchedRole) {
-              role = fetchedRole
-              // console.log('[Auth] Role fetched from database:', role)
-            } else {
-              // console.log('[Auth] No valid role found in database')
-            }
+            const profileData = await fetchUserProfile(userId)
+            name = profileData.name
+            role = profileData.role
+            // console.log('[Auth] Profile fetched from database:', { name, role })
           }
 
           // console.log('[Auth] About to set profile state:', { name, email, userId, role })
@@ -289,10 +303,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // AND if the user is not already signed in (prevents duplicate processing)
       if (event === 'SIGNED_IN' && session?.user && initializationComplete) {
         const email = session.user.email
-        const meta = session.user.user_metadata || {}
-        const name = meta?.name
-        let role = meta?.role as 'business' | 'community' | undefined
         const userId = session.user.id
+        
+        // Fetch fresh profile data from database (not stale session metadata)
+        let name: string | undefined
+        let role: 'business' | 'community' | undefined
 
         // CRITICAL FIX: Don't process SIGNED_IN if user is already signed in with same email
         // This prevents the auth state reset when switching tabs
@@ -301,15 +316,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // console.log('User signed in:', { email, userId, metaRole: role })
+        // console.log('User signed in:', { email, userId })
 
-        // CRITICAL FIX: Always fetch role from database for signed in users
+        // CRITICAL FIX: Fetch name and role from database, not session metadata
+        // This ensures we always have the latest profile data
         if (userId) {
-          const fetchedRole = await fetchUserRole(userId)
-          if (fetchedRole) {
-            role = fetchedRole
-            // console.log('Role fetched from database on sign in:', role)
-          }
+          const profileData = await fetchUserProfile(userId)
+          name = profileData.name
+          role = profileData.role
+          // console.log('Profile fetched from database on sign in:', { name, role })
         }
 
         // console.log('[Auth] Setting profile state:', { name, email, userId, role })
