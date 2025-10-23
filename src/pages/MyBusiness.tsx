@@ -170,7 +170,10 @@ export default function MyBusinessPage() {
   // State to control subscription card visibility
   const [showSubscriptionCard, setShowSubscriptionCard] = useState(true)
   // State to track user's plan choice and status (database-backed)
+  // Note: Only setter is used; value is for internal state tracking
   const [userPlanChoice, setUserPlanChoice] = useState<PlanChoice>(null)
+  void userPlanChoice // Suppress unused variable warning
+  
   // State to track dismissed notifications (database-based)
   const [dismissedNotifications, setDismissedNotifications] = useState<DismissedNotification[]>([])
 
