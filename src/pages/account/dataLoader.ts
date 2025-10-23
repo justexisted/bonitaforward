@@ -126,10 +126,24 @@ export async function loadSavedBusinesses(userId: string): Promise<SavedBusiness
   }
 }
 
-export async function loadMyEvents(_userId: string): Promise<CalendarEvent[]> {
-  // Calendar events table doesn't have user association
-  // Return empty array for now
-  return []
+export async function loadMyEvents(userId: string): Promise<CalendarEvent[]> {
+  try {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('created_by_user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.log('[Account] Error loading user events:', error)
+      return []
+    }
+    
+    return (data || []) as CalendarEvent[]
+  } catch (err) {
+    console.log('[Account] Error loading user events:', err)
+    return []
+  }
 }
 
 export async function loadPendingApplications(email: string): Promise<PendingApplication[]> {

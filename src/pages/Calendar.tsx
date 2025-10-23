@@ -1639,7 +1639,7 @@ export default function CalendarPage() {
                 <input
                   type="text"
                   value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="e.g., Bonita Farmers Market"
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   maxLength={100}
@@ -1655,7 +1655,7 @@ export default function CalendarPage() {
                   <input
                     type="date"
                     value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -1666,7 +1666,7 @@ export default function CalendarPage() {
                   <input
                     type="time"
                     value={newEvent.time}
-                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                    onChange={(e) => setNewEvent(prev => ({ ...prev, time: e.target.value }))}
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -1680,7 +1680,7 @@ export default function CalendarPage() {
                 <input
                   type="text"
                   value={newEvent.location}
-                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
                   placeholder="e.g., Bonita Community Center"
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -1694,7 +1694,7 @@ export default function CalendarPage() {
                 <input
                   type="text"
                   value={newEvent.address}
-                  onChange={(e) => setNewEvent({ ...newEvent, address: e.target.value })}
+                  onChange={(e) => setNewEvent(prev => ({ ...prev, address: e.target.value }))}
                   placeholder="e.g., 123 Main St, Bonita, CA 91902"
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -1707,7 +1707,7 @@ export default function CalendarPage() {
                 </label>
                 <select
                   value={newEvent.category}
-                  onChange={(e) => setNewEvent({ ...newEvent, category: e.target.value })}
+                  onChange={(e) => setNewEvent(prev => ({ ...prev, category: e.target.value }))}
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="Community">Community</option>
@@ -1727,7 +1727,7 @@ export default function CalendarPage() {
                 </label>
                 <textarea
                   value={newEvent.description}
-                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Tell us more about your event..."
                   rows={4}
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"

@@ -16,6 +16,11 @@ export async function fetchSavedEvents(userId: string): Promise<Set<string>> {
       .eq('user_id', userId)
     
     if (error) {
+      // If table doesn't exist yet, silently return empty set (not an error condition)
+      if (error.code === 'PGRST205') {
+        console.warn('[SavedEvents] Table not found - please run migrations')
+        return new Set()
+      }
       console.error('[SavedEvents] Error fetching saved events:', error)
       return new Set()
     }
@@ -41,6 +46,11 @@ export async function saveEvent(userId: string, eventId: string): Promise<{ succ
       if (error.code === '23505') {
         return { success: true }
       }
+      // If table doesn't exist, fail silently
+      if (error.code === 'PGRST205') {
+        console.warn('[SavedEvents] Table not found - please run migrations')
+        return { success: false, error: 'Table not found' }
+      }
       console.error('[SavedEvents] Error saving event:', error)
       return { success: false, error: error.message }
     }
@@ -64,6 +74,11 @@ export async function unsaveEvent(userId: string, eventId: string): Promise<{ su
       .eq('event_id', eventId)
     
     if (error) {
+      // If table doesn't exist, fail silently
+      if (error.code === 'PGRST205') {
+        console.warn('[SavedEvents] Table not found - please run migrations')
+        return { success: false, error: 'Table not found' }
+      }
       console.error('[SavedEvents] Error unsaving event:', error)
       return { success: false, error: error.message }
     }
