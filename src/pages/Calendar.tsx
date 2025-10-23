@@ -320,9 +320,11 @@ export default function CalendarPage() {
         const allEvents = await fetchCalendarEvents()
         setEvents(allEvents)
         
-        // Load images dynamically after events are loaded
-        if (allEvents.length > 0) {
-          const images = await preloadEventImages(allEvents)
+        // ONLY load dynamic images for events that don't have database images
+        const eventsNeedingImages = allEvents.filter(e => !e.image_url)
+        if (eventsNeedingImages.length > 0) {
+          console.log(`[Calendar] ${eventsNeedingImages.length} events need dynamic images`)
+          const images = await preloadEventImages(eventsNeedingImages)
           setEventImages(images)
         }
       } catch (err) {
@@ -826,12 +828,12 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // Get dynamically loaded image or use database image or fallback to gradient
+                    // PRIORITIZE database images, then dynamic, then gradient fallback
                     const dynamicImage = eventImages.get(event.id)
-                    const headerImage = dynamicImage
-                      ? dynamicImage
-                      : event.image_url && event.image_type
-                        ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                    const headerImage = event.image_url && event.image_type
+                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                      : dynamicImage
+                        ? dynamicImage
                         : { type: 'gradient' as const, value: getEventGradient(event) }
                     
                     return (
@@ -990,12 +992,12 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // Get dynamically loaded image or use database image or fallback to gradient
+                    // PRIORITIZE database images, then dynamic, then gradient fallback
                     const dynamicImage = eventImages.get(event.id)
-                    const headerImage = dynamicImage
-                      ? dynamicImage
-                      : event.image_url && event.image_type
-                        ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                    const headerImage = event.image_url && event.image_type
+                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                      : dynamicImage
+                        ? dynamicImage
                         : { type: 'gradient' as const, value: getEventGradient(event) }
                     
                     return (
@@ -1144,12 +1146,12 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // Get dynamically loaded image or use database image or fallback to gradient
+                    // PRIORITIZE database images, then dynamic, then gradient fallback
                     const dynamicImage = eventImages.get(event.id)
-                    const headerImage = dynamicImage
-                      ? dynamicImage
-                      : event.image_url && event.image_type
-                        ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                    const headerImage = event.image_url && event.image_type
+                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                      : dynamicImage
+                        ? dynamicImage
                         : { type: 'gradient' as const, value: getEventGradient(event) }
                     
                     return (

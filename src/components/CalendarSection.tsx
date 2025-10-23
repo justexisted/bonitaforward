@@ -65,9 +65,11 @@ export default function CalendarSection() {
         const calendarEvents = await fetchCalendarEvents()
         setEvents(calendarEvents)
         
-        // Load images dynamically after events are loaded
-        if (calendarEvents.length > 0) {
-          const images = await preloadEventImages(calendarEvents)
+        // ONLY load dynamic images for events that don't have database images
+        const eventsNeedingImages = calendarEvents.filter(e => !e.image_url)
+        if (eventsNeedingImages.length > 0) {
+          console.log(`[CalendarSection] ${eventsNeedingImages.length} events need dynamic images`)
+          const images = await preloadEventImages(eventsNeedingImages)
           setEventImages(images)
         }
       } catch (error) {
@@ -212,14 +214,14 @@ export default function CalendarSection() {
           {/* Event Cards Grid */}
           {upcomingEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-visible">
-              {upcomingEvents.map((event) => {
-                // Get dynamically loaded image or use database image as fallback
-                const dynamicImage = eventImages.get(event.id)
-                const eventWithImage = dynamicImage ? {
-                  ...event,
-                  image_url: dynamicImage.value,
-                  image_type: dynamicImage.type
-                } : event
+            {upcomingEvents.map((event) => {
+              // PRIORITIZE database images, only use dynamic if database is empty
+              const dynamicImage = eventImages.get(event.id)
+              const eventWithImage = event.image_url ? event : (dynamicImage ? {
+                ...event,
+                image_url: dynamicImage.value,
+                image_type: dynamicImage.type
+              } : event)
                 
                 return (
                   <EventCard

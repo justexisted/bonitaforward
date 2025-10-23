@@ -297,8 +297,35 @@ export async function getEventHeaderImage(event: CalendarEvent): Promise<{
 }
 
 /**
+ * Save fetched image to database permanently
+ * This ensures we only fetch from Unsplash ONCE per event
+ */
+async function saveImageToDatabase(eventId: string, imageUrl: string, imageType: 'image' | 'gradient'): Promise<void> {
+  try {
+    const { supabase } = await import('../lib/supabase')
+    
+    const { error } = await supabase
+      .from('calendar_events')
+      .update({
+        image_url: imageUrl,
+        image_type: imageType
+      })
+      .eq('id', eventId)
+    
+    if (error) {
+      console.warn(`[ImageUtils] Failed to save image to database for event ${eventId}:`, error)
+    } else {
+      console.log(`[ImageUtils] Saved image to database for event ${eventId}`)
+    }
+  } catch (err) {
+    console.warn('[ImageUtils] Error saving image to database:', err)
+  }
+}
+
+/**
  * Preload images for multiple events (batch processing)
  * Useful for calendar page to load all images at once
+ * Automatically saves fetched images to database for permanent storage
  */
 export async function preloadEventImages(events: CalendarEvent[]): Promise<Map<string, {
   type: 'image' | 'gradient'
@@ -311,7 +338,14 @@ export async function preloadEventImages(events: CalendarEvent[]): Promise<Map<s
   for (let i = 0; i < events.length; i += batchSize) {
     const batch = events.slice(i, i + batchSize)
     const results = await Promise.all(
-      batch.map(event => getEventHeaderImage(event))
+      batch.map(async (event) => {
+        const result = await getEventHeaderImage(event)
+        
+        // Save to database permanently (fetch once, store forever)
+        await saveImageToDatabase(event.id, result.value, result.type)
+        
+        return result
+      })
     )
     
     batch.forEach((event, index) => {
