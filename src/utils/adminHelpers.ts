@@ -15,7 +15,7 @@
  * - formatAdminDate: Format dates for admin panel display
  */
 
-import type { ProviderRow } from '../pages/Admin'
+import type { ProviderRow } from '../types/admin'
 
 // Type definitions
 type FunnelRow = {

@@ -1,5 +1,5 @@
 import React from 'react'
-import { type ProviderRow } from '../../../pages/Admin'
+import type { ProviderRow } from '../../../types/admin'
 import { ProviderCoreInfoFields } from '../ProviderCoreInfoFields'
 import { ProviderDescriptionField } from '../ProviderDescriptionField-2025-10-19'
 import { ProviderCouponFields } from '../ProviderCouponFields-2025-10-19'

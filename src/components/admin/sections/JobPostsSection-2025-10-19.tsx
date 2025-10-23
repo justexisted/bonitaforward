@@ -19,18 +19,18 @@ import type { ProviderJobPost } from '../../../lib/supabaseData'
  * This is a self-contained section with its own state management.
  */
 
-// Extended type with joined data
+// Extended type with joined data from providers and profiles tables
 export interface ProviderJobPostWithDetails extends ProviderJobPost {
   provider?: {
     id: string
     name: string
-    email?: string
-  }
+    email: string | null
+  } | null
   owner?: {
     id: string
     email: string
-    name?: string
-  }
+    name: string | null
+  } | null
 }
 
 interface JobPostsSectionProps {
@@ -50,13 +50,47 @@ export function JobPostsSection({ onMessage, onError }: JobPostsSectionProps) {
   const loadJobPosts = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      
+      // Step 1: Get all job posts
+      const { data: jobPostsData, error: jobPostsError } = await supabase
         .from('provider_job_posts')
         .select('*')
         .order('created_at', { ascending: false })
       
-      if (error) throw error
-      setJobPosts((data as ProviderJobPostWithDetails[]) || [])
+      if (jobPostsError) throw jobPostsError
+      if (!jobPostsData || jobPostsData.length === 0) {
+        setJobPosts([])
+        return
+      }
+      
+      // Step 2: Get unique provider IDs and owner user IDs
+      const providerIds = [...new Set(jobPostsData.map(job => job.provider_id).filter(Boolean))]
+      const ownerIds = [...new Set(jobPostsData.map(job => job.owner_user_id).filter(Boolean))]
+      
+      // Step 3: Fetch provider details
+      const { data: providersData } = await supabase
+        .from('providers')
+        .select('id, name, email')
+        .in('id', providerIds)
+      
+      // Step 4: Fetch owner details from profiles
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, email, name')
+        .in('id', ownerIds)
+      
+      // Step 5: Create lookup maps
+      const providersMap = new Map(providersData?.map(p => [p.id, p]) || [])
+      const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || [])
+      
+      // Step 6: Merge data
+      const enrichedJobPosts: ProviderJobPostWithDetails[] = jobPostsData.map(job => ({
+        ...job,
+        provider: job.provider_id ? providersMap.get(job.provider_id) || null : null,
+        owner: job.owner_user_id ? profilesMap.get(job.owner_user_id) || null : null
+      }))
+      
+      setJobPosts(enrichedJobPosts)
     } catch (err: any) {
       console.error('[JobPostsSection] Failed to load job posts:', err)
       onError(err.message || 'Failed to load job posts')

@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, MapPin, Clock, 
 import { type CalendarEvent } from '../pages/Calendar'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { EventIcons } from '../utils/eventIcons'
 
 interface CalendarProps {
   events: CalendarEvent[]
@@ -267,7 +268,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                                 }}
                                 onMouseEnter={() => setHoveredEvent(event)}
                                 onMouseLeave={() => setHoveredEvent(null)}
-                                className={`w-full text-left text-xs px-2 py-1 rounded-full truncate cursor-pointer hover:opacity-80 transition-opacity ${
+                                className={`w-full text-left text-xs px-2 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 ${
                                    event.source.includes('San Diego') || event.source.includes('Museum') ? 'bg-blue-100 text-blue-800 border border-blue-200' :
                                    event.source.includes('Library') ? 'bg-green-100 text-green-800 border border-green-200' :
                                    event.source.includes('Parks') ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
@@ -282,7 +283,14 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                                    'bg-neutral-100 text-neutral-700'
                                  }`}
                               >
-                                {event.title.length > 12 ? event.title.substring(0, 12) + '...' : event.title}
+                                <EventIcons 
+                                  title={event.title} 
+                                  description={event.description} 
+                                  className="w-3 h-3 flex-shrink-0" 
+                                />
+                                <span className="truncate">
+                                  {event.title.length > 12 ? event.title.substring(0, 12) + '...' : event.title}
+                                </span>
                               </button>
                               {/* Hover tooltip for desktop */}
                               {hoveredEvent === event && (
@@ -459,9 +467,16 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                   className="w-full text-left bg-neutral-50 hover:bg-blue-50 border border-neutral-200 hover:border-blue-300 rounded-xl p-4 transition-all group"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-semibold text-neutral-900 group-hover:text-blue-600 transition-colors pr-2">
-                      {event.title}
-                    </h4>
+                    <div className="flex items-center gap-2 pr-2">
+                      <h4 className="font-semibold text-neutral-900 group-hover:text-blue-600 transition-colors">
+                        {event.title}
+                      </h4>
+                      <EventIcons 
+                        title={event.title} 
+                        description={event.description} 
+                        className="w-4 h-4 flex-shrink-0 text-neutral-600" 
+                      />
+                    </div>
                     <span className="text-xs px-2 py-1 bg-neutral-200 text-neutral-700 rounded-full flex-shrink-0">
                       {event.source}
                     </span>
@@ -498,10 +513,17 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
             {/* Modal Header */}
             <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 px-4 md:px-6 py-4 rounded-t-2xl flex items-start justify-between">
               <div className="flex-1 pr-4">
-                <h3 className="text-lg md:text-xl font-bold text-white font-display">
-                  {selectedEvent.title}
-                </h3>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-lg md:text-xl font-bold text-white font-display">
+                    {selectedEvent.title}
+                  </h3>
+                  <EventIcons 
+                    title={selectedEvent.title} 
+                    description={selectedEvent.description} 
+                    className="w-5 h-5 md:w-6 md:h-6 text-white flex-shrink-0" 
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs md:text-sm px-2 md:px-3 py-1 bg-blue-800 text-white rounded-full border border-blue-900">
                     {selectedEvent.source}
                   </span>

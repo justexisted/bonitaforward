@@ -11,7 +11,8 @@
     "seed:providers": "tsx scripts/seed-providers.ts",
     "seed:realty": "tsx scripts/seed-realty-report.ts",
     "seed:calendar": "tsx scripts/seed-calendar-events.ts",
-    "migrate:images": "tsx scripts/migrate-google-images.ts"
+    "migrate:images": "tsx scripts/migrate-google-images.ts",
+    "populate:event-images": "tsx scripts/populate-event-images.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

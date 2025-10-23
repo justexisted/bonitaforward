@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { type ProviderRow } from '../../pages/Admin'
+import type { ProviderRow } from '../../types/admin'
 
 /**
  * PROVIDER DESCRIPTION FIELD - OPTIMIZED ⚡

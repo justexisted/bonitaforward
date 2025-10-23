@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 // iCalendar parsing moved to server-side Netlify function for reliability
 // import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
-import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
+// Type imports (extracted from Admin.tsx for better organization)
+import type { ProviderRow, ProviderChangeRequestWithDetails, ProviderJobPostWithDetails } from '../types/admin'
 // Provider management utilities (extracted for better organization)
 import * as ProviderUtils from '../utils/adminProviderUtils'
 // User management utilities (extracted for better organization)
@@ -48,74 +49,8 @@ import { useAdminData } from '../hooks/useAdminData'
 import type { AdminSection as _AdminSection } from '../types/admin'
 // ============================================================================
 
-// Extended type for change requests with joined provider and profile data
-type ProviderChangeRequestWithDetails = ProviderChangeRequest & {
-  providers?: {
-    id: string
-    name: string
-    email: string | null
-  }
-  profiles?: {
-    id: string
-    email: string
-    name: string | null
-  }
-}
-
-// Extended type for job posts with provider information
-type ProviderJobPostWithDetails = ProviderJobPost & {
-  provider?: {
-    id: string
-    name: string
-    email: string | null
-  }
-  owner?: {
-    id: string
-    email: string
-    name: string | null
-  }
-}
-
-// REFACTORED: All type definitions moved to hook files or removed (now sourced from hooks)
-export type ProviderRow = {
-  id: string
-  name: string
-  category_key: string
-  tags: string[] | null
-  badges: string[] | null
-  rating: number | null
-  phone: string | null
-  email: string | null
-  website: string | null
-  address: string | null
-  images: string[] | null
-  owner_user_id: string | null
-  is_member?: boolean | null
-  is_featured?: boolean | null
-  featured_since?: string | null
-  subscription_type?: string | null
-  description?: string | null
-  specialties?: string[] | null
-  social_links?: Record<string, string> | null
-  business_hours?: Record<string, string> | null
-  service_areas?: string[] | null
-  google_maps_url?: string | null
-  bonita_resident_discount?: string | null
-  published?: boolean | null
-  created_at?: string | null
-  updated_at?: string | null
-  booking_enabled?: boolean | null
-  booking_type?: 'appointment' | 'reservation' | 'consultation' | 'walk-in' | null
-  booking_instructions?: string | null
-  booking_url?: string | null
-  enable_calendar_booking?: boolean | null
-  enable_call_contact?: boolean | null
-  enable_email_contact?: boolean | null
-  coupon_code?: string | null
-  coupon_discount?: string | null
-  coupon_description?: string | null
-  coupon_expires_at?: string | null
-}
+// REFACTORED: Type definitions moved to types/admin.ts for better organization
+// Types now imported at top: ProviderRow, ProviderChangeRequestWithDetails, ProviderJobPostWithDetails
 
 /**
  * Admin page (per-user): Lists the authenticated user's saved funnel responses and bookings.

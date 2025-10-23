@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { ProviderChangeRequest } from '../../../lib/supabaseData'
-import type { ProviderRow } from '../../../pages/Admin'
+import type { ProviderRow } from '../../../types/admin'
 
 /**
  * CHANGE REQUESTS SECTION

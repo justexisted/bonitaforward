@@ -117,6 +117,17 @@ export const parseICalFeed = async (feedUrl: string, source: string): Promise<IC
         const location = event.location || ''
         const uid = event.uid || `ical-${source}-${index}`
         
+        // Try to get URL from the ICAL component
+        let eventUrl = ''
+        try {
+          const urlProp = vevent.getFirstPropertyValue('url')
+          if (urlProp && typeof urlProp === 'string') {
+            eventUrl = urlProp
+          }
+        } catch {
+          // URL property not available, leave empty
+        }
+        
         // Get start and end times
         const startTime = event.startDate
         const endTime = event.endDate
@@ -147,7 +158,7 @@ export const parseICalFeed = async (feedUrl: string, source: string): Promise<IC
           startDate: startDate,
           endDate: endTime ? endTime.toJSDate() : undefined,
           location: location,
-          url: '', // URL not available in ICAL.js Event object
+          url: eventUrl,
           source,
           allDay: startTime.isDate
         }
@@ -223,6 +234,7 @@ export const convertICalToCalendarEvent = (icalEvent: ICalEvent): any => {
     source: icalEvent.source,
     upvotes: 0,
     downvotes: 0,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    url: icalEvent.url || null
   }
 }

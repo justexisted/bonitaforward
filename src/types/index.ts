@@ -157,6 +157,9 @@ export type CalendarEvent = {
   provider_id?: string | null
   is_flagged?: boolean | null
   flag_count?: number | null
+  url?: string | null
+  image_url?: string | null
+  image_type?: 'image' | 'gradient' | null
 }
 
 // ============================================================================

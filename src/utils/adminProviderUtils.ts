@@ -16,7 +16,7 @@
  */
 
 import { supabase } from '../lib/supabase'
-import type { ProviderRow } from '../pages/Admin'
+import type { ProviderRow } from '../types/admin'
 
 /**
  * TOGGLE FEATURED STATUS
