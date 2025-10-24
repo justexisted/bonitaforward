@@ -1589,6 +1589,12 @@ export default function MyBusinessPage() {
                   </svg>
                   1 business image
                 </li>
+                <li className="flex items-start">
+                  <svg className="w-4 h-4 text-amber-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-amber-700"><strong>Changes require admin approval</strong> (1-2 business days)</span>
+                </li>
               </ul>
               <button
                 onClick={selectFreeAccount}
@@ -1663,10 +1669,10 @@ export default function MyBusinessPage() {
                   <strong>Analytics</strong> - view customer interactions
                 </li>
                 <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <strong>No admin approval needed</strong> - make changes instantly
+                  <span className="text-green-700"><strong>No admin approval needed</strong> - make changes instantly</span>
                 </li>
               </ul>
               <button

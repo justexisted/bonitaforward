@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Calendar } from 'lucide-react'
 import type { Booking } from '../types'
 import { cancelBooking } from '../dataLoader'
@@ -56,10 +57,21 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
         {bookings.map((booking) => (
           <div key={booking.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
             <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-lg text-neutral-900 mb-2">
-                  {booking.provider_name || 'Unknown Business'}
-                </h3>
+              <div className="flex-1">
+                {/* Business name - clickable if provider_id exists */}
+                {booking.provider_id ? (
+                  <Link 
+                    to={`/providers/${booking.provider_id}`}
+                    className="font-semibold text-lg text-blue-600 hover:text-blue-700 hover:underline mb-2 inline-block"
+                  >
+                    {booking.provider_name || 'Unknown Business'}
+                  </Link>
+                ) : (
+                  <h3 className="font-semibold text-lg text-neutral-900 mb-2">
+                    {booking.provider_name || 'Unknown Business'}
+                  </h3>
+                )}
+                
                 {booking.created_at && (
                   <p className="text-sm text-neutral-600 mb-1">
                     📅 Booked: {new Date(booking.created_at).toLocaleString()}
@@ -79,15 +91,29 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
                   {booking.status || 'pending'}
                 </span>
               </div>
-              {booking.status !== 'cancelled' && (
-                <button
-                  onClick={() => handleCancel(booking.id)}
-                  disabled={cancellingId === booking.id}
-                  className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
-                >
-                  {cancellingId === booking.id ? 'Cancelling...' : 'Cancel'}
-                </button>
-              )}
+              
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2 ml-4">
+                {booking.status !== 'cancelled' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        alert('To request a change to your booking date/time, please contact the business directly or email us at hello@bonitaforward.com')
+                      }}
+                      className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap"
+                    >
+                      Request Change
+                    </button>
+                    <button
+                      onClick={() => handleCancel(booking.id)}
+                      disabled={cancellingId === booking.id}
+                      className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 disabled:opacity-50 transition-colors whitespace-nowrap"
+                    >
+                      {cancellingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         ))}

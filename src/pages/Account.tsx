@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { X, FileText, CalendarDays, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { SIDEBAR_ITEMS } from './account/constants'
@@ -9,13 +9,21 @@ import {
   loadSavedBusinesses, 
   loadMyEvents, 
   loadPendingApplications,
-  loadMyBusinesses
+  loadMyBusinesses,
+  requestApplicationUpdate
 } from './account/dataLoader'
 import { AccountSettings, MyBookings, SavedBusinesses } from './account/components'
 
 export default function AccountPage() {
   const auth = useAuth()
-  const [activeSection, setActiveSection] = useState<DashboardSection>('dashboard')
+  const location = useLocation()
+  // Default to 'account' on desktop (lg+), 'dashboard' on mobile
+  const [activeSection, setActiveSection] = useState<DashboardSection>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024 ? 'account' : 'dashboard'
+    }
+    return 'dashboard'
+  })
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<AccountData>({
@@ -25,6 +33,16 @@ export default function AccountPage() {
     pendingApps: [],
     myBusinesses: [],
   })
+
+  // Handle navigation from notifications
+  useEffect(() => {
+    const state = location.state as { section?: string } | null
+    if (state?.section) {
+      setActiveSection(state.section as DashboardSection)
+      // Clear the state so it doesn't persist on refresh
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
 
   // Load data when component mounts
   useEffect(() => {
@@ -66,6 +84,15 @@ export default function AccountPage() {
     }))
   }
 
+  // Filter sidebar items based on user type
+  // Hide Business Management and Pending Applications if user has no businesses
+  const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => {
+    if (item.id === 'business' || item.id === 'applications') {
+      return data.myBusinesses.length > 0
+    }
+    return true
+  })
+
   if (!auth.isAuthed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
@@ -104,7 +131,7 @@ export default function AccountPage() {
           {/* 4x2 Icon Grid (Mobile Only) */}
           {activeSection === 'dashboard' && (
             <div className="grid grid-cols-2 gap-4 mb-8">
-              {SIDEBAR_ITEMS.map((item) => {
+              {visibleSidebarItems.map((item) => {
                 const IconComponent = item.icon
                 
                 return (
@@ -289,25 +316,104 @@ export default function AccountPage() {
             
             {activeSection === 'applications' && (
               <div>
-                <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Pending Applications</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Business Applications</h2>
                 {data.pendingApps.length === 0 ? (
                   <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-12 text-center">
                     <FileText className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                    <p className="text-neutral-600">No pending applications</p>
+                    <p className="text-neutral-600">No applications</p>
                       </div>
                     ) : (
                   <div className="space-y-4">
                     {data.pendingApps.map((app) => (
                       <div key={app.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                        <h3 className="font-semibold text-lg text-neutral-900 mb-2">
-                          {app.business_name || 'Untitled Application'}
-                        </h3>
-                        <p className="text-sm text-neutral-600">
-                          Submitted: {new Date(app.created_at).toLocaleDateString()}
-                        </p>
-                        <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium mt-2">
-                          Pending Review
-                        </span>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-xl text-neutral-900 mb-2">
+                              {app.business_name || 'Untitled Application'}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                app.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {app.status === 'approved' ? '✓ Approved' :
+                                 app.status === 'rejected' ? '✗ Rejected' :
+                                 '⏳ Pending Review'}
+                              </span>
+                              {app.tier_requested && (
+                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                  {app.tier_requested === 'featured' ? '⭐ Featured' : '🆓 Free'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {app.status === 'pending' && (
+                            <button
+                              onClick={async () => {
+                                const message = prompt('What would you like to ask the admin about your application?')
+                                if (message) {
+                                  const result = await requestApplicationUpdate(app.id, message)
+                                  if (result.success) {
+                                    setMessage('Update request sent to admin')
+                                    // Reload data
+                                    const pendingApps = await loadPendingApplications(auth.email || '')
+                                    setData(prev => ({ ...prev, pendingApps }))
+                                  } else {
+                                    setMessage('Failed to send update request: ' + (result.error || 'Unknown error'))
+                                  }
+                                }
+                              }}
+                              className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap"
+                            >
+                              Request Update
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Application Details */}
+                        <div className="border-t border-neutral-100 pt-4 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            {app.full_name && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Contact Name:</span>
+                                <p className="text-neutral-600">{app.full_name}</p>
+                              </div>
+                            )}
+                            {app.email && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Email:</span>
+                                <p className="text-neutral-600">{app.email}</p>
+                              </div>
+                            )}
+                            {app.phone && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Phone:</span>
+                                <p className="text-neutral-600">{app.phone}</p>
+                              </div>
+                            )}
+                            {app.category && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Category:</span>
+                                <p className="text-neutral-600 capitalize">{app.category.replace('-', ' ')}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {app.challenge && (
+                            <div className="text-sm">
+                              <span className="font-medium text-neutral-700">Message/Notes:</span>
+                              <p className="text-neutral-600 mt-1 bg-neutral-50 p-3 rounded-lg">{app.challenge}</p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-xs text-neutral-500 pt-2 border-t border-neutral-100">
+                            <span>Submitted: {new Date(app.created_at).toLocaleString()}</span>
+                            {app.updated_at && (
+                              <span>Updated: {new Date(app.updated_at).toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
                             </div>
                     ))}
                               </div>
@@ -385,7 +491,7 @@ export default function AccountPage() {
           
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4">
-            {SIDEBAR_ITEMS.map((item) => {
+            {visibleSidebarItems.map((item) => {
               const IconComponent = item.icon
               const isActive = activeSection === item.id
               

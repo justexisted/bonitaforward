@@ -51,7 +51,15 @@ export interface SavedBusiness {
 export interface PendingApplication {
   id: string
   business_name: string | null
+  full_name: string | null
+  email: string | null
+  phone: string | null
+  category: string | null
+  challenge: string | null
+  tier_requested: 'free' | 'featured' | null
+  status: 'pending' | 'approved' | 'rejected' | null
   created_at: string
+  updated_at: string | null
 }
 
 export interface MyBusiness {

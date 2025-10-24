@@ -150,7 +150,7 @@ export async function loadPendingApplications(email: string): Promise<PendingApp
   try {
     const { data, error } = await supabase
       .from('business_applications')
-      .select('id,business_name,created_at,email')
+      .select('*')
       .eq('email', email)
       .order('created_at', { ascending: false })
       .limit(10)
@@ -163,11 +163,43 @@ export async function loadPendingApplications(email: string): Promise<PendingApp
     return (data || []).map((r: any) => ({
       id: r.id,
       business_name: r.business_name,
+      full_name: r.full_name,
+      email: r.email,
+      phone: r.phone,
+      category: r.category,
+      challenge: r.challenge,
+      tier_requested: r.tier_requested,
+      status: r.status,
       created_at: r.created_at,
+      updated_at: r.updated_at,
     }))
   } catch (err) {
     console.log('[Account] Error loading applications:', err)
     return []
+  }
+}
+
+export async function requestApplicationUpdate(applicationId: string, message: string): Promise<{ success: boolean, error?: string }> {
+  try {
+    // Create a change request or notification for the admin
+    // For now, we'll update the application with a note
+    const { error } = await supabase
+      .from('business_applications')
+      .update({
+        challenge: message,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', applicationId)
+    
+    if (error) {
+      console.error('[Account] Error requesting update:', error)
+      return { success: false, error: error.message }
+    }
+    
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Account] Error requesting update:', err)
+    return { success: false, error: err.message || 'Failed to request update' }
   }
 }
 

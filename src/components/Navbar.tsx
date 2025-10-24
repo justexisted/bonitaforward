@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useAuth, saveReturnUrl } from '../contexts/AuthContext'
 import CardNav, { type CardNavItem } from './CardNav'
+import NotificationBell from './NotificationBell'
 import { isUserAdmin } from '../utils/helpers'
 
 // ============================================================================
@@ -137,6 +138,26 @@ export default function Navbar() {
     }
   }, [auth])
 
+  // Determine which button to show
+  const getCustomButton = () => {
+    // While loading auth state, show empty placeholder
+    if (auth.loading) {
+      return (
+        <div className="hidden md:inline-flex items-center justify-center border-0 rounded-[calc(0.75rem-0.2rem)] px-4 h-full">
+          {/* Empty placeholder to prevent layout shift */}
+        </div>
+      )
+    }
+    
+    // Once loaded, show appropriate button
+    if (auth.isAuthed) {
+      return <NotificationBell buttonBgColor="#89D185" buttonTextColor="#000" />
+    }
+    
+    // Not authenticated - show default Get Started button
+    return undefined
+  }
+
   return (
     <header className="relative z-40 bg-white/80 backdrop-blur border-b border-neutral-100 pt-2.5">
       <div className="relative">
@@ -149,6 +170,7 @@ export default function Navbar() {
           buttonBgColor="#89D185"
           buttonTextColor="#000"
           ease="power3.out"
+          customButton={getCustomButton()}
         />
       </div>
     </header>
