@@ -224,7 +224,8 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
   
   // Skip if no API key (will use gradient fallback)
   if (!UNSPLASH_ACCESS_KEY || UNSPLASH_ACCESS_KEY === 'demo_key') {
-    console.log('[Unsplash] No API key configured, using gradient fallback')
+    console.warn('[Unsplash] ❌ NO API KEY - Add VITE_UNSPLASH_ACCESS_KEY to environment variables')
+    console.warn('[Unsplash] Get free key at: https://unsplash.com/developers')
     return null
   }
   

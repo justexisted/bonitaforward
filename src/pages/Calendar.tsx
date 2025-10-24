@@ -321,9 +321,14 @@ export default function CalendarPage() {
         setEvents(allEvents)
         
         // ONLY load dynamic images for events that don't have database images
+        const eventsWithDbImages = allEvents.filter(e => e.image_url).length
         const eventsNeedingImages = allEvents.filter(e => !e.image_url)
+        
+        console.log(`[Calendar] 📊 Events: ${allEvents.length} total`)
+        console.log(`[Calendar] ✅ ${eventsWithDbImages} have database images`)
+        console.log(`[Calendar] 🔍 ${eventsNeedingImages.length} need dynamic images`)
+        
         if (eventsNeedingImages.length > 0) {
-          console.log(`[Calendar] ${eventsNeedingImages.length} events need dynamic images`)
           const images = await preloadEventImages(eventsNeedingImages)
           setEventImages(images)
         }

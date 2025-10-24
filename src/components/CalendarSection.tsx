@@ -66,9 +66,14 @@ export default function CalendarSection() {
         setEvents(calendarEvents)
         
         // ONLY load dynamic images for events that don't have database images
+        const eventsWithDbImages = calendarEvents.filter(e => e.image_url).length
         const eventsNeedingImages = calendarEvents.filter(e => !e.image_url)
+        
+        console.log(`[CalendarSection] 📊 Events: ${calendarEvents.length} total`)
+        console.log(`[CalendarSection] ✅ ${eventsWithDbImages} have database images`)
+        console.log(`[CalendarSection] 🔍 ${eventsNeedingImages.length} need dynamic images`)
+        
         if (eventsNeedingImages.length > 0) {
-          console.log(`[CalendarSection] ${eventsNeedingImages.length} events need dynamic images`)
           const images = await preloadEventImages(eventsNeedingImages)
           setEventImages(images)
         }
