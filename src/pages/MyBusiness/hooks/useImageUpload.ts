@@ -33,7 +33,7 @@ export function useImageUpload(isMember: boolean) {
 
     console.log('[useImageUpload] Uploading image:', { businessId, file: file.name, path })
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('business-images')
       .upload(path, file, {
         cacheControl: '3600',
