@@ -72,6 +72,9 @@ import { getUserPlanChoice, setUserPlanChoice as savePlanChoice, migratePlanChoi
 import { Link, useLocation } from 'react-router-dom'
 import { createProviderChangeRequest, type ProviderChangeRequest, dismissNotification as dismissNotificationDB, getDismissedNotifications, getLatestActivityTimestamp, type DismissedNotification } from '../lib/supabaseData'
 
+// Import mobile optimizations CSS
+import './MyBusiness/mobile-optimizations.css'
+
 // Import extracted components
 import { BusinessListingForm } from './MyBusiness/components/BusinessListingForm'
 import { JobPostForm } from './MyBusiness/components/JobPostForm'
@@ -1496,19 +1499,19 @@ export default function MyBusinessPage() {
   }
 
   return (
-    <section className="py-8">
+    <section className="py-8 my-business-container">
       <div className="container-px mx-auto max-w-6xl">
 
         {message && (
-          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-blue-800">{message}</p>
+          <div className="my-business-mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 my-business-card">
+            <p className="text-blue-800 my-business-text-sm">{message}</p>
           </div>
         )}
 
         {/* Subscription Comparison Section - hidden if any listing is featured */}
         {showSubscriptionCard && listings.every(l => !l.is_member) && (
-          <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-neutral-900 mb-6 text-center">Choose Your Business Plan</h2>
+          <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm my-business-plan-card">
+          <h2 className="text-xl font-semibold text-neutral-900 mb-6 text-center my-business-heading-xl">Choose Your Business Plan</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Free Account Section */}
             <div className="space-y-4">
@@ -1559,7 +1562,7 @@ export default function MyBusinessPage() {
               </ul>
               <button
                 onClick={selectFreeAccount}
-                className="w-full mt-4 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                className="w-full mt-4 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium my-business-btn-lg"
               >
                 Choose Free Account
               </button>
@@ -1638,7 +1641,7 @@ export default function MyBusinessPage() {
               </ul>
               <button
                 onClick={() => upgradeToFeatured()}
-                className="w-full mt-4 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition-colors font-medium"
+                className="w-full mt-4 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition-colors font-medium my-business-btn-lg"
               >
                 Choose Featured Account
               </button>
@@ -1891,7 +1894,7 @@ export default function MyBusinessPage() {
                     setIsDropdownOpen(false)
                   }
                 }}
-                className="inline-flex justify-between w-full rounded-xl border border-neutral-300 shadow-sm px-4 py-3 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-100 focus:ring-blue-500"
+                className="inline-flex justify-between w-full rounded-xl border border-neutral-300 shadow-sm px-4 py-3 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-100 focus:ring-blue-500 my-business-dropdown-btn"
                 aria-expanded={isDropdownOpen}
                 aria-haspopup="true"
               >
@@ -1960,34 +1963,34 @@ export default function MyBusinessPage() {
 
         {/* Business Listings Tab */}
         {activeTab === 'listings' && (
-          <div className="space-y-4">
+          <div className="space-y-4 my-business-space-y-4">
             {/* Header with Create Button */}
-            <div className="flex flex-wrap items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between my-business-gap-2">
               <div className="p-[1vh] m-[1vh]">
-                <h2 className="text-lg font-semibold">Your Business Listings</h2>
-                <p className="text-sm text-neutral-600">Manage your business listings and details</p>
+                <h2 className="text-lg font-semibold my-business-heading-lg">Your Business Listings</h2>
+                <p className="text-sm text-neutral-600 my-business-text-sm">Manage your business listings and details</p>
               </div>
               <button
                 onClick={() => setShowCreateForm(true)}
-                className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800"
+                className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 my-business-btn"
               >
                 + Create New Listing
               </button>
             </div>
 
             {listings.length === 0 ? (
-              <div className="rounded-2xl border border-neutral-100 p-6 sm:p-8 bg-white text-center">
+              <div className="rounded-2xl border border-neutral-100 p-6 sm:p-8 bg-white text-center my-business-empty-state">
                 <div className="max-w-md mx-auto">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 my-business-empty-icon">
+                    <svg className="w-8 h-8 text-blue-600 my-business-icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-neutral-900 mb-2">No Business Listings</h3>
-                  <p className="text-neutral-600 mb-6">You don't have any business listings yet. Create your first one to get started!</p>
+                  <h3 className="text-xl font-semibold text-neutral-900 mb-2 my-business-heading-xl">No Business Listings</h3>
+                  <p className="text-neutral-600 mb-6 my-business-text-sm">You don't have any business listings yet. Create your first one to get started!</p>
                   <button
                     onClick={() => setShowCreateForm(true)}
-                    className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors my-business-btn-lg"
                   >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1998,14 +2001,14 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               listings.map((listing) => (
-                <div key={listing.id} className="rounded-2xl border border-neutral-200 p-4 sm:p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
-                  <div className="space-y-4">
+                <div key={listing.id} className="rounded-2xl border border-neutral-200 p-4 sm:p-6 bg-white shadow-sm hover:shadow-md transition-shadow my-business-card">
+                  <div className="space-y-4 my-business-space-y-4">
                     {/* Header Section */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:items-center sm:justify-between gap-3 my-business-gap-3">
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-neutral-900 mb-2">{listing.name}</h3>
-                        <div className="flex flex-wrap gap-2">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                        <h3 className="text-xl font-semibold text-neutral-900 mb-2 my-business-heading-lg">{listing.name}</h3>
+                        <div className="flex flex-wrap gap-2 my-business-gap-2">
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium my-business-badge ${
                             listing.is_member 
                               ? 'bg-yellow-100 text-yellow-800' 
                               : 'bg-green-100 text-green-800'
@@ -2018,11 +2021,11 @@ export default function MyBusinessPage() {
                               req => req.provider_id === listing.id && req.status === 'pending'
                             )
                             return hasPendingChanges ? (
-                              <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800">
+                              <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800 my-business-badge">
                                 ⏳ Changes Pending
                               </span>
                             ) : (
-                              <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-green-100 text-green-800">
+                              <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-green-100 text-green-800 my-business-badge">
                                 ✓ Live
                               </span>
                             )
@@ -2031,7 +2034,7 @@ export default function MyBusinessPage() {
                       </div>
                       
                       {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 my-business-action-group my-business-gap-2">
                         {listing.is_member ? (
                           <div className="text-center sm:text-right space-y-2">
                             <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800">
