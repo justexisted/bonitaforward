@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { X, FileText, CalendarDays, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { SIDEBAR_ITEMS } from './account/constants'
@@ -17,6 +17,7 @@ import { AccountSettings, MyBookings, SavedBusinesses } from './account/componen
 export default function AccountPage() {
   const auth = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   // Default to 'account' on desktop (lg+), 'dashboard' on mobile
   const [activeSection, setActiveSection] = useState<DashboardSection>(() => {
     if (typeof window !== 'undefined') {
@@ -210,11 +211,15 @@ export default function AccountPage() {
                   <>
                     <div className="space-y-4 mb-6">
                       {data.myBusinesses.map((business) => (
-                        <div key={business.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                          <div className="flex items-start justify-between">
+                        <div
+                          key={business.id}
+                          onClick={() => navigate('/my-business')}
+                          className="block bg-white rounded-xl shadow-sm border border-neutral-200 p-6 hover:shadow-md hover:border-neutral-300 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-start justify-between mb-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
-                                <h3 className="font-semibold text-lg text-neutral-900">{business.name}</h3>
+                                <h3 className="font-semibold text-lg text-neutral-900 group-hover:text-blue-600 transition-colors">{business.name}</h3>
                                 {business.published ? (
                                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                                     Published
@@ -232,19 +237,35 @@ export default function AccountPage() {
                                 {business.email && <p>✉️ {business.email}</p>}
                                 {business.website && (
                                   <p>
-                                    🌐 <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                    🌐 <a 
+                                      href={business.website} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-blue-600 hover:underline"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       {business.website}
                                     </a>
                                   </p>
                                 )}
                               </div>
                             </div>
-                            <Link
-                              to="/my-business"
-                              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                            >
-                              Manage
-                            </Link>
+                          </div>
+                          
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
+                            <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700">
+                              Manage Business →
+                            </span>
+                            {business.published && (
+                              <Link
+                                to={`/providers/${business.id}`}
+                                className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View Listing in {business.category_key?.replace('-', ' ') || 'Category'}
+                              </Link>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -586,11 +607,15 @@ export default function AccountPage() {
                   <>
                     <div className="space-y-4 mb-6">
                       {data.myBusinesses.map((business) => (
-                        <div key={business.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                          <div className="flex items-start justify-between">
+                        <div
+                          key={business.id}
+                          onClick={() => navigate('/my-business')}
+                          className="block bg-white rounded-xl shadow-sm border border-neutral-200 p-6 hover:shadow-md hover:border-neutral-300 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-start justify-between mb-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
-                                <h3 className="font-semibold text-lg text-neutral-900">{business.name}</h3>
+                                <h3 className="font-semibold text-lg text-neutral-900 group-hover:text-blue-600 transition-colors">{business.name}</h3>
                                 {business.published ? (
                                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                                     Published
@@ -608,19 +633,35 @@ export default function AccountPage() {
                                 {business.email && <p>✉️ {business.email}</p>}
                                 {business.website && (
                                   <p>
-                                    🌐 <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                    🌐 <a 
+                                      href={business.website} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-blue-600 hover:underline"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       {business.website}
                                     </a>
                                   </p>
                                 )}
                               </div>
                             </div>
-                            <Link
-                              to="/my-business"
-                              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                            >
-                              Manage
-                            </Link>
+                          </div>
+                          
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2 pt-4 border-t border-neutral-100">
+                            <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700">
+                              Manage Business →
+                            </span>
+                            {business.published && (
+                              <Link
+                                to={`/providers/${business.id}`}
+                                className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View Listing in {business.category_key?.replace('-', ' ') || 'Category'}
+                              </Link>
+                            )}
                           </div>
                         </div>
                       ))}
