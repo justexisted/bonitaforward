@@ -967,13 +967,15 @@ export default function MyBusinessPage() {
       // Create a business application (NOT a provider directly)
       // This requires admin approval before becoming a live listing
       // IMPORTANT: business_applications table uses 'category' NOT 'category_key'
+      // IMPORTANT: Always use auth.email so the application shows up in the user's account
       const applicationData = {
         business_name: listingData.name,
         full_name: auth.name || 'Business Owner',
-        email: listingData.email || auth.email,
+        email: auth.email,  // Always use auth.email to ensure application shows in My Business page
         phone: listingData.phone || '',
         category: listingData.category_key || 'professional-services',  // Note: 'category' not 'category_key'
         // Store additional details as JSON string in the challenge field
+        // Store the business contact email separately in the details
         challenge: JSON.stringify({
           website: listingData.website,
           address: listingData.address,
@@ -985,18 +987,24 @@ export default function MyBusinessPage() {
           service_areas: listingData.service_areas,
           google_maps_url: listingData.google_maps_url,
           bonita_resident_discount: listingData.bonita_resident_discount,
-          images: listingData.images
+          images: listingData.images,
+          business_contact_email: listingData.email  // Store business email separately from account email
         })
       }
       
-      const { error } = await supabase
+      console.log('[MyBusiness] Submitting application data:', applicationData)
+      
+      const { data: insertedData, error } = await supabase
         .from('business_applications')
         .insert([applicationData])
+        .select()
+
+      console.log('[MyBusiness] Application insert result:', { data: insertedData, error })
 
       if (error) throw error
 
       setMessage('Success! Your business application has been submitted and is pending admin approval.')
-      loadBusinessData() // Refresh data to show new application in pending state
+      await loadBusinessData() // Refresh data to show new application in pending state
       setShowCreateForm(false)
     } catch (error: any) {
       setMessage(`Error submitting application: ${error.message}`)

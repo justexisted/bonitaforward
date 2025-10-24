@@ -190,9 +190,9 @@ export function BusinessListingForm({
       diningType: ''
     })
     
-    // Image upload state management
-    const [uploadingImages, setUploadingImages] = useState(false)
-    const [imageUploadProgress, setImageUploadProgress] = useState<Record<string, number>>({})
+  // Image upload state management
+  const [uploadingImages, setUploadingImages] = useState(false)
+  const [imageUploadProgress, setImageUploadProgress] = useState<ImageUploadProgress>({})
   
     const categories = [
       { key: 'real-estate', name: 'Real Estate' },
