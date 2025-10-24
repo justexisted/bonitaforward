@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
 import SignInPage from './pages/SignIn'
@@ -9,7 +9,6 @@ import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
 import AboutPage from './pages/AboutPage'
 import ContactPage from './pages/ContactPage'
-import OwnerPage from './pages/Owner'
 import MyBusinessPage from './pages/MyBusiness'
 import PricingPage from './pages/Pricing'
 import JobsPage from './pages/Jobs'
@@ -92,11 +91,8 @@ export default function App() {
             <Route path="jobs" element={<JobsPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="admin" element={<AdminPage />} />
-            <Route path="owner" element={
-              <ProtectedRoute allowedRoles={['business']}>
-                <OwnerPage />
-              </ProtectedRoute>
-            } />
+            {/* Redirect legacy /owner route to /my-business */}
+            <Route path="owner" element={<Navigate to="/my-business" replace />} />
             <Route path="my-business" element={
               <ProtectedRoute allowedRoles={['business']}>
                 <MyBusinessPage />

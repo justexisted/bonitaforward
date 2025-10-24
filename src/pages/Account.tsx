@@ -85,10 +85,28 @@ export default function AccountPage() {
   }
 
   // Filter sidebar items based on user type
-  // Hide Business Management and Pending Applications if user has no businesses
+  // Show Business Management and Pending Applications if user has:
+  // 1. Any businesses (featured or free) in providers table, OR
+  // 2. Any pending/approved/rejected applications
+  // This ensures business account holders always see these sections,
+  // but community members without businesses don't see them
   const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => {
     if (item.id === 'business' || item.id === 'applications') {
-      return data.myBusinesses.length > 0
+      // Show if user has businesses OR has submitted any applications
+      const hasBusinesses = data.myBusinesses.length > 0
+      const hasApplications = data.pendingApps.length > 0
+      
+      // Debug logging to help diagnose visibility issues
+      if (!hasBusinesses && !hasApplications && auth.role === 'business') {
+        console.log('[Account] Business account but no data:', {
+          myBusinesses: data.myBusinesses,
+          pendingApps: data.pendingApps,
+          userId: auth.userId,
+          email: auth.email
+        })
+      }
+      
+      return hasBusinesses || hasApplications
     }
     return true
   })
@@ -235,7 +253,7 @@ export default function AccountPage() {
                     <div className="bg-neutral-50 rounded-xl border border-neutral-200 p-6">
                       <p className="text-neutral-600 mb-4">Need more control? Access the full business dashboard.</p>
                       <Link 
-                        to="/owner"
+                        to="/my-business"
                         className="inline-block px-6 py-2 bg-neutral-900 text-white rounded-lg font-medium hover:bg-neutral-800 transition-colors"
                       >
                         Go to Business Dashboard
@@ -611,7 +629,7 @@ export default function AccountPage() {
                     <div className="bg-neutral-50 rounded-xl border border-neutral-200 p-6">
                       <p className="text-neutral-600 mb-4">Need more control? Access the full business dashboard.</p>
                       <Link 
-                        to="/owner"
+                        to="/my-business"
                         className="inline-block px-6 py-2 bg-neutral-900 text-white rounded-lg font-medium hover:bg-neutral-800 transition-colors"
                       >
                         Go to Business Dashboard
