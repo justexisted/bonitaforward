@@ -184,7 +184,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center z-10 shadow-lg border-2 border-current">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

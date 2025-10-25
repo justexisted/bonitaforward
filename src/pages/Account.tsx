@@ -414,27 +414,39 @@ export default function AccountPage() {
                               )}
                             </div>
                           </div>
-                          {app.status === 'pending' && (
-                            <button
-                              onClick={async () => {
-                                const message = prompt('What would you like to ask the admin about your application?')
-                                if (message) {
-                                  const result = await requestApplicationUpdate(app.id, message)
-                                  if (result.success) {
-                                    setMessage('Update request sent to admin')
-                                    // Reload data
-                                    const pendingApps = await loadPendingApplications(auth.email || '')
-                                    setData(prev => ({ ...prev, pendingApps }))
-                                  } else {
-                                    setMessage('Failed to send update request: ' + (result.error || 'Unknown error'))
-                                  }
-                                }
-                              }}
-                              className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap"
-                            >
-                              Request Update
-                            </button>
-                          )}
+                          <div className="flex gap-2">
+                            {app.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={async () => {
+                                    const message = prompt('What would you like to ask the admin about your application?')
+                                    if (message) {
+                                      const result = await requestApplicationUpdate(app.id, message)
+                                      if (result.success) {
+                                        setMessage('Update request sent to admin')
+                                        // Reload data
+                                        const pendingApps = await loadPendingApplications(auth.email || '')
+                                        setData(prev => ({ ...prev, pendingApps }))
+                                      } else {
+                                        setMessage('Failed to send update request: ' + (result.error || 'Unknown error'))
+                                      }
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap"
+                                >
+                                  Request Update
+                                </button>
+                                <button
+                                  onClick={() => cancelApplication(app.id, app.business_name || 'Untitled Application')}
+                                  className="flex-shrink-0 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
+                                  title="Cancel application"
+                                >
+                                  <X className="w-4 h-4" />
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         {/* Application Details */}
