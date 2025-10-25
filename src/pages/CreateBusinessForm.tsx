@@ -32,6 +32,7 @@ export default function CreateBusinessForm() {
 
       const payload: any = { 
         business_name: businessName,
+        full_name: auth.name || null, // Include user's full name from auth context
         email: auth.email, // Use signed-in user's email
         category: category,
         phone: phone || null,

@@ -486,6 +486,7 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         const { error } = await supabase
           .from('business_applications')
           .insert([{
+            full_name: auth.name || null,
             email: auth.email,
             tier_requested: 'featured',
             status: 'pending',

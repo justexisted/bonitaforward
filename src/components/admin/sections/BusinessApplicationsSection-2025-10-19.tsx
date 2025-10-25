@@ -77,10 +77,6 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                 }`}>
                   {app.tier_requested === 'featured' ? '⭐ FEATURED TIER REQUESTED ($97/YEAR)' : '🆓 FREE TIER REQUESTED (NO PAYMENT)'}
                 </span>
-                {/* Debug: Show raw value */}
-                <span className="ml-2 text-[10px] text-neutral-400 font-mono">
-                  tier_requested={app.tier_requested || 'null'}
-                </span>
               </div>
 
               <div className="flex items-start justify-between mb-3">
