@@ -7,4 +7,5 @@
 
 export { useImageUpload } from './useImageUpload'
 export { useBusinessData } from './useBusinessData'
+export { useBusinessOperations } from './useBusinessOperations'
 

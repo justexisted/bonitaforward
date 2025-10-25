@@ -530,10 +530,11 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                 )}
 
                 {/* Business Hours & Follow Us Grid - Side by side on desktop */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Business Hours - Left Column */}
+                {/* Using grid-cols-3 so business hours takes 1 column (33%) and right side takes 2 columns (66%) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Business Hours - Left Column (1/3 width on desktop) */}
                   {provider.business_hours && Object.keys(provider.business_hours).length > 0 && (
-                    <div>
+                    <div className="lg:col-span-1">
                       <h3 className="text-lg font-semibold text-neutral-900 mb-3">Business Hours</h3>
                       <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
                         {/* Business hours in proper day order */}
@@ -562,8 +563,8 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                     </div>
                   )}
 
-                  {/* Right Column - Follow Us + Coupon */}
-                  <div className="space-y-6">
+                  {/* Right Column - Follow Us + Coupon (2/3 width on desktop, full width if no business hours) */}
+                  <div className={`space-y-6 ${provider.business_hours && Object.keys(provider.business_hours).length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
                     {/* Social Media Links */}
                     {provider.social_links && Object.keys(provider.social_links).length > 0 && (
                       <div>
