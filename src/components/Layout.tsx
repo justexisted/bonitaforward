@@ -7,6 +7,7 @@ import SupabasePing from './SupabasePing'
 import Navbar from './Navbar'
 import Footer from './Footer'
 import Dock, { type DockItemData } from './Dock'
+import './Layout-mobile.css'
 
 // ============================================================================
 // LAYOUT COMPONENT
@@ -138,10 +139,10 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-full flex flex-col">
+    <div className="min-h-full flex flex-col layout-mobile-container">
       <SupabasePing />
       <Navbar />
-      <main className="flex-1 overflow-x-hidden pt-4">
+      <main className="flex-1 overflow-x-hidden pt-4 layout-mobile-main">
         <Outlet />
       </main>
       <Footer />

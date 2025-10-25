@@ -1,0 +1,30 @@
+/**
+ * Mobile Optimizations for Layout Component
+ * Target: Screens smaller than 447px
+ * 
+ * Ensures proper spacing between content, footer, and dock
+ */
+
+/* Target only screens smaller than 447px */
+@media (max-width: 447px) {
+  /* Main content area - ensure proper spacing */
+  .layout-mobile-main {
+    padding-top: 0.75rem !important; /* 12px instead of 16px */
+    padding-bottom: 0 !important; /* Remove bottom padding as footer handles it */
+  }
+
+  /* Container adjustments */
+  .layout-mobile-container {
+    min-height: 100vh !important;
+  }
+}
+
+/* Ensure smooth scrolling and proper stacking */
+@media (max-width: 447px) {
+  /* Prevent horizontal overflow */
+  .layout-mobile-main {
+    overflow-x: hidden;
+    width: 100%;
+  }
+}
+

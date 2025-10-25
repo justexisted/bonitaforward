@@ -176,7 +176,7 @@ export default function CalendarSection() {
   // Show loading spinner while events are being fetched
   if (loading) {
     return (
-      <section className="py-16 bg-gradient-to-b from-neutral-50 to-white">
+      <section className="py-6 md:py-8 bg-gradient-to-b from-neutral-50 to-white">
         <div className="container-px mx-auto max-w-6xl">
           <LoadingSpinner message="Loading calendar events..." />
         </div>
@@ -194,7 +194,7 @@ export default function CalendarSection() {
 
   return (
     <>
-      <section className="py-16 bg-gradient-to-b from-neutral-50 to-white overflow-visible">
+      <section className="py-6 md:py-8 bg-gradient-to-b from-neutral-50 to-white overflow-visible">
         <div className="container-px mx-auto max-w-6xl overflow-visible">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
@@ -241,7 +241,7 @@ export default function CalendarSection() {
               })}
             </div>
           ) : (
-            <div className="text-center py-12">
+            <div className="text-center py-6">
               <CalendarIcon className="w-16 h-16 mx-auto text-neutral-300 mb-4" />
               <p className="text-neutral-600">No upcoming events at the moment</p>
               <Link

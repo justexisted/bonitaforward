@@ -157,7 +157,7 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
       <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-neutral-900/60 to-transparent" aria-hidden></div>
       <div className="relative" style={{ minHeight: '33vh', alignContent: 'center' }}>
         <Container>
-          <div className="py-10 sm:py-12 text-center">
+          <div className="py-6 sm:py-8 text-center">
             <SplitText 
             className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-white relative z-1 font-display" 
             text="Discover, Support, and Grow Local Bonita." 

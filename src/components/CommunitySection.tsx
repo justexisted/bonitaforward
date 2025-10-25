@@ -49,7 +49,7 @@ export default function CommunitySection() {
   ]
 
   return (
-    <section className="py-8">
+    <section className="py-6 md:py-8">
       <Container>
         <ScrollFloat
           animationDuration={1}

@@ -1,0 +1,71 @@
+/**
+ * Mobile Optimizations for Footer Component
+ * Target: Screens smaller than 447px
+ * 
+ * Ensures footer sits properly above the dock on mobile
+ * and removes unnecessary vertical spacing
+ */
+
+/* Target only screens smaller than 447px */
+@media (max-width: 447px) {
+  /* Footer container optimizations */
+  .footer-mobile-container {
+    margin-top: 2rem !important; /* 32px instead of 64px (mt-16) - 50% reduction */
+    padding-top: 1rem !important; /* 16px instead of 32px (py-8) - 50% reduction */
+    padding-bottom: 4rem !important; /* 64px to sit above dock (dock is ~50px + 4px bottom + 8px buffer = 62px) */
+  }
+
+  /* Inner content padding */
+  .footer-mobile-content {
+    padding: 0.5rem !important; /* 8px instead of 16px */
+    gap: 0.75rem !important; /* 12px instead of 16px */
+  }
+
+  /* Text size adjustments */
+  .footer-mobile-text {
+    font-size: 0.625rem !important; /* 10px instead of 12px */
+    line-height: 1rem !important;
+  }
+
+  /* Link spacing */
+  .footer-mobile-links {
+    gap: 0.5rem !important; /* 8px instead of 12px */
+    font-size: 0.625rem !important; /* 10px */
+  }
+
+  /* Separator dots - hide on very small screens */
+  .footer-mobile-separator {
+    display: none !important;
+  }
+}
+
+/* Additional optimizations for very small screens (< 375px) */
+@media (max-width: 374px) {
+  .footer-mobile-container {
+    margin-top: 1.5rem !important; /* 24px - even more compact */
+    padding-top: 0.75rem !important; /* 12px */
+    padding-bottom: 4rem !important; /* Keep same dock clearance */
+  }
+
+  .footer-mobile-content {
+    padding: 0.375rem !important; /* 6px */
+    gap: 0.5rem !important; /* 8px */
+  }
+
+  .footer-mobile-text {
+    font-size: 0.5625rem !important; /* 9px for ultra-small screens */
+  }
+
+  .footer-mobile-links {
+    gap: 0.375rem !important; /* 6px */
+  }
+}
+
+/* Ensure footer sits above dock but below other content */
+@media (max-width: 447px) {
+  .footer-mobile-container {
+    position: relative;
+    z-index: 10; /* Below dock (9999) but above normal content */
+  }
+}
+

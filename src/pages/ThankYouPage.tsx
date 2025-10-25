@@ -43,7 +43,7 @@ function Confetti() {
  */
 export default function ThankYouPage() {
   return (
-    <section className="py-12">
+    <section className="py-6 md:py-8">
       <div className="container-px mx-auto max-w-6xl">
         <div className="relative rounded-2xl border border-neutral-100 p-8 bg-white text-center elevate form-fade">
           <Confetti />

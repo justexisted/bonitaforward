@@ -8,7 +8,7 @@ function Container(props: { children: React.ReactNode; className?: string }) {
 
 export default function AboutPage() {
   return (
-    <section className="relative min-h-screen py-12">
+    <section className="relative min-h-screen py-6 md:py-8">
       {/* Prism Background - Top Section */}
       <div className="absolute top-0 left-0 right-0 h-99 z-0" style={{ willChange: 'transform', transform: 'translate3d(0,0,0) rotate(180deg)' }}>
         <Prism
@@ -34,7 +34,7 @@ export default function AboutPage() {
       <div className="relative z-10" style={{ willChange: 'transform', transform: 'translate3d(0,0,0)' }}>
         <Container>
           {/* Hero Section */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-8">
             <h1 className="text-4xl md:text-6xl font-bold text-black mb-6">
               For Bonita, By Bonita
             </h1>
@@ -47,7 +47,7 @@ export default function AboutPage() {
           </div>
 
           {/* Story Section */}
-          <div className="mb-16">
+          <div className="mb-8">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 md:p-12 border border-white/20">
               <h2 className="text-3xl font-bold text-black mb-6 text-center">Our Story</h2>
               <p className="text-lg text-black/90 leading-relaxed text-center max-w-4xl mx-auto">
@@ -57,7 +57,7 @@ export default function AboutPage() {
           </div>
 
           {/* Mission & Vision */}
-          <div className="grid md:grid-cols-2 gap-8 mb-16">
+          <div className="grid md:grid-cols-2 gap-8 mb-8">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
               <h3 className="text-2xl font-bold text-black mb-4">Our Mission</h3>
               <p className="text-black/90 leading-relaxed">
@@ -73,7 +73,7 @@ export default function AboutPage() {
           </div>
 
           {/* Values Section */}
-          <div className="mb-16">
+          <div className="mb-8">
             <h2 className="text-3xl font-bold text-black mb-8 text-center">Our Values</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
               {/* Community First */}
@@ -145,7 +145,7 @@ export default function AboutPage() {
           </div>
 
           {/* Meet the Team Section */}
-          <div className="mb-16">
+          <div className="mb-8">
             <h2 className="text-3xl font-bold text-black mb-8 text-center">Meet the Team</h2>
             <div className="grid md:grid-cols-1 lg:grid-cols-1 gap-8">
 

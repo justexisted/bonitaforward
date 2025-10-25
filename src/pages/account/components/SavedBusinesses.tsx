@@ -23,7 +23,7 @@ export function SavedBusinesses({ businesses, loading, onBusinessRemoved, onMess
 
   if (loading) {
     return (
-      <div className="text-center py-12">
+      <div className="text-center py-6">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
       </div>
     )

@@ -1291,7 +1291,7 @@ export default function CalendarPage() {
             )}
 
             {displayEvents.length === 0 && events.length > 0 && (
-              <div className="text-center py-12">
+              <div className="text-center py-6">
                 <p className="text-neutral-600">
                   {categoryFilter !== 'all' 
                     ? `No ${categoryFilter} events found.`
@@ -1306,7 +1306,7 @@ export default function CalendarPage() {
             )}
             
             {events.length === 0 && (
-              <div className="text-center py-12">
+              <div className="text-center py-6">
                 <p className="text-neutral-600">No events found for Bonita area at this time.</p>
                 <p className="text-sm text-neutral-500 mt-2">Be the first to add an event to our community calendar!</p>
               </div>
