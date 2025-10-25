@@ -239,12 +239,17 @@ export async function approveApplication(
       
       console.log('[Admin] Sending approval notification to user:', ownerUserId)
       
-      await supabase.from('user_notifications').insert({
+      const { error: notifError } = await supabase.from('user_notifications').insert({
         user_id: ownerUserId,
         title: notificationTitle,
         message: notificationMessage,
-        type: 'application_approved'
+        type: 'application_approved',
+        metadata: {}
       })
+      
+      if (notifError) {
+        console.error('[Admin] ❌ Failed to insert approval notification:', notifError)
+      }
       
       console.log('[Admin] ✅ Approval notification sent')
     } catch (err) {
@@ -328,14 +333,19 @@ export async function deleteApplication(
         
         console.log('[Admin] Sending rejection notification to user:', profile.id)
         
-        await supabase.from('user_notifications').insert({
+        const { error: notifError } = await supabase.from('user_notifications').insert({
           user_id: profile.id,
           title: notificationTitle,
           message: notificationMessage,
-          type: 'application_rejected'
+          type: 'application_rejected',
+          metadata: { reason: reason || 'No reason provided' }
         })
         
-        console.log('[Admin] ✅ Rejection notification sent')
+        if (notifError) {
+          console.error('[Admin] ❌ Failed to insert rejection notification:', notifError)
+        } else {
+          console.log('[Admin] ✅ Rejection notification sent')
+        }
       }
     } catch (err) {
       console.error('[Admin] Failed to send rejection notification:', err)

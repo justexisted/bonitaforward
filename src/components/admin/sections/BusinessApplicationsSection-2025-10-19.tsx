@@ -176,16 +176,117 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                 </div>
               )}
 
-              {app.challenge && (
-                <div className="mb-4">
-                  <label className="block text-xs font-medium text-neutral-700 mb-1">
-                    Additional Information
-                  </label>
-                  <div className="text-sm text-neutral-600 bg-white rounded-lg border border-neutral-200 px-3 py-2">
-                    {app.challenge}
-                  </div>
-                </div>
-              )}
+              {app.challenge && (() => {
+                try {
+                  const parsed = JSON.parse(app.challenge)
+                  return (
+                    <div className="mb-4">
+                      <label className="block text-xs font-medium text-neutral-700 mb-2">
+                        Additional Information
+                      </label>
+                      <div className="text-sm bg-white rounded-lg border border-neutral-200 p-3 space-y-2">
+                        {parsed.website && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Website:</span>{' '}
+                            <a href={parsed.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {parsed.website}
+                            </a>
+                          </div>
+                        )}
+                        {parsed.address && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Address:</span>{' '}
+                            <span className="text-neutral-600">{parsed.address}</span>
+                          </div>
+                        )}
+                        {parsed.description && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Description:</span>{' '}
+                            <span className="text-neutral-600">{parsed.description}</span>
+                          </div>
+                        )}
+                        {parsed.google_maps_url && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Google Maps:</span>{' '}
+                            <a href={parsed.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              View on Google Maps
+                            </a>
+                          </div>
+                        )}
+                        {parsed.bonita_resident_discount && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Bonita Resident Discount:</span>{' '}
+                            <span className="text-neutral-600">{parsed.bonita_resident_discount}</span>
+                          </div>
+                        )}
+                        {parsed.tags && Array.isArray(parsed.tags) && parsed.tags.length > 0 && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Tags:</span>{' '}
+                            <span className="text-neutral-600">{parsed.tags.join(', ')}</span>
+                          </div>
+                        )}
+                        {parsed.specialties && Array.isArray(parsed.specialties) && parsed.specialties.length > 0 && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Specialties:</span>{' '}
+                            <span className="text-neutral-600">{parsed.specialties.join(', ')}</span>
+                          </div>
+                        )}
+                        {parsed.service_areas && Array.isArray(parsed.service_areas) && parsed.service_areas.length > 0 && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Service Areas:</span>{' '}
+                            <span className="text-neutral-600">{parsed.service_areas.join(', ')}</span>
+                          </div>
+                        )}
+                        {parsed.business_hours && typeof parsed.business_hours === 'object' && Object.keys(parsed.business_hours).length > 0 && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Business Hours:</span>
+                            <div className="ml-4 mt-1 space-y-1">
+                              {Object.entries(parsed.business_hours).map(([day, hours]) => (
+                                <div key={day} className="text-neutral-600">
+                                  <span className="font-medium capitalize">{day}:</span> {hours as string}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {parsed.social_links && typeof parsed.social_links === 'object' && Object.keys(parsed.social_links).length > 0 && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Social Links:</span>
+                            <div className="ml-4 mt-1 space-y-1">
+                              {Object.entries(parsed.social_links).map(([platform, url]) => (
+                                <div key={platform}>
+                                  <span className="font-medium capitalize text-neutral-600">{platform}:</span>{' '}
+                                  <a href={url as string} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                                    {url as string}
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {parsed.images && Array.isArray(parsed.images) && parsed.images.length > 0 && (
+                          <div>
+                            <span className="font-medium text-neutral-700">Images:</span>{' '}
+                            <span className="text-neutral-600">{parsed.images.length} image(s) uploaded</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                } catch (e) {
+                  // If JSON parse fails, show raw text as fallback
+                  return (
+                    <div className="mb-4">
+                      <label className="block text-xs font-medium text-neutral-700 mb-1">
+                        Additional Information
+                      </label>
+                      <div className="text-sm text-neutral-600 bg-white rounded-lg border border-neutral-200 px-3 py-2">
+                        {app.challenge}
+                      </div>
+                    </div>
+                  )
+                }
+              })()}
 
               <div className="flex items-center gap-3">
                 <button 
