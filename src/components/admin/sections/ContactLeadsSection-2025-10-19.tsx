@@ -49,6 +49,17 @@ export const ContactLeadsSection: React.FC<ContactLeadsSectionProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [isProviderListExpanded, setIsProviderListExpanded] = useState(false)
   const [showCount, setShowCount] = useState(20) // Show 20 providers initially
+  
+  // Edit lead modal state
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingLead, setEditingLead] = useState<ContactLeadRow | null>(null)
+  const [editBusinessName, setEditBusinessName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editDetails, setEditDetails] = useState('')
+  
+  // Delete confirmation modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletingLead, setDeletingLead] = useState<ContactLeadRow | null>(null)
 
   // Get unique categories from providers
   const categories = useMemo(() => {
@@ -90,49 +101,63 @@ export const ContactLeadsSection: React.FC<ContactLeadsSectionProps> = ({
   const displayedProviders = filteredProviders.slice(0, showCount)
 
   const handleEditLead = async (row: ContactLeadRow) => {
-    const newBusinessName = prompt('Business Name:', row.business_name || '')
-    const newEmail = prompt('Contact Email:', row.contact_email || '')
-    const newDetails = prompt('Details:', row.details || '')
+    setEditingLead(row)
+    setEditBusinessName(row.business_name || '')
+    setEditEmail(row.contact_email || '')
+    setEditDetails(row.details || '')
+    setShowEditModal(true)
+  }
+
+  const saveEditedLead = async () => {
+    if (!editingLead) return
     
-    if (newBusinessName !== null && newEmail !== null && newDetails !== null) {
-      const { error } = await supabase
-        .from('contact_leads')
-        .update({
-          business_name: newBusinessName,
-          contact_email: newEmail,
-          details: newDetails
-        })
-        .eq('id', row.id)
-      
-      if (error) {
-        onError(`Failed to update lead: ${error.message}`)
-      } else {
-        onMessage('Lead updated successfully')
-        onContactLeadsUpdate(
-          contactLeads.map(l => 
-            l.id === row.id 
-              ? { ...l, business_name: newBusinessName, contact_email: newEmail, details: newDetails }
-              : l
-          )
+    const { error } = await supabase
+      .from('contact_leads')
+      .update({
+        business_name: editBusinessName,
+        contact_email: editEmail,
+        details: editDetails
+      })
+      .eq('id', editingLead.id)
+    
+    if (error) {
+      onError(`Failed to update lead: ${error.message}`)
+    } else {
+      onMessage('Lead updated successfully')
+      onContactLeadsUpdate(
+        contactLeads.map(l => 
+          l.id === editingLead.id 
+            ? { ...l, business_name: editBusinessName, contact_email: editEmail, details: editDetails }
+            : l
         )
-      }
+      )
+      setShowEditModal(false)
+      setEditingLead(null)
     }
   }
 
   const handleDeleteLead = async (row: ContactLeadRow) => {
-    if (!confirm(`Delete lead from "${row.business_name || 'Unnamed Business'}"? This action cannot be undone.`)) return
+    setDeletingLead(row)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteLead = async () => {
+    if (!deletingLead) return
     
     const { error } = await supabase
       .from('contact_leads')
       .delete()
-      .eq('id', row.id)
+      .eq('id', deletingLead.id)
     
     if (error) {
       onError(`Failed to delete lead: ${error.message}`)
     } else {
       onMessage('Lead deleted successfully')
-      onContactLeadsUpdate(contactLeads.filter(l => l.id !== row.id))
+      onContactLeadsUpdate(contactLeads.filter(l => l.id !== deletingLead.id))
     }
+    
+    setShowDeleteModal(false)
+    setDeletingLead(null)
   }
 
   return (
@@ -468,6 +493,102 @@ Bonita Forward Team`}
           </div>
         )}
       </div>
+
+      {/* Edit Lead Modal */}
+      {showEditModal && editingLead && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Edit Contact Lead</h3>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Business Name
+                </label>
+                <input
+                  type="text"
+                  value={editBusinessName}
+                  onChange={(e) => setEditBusinessName(e.target.value)}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Contact Email
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Details
+                </label>
+                <textarea
+                  value={editDetails}
+                  onChange={(e) => setEditDetails(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={saveEditedLead}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingLead(null)
+                }}
+                className="flex-1 px-4 py-2 bg-neutral-200 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingLead && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Delete Contact Lead</h3>
+            
+            <p className="text-sm text-neutral-600 mb-6">
+              Are you sure you want to delete the lead from <span className="font-medium">"{deletingLead.business_name || 'Unnamed Business'}"</span>? This action cannot be undone.
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDeleteLead}
+                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete Lead
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeletingLead(null)
+                }}
+                className="flex-1 px-4 py-2 bg-neutral-200 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

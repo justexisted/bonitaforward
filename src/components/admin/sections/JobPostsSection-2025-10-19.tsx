@@ -41,6 +41,10 @@ interface JobPostsSectionProps {
 export function JobPostsSection({ onMessage, onError }: JobPostsSectionProps) {
   const [jobPosts, setJobPosts] = useState<ProviderJobPostWithDetails[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Delete confirmation modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
 
   // Load job posts on mount
   useEffect(() => {
@@ -174,17 +178,24 @@ export function JobPostsSection({ onMessage, onError }: JobPostsSectionProps) {
   }
 
   const deleteJobPost = async (jobId: string) => {
-    if (!confirm('Are you sure you want to delete this job post? This action cannot be undone.')) {
-      return
-    }
+    setDeletingJobId(jobId)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteJobPost = async () => {
+    if (!deletingJobId) return
 
     onMessage('')
     try {
-      await supabase.from('provider_job_posts').delete().eq('id', jobId)
-      setJobPosts(arr => arr.filter(j => j.id !== jobId))
+      await supabase.from('provider_job_posts').delete().eq('id', deletingJobId)
+      setJobPosts(arr => arr.filter(j => j.id !== deletingJobId))
       onMessage('Job post deleted successfully')
+      setShowDeleteModal(false)
+      setDeletingJobId(null)
     } catch (err: any) {
       onError(err?.message || 'Failed to delete job post')
+      setShowDeleteModal(false)
+      setDeletingJobId(null)
     }
   }
 
@@ -283,6 +294,37 @@ export function JobPostsSection({ onMessage, onError }: JobPostsSectionProps) {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingJobId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Delete Job Post</h3>
+            
+            <p className="text-sm text-neutral-600 mb-6">
+              Are you sure you want to delete this job post? This action cannot be undone.
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDeleteJobPost}
+                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete Job Post
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeletingJobId(null)
+                }}
+                className="flex-1 px-4 py-2 bg-neutral-200 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

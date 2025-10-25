@@ -36,6 +36,9 @@ export const BookingEventsSection: React.FC<BookingEventsSectionProps> = ({
   onBookingEventsUpdate,
   onLoadBookingEvents
 }) => {
+  const [showDeleteModal, setShowDeleteModal] = React.useState(false)
+  const [deletingBooking, setDeletingBooking] = React.useState<BookingEvent | null>(null)
+
   const handleToggleStatus = async (booking: BookingEvent) => {
     const newStatus = booking.status === 'confirmed' ? 'cancelled' : 'confirmed'
     try {
@@ -58,24 +61,33 @@ export const BookingEventsSection: React.FC<BookingEventsSectionProps> = ({
   }
 
   const handleDeleteBooking = async (booking: BookingEvent) => {
-    if (!confirm('Are you sure you want to delete this booking? This action cannot be undone.')) {
-      return
-    }
+    setDeletingBooking(booking)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteBooking = async () => {
+    if (!deletingBooking) return
 
     try {
       const { error } = await supabase
         .from('booking_events')
         .delete()
-        .eq('id', booking.id)
+        .eq('id', deletingBooking.id)
       
       if (error) {
         onError(error.message)
+        setShowDeleteModal(false)
+        setDeletingBooking(null)
       } else {
-        onBookingEventsUpdate(bookingEvents.filter(b => b.id !== booking.id))
+        onBookingEventsUpdate(bookingEvents.filter(b => b.id !== deletingBooking.id))
         onMessage('Booking deleted')
+        setShowDeleteModal(false)
+        setDeletingBooking(null)
       }
     } catch (err: any) {
       onError(err.message)
+      setShowDeleteModal(false)
+      setDeletingBooking(null)
     }
   }
 
@@ -187,6 +199,43 @@ export const BookingEventsSection: React.FC<BookingEventsSectionProps> = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Delete Booking</h3>
+            
+            <p className="text-sm text-neutral-600 mb-2">
+              Are you sure you want to delete this booking?
+            </p>
+            <div className="bg-neutral-50 p-3 rounded-lg mb-6 text-sm">
+              <p className="font-medium">{deletingBooking.customer_name || 'Unknown'}</p>
+              <p className="text-neutral-600">{deletingBooking.customer_email}</p>
+              <p className="text-neutral-600">Date: {new Date(deletingBooking.booking_date).toLocaleDateString()}</p>
+            </div>
+            <p className="text-sm text-neutral-600 mb-6">This action cannot be undone.</p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDeleteBooking}
+                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete Booking
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeletingBooking(null)
+                }}
+                className="flex-1 px-4 py-2 bg-neutral-200 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

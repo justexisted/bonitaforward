@@ -120,6 +120,13 @@ export default function MyBusinessPage() {
   
   // State to track dismissed notifications (database-based)
   const [dismissedNotifications, setDismissedNotifications] = useState<DismissedNotification[]>([])
+  
+  
+  // State for collapsible change requests section
+  const [showChangeRequests, setShowChangeRequests] = useState(false)
+  
+  // State for featured upgrade success modal
+  const [showFeaturedUpgradeModal, setShowFeaturedUpgradeModal] = useState(false)
 
   // Initialize business operations hook with all required state setters
   const businessOps = useBusinessOperations({
@@ -148,13 +155,22 @@ export default function MyBusinessPage() {
     checkUserPlanChoice,
     requestFreeListingFromApp,
     selectFreeAccount,
-    upgradeToFeatured,
+    upgradeToFeatured: upgradeToFeaturedOriginal,
     downgradeToFree,
     promptAndUploadImages,
     createBusinessListing,
     updateBusinessListing,
     deleteBusinessListing
   } = businessOps
+  
+  // Wrapper for upgradeToFeatured that shows the modal after submission
+  const upgradeToFeatured = async (listingId?: string) => {
+    await upgradeToFeaturedOriginal(listingId)
+    // Show modal to confirm submission and inform about admin approval
+    setShowFeaturedUpgradeModal(true)
+    // Scroll to top so user sees any other notifications too
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
 
   /**
@@ -728,6 +744,66 @@ export default function MyBusinessPage() {
           </div>
         )}
 
+
+        {/* Featured Upgrade Confirmation - Inline Card */}
+        {showFeaturedUpgradeModal && (
+          <div className="my-business-mb-6 rounded-2xl border-2 border-yellow-400 bg-gradient-to-r from-yellow-50 to-amber-50 p-6 shadow-lg">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100">
+                    <svg className="h-7 w-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-neutral-900">Featured Upgrade Requested!</h3>
+                </div>
+                
+                <div className="space-y-3 mb-4">
+                  <div className="bg-white border border-amber-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-900">Pending Admin Approval</p>
+                        <p className="text-xs text-amber-700 mt-1">
+                          Your request is in the queue. We'll review it and contact you about payment options and setup.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm font-semibold text-blue-900 mb-2">What happens next?</p>
+                    <ul className="text-xs text-blue-700 space-y-1">
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600">•</span>
+                        <span>Admin will review your request</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600">•</span>
+                        <span>We'll contact you about payment ($97/year)</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600">•</span>
+                        <span>Once approved, you'll get priority placement & instant updates</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setShowFeaturedUpgradeModal(false)}
+                className="flex-shrink-0 px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Subscription Comparison Section - hidden if any listing is featured */}
         {showSubscriptionCard && listings.every(l => !l.is_member) && (
           <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm my-business-plan-card">
@@ -874,9 +950,12 @@ export default function MyBusinessPage() {
             ONLY for non-featured accounts. Featured accounts get instant updates without approval. */}
         {changeRequests.length > 0 && listings.some(listing => !listing.is_member) && (
           <div className="mb-6 space-y-3">
-            {/* Notification Summary */}
+            {/* Collapsible Toggle Button with Summary */}
             <div className="text-center mb-4">
-              <div className="inline-flex items-center gap-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <button
+                onClick={() => setShowChangeRequests(!showChangeRequests)}
+                className="inline-flex items-center gap-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+              >
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
                   <span className="text-sm font-medium text-amber-800">
@@ -897,8 +976,21 @@ export default function MyBusinessPage() {
                       new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length} Recently Rejected
                   </span>
                 </div>
-              </div>
+                {/* Chevron icon */}
+                <svg 
+                  className={`w-5 h-5 text-blue-600 transition-transform ${showChangeRequests ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
+            
+            {/* Collapsible Content */}
+            {showChangeRequests && (
+            <div className="space-y-3">
             {/* Pending Requests */}
             {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length > 0 && shouldShowNotification('pending') && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -1098,6 +1190,8 @@ export default function MyBusinessPage() {
                 </div>
               </div>
             )}
+            </div>
+            )}
           </div>
         )}
 
@@ -1255,23 +1349,7 @@ export default function MyBusinessPage() {
                       
                       {/* Action Buttons */}
                       <div className="flex flex-col sm:flex-row gap-2 my-business-action-group my-business-gap-2">
-                        {listing.is_member ? (
-                          <div className="text-center sm:text-right space-y-2">
-                            <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800">
-                              ⭐ Featured Listing
-                            </div>
-                            <p className="text-xs text-neutral-500">Priority placement in search results</p>
-                            <button
-                              onClick={() => downgradeToFree(listing.id)}
-                              className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-white text-neutral-700 text-sm font-medium rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors"
-                            >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-6-6m0 6l6-6" />
-                              </svg>
-                              Downgrade back to Free
-                            </button>
-                          </div>
-                        ) : (
+                        {!listing.is_member && (
                           <div className="space-y-2">
                             <button
                               onClick={() => upgradeToFeatured(listing.id)}
@@ -1648,6 +1726,23 @@ export default function MyBusinessPage() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-200">
+                      {/* Downgrade button - only for featured listings */}
+                      {listing.is_member && (
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to downgrade to Free? You will lose Featured benefits including priority placement, enhanced visibility, and immediate updates. This action requires admin approval.')) {
+                              downgradeToFree(listing.id)
+                            }
+                          }}
+                          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-6-6m0 6l6-6" />
+                          </svg>
+                          Downgrade to Free
+                        </button>
+                      )}
+                      
                       <button
                         onClick={() => deleteBusinessListing(listing.id)}
                         className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-100 transition-colors"

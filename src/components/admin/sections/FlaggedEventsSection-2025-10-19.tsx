@@ -21,6 +21,12 @@ type FlaggedEvent = {
 export const FlaggedEventsSection: React.FC<FlaggedEventsSectionProps> = ({ onMessage, onError }) => {
   const [flaggedEvents, setFlaggedEvents] = useState<FlaggedEvent[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Modal states
+  const [showDismissModal, setShowDismissModal] = useState(false)
+  const [dismissingFlagId, setDismissingFlagId] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletingFlag, setDeletingFlag] = useState<FlaggedEvent | null>(null)
 
   useEffect(() => {
     loadFlaggedEvents()
@@ -58,7 +64,12 @@ export const FlaggedEventsSection: React.FC<FlaggedEventsSectionProps> = ({ onMe
   }
 
   const dismissFlag = async (flagId: string) => {
-    if (!confirm('Dismiss this flag? The event will remain on the calendar.')) return
+    setDismissingFlagId(flagId)
+    setShowDismissModal(true)
+  }
+
+  const confirmDismissFlag = async () => {
+    if (!dismissingFlagId) return
 
     onMessage(null)
     onError(null)
@@ -67,23 +78,34 @@ export const FlaggedEventsSection: React.FC<FlaggedEventsSectionProps> = ({ onMe
       const { error } = await supabase
         .from('event_flags')
         .delete()
-        .eq('id', flagId)
+        .eq('id', dismissingFlagId)
       
       if (error) {
         onError(`Failed to dismiss flag: ${error.message}`)
+        setShowDismissModal(false)
+        setDismissingFlagId(null)
         return
       }
       
       // Refresh flagged events
-      setFlaggedEvents(prev => prev.filter(f => f.id !== flagId))
+      setFlaggedEvents(prev => prev.filter(f => f.id !== dismissingFlagId))
       onMessage('Flag dismissed successfully')
+      setShowDismissModal(false)
+      setDismissingFlagId(null)
     } catch (error: any) {
       onError(`Failed to dismiss flag: ${error.message}`)
+      setShowDismissModal(false)
+      setDismissingFlagId(null)
     }
   }
 
   const deleteEventAndFlags = async (flag: FlaggedEvent) => {
-    if (!confirm(`Delete event "${flag.event?.title}"? This cannot be undone.`)) return
+    setDeletingFlag(flag)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteEvent = async () => {
+    if (!deletingFlag) return
 
     onMessage(null)
     onError(null)
@@ -93,10 +115,12 @@ export const FlaggedEventsSection: React.FC<FlaggedEventsSectionProps> = ({ onMe
       const { error: eventError } = await supabase
         .from('calendar_events')
         .delete()
-        .eq('id', flag.event_id)
+        .eq('id', deletingFlag.event_id)
       
       if (eventError) {
         onError(`Failed to delete event: ${eventError.message}`)
+        setShowDeleteModal(false)
+        setDeletingFlag(null)
         return
       }
 
@@ -104,18 +128,22 @@ export const FlaggedEventsSection: React.FC<FlaggedEventsSectionProps> = ({ onMe
       const { error: flagError } = await supabase
         .from('event_flags')
         .delete()
-        .eq('event_id', flag.event_id)
+        .eq('event_id', deletingFlag.event_id)
       
       if (flagError) {
         console.warn('Error deleting flags:', flagError)
       }
       
       // Refresh flagged events
-      setFlaggedEvents(prev => prev.filter(f => f.event_id !== flag.event_id))
+      setFlaggedEvents(prev => prev.filter(f => f.event_id !== deletingFlag.event_id))
       
       onMessage('Event deleted successfully')
+      setShowDeleteModal(false)
+      setDeletingFlag(null)
     } catch (error: any) {
       onError(`Failed to delete event: ${error.message}`)
+      setShowDeleteModal(false)
+      setDeletingFlag(null)
     }
   }
 
@@ -247,6 +275,75 @@ export const FlaggedEventsSection: React.FC<FlaggedEventsSectionProps> = ({ onMe
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Dismiss Flag Modal */}
+      {showDismissModal && dismissingFlagId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Dismiss Flag</h3>
+            
+            <p className="text-sm text-neutral-600 mb-6">
+              Are you sure you want to dismiss this flag? The event will remain on the calendar.
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDismissFlag}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Dismiss Flag
+              </button>
+              <button
+                onClick={() => {
+                  setShowDismissModal(false)
+                  setDismissingFlagId(null)
+                }}
+                className="flex-1 px-4 py-2 bg-neutral-200 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Event Modal */}
+      {showDeleteModal && deletingFlag && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">Delete Event</h3>
+            
+            <p className="text-sm text-neutral-600 mb-2">
+              Are you sure you want to delete this event?
+            </p>
+            <div className="bg-neutral-50 p-3 rounded-lg mb-4 text-sm">
+              <p className="font-medium">{deletingFlag.event?.title || 'Unknown Event'}</p>
+              {deletingFlag.event?.description && (
+                <p className="text-neutral-600 mt-1">{deletingFlag.event.description}</p>
+              )}
+            </div>
+            <p className="text-sm text-neutral-600 mb-6">This action cannot be undone. All flags for this event will also be deleted.</p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDeleteEvent}
+                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete Event
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeletingFlag(null)
+                }}
+                className="flex-1 px-4 py-2 bg-neutral-200 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

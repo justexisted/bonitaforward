@@ -51,6 +51,11 @@ export function ChangeRequestsSection({
   const [loading, setLoading] = useState(true)
   const [expandedBusinessDropdowns, setExpandedBusinessDropdowns] = useState<Set<string>>(new Set())
   const [expandedChangeRequestIds, setExpandedChangeRequestIds] = useState<Set<string>>(new Set())
+  
+  // Rejection modal state
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectionRequest, setRejectionRequest] = useState<ProviderChangeRequestWithDetails | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
 
   // Load change requests on mount
   useEffect(() => {
@@ -115,17 +120,30 @@ export function ChangeRequestsSection({
   /**
    * Notify user helper
    */
-  const notifyUser = async (user_id: string | null | undefined, subject: string, body?: string, data?: any) => {
-    if (!user_id) return
+  const notifyUser = async (user_id: string | null | undefined, title: string, message?: string, metadata?: any) => {
+    if (!user_id) {
+      console.warn('[ChangeRequestsSection] Cannot send notification - no user_id')
+      return
+    }
+    
     try { 
-      await supabase.from('user_notifications').insert([{ 
+      console.log('[ChangeRequestsSection] Sending notification:', { user_id, title, message })
+      
+      const { data, error } = await supabase.from('user_notifications').insert([{ 
         user_id, 
-        subject, 
-        body: body || null, 
-        data: data || null 
-      }]) 
+        title, 
+        message: message || title,
+        type: 'change_request',
+        metadata: metadata || null 
+      }]).select()
+      
+      if (error) {
+        console.error('[ChangeRequestsSection] ❌ Failed to insert notification:', error)
+      } else {
+        console.log('[ChangeRequestsSection] ✅ Notification sent successfully:', data)
+      }
     } catch (err) {
-      console.error('[ChangeRequestsSection] Failed to send notification:', err)
+      console.error('[ChangeRequestsSection] ❌ Exception sending notification:', err)
     }
   }
 
@@ -180,12 +198,25 @@ export function ChangeRequestsSection({
         })
         .eq('id', req.id)
       
-      await notifyUser(
-        req.owner_user_id, 
-        'Request approved', 
-        `Your ${req.type} request was approved.`, 
-        { reqId: req.id }
-      )
+      // Send specific notification based on request type
+      let notificationTitle = 'Request Approved'
+      let notificationMessage = ''
+      
+      if (req.type === 'feature_request') {
+        notificationTitle = '✅ Featured Listing Approved!'
+        notificationMessage = `Your request to upgrade "${req.providers?.name || 'your business'}" to Featured status has been approved. Your listing will now appear at the top of search results!`
+      } else if (req.type === 'claim') {
+        notificationTitle = '✅ Business Claim Approved'
+        notificationMessage = `Your claim for "${req.providers?.name || 'the business'}" has been approved. You now have full control of this listing.`
+      } else if (req.type === 'delete') {
+        notificationTitle = '✅ Deletion Request Approved'
+        notificationMessage = `Your request to delete "${req.providers?.name || 'your business'}" has been processed.`
+      } else {
+        notificationTitle = '✅ Change Approved'
+        notificationMessage = `Your requested changes to "${req.providers?.name || 'your business'}" have been approved and applied.`
+      }
+      
+      await notifyUser(req.owner_user_id, notificationTitle, notificationMessage, { reqId: req.id })
       
       onMessage('Change request approved')
       
@@ -215,12 +246,33 @@ export function ChangeRequestsSection({
         })
         .eq('id', req.id)
       
-      await notifyUser(
-        req.owner_user_id, 
-        'Request rejected', 
-        reason || `Your ${req.type} request was rejected.`, 
-        { reqId: req.id }
-      )
+      // Send specific rejection notification
+      let notificationTitle = 'Request Rejected'
+      let notificationMessage = ''
+      
+      if (req.type === 'feature_request') {
+        notificationTitle = '❌ Featured Listing Request Rejected'
+        notificationMessage = reason 
+          ? `Your request to upgrade "${req.providers?.name || 'your business'}" to Featured was rejected. Reason: ${reason}`
+          : `Your request to upgrade "${req.providers?.name || 'your business'}" to Featured was rejected.`
+      } else if (req.type === 'claim') {
+        notificationTitle = '❌ Business Claim Rejected'
+        notificationMessage = reason
+          ? `Your claim for "${req.providers?.name || 'the business'}" was rejected. Reason: ${reason}`
+          : `Your claim for "${req.providers?.name || 'the business'}" was rejected.`
+      } else if (req.type === 'delete') {
+        notificationTitle = '❌ Deletion Request Rejected'
+        notificationMessage = reason
+          ? `Your request to delete "${req.providers?.name || 'your business'}" was rejected. Reason: ${reason}`
+          : `Your request to delete "${req.providers?.name || 'your business'}" was rejected.`
+      } else {
+        notificationTitle = '❌ Change Request Rejected'
+        notificationMessage = reason
+          ? `Your requested changes to "${req.providers?.name || 'your business'}" were rejected. Reason: ${reason}`
+          : `Your requested changes to "${req.providers?.name || 'your business'}" were rejected.`
+      }
+      
+      await notifyUser(req.owner_user_id, notificationTitle, notificationMessage, { reqId: req.id })
       
       onMessage('Change request rejected')
       
@@ -622,16 +674,58 @@ export function ChangeRequestsSection({
                                 </button>
                                 <button
                                   onClick={() => {
-                                    const reason = prompt('Reason for rejection (optional):')
-                                    if (reason !== null) {
-                                      rejectChangeRequest(r, reason)
-                                    }
+                                    setRejectionRequest(r)
+                                    setRejectionReason('')
+                                    setShowRejectModal(true)
                                   }}
                                   className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
                                 >
                                   ❌ Reject
                                 </button>
                               </div>
+
+                              {/* Inline Rejection Form */}
+                              {showRejectModal && rejectionRequest?.id === r.id && (
+                                <div className="mt-3 p-3 border-2 border-red-300 bg-red-50 rounded-lg">
+                                  <div className="mb-2">
+                                    <label htmlFor={`rejection-reason-${r.id}`} className="block text-xs font-medium text-neutral-700 mb-1">
+                                      Reason for rejection (optional)
+                                    </label>
+                                    <textarea
+                                      id={`rejection-reason-${r.id}`}
+                                      value={rejectionReason}
+                                      onChange={(e) => setRejectionReason(e.target.value)}
+                                      placeholder="Explain why this request was rejected..."
+                                      rows={3}
+                                      className="w-full px-2 py-1.5 border border-neutral-300 rounded text-xs focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    />
+                                  </div>
+                                  
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        rejectChangeRequest(rejectionRequest, rejectionReason)
+                                        setShowRejectModal(false)
+                                        setRejectionRequest(null)
+                                        setRejectionReason('')
+                                      }}
+                                      className="flex-1 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
+                                    >
+                                      Reject Request
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setShowRejectModal(false)
+                                        setRejectionRequest(null)
+                                        setRejectionReason('')
+                                      }}
+                                      className="flex-1 px-3 py-1.5 bg-neutral-200 text-neutral-700 text-xs font-medium rounded-lg hover:bg-neutral-300 transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         })}

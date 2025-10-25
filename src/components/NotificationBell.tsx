@@ -7,13 +7,14 @@ import { useAuth } from '../contexts/AuthContext'
 
 type Notification = {
   id: string
-  type: 'pending_application' | 'approved_application' | 'rejected_application'
+  type: 'pending_application' | 'approved_application' | 'rejected_application' | 'admin_notification'
   title: string
   message: string
   timestamp: string
   read: boolean
   link?: string
   linkSection?: string
+  isAdminNotification?: boolean
 }
 
 interface NotificationBellProps {
@@ -32,23 +33,47 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
 
   // Load notifications
   useEffect(() => {
-    if (!auth.isAuthed || !auth.email) return
+    if (!auth.isAuthed || !auth.userId) return
 
     async function loadNotifications() {
       try {
-        // Fetch pending business applications
-        const { data: applications } = await supabase
-          .from('business_applications')
-          .select('id, business_name, status, created_at')
-          .eq('email', auth.email)
-          .order('created_at', { ascending: false })
+        const allNotifications: Notification[] = []
 
-        if (applications && applications.length > 0) {
-          // Only show pending applications as unread notifications
-          const notifs: Notification[] = applications
-            .filter(app => app.status === 'pending' || !app.status)
-            .map((app) => {
-              return {
+        // 1. Fetch admin notifications from user_notifications table
+        const { data: userNotifs } = await supabase
+          .from('user_notifications')
+          .select('id, title, message, created_at, is_read')
+          .eq('user_id', auth.userId)
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        if (userNotifs && userNotifs.length > 0) {
+          const adminNotifs: Notification[] = userNotifs.map((notif) => ({
+            id: notif.id,
+            type: 'admin_notification' as const,
+            title: notif.title,
+            message: notif.message,
+            timestamp: notif.created_at,
+            read: notif.is_read,
+            link: '/my-business',
+            isAdminNotification: true
+          }))
+          allNotifications.push(...adminNotifs)
+        }
+
+        // 2. Fetch pending business applications (if user has email)
+        if (auth.email) {
+          const { data: applications } = await supabase
+            .from('business_applications')
+            .select('id, business_name, status, created_at')
+            .eq('email', auth.email)
+            .order('created_at', { ascending: false })
+
+          if (applications && applications.length > 0) {
+            // Only show pending applications as unread notifications
+            const appNotifs: Notification[] = applications
+              .filter(app => app.status === 'pending' || !app.status)
+              .map((app) => ({
                 id: app.id,
                 type: 'pending_application' as const,
                 title: 'Business Application Pending',
@@ -56,12 +81,19 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
                 timestamp: app.created_at,
                 read: false,
                 link: '/account',
-                linkSection: 'applications'
-              }
-            })
-
-          setNotifications(notifs)
+                linkSection: 'applications',
+                isAdminNotification: false
+              }))
+            allNotifications.push(...appNotifs)
+          }
         }
+
+        // Sort all notifications by timestamp (newest first)
+        allNotifications.sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        )
+
+        setNotifications(allNotifications)
       } catch (error) {
         console.error('[NotificationBell] Error loading notifications:', error)
       }
@@ -73,7 +105,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
     const interval = setInterval(loadNotifications, 30000)
 
     return () => clearInterval(interval)
-  }, [auth.isAuthed, auth.email])
+  }, [auth.isAuthed, auth.userId, auth.email])
 
   // Update dropdown position when opened
   useEffect(() => {
@@ -107,11 +139,23 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  const handleNotificationClick = (notification: Notification) => {
-    // Mark as read
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read in local state
     setNotifications(prev =>
       prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
     )
+
+    // If it's an admin notification, mark as read in database
+    if (notification.isAdminNotification) {
+      try {
+        await supabase
+          .from('user_notifications')
+          .update({ is_read: true })
+          .eq('id', notification.id)
+      } catch (error) {
+        console.error('[NotificationBell] Failed to mark notification as read:', error)
+      }
+    }
 
     // Navigate to the link with section
     if (notification.link && notification.linkSection) {
@@ -182,6 +226,11 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
                     <div className="flex items-start gap-3">
                       {/* Status indicator */}
                       <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
+                        notification.type === 'admin_notification' ? (
+                          notification.title.includes('Approved') || notification.title.includes('✅') ? 'bg-green-500' :
+                          notification.title.includes('Rejected') || notification.title.includes('❌') ? 'bg-red-500' :
+                          'bg-blue-500'
+                        ) :
                         notification.type === 'approved_application' ? 'bg-green-500' :
                         notification.type === 'rejected_application' ? 'bg-red-500' :
                         'bg-amber-500'
@@ -191,7 +240,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
                         <p className="font-medium text-sm text-neutral-900 mb-1">
                           {notification.title}
                         </p>
-                        <p className="text-xs text-neutral-600 mb-2 line-clamp-2">
+                        <p className="text-xs text-neutral-600 mb-2 line-clamp-3">
                           {notification.message}
                         </p>
                         <p className="text-xs text-neutral-400">
