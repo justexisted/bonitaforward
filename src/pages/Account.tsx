@@ -114,7 +114,7 @@ export default function AccountPage() {
 
   if (!auth.isAuthed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+      <div className="flex items-center justify-center bg-neutral-50 py-20">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Please Sign In</h2>
           <p className="text-neutral-600 mb-6">You need to be signed in to access your account.</p>
@@ -127,10 +127,10 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="bg-neutral-50">
       {/* Mobile 4x2 Icon Grid Navigation */}
       <div className="lg:hidden">
-        <main className="container-px mx-auto max-w-6xl px-4 pt-3">
+        <main className="container-px mx-auto max-w-6xl px-4 pt-3 pb-4">
           {/* Header */}
           <div className="mb-3">
             <h1 className="text-2xl font-bold text-neutral-900 mb-1">My Account</h1>
@@ -149,7 +149,7 @@ export default function AccountPage() {
 
           {/* 4x2 Icon Grid (Mobile Only) */}
           {activeSection === 'dashboard' && (
-            <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               {visibleSidebarItems.map((item) => {
                 const IconComponent = item.icon
                 
@@ -179,7 +179,7 @@ export default function AccountPage() {
           )}
 
           {/* Section Content (Mobile) */}
-          <div className="max-w-4xl">
+          <div className="max-w-4xl pb-4">
             {activeSection === 'account' && (
               <AccountSettings
                 userId={auth.userId!}
@@ -357,11 +357,11 @@ export default function AccountPage() {
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Business Applications</h2>
                 {data.pendingApps.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-12 text-center">
+                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 text-center">
                     <FileText className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                     <p className="text-neutral-600">No applications</p>
-                      </div>
-                    ) : (
+                  </div>
+                ) : (
                   <div className="space-y-4">
                     {data.pendingApps.map((app) => (
                       <div key={app.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
@@ -563,7 +563,7 @@ export default function AccountPage() {
         </aside>
 
         {/* Main Content (Desktop) */}
-        <main className="flex-1 ml-64 p-8 pt-24">
+        <main className="flex-1 ml-64 p-8 pt-20 pb-6">
           {/* Message Banner */}
           {message && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between">
@@ -753,7 +753,7 @@ export default function AccountPage() {
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Pending Applications</h2>
                 {data.pendingApps.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-12 text-center">
+                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 text-center">
                     <FileText className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                     <p className="text-neutral-600">No pending applications</p>
                   </div>
