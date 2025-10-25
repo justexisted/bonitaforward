@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { X, FileText, CalendarDays, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { SIDEBAR_ITEMS } from './account/constants'
 import type { DashboardSection, AccountData } from './account/types'
 import { 
@@ -83,6 +84,32 @@ export default function AccountPage() {
       ...prev,
       savedBusinesses: prev.savedBusinesses.filter(b => b.id !== savedId)
     }))
+  }
+
+  // Cancel pending application
+  async function cancelApplication(appId: string, businessName: string) {
+    const confirmed = confirm(`Cancel your application for "${businessName}"?\n\nThis action cannot be undone.`)
+    if (!confirmed) return
+    
+    try {
+      const { error } = await supabase
+        .from('business_applications')
+        .delete()
+        .eq('id', appId)
+      
+      if (error) {
+        setMessage(`Failed to cancel application: ${error.message}`)
+      } else {
+        // Remove from local state
+        setData(prev => ({
+          ...prev,
+          pendingApps: prev.pendingApps.filter(app => app.id !== appId)
+        }))
+        setMessage(`Application for "${businessName}" has been cancelled`)
+      }
+    } catch (err: any) {
+      setMessage(`Error cancelling application: ${err.message}`)
+    }
   }
 
   // Filter sidebar items based on user type
@@ -761,15 +788,27 @@ export default function AccountPage() {
                   <div className="space-y-4">
                     {data.pendingApps.map((app) => (
                       <div key={app.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                        <h3 className="font-semibold text-lg text-neutral-900 mb-2">
-                          {app.business_name || 'Untitled Application'}
-                        </h3>
-                        <p className="text-sm text-neutral-600">
-                          Submitted: {new Date(app.created_at).toLocaleDateString()}
-                        </p>
-                        <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium mt-2">
-                          Pending Review
-                        </span>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg text-neutral-900 mb-2">
+                              {app.business_name || 'Untitled Application'}
+                            </h3>
+                            <p className="text-sm text-neutral-600">
+                              Submitted: {new Date(app.created_at).toLocaleDateString()}
+                            </p>
+                            <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium mt-2">
+                              Pending Review
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => cancelApplication(app.id, app.business_name || 'Untitled Application')}
+                            className="flex-shrink-0 ml-4 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
+                            title="Cancel application"
+                          >
+                            <X className="w-4 h-4" />
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -52,11 +52,11 @@ export async function loadBookings(email: string): Promise<Booking[]> {
     console.log('[Account] booking_events query failed:', err)
   }
 
-  // Fallback to bookings table (simpler structure)
+  // Fallback to bookings table (simpler structure - no category_key)
   try {
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, status, created_at, user_email, category_key, name, notes')
+      .select('id, status, created_at, user_email, name, notes')
       .eq('user_email', email)
       .order('created_at', { ascending: false })
     
@@ -76,7 +76,7 @@ export async function loadBookings(email: string): Promise<Booking[]> {
       customer_email: b.user_email,
       booking_duration_minutes: null,
       booking_notes: b.notes,
-      provider_category: b.category_key,
+      provider_category: null, // bookings table doesn't have category_key
       provider_address: null,
       provider_phone: null,
     }))

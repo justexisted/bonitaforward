@@ -70,9 +70,9 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
             .order('created_at', { ascending: false })
 
           if (applications && applications.length > 0) {
-            // Only show pending applications as unread notifications
+            // Only show pending applications as unread notifications (exclude approved/rejected)
             const appNotifs: Notification[] = applications
-              .filter(app => app.status === 'pending' || !app.status)
+              .filter(app => (app.status === 'pending' || !app.status) && app.status !== 'approved' && app.status !== 'rejected')
               .map((app) => ({
                 id: app.id,
                 type: 'pending_application' as const,

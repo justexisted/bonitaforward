@@ -231,6 +231,28 @@ export async function approveApplication(
   
   setMessage(`✅ Application approved! "${businessName}" has been created as a new provider.`)
   
+  // Send notification to the applicant if they have a user account
+  if (ownerUserId) {
+    try {
+      const notificationTitle = '✅ Business Application Approved!'
+      const notificationMessage = `Great news! Your application for "${businessName}" has been approved and your business listing has been created. You can now manage it from your account.`
+      
+      console.log('[Admin] Sending approval notification to user:', ownerUserId)
+      
+      await supabase.from('user_notifications').insert({
+        user_id: ownerUserId,
+        title: notificationTitle,
+        message: notificationMessage,
+        type: 'application_approved'
+      })
+      
+      console.log('[Admin] ✅ Approval notification sent')
+    } catch (err) {
+      console.error('[Admin] Failed to send approval notification:', err)
+      // Don't fail the approval just because notification failed
+    }
+  }
+  
   // Refresh providers list
   try {
     const { data: pData } = await supabase
@@ -248,6 +270,7 @@ export async function approveApplication(
  * 
  * This function rejects and deletes a business application.
  * It updates the status to 'rejected' before deleting for audit trail purposes.
+ * IMPORTANT: Now sends a notification to the applicant explaining why they were rejected.
  */
 export async function deleteApplication(
   appId: string,
@@ -256,6 +279,25 @@ export async function deleteApplication(
   setBizApps: React.Dispatch<React.SetStateAction<BusinessApplicationRow[]>>
 ) {
   setMessage(null)
+  
+  // Get the application details before deleting
+  const { data: app } = await supabase
+    .from('business_applications')
+    .select('*')
+    .eq('id', appId)
+    .single()
+  
+  if (!app) {
+    setError('Application not found')
+    return
+  }
+  
+  // Ask admin for rejection reason
+  const reason = prompt('Reason for rejection (will be sent to applicant):')
+  if (reason === null) {
+    // Admin cancelled - don't reject
+    return
+  }
   
   // Update status to rejected before deleting the application
   const { error: updateError } = await supabase
@@ -268,6 +310,39 @@ export async function deleteApplication(
     return
   }
   
+  // Send notification to the applicant if they have a user account
+  if (app.email) {
+    try {
+      // Find user by email
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', app.email)
+        .single()
+      
+      if (profile) {
+        const notificationTitle = '❌ Business Application Rejected'
+        const notificationMessage = reason 
+          ? `Your application for "${app.business_name || 'your business'}" was rejected. Reason: ${reason}\n\nYou can submit a new application after addressing these concerns.`
+          : `Your application for "${app.business_name || 'your business'}" was rejected. Please contact us if you have questions.`
+        
+        console.log('[Admin] Sending rejection notification to user:', profile.id)
+        
+        await supabase.from('user_notifications').insert({
+          user_id: profile.id,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: 'application_rejected'
+        })
+        
+        console.log('[Admin] ✅ Rejection notification sent')
+      }
+    } catch (err) {
+      console.error('[Admin] Failed to send rejection notification:', err)
+      // Don't fail the rejection just because notification failed
+    }
+  }
+  
   const { error } = await supabase
     .from('business_applications')
     .delete()
@@ -276,7 +351,7 @@ export async function deleteApplication(
   if (error) {
     setError(error.message)
   } else {
-    setMessage('Application rejected and deleted')
+    setMessage(`Application rejected and deleted. ${app.email ? 'Applicant has been notified.' : ''}`)
     setBizApps((rows) => rows.filter((r) => r.id !== appId))
   }
 }
