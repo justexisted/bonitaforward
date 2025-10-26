@@ -88,6 +88,40 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
           }
         }
 
+        // 3. Fetch pending change requests for user's businesses
+        const { data: providers } = await supabase
+          .from('providers')
+          .select('id, name')
+          .eq('owner_user_id', auth.userId)
+
+        if (providers && providers.length > 0) {
+          const providerIds = providers.map(p => p.id)
+          
+          const { data: changeRequests } = await supabase
+            .from('provider_change_requests')
+            .select('id, provider_id, type, status, created_at')
+            .in('provider_id', providerIds)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false })
+
+          if (changeRequests && changeRequests.length > 0) {
+            const changeReqNotifs: Notification[] = changeRequests.map((req) => {
+              const provider = providers.find(p => p.id === req.provider_id)
+              return {
+                id: req.id,
+                type: 'pending_application' as const,
+                title: 'Business Update Pending',
+                message: `Your changes to "${provider?.name || 'your business'}" are awaiting approval.`,
+                timestamp: req.created_at,
+                read: false,
+                link: '/my-business',
+                isAdminNotification: false
+              }
+            })
+            allNotifications.push(...changeReqNotifs)
+          }
+        }
+
         // Sort all notifications by timestamp (newest first)
         allNotifications.sort((a, b) => 
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -101,10 +135,60 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
 
     loadNotifications()
 
-    // Poll for updates every 30 seconds
+    // Set up real-time subscriptions for immediate updates
+    const userNotifsChannel = supabase
+      .channel('user_notifications_changes')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${auth.userId}`
+        },
+        () => {
+          loadNotifications()
+        }
+      )
+      .subscribe()
+
+    const changeRequestsChannel = supabase
+      .channel('provider_change_requests_changes')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'provider_change_requests'
+        },
+        () => {
+          loadNotifications()
+        }
+      )
+      .subscribe()
+
+    const applicationsChannel = supabase
+      .channel('business_applications_changes')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'business_applications',
+          filter: auth.email ? `email=eq.${auth.email}` : undefined
+        },
+        () => {
+          loadNotifications()
+        }
+      )
+      .subscribe()
+
+    // Also poll for updates every 30 seconds as backup
     const interval = setInterval(loadNotifications, 30000)
 
-    return () => clearInterval(interval)
+    return () => {
+      userNotifsChannel.unsubscribe()
+      changeRequestsChannel.unsubscribe()
+      applicationsChannel.unsubscribe()
+      clearInterval(interval)
+    }
   }, [auth.isAuthed, auth.userId, auth.email])
 
   // Update dropdown position when opened
@@ -178,7 +262,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative hidden md:inline-flex items-center justify-center border-0 rounded-[calc(0.75rem-0.2rem)] px-4 h-full font-medium cursor-pointer transition-colors duration-300"
+        className="relative inline-flex items-center justify-center border-0 rounded-[calc(0.75rem-0.2rem)] px-3 md:px-4 h-full font-medium cursor-pointer transition-colors duration-300"
         style={{ backgroundColor: buttonBgColor, color: buttonTextColor }}
         aria-label="Notifications"
       >
@@ -194,7 +278,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
       {isOpen && createPortal(
         <div 
           ref={dropdownRef}
-          className="fixed w-80 bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden z-[9999]"
+          className="fixed w-[calc(100vw-2rem)] max-w-80 bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden z-[9999]"
           style={{ 
             top: `${dropdownPosition.top}px`, 
             right: `${dropdownPosition.right}px` 

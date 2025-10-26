@@ -164,9 +164,11 @@ export function EventCard({ event, onClick, savedEventIds, onToggleSave, isAuthe
             <span className="text-[10px] md:text-xs text-neutral-400 bg-neutral-100 px-2 py-1 rounded-full">
               {event.source}
             </span>
-            <span className="text-xs text-neutral-400">
-              Click for details
-            </span>
+            {cleanDescription && (
+              <span className="text-xs text-neutral-400">
+                Click for details
+              </span>
+            )}
           </div>
         </div>
       </div>

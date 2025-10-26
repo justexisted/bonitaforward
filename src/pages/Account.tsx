@@ -161,7 +161,7 @@ export default function AccountPage() {
           {/* Header */}
           <div className="mb-3">
             <h1 className="text-2xl font-bold text-neutral-900 mb-1">My Account</h1>
-            <p className="text-sm text-neutral-600">{auth.email}</p>
+            <p className="text-sm text-neutral-600">Hi, {auth.name || 'User'}</p>
           </div>
 
           {/* Message Banner */}
@@ -564,7 +564,7 @@ export default function AccountPage() {
           {/* Header */}
           <div className="p-6 border-b border-neutral-200">
             <h1 className="text-2xl font-bold text-neutral-900">Account</h1>
-            <p className="text-sm text-neutral-600 mt-1 truncate">{auth.email}</p>
+            <p className="text-sm text-neutral-600 mt-1 truncate">Hi, {auth.name || 'User'}</p>
           </div>
           
           {/* Navigation */}

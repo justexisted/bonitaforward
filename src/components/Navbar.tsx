@@ -143,7 +143,7 @@ export default function Navbar() {
     // While loading auth state, show empty placeholder
     if (auth.loading) {
       return (
-        <div className="hidden md:inline-flex items-center justify-center border-0 rounded-[calc(0.75rem-0.2rem)] px-4 h-full">
+        <div className="inline-flex items-center justify-center border-0 rounded-[calc(0.75rem-0.2rem)] px-3 md:px-4 h-full">
           {/* Empty placeholder to prevent layout shift */}
         </div>
       )

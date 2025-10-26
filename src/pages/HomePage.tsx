@@ -123,6 +123,7 @@ interface HomePageProps {
  */
 export default function HomePage({ providersByCategory }: HomePageProps) {
   const [, setVersion] = useState(0)
+  const [showMoreCategories, setShowMoreCategories] = useState(false)
   
   // Listen for provider updates to trigger re-renders when data loads
   useProviderUpdates(() => { setVersion((v: number) => v + 1) }, [])
@@ -136,16 +137,36 @@ export default function HomePage({ providersByCategory }: HomePageProps) {
             {categories.slice(0, 4).map((c) => (
               <CategoryCard cat={c} key={c.key} />
             ))}
-            <details className="rounded-2xl p-4 bg-white">
-              <summary className="cursor-pointer select-none text-sm" style={{ color: '#7070e3' }}>See more</summary>
-              <div className="mt-3">
-                {categories.slice(4).map((c) => (
-                  <div key={c.key} className="mt-2">
-                    <CategoryCard cat={c} />
-                  </div>
-                ))}
-              </div>
-            </details>
+            <div className="rounded-2xl p-4 bg-white">
+              <button 
+                onClick={() => setShowMoreCategories(!showMoreCategories)}
+                className="cursor-pointer select-none text-sm w-full text-left flex items-center gap-2" 
+                style={{ color: '#7070e3' }}
+              >
+                <svg 
+                  className="w-3 h-3 transition-transform" 
+                  style={{ transform: showMoreCategories ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                {showMoreCategories ? 'See less' : 'See more'}
+              </button>
+              {showMoreCategories && (
+                <div className="mt-3">
+                  {categories.slice(4).map((c) => (
+                    <div key={c.key} className="mt-2">
+                      <CategoryCard cat={c} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </Container>
       </section>

@@ -96,31 +96,48 @@ export default function Layout() {
     {
       icon: <ArrowLeft className="w-6 h-6" />,
       label: "Back",
-      onClick: () => window.history.back(),
+      onClick: () => {
+        window.history.back()
+        // Scroll to top after a brief delay to ensure navigation completes
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100)
+      },
       className: "!bg-gradient-to-br !from-blue-100 !to-blue-200"
     },
     {
       icon: <ArrowRight className="w-6 h-6" />,
       label: "Forward", 
-      onClick: () => window.history.forward(),
+      onClick: () => {
+        window.history.forward()
+        // Scroll to top after a brief delay to ensure navigation completes
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100)
+      },
       className: "!bg-gradient-to-br !from-blue-100 !to-blue-200"
     },
     {
       icon: <Home className="w-6 h-6" />,
       label: "Home",
-      onClick: () => navigate('/'),
+      onClick: () => {
+        navigate('/')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      },
       className: "!bg-gradient-to-br !from-red-100 !to-red-200"
     },
     {
       icon: <User className="w-6 h-6" />,
       label: "Profile",
-      onClick: () => navigate(auth.isAuthed ? '/account' : '/signin'),
+      onClick: () => {
+        navigate(auth.isAuthed ? '/account' : '/signin')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      },
       className: "!bg-gradient-to-br !from-orange-100 !to-orange-200"
     },
     {
       icon: <BookOpen className="w-6 h-6" />,
       label: "Blog",
-      onClick: () => navigate('/community'),
+      onClick: () => {
+        navigate('/community')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      },
       className: "!bg-gradient-to-br !from-yellow-100 !to-yellow-200"
     }
   ]
@@ -132,7 +149,10 @@ export default function Layout() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>,
       label: "My Business",
-      onClick: () => navigate('/my-business'),
+      onClick: () => {
+        navigate('/my-business')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      },
       notificationCount: unreadBookingNotifications,
       className: "!bg-gradient-to-br !from-green-100 !to-green-200"
     })
