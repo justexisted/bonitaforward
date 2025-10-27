@@ -196,7 +196,7 @@ const CardNav: React.FC<CardNavProps> = ({
         className={`card-nav ${isExpanded ? 'open' : ''} block h-[60px] p-0 rounded-xl shadow-md relative overflow-hidden will-change-[height]`}
         style={{ backgroundColor: baseColor }}
       >
-        <div className="card-nav-top absolute inset-x-0 top-0 h-[60px] flex items-center justify-between p-1 pl-[1.5rem] z-[2]">
+        <div className="card-nav-top absolute inset-x-0 top-0 h-[60px] flex items-center justify-between p-1 pl-2 md:pl-[1.5rem] z-[2]">
           <div
             className={`hamburger-menu ${isHamburgerOpen ? 'open' : ''} group h-full flex flex-col items-center justify-center gap-[6px] order-2 md:order-none transition-opacity ${
               !isTimelineReady ? 'cursor-wait opacity-50' : 'cursor-pointer opacity-100'
@@ -222,9 +222,9 @@ const CardNav: React.FC<CardNavProps> = ({
           </div>
 
           <div className="logo-container flex items-center justify-center md:justify-center md:absolute md:left-4 md:top-1/2 md:-translate-y-1/2 order-1 md:order-none"  style={{ justifySelf: 'anchor-center' }}>
-            <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-              <img src={logo} alt={logoAlt} className="logo h-[40px]" />
-              <span className="font-semibold tracking-tight text-2xl">Bonita Forward</span>
+            <a href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
+              <img src={logo} alt={logoAlt} className="logo h-[32px] md:h-[40px]" />
+              <span className="font-semibold tracking-tight text-lg md:text-2xl">Bonita Forward</span>
             </a>
           </div>
 

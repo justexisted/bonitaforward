@@ -275,7 +275,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative inline-flex items-center justify-center border-0 rounded-[calc(0.75rem-0.2rem)] px-3 md:px-4 h-full font-medium cursor-pointer transition-colors duration-300"
+        className="relative inline-flex items-center justify-center border-0 rounded-[calc(0.75rem-0.2rem)] px-2 md:px-4 h-full font-medium cursor-pointer transition-colors duration-300 md:ml-0"
         style={{ backgroundColor: buttonBgColor, color: buttonTextColor }}
         aria-label="Notifications"
       >
