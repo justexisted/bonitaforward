@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { fixImageUrl } from '../utils/imageUtils'
+import { useHideDock } from '../hooks/useHideDock'
 
 // ============================================================================
 // TYPES
@@ -115,6 +116,10 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
   const [bookingPartySize, setBookingPartySize] = useState<number | ''>('')
   const [bookingBusy, setBookingBusy] = useState(false)
   const [bookingMsg, setBookingMsg] = useState<string | null>(null)
+
+  // Hide Dock when any modal is open
+  const isAnyModalOpen = Boolean(selectedImage || bookingOpen)
+  useHideDock(isAnyModalOpen)
 
   useEffect(() => {
     let cancelled = false

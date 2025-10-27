@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { BusinessListing, ImageUploadProgress } from '../types'
+import { useHideDock } from '../../../hooks/useHideDock'
 
 
 /**
@@ -59,6 +60,9 @@ export function BusinessListingForm({
     isUpdating?: boolean
   }) {
     console.log('[BusinessListingForm] Rendering with listing:', listing?.id, listing?.name)
+    
+    // Hide Dock when this modal is open
+    useHideDock(true)
     
     const [formData, setFormData] = useState<Partial<BusinessListing>>({
       // Core business fields
@@ -513,8 +517,14 @@ export function BusinessListingForm({
     }
   
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
-        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-neutral-200 pointer-events-auto">
+      <div 
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto"
+        onClick={onCancel}
+      >
+        <div 
+          className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-neutral-200"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold">

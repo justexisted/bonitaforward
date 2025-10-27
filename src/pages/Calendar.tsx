@@ -8,6 +8,7 @@ import { EventIcons } from '../utils/eventIcons'
 import { extractEventUrl, cleanDescriptionFromUrls, getButtonTextForUrl } from '../utils/eventUrlUtils'
 import { getEventGradient, preloadEventImages, getEventHeaderImage } from '../utils/eventImageUtils'
 import { fetchSavedEvents, saveEvent, unsaveEvent, migrateLocalStorageToDatabase } from '../utils/savedEventsDb'
+import { useHideDock } from '../hooks/useHideDock'
 import { hasAcceptedEventTerms, acceptEventTerms, migrateEventTermsToDatabase } from '../utils/eventTermsDb'
 
 // Re-export type for backward compatibility
@@ -214,6 +215,10 @@ export default function CalendarPage() {
 
   // State for dynamically loaded event images (Unsplash + gradients)
   const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
+
+  // Hide Dock when any modal is open
+  const isAnyModalOpen = Boolean(selectedEvent || showCreateEvent || showTermsModal || showFlagModal)
+  useHideDock(isAnyModalOpen)
 
   // Load saved events from database and migrate localStorage data
   useEffect(() => {

@@ -27,6 +27,24 @@ export default function Layout() {
   const navigate = useNavigate()
   const auth = useAuth()
   const [unreadBookingNotifications, setUnreadBookingNotifications] = useState(0)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Watch for modal-open class on body to hide Dock
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsModalOpen(document.body.classList.contains('modal-open'))
+    })
+    
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+    
+    // Check initial state
+    setIsModalOpen(document.body.classList.contains('modal-open'))
+    
+    return () => observer.disconnect()
+  }, [])
 
   // Load unread booking notifications for business owners
   useEffect(() => {
@@ -167,11 +185,13 @@ export default function Layout() {
       </main>
       <Footer />
       
-      {/* Dock Navigation */}
-      <Dock 
-        items={dockItems}
-        className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-40"
-      />
+      {/* Dock Navigation - Hidden when modals are open */}
+      {!isModalOpen && (
+        <Dock 
+          items={dockItems}
+          className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-10"
+        />
+      )}
     </div>
   )
 }

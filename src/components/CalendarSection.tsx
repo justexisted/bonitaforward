@@ -15,6 +15,7 @@ import {
   saveEventToLocalStorage,
   unsaveEventFromLocalStorage
 } from '../utils/savedEventsDb'
+import { useHideDock } from '../hooks/useHideDock'
 
 interface LoadingSpinnerProps {
   message?: string
@@ -58,6 +59,9 @@ export default function CalendarSection() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set())
   const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
+
+  // Hide Dock when modal is open
+  useHideDock(Boolean(selectedEvent))
 
   useEffect(() => {
     const loadEvents = async () => {
