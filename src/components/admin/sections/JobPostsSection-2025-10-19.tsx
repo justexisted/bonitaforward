@@ -106,10 +106,13 @@ export function JobPostsSection({ onMessage, onError }: JobPostsSectionProps) {
   // Notify user helper
   const notifyUser = async (userId: string, title: string, message: string, metadata?: any) => {
     try {
+      // FIXED: Added 'subject' and 'type' fields which are required by the database schema
       await supabase.from('user_notifications').insert({
         user_id: userId,
+        subject: title,  // Subject is required field in database
         title,
         message,
+        type: 'job_post',  // Type is required field in database
         metadata: metadata || {}
       })
     } catch (err) {

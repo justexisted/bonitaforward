@@ -129,8 +129,10 @@ export function ChangeRequestsSection({
     try { 
       console.log('[ChangeRequestsSection] Sending notification:', { user_id, title, message })
       
+      // FIXED: Added 'subject' field which is required by the database schema
       const { data, error } = await supabase.from('user_notifications').insert([{ 
         user_id, 
+        subject: title,  // Subject is required field in database
         title, 
         message: message || title,
         type: 'change_request',

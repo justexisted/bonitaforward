@@ -53,7 +53,6 @@ SELECT
   LEFT(n.message, 100) as message_preview,
   n.is_read,
   p.email as recipient_email,
-  p.full_name as recipient_name,
   p.is_admin as recipient_is_admin,
   n.metadata
 FROM public.user_notifications n
@@ -78,7 +77,6 @@ ORDER BY count DESC;
 -- ============================================================================
 SELECT 
   p.email,
-  p.full_name,
   p.is_admin,
   COUNT(n.id) as total_notifications,
   COUNT(CASE WHEN NOT n.is_read THEN 1 END) as unread_count,
@@ -86,7 +84,7 @@ SELECT
 FROM public.profiles p
 LEFT JOIN public.user_notifications n ON n.user_id = p.id
 WHERE p.is_admin = false  -- Focus on business owners
-GROUP BY p.id, p.email, p.full_name, p.is_admin
+GROUP BY p.id, p.email, p.is_admin
 HAVING COUNT(n.id) > 0
 ORDER BY MAX(n.created_at) DESC
 LIMIT 20;
@@ -212,7 +210,7 @@ SELECT
     WHEN p.is_admin THEN 'You can insert notifications for other users'
     ELSE 'You can only insert notifications for yourself'
   END as notification_permissions
-FROM profiles p
+FROM public.profiles p
 WHERE p.id = auth.uid();
 
 -- ============================================================================

@@ -239,8 +239,10 @@ export async function approveApplication(
       
       console.log('[Admin] Sending approval notification to user:', ownerUserId)
       
+      // FIXED: Added 'subject' field which is required by the database schema
       const { error: notifError } = await supabase.from('user_notifications').insert({
         user_id: ownerUserId,
+        subject: notificationTitle,  // Subject is required field in database
         title: notificationTitle,
         message: notificationMessage,
         type: 'application_approved',
@@ -333,8 +335,10 @@ export async function deleteApplication(
         
         console.log('[Admin] Sending rejection notification to user:', profile.id)
         
+        // FIXED: Added 'subject' field which is required by the database schema
         const { error: notifError } = await supabase.from('user_notifications').insert({
           user_id: profile.id,
+          subject: notificationTitle,  // Subject is required field in database
           title: notificationTitle,
           message: notificationMessage,
           type: 'application_rejected',
