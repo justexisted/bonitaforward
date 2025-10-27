@@ -155,7 +155,13 @@ export function ChangeRequestsSection({
   const approveChangeRequest = async (req: ProviderChangeRequestWithDetails) => {
     onMessage('')
     try {
+      // IMPORTANT: Compute the diff BEFORE applying changes, so we can store what actually changed
+      let changedFields: string[] = []
       if (req.type === 'update') {
+        const currentProvider = providers.find(p => p.id === req.provider_id)
+        const diff = computeChangeDiff(currentProvider, req.changes)
+        changedFields = diff.map(d => d.fieldLabel)
+        
         const { error } = await supabase
           .from('providers')
           .update(req.changes as any)
@@ -192,11 +198,17 @@ export function ChangeRequestsSection({
         if (error) throw new Error(error.message)
       }
       
+      // Store the changed fields summary so we can display it later in history
+      const reasonSummary = changedFields.length > 0 
+        ? `Fields updated: ${changedFields.join(', ')}`
+        : (req.reason || '')
+      
       await supabase
         .from('provider_change_requests')
         .update({ 
           status: 'approved', 
-          decided_at: new Date().toISOString() as any 
+          decided_at: new Date().toISOString() as any,
+          reason: reasonSummary
         })
         .eq('id', req.id)
       
@@ -309,16 +321,31 @@ export function ChangeRequestsSection({
       booking_enabled: 'Online Booking',
       booking_type: 'Booking Type',
       booking_instructions: 'Booking Instructions',
-      booking_url: 'Booking URL'
+      booking_url: 'Booking URL',
+      google_maps_url: 'Google Maps URL'
+    }
+
+    // Helper function to normalize values for comparison
+    // Treats null, undefined, empty string, and empty arrays/objects as equivalent
+    const normalizeValue = (value: any): any => {
+      if (value === null || value === undefined || value === '') return null
+      if (Array.isArray(value) && value.length === 0) return null
+      if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) return null
+      return value
     }
 
     for (const field in proposedChanges) {
       const oldValue = (currentProvider as any)[field]
       const newValue = proposedChanges[field]
       
-      // Deep comparison for arrays and objects
-      const isDifferent = JSON.stringify(oldValue) !== JSON.stringify(newValue)
+      // Normalize values before comparison to avoid false positives (null vs "" vs undefined)
+      const normalizedOld = normalizeValue(oldValue)
+      const normalizedNew = normalizeValue(newValue)
       
+      // Deep comparison for arrays and objects after normalization
+      const isDifferent = JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew)
+      
+      // Only add to diffs if there's an ACTUAL change (not just null → "" or vice versa)
       if (isDifferent) {
         diffs.push({
           field,
@@ -779,42 +806,59 @@ export function ChangeRequestsSection({
                     </div>
                   )}
 
-                  {/* Auto-Applied Changes History (Last 10) */}
+                  {/* Recent Approved Changes History (Last 10) */}
                   {requests.some(r => r.status === 'approved' && r.type === 'update') && (
                     <div>
-                      <div className="font-medium text-blue-800 mb-3">🔄 Recent Auto-Applied Changes (Last 10)</div>
+                      <div className="font-medium text-blue-800 mb-3">🔄 Recent Approved Changes (Last 10)</div>
                       <div className="space-y-2">
                         {requests
                           .filter(r => r.status === 'approved' && r.type === 'update')
                           .slice(0, 10)
                           .map((r) => {
                             const currentProvider = providers.find(p => p.id === r.provider_id)
-                            const changeDiff = computeChangeDiff(currentProvider, r.changes)
+                            const isFeatured = currentProvider?.is_member === true
+                            const approvalType = isFeatured ? 'Auto-Applied' : 'Admin Approved'
+                            const borderColor = isFeatured ? 'border-purple-200' : 'border-green-200'
+                            const bgColor = isFeatured ? 'bg-purple-50' : 'bg-green-50'
+                            const textColor = isFeatured ? 'text-purple-900' : 'text-green-900'
+                            const secondaryTextColor = isFeatured ? 'text-purple-700' : 'text-green-700'
+                            const accentColor = isFeatured ? 'text-purple-600' : 'text-green-600'
+                            const accentBoldColor = isFeatured ? 'text-purple-800' : 'text-green-800'
+                            
+                            // Extract changed fields from the reason field (stored at approval time)
+                            const changedFieldsSummary = r.reason?.startsWith('Fields updated:') 
+                              ? r.reason.replace('Fields updated: ', '')
+                              : null
                             
                             return (
-                              <div key={r.id} className="rounded-xl border border-green-200 p-3 bg-green-50 shadow-sm">
+                              <div key={r.id} className={`rounded-xl border ${borderColor} p-3 ${bgColor} shadow-sm`}>
                                 <div className="flex items-center justify-between">
-                                  <div className="font-medium text-green-900">
-                                    ✅ Auto-Applied Changes
+                                  <div className={`font-medium ${textColor}`}>
+                                    {isFeatured ? '⚡' : '✅'} {approvalType}
                                   </div>
-                                  <div className="text-xs text-green-600">{new Date(r.created_at).toLocaleString()}</div>
+                                  <div className={`text-xs ${accentColor}`}>{new Date(r.created_at).toLocaleString()}</div>
                                 </div>
                                 
                                 {/* Business Information */}
-                                <div className="text-xs text-green-700 mt-2 space-y-1">
+                                <div className={`text-xs ${secondaryTextColor} mt-2 space-y-1`}>
                                   <div><strong>Business:</strong> {r.providers?.name || 'Unknown Business'}</div>
                                   <div><strong>Owner:</strong> {r.profiles?.name || r.profiles?.email || 'Loading...'}</div>
+                                  {isFeatured && <div className="text-purple-600 font-semibold">⭐ Featured Business</div>}
                                 </div>
                                 
-                                {/* Show changes */}
-                                {changeDiff.length > 0 && (
+                                {/* Show changes from stored summary */}
+                                {changedFieldsSummary ? (
                                   <div className="mt-2 text-xs">
-                                    <div className="font-semibold text-green-800 mb-1">
-                                      Fields Updated ({changeDiff.length}):
+                                    <div className={`font-semibold ${accentBoldColor} mb-1`}>
+                                      Changes:
                                     </div>
-                                    <div className="text-green-700">
-                                      {changeDiff.map(d => d.fieldLabel).join(', ')}
+                                    <div className={secondaryTextColor}>
+                                      {changedFieldsSummary}
                                     </div>
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 text-xs text-neutral-500 italic">
+                                    Change details not available (approved before tracking was added)
                                   </div>
                                 )}
                               </div>
