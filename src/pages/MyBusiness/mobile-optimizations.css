@@ -221,3 +221,259 @@
   }
 }
 
+/* Ultra-small screens optimization - Below 350px */
+@media (max-width: 349px) {
+  /* Further reduce container padding */
+  .my-business-container {
+    padding-left: 0.5rem !important; /* 8px */
+    padding-right: 0.5rem !important;
+    padding-top: 0.75rem !important; /* 12px */
+    padding-bottom: 0.75rem !important;
+  }
+
+  /* Card padding reduction */
+  .my-business-card {
+    padding: 0.5rem !important; /* 8px */
+    border-radius: 0.75rem !important; /* 12px */
+  }
+
+  /* Heading sizes - even smaller */
+  .my-business-heading-xl {
+    font-size: 1rem !important; /* 16px */
+    line-height: 1.375rem !important;
+  }
+
+  .my-business-heading-lg {
+    font-size: 0.875rem !important; /* 14px */
+    line-height: 1.25rem !important;
+  }
+
+  .my-business-heading-md {
+    font-size: 0.8125rem !important; /* 13px */
+    line-height: 1.125rem !important;
+  }
+
+  /* Text sizes */
+  .my-business-text-sm {
+    font-size: 0.6875rem !important; /* 11px */
+    line-height: 0.9375rem !important;
+  }
+
+  /* Button padding - more compact */
+  .my-business-btn {
+    padding: 0.375rem 0.5rem !important; /* 6px 8px */
+    font-size: 0.8125rem !important; /* 13px */
+  }
+
+  .my-business-btn-lg {
+    padding: 0.5rem 0.75rem !important; /* 8px 12px */
+    font-size: 0.8125rem !important; /* 13px */
+  }
+
+  /* Badge sizes - more compact */
+  .my-business-badge {
+    padding: 0.1875rem 0.375rem !important; /* 3px 6px */
+    font-size: 0.5625rem !important; /* 9px */
+  }
+
+  /* Spacing reductions */
+  .my-business-space-y-4 > * + * {
+    margin-top: 0.5rem !important; /* 8px */
+  }
+
+  .my-business-space-y-3 > * + * {
+    margin-top: 0.375rem !important; /* 6px */
+  }
+
+  .my-business-space-y-2 > * + * {
+    margin-top: 0.25rem !important; /* 4px */
+  }
+
+  /* Gap reductions */
+  .my-business-gap-4 {
+    gap: 0.5rem !important; /* 8px */
+  }
+
+  .my-business-gap-3 {
+    gap: 0.375rem !important; /* 6px */
+  }
+
+  .my-business-gap-2 {
+    gap: 0.25rem !important; /* 4px */
+  }
+
+  /* Margin reductions */
+  .my-business-mb-6 {
+    margin-bottom: 0.75rem !important; /* 12px */
+  }
+
+  .my-business-mb-4 {
+    margin-bottom: 0.5rem !important; /* 8px */
+  }
+
+  .my-business-mt-4 {
+    margin-top: 0.5rem !important; /* 8px */
+  }
+
+  /* Image gallery optimizations */
+  .my-business-image-grid {
+    gap: 0.375rem !important; /* 6px */
+  }
+
+  .my-business-image-item {
+    height: 3.5rem !important; /* 56px */
+  }
+
+  /* Dropdown menu */
+  .my-business-dropdown-btn {
+    padding: 0.5rem 0.625rem !important; /* 8px 10px */
+    font-size: 0.8125rem !important; /* 13px */
+  }
+
+  /* Business info grid */
+  .my-business-info-grid {
+    gap: 0.375rem !important; /* 6px */
+    padding: 0.5rem !important; /* 8px */
+  }
+
+  /* Modal/Form containers */
+  .my-business-modal-content {
+    padding: 0.75rem !important; /* 12px */
+    max-height: calc(100vh - 1.5rem) !important;
+  }
+
+  /* Icon sizes */
+  .my-business-icon-sm {
+    width: 0.75rem !important; /* 12px */
+    height: 0.75rem !important;
+  }
+
+  .my-business-icon-md {
+    width: 0.875rem !important; /* 14px */
+    height: 0.875rem !important;
+  }
+
+  .my-business-icon-lg {
+    width: 1rem !important; /* 16px */
+    height: 1rem !important;
+  }
+
+  /* Empty state */
+  .my-business-empty-state {
+    padding: 1rem !important; /* 16px */
+  }
+
+  .my-business-empty-icon {
+    width: 2.5rem !important; /* 40px */
+    height: 2.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Notification badges */
+  .my-business-notification-badge {
+    padding: 0.375rem 0.5rem !important; /* 6px 8px */
+    font-size: 0.6875rem !important; /* 11px */
+  }
+
+  /* Social links */
+  .my-business-social-link {
+    padding: 0.375rem 0.5rem !important; /* 6px 8px */
+    font-size: 0.6875rem !important; /* 11px */
+  }
+
+  /* Calendar integration card */
+  .my-business-calendar-card {
+    padding: 0.5rem !important; /* 8px */
+    font-size: 0.8125rem !important; /* 13px */
+  }
+
+  /* Action button groups */
+  .my-business-action-group {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  .my-business-action-group > button,
+  .my-business-action-group > a {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Tab counts */
+  .my-business-tab-count {
+    height: 1rem !important; /* 16px */
+    width: 1rem !important;
+    font-size: 0.5625rem !important; /* 9px */
+  }
+
+  /* Plan comparison cards */
+  .my-business-plan-card {
+    padding: 0.75rem !important; /* 12px */
+  }
+
+  .my-business-plan-card h3 {
+    font-size: 0.875rem !important; /* 14px */
+  }
+
+  .my-business-plan-card .price {
+    font-size: 1.125rem !important; /* 18px */
+  }
+
+  .my-business-plan-card ul li {
+    font-size: 0.6875rem !important; /* 11px */
+    padding: 0.1875rem 0 !important; /* 3px */
+  }
+
+  /* Status indicators */
+  .my-business-status-indicator {
+    padding: 0.25rem 0.5rem !important; /* 4px 8px */
+    font-size: 0.5625rem !important; /* 9px */
+  }
+
+  /* Business hours display */
+  .my-business-hours-item {
+    padding: 0.375rem !important; /* 6px */
+    font-size: 0.6875rem !important; /* 11px */
+  }
+
+  /* Title text specific adjustments */
+  h1, .text-2xl {
+    font-size: 1.125rem !important; /* 18px instead of 24px */
+  }
+
+  h2, .text-xl {
+    font-size: 1rem !important; /* 16px instead of 20px */
+  }
+
+  h3, .text-lg {
+    font-size: 0.875rem !important; /* 14px instead of 18px */
+  }
+
+  /* General text adjustments */
+  .text-sm {
+    font-size: 0.6875rem !important; /* 11px instead of 14px */
+  }
+
+  .text-xs {
+    font-size: 0.625rem !important; /* 10px instead of 12px */
+  }
+
+  /* General padding and margin reductions */
+  .p-6, .py-6, .pt-6, .pb-6 {
+    padding: 0.75rem !important; /* 12px instead of 24px */
+  }
+
+  .p-4, .py-4, .pt-4, .pb-4 {
+    padding: 0.5rem !important; /* 8px instead of 16px */
+  }
+
+  .px-4 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  .m-4, .my-4, .mt-4, .mb-4 {
+    margin: 0.5rem !important; /* 8px instead of 16px */
+  }
+}
+

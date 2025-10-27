@@ -147,6 +147,7 @@ export function CommunityPost() {
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set())
 
   // Get all category keys for navigation
   const allCategories = Object.keys(categoryToTitle)
@@ -162,10 +163,27 @@ export function CommunityPost() {
       const data = await fetchBlogPostsByCategory(categoryKey)
       if (cancelled) return
       setPosts(data)
+      // Automatically expand the first (most recent) post
+      if (data.length > 0) {
+        setExpandedPosts(new Set([data[0].id]))
+      }
       setLoading(false)
     })()
     return () => { cancelled = true }
   }, [categoryKey])
+
+  // Toggle post expansion
+  const togglePost = (postId: string) => {
+    setExpandedPosts(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(postId)) {
+        newSet.delete(postId)
+      } else {
+        newSet.add(postId)
+      }
+      return newSet
+    })
+  }
 
   return (
     <section className="py-8">
@@ -202,50 +220,120 @@ export function CommunityPost() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
+        {/* Category Title */}
+        <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {loading && <div className="mt-3 text-sm text-neutral-600">Loading…</div>}
-          {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
-          {!loading && !error && (
-            <div className="prose prose-neutral max-w-none mt-3 space-y-8">
-              {posts.length > 0 ? (
-                posts.map((post) => (
-                  <article key={post.id}>
-                    <h2 className="text-xl font-semibold">{post.title}</h2>
-                    <div className="mt-1 text-xs text-neutral-500">{new Date(post.created_at).toLocaleString()}</div>
-                    
-                    {/* Display images if they exist */}
-                    {post.images && post.images.length > 0 && (
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {post.images.map((imageUrl, index) => (
-                          <img
-                            key={index}
-                            src={imageUrl}
-                            alt={`Blog image ${index + 1}`}
-                            className="w-full h-48 object-cover rounded-lg border border-neutral-200"
-                          />
-                        ))}
+        </div>
+
+        {/* Loading and Error States */}
+        {loading && <div className="rounded-2xl border border-neutral-100 p-5 bg-white text-sm text-neutral-600">Loading…</div>}
+        {error && <div className="rounded-2xl border border-neutral-100 p-5 bg-white text-sm text-red-600">{error}</div>}
+        
+        {/* Blog Posts - Each in its own card */}
+        {!loading && !error && (
+          <div className="space-y-4">
+            {posts.length > 0 ? (
+              posts.map((post, index) => {
+                const isExpanded = expandedPosts.has(post.id)
+                const isFirst = index === 0
+                
+                return (
+                  <article 
+                    key={post.id} 
+                    className={`rounded-2xl border bg-white overflow-hidden transition-all ${
+                      isFirst 
+                        ? 'border-blue-200 shadow-md' 
+                        : 'border-neutral-200 shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    {/* Post Header - Always visible */}
+                    <div className="p-4 sm:p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h2 className={`font-semibold ${isFirst ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'}`}>
+                            {post.title}
+                          </h2>
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="text-xs text-neutral-500">
+                              {new Date(post.created_at).toLocaleDateString('en-US', { 
+                                month: 'long', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })}
+                            </div>
+                            {isFirst && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                Latest
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Expand/Collapse Button */}
+                        {!isFirst && (
+                          <button
+                            onClick={() => togglePost(post.id)}
+                            className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <span>Hide</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                </svg>
+                              </>
+                            ) : (
+                              <>
+                                <span>Read more</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
-                    )}
-                    
-                    <div className="mt-3">
-                      {containsHtml(post.content) ? (
-                        <div
-                          className="bf-post-content space-y-4 [&>p]:my-3 [&>div]:my-3 [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-2 [&_br]:block [&_br]:h-4"
-                          dangerouslySetInnerHTML={{ __html: sanitizePostHtml(post.content) }}
-                        />
-                      ) : (
-                        <div className="space-y-2">{renderStyledContent(post.content)}</div>
+                      
+                      {/* Post Content - Conditionally visible */}
+                      {isExpanded && (
+                        <div className="mt-4">
+                          {/* Display images if they exist */}
+                          {post.images && post.images.length > 0 && (
+                            <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {post.images.map((imageUrl, imgIndex) => (
+                                <img
+                                  key={imgIndex}
+                                  src={imageUrl}
+                                  alt={`Blog image ${imgIndex + 1}`}
+                                  className="w-full h-48 object-cover rounded-lg border border-neutral-200"
+                                />
+                              ))}
+                            </div>
+                          )}
+                          
+                          <div className="prose prose-neutral max-w-none">
+                            {containsHtml(post.content) ? (
+                              <div
+                                className="bf-post-content space-y-4 [&>p]:my-3 [&>div]:my-3 [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-2 [&_br]:block [&_br]:h-4"
+                                dangerouslySetInnerHTML={{ __html: sanitizePostHtml(post.content) }}
+                              />
+                            ) : (
+                              <div className="space-y-2">{renderStyledContent(post.content)}</div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </article>
-                ))
-              ) : (
-                <div className="text-neutral-600 text-sm">No post yet for this category.</div>
-              )}
-            </div>
-          )}
-        </div>
+                )
+              })
+            ) : (
+              <div className="rounded-2xl border border-neutral-100 p-5 bg-white text-neutral-600 text-sm text-center">
+                No posts yet for this category.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bottom Navigation */}
         <div className="mt-6 flex items-center justify-between">

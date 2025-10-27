@@ -180,7 +180,7 @@ export default function Layout() {
     <div className="min-h-full flex flex-col layout-mobile-container">
       <SupabasePing />
       <Navbar />
-      <main className="flex-1 overflow-x-hidden pt-4 layout-mobile-main">
+      <main className="flex-1 overflow-x-hidden pt-1 sm:pt-2 md:pt-4 layout-mobile-main">
         <Outlet />
       </main>
       <Footer />

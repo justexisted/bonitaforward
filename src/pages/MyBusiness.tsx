@@ -704,8 +704,8 @@ export default function MyBusinessPage() {
 
   if (auth.role !== 'business') {
     return (
-      <section className="py-8">
-        <div className="container-px mx-auto max-w-4xl">
+      <section className="py-2 sm:py-4 md:py-8 px-2 sm:px-4 md:px-6">
+        <div className="mx-auto max-w-4xl">
           <div className="rounded-2xl border border-neutral-100 p-1 bg-white">
             <h1 className="text-xl font-semibold">Access Restricted</h1>
             <p className="mt-2 text-neutral-600">This page is only available for business accounts.</p>
@@ -720,8 +720,8 @@ export default function MyBusinessPage() {
 
   if (loading) {
     return (
-      <section className="py-8">
-        <div className="container-px mx-auto max-w-4xl">
+      <section className="py-2 sm:py-4 md:py-8 px-2 sm:px-4 md:px-6">
+        <div className="mx-auto max-w-4xl">
           <div className="rounded-2xl border border-neutral-100 p-1 bg-white">
             <div className="animate-pulse">
               <div className="h-6 bg-neutral-200 rounded w-1/4 mb-4"></div>
@@ -734,8 +734,8 @@ export default function MyBusinessPage() {
   }
 
   return (
-    <section className="py-8 my-business-container">
-      <div className="container-px mx-auto max-w-6xl">
+    <section className="py-2 sm:py-4 md:py-8 px-2 sm:px-4 md:px-6 my-business-container">
+      <div className="mx-auto max-w-6xl">
 
         {message && (
           <div className="my-business-mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 my-business-card">
@@ -1104,7 +1104,7 @@ export default function MyBusinessPage() {
             </div>
 
             {listings.length === 0 ? (
-              <div className="rounded-2xl border border-neutral-100 p-6 sm:p-8 bg-white text-center my-business-empty-state">
+              <div className="rounded-2xl border border-neutral-100 p-3 sm:p-4 md:p-6 lg:p-8 bg-white text-center my-business-empty-state">
                 <div className="max-w-md mx-auto">
                   <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 my-business-empty-icon">
                     <svg className="w-8 h-8 text-blue-600 my-business-icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1126,13 +1126,13 @@ export default function MyBusinessPage() {
               </div>
             ) : (
               listings.map((listing) => (
-                <div key={listing.id} className="rounded-2xl border border-neutral-200 p-4 sm:p-6 bg-white shadow-sm hover:shadow-md transition-shadow my-business-card">
+                <div key={listing.id} className="rounded-2xl border border-neutral-200 p-2 sm:p-3 md:p-4 lg:p-6 bg-white shadow-sm hover:shadow-md transition-shadow my-business-card">
                   <div className="space-y-4 my-business-space-y-4">
                     {/* Header Section */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:items-center sm:justify-between gap-3 my-business-gap-3">
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-neutral-900 mb-2 my-business-heading-lg">{listing.name}</h3>
-                        <div className="flex flex-wrap gap-2 my-business-gap-2">
+                        <h3 className="text-xl font-semibold text-neutral-900 mb-2 my-business-heading-lg text-center sm:text-left">{listing.name}</h3>
+                        <div className="flex flex-wrap gap-2 my-business-gap-2 justify-center sm:justify-start">
                           <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium my-business-badge ${
                             listing.is_member 
                               ? 'bg-yellow-100 text-yellow-800' 
@@ -1300,8 +1300,8 @@ export default function MyBusinessPage() {
                               </div>
                             ))}
                           </div>
-                          <div className="mt-3 flex items-center justify-between">
-                            <p className="text-xs text-neutral-500">Click any image to view full size</p>
+                          <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0">
+                            <p className="text-xs text-neutral-500 text-center sm:text-left">Click any image to view full size</p>
                             <button
                               onClick={() => promptAndUploadImages(listing)}
                               className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -1874,7 +1874,7 @@ export default function MyBusinessPage() {
         {/* User Activity Tab */}
         {activeTab === 'user-activity' && (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-neutral-100 p-6 bg-white">
+            <div className="rounded-2xl border border-neutral-100 p-2 sm:p-3 md:p-4 lg:p-6 bg-white">
               <h3 className="text-lg font-semibold text-neutral-900 mb-4">Customer Interactions</h3>
               <p className="text-sm text-neutral-600 mb-6">
                 Track how customers interact with your business listings - profile views, discount copies, booking requests, and questions.
