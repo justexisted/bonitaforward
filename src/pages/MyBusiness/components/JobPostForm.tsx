@@ -37,6 +37,7 @@ export function JobPostForm({
       apply_url: editingJob?.apply_url || '',
       salary_range: editingJob?.salary_range || ''
     })
+    const [isSubmitting, setIsSubmitting] = useState(false)
   
     // Update form data when editingJob changes
     useEffect(() => {
@@ -63,16 +64,21 @@ export function JobPostForm({
     // Hide Dock when this modal is open
     useHideDock(true)
   
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
-      if (!formData.provider_id || !formData.title) return
+      if (!formData.provider_id || !formData.title || isSubmitting) return
       
-      onSave(formData.provider_id, {
-        title: formData.title,
-        description: formData.description || undefined,
-        apply_url: formData.apply_url || undefined,
-        salary_range: formData.salary_range || undefined
-      })
+      setIsSubmitting(true)
+      try {
+        await onSave(formData.provider_id, {
+          title: formData.title,
+          description: formData.description || undefined,
+          apply_url: formData.apply_url || undefined,
+          salary_range: formData.salary_range || undefined
+        })
+      } finally {
+        setIsSubmitting(false)
+      }
     }
   
     return (
@@ -179,14 +185,39 @@ export function JobPostForm({
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 bg-neutral-900 text-white px-6 py-2 rounded-lg hover:bg-neutral-800"
+                  disabled={isSubmitting}
+                  className={`flex-1 px-6 py-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all ${
+                    isSubmitting 
+                      ? 'bg-blue-500 text-white cursor-wait shadow-lg' 
+                      : 'bg-neutral-900 text-white hover:bg-neutral-800 hover:shadow-md'
+                  }`}
                 >
-                  {editingJob ? 'Update Job Post' : 'Create Job Post'}
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>{editingJob ? 'Updating Job...' : 'Creating Job...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <span>{editingJob ? 'Update Job Post' : 'Create Job Post'}</span>
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50"
+                  disabled={isSubmitting}
+                  className={`px-6 py-3 border rounded-lg font-medium transition-colors ${
+                    isSubmitting 
+                      ? 'border-neutral-300 text-neutral-400 cursor-not-allowed bg-neutral-50' 
+                      : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50'
+                  }`}
                 >
                   Cancel
                 </button>

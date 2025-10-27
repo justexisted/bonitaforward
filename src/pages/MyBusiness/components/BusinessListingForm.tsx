@@ -1504,32 +1504,40 @@ export function BusinessListingForm({
                 <button
                   type="submit"
                   disabled={isUpdating}
-                  className={`flex-1 px-6 py-2 rounded-lg flex items-center justify-center ${
+                  className={`flex-1 px-6 py-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all ${
                     isUpdating 
-                      ? 'bg-neutral-400 text-white cursor-not-allowed' 
-                      : 'bg-neutral-900 text-white hover:bg-neutral-800'
+                      ? 'bg-blue-500 text-white cursor-wait shadow-lg' 
+                      : 'bg-neutral-900 text-white hover:bg-neutral-800 hover:shadow-md'
                   }`}
                 >
                   {isUpdating ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      {listing ? 'Updating...' : 'Creating...'}
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>{listing ? 'Submitting Changes...' : 'Creating Listing...'}</span>
                     </>
                   ) : (
-                    listing ? 'Update Listing' : 'Create Listing'
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>{listing ? 'Update Listing' : 'Create Listing'}</span>
+                    </>
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={onCancel}
                   disabled={isUpdating}
-                  className={`px-6 py-2 border rounded-lg ${
+                  className={`px-6 py-3 border rounded-lg font-medium transition-colors ${
                     isUpdating 
-                      ? 'border-neutral-300 text-neutral-400 cursor-not-allowed' 
+                      ? 'border-neutral-300 text-neutral-400 cursor-not-allowed bg-neutral-50' 
                       : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50'
                   }`}
                 >
-                  {isUpdating ? 'Please Wait...' : 'Cancel'}
+                  Cancel
                 </button>
               </div>
             </form>
