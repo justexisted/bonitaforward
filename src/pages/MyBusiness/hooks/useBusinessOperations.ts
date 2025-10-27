@@ -689,9 +689,18 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       const currentListing = listings.find(l => l.id === listingId)
       const isFeatured = currentListing?.is_member === true
       
+      console.log('[MyBusiness] 🔍 UPDATE CHECK:', {
+        businessName: currentListing?.name,
+        isFeatured: isFeatured,
+        is_member: currentListing?.is_member,
+        willApplyImmediately: isFeatured,
+        willRequireApproval: !isFeatured,
+        proposedChanges: Object.keys(updates)
+      })
+      
       if (isFeatured) {
         // Featured businesses: Apply ALL changes immediately
-        console.log('[MyBusiness] Applying all changes immediately for featured business:', updates)
+        console.log('[MyBusiness] ⚡ Applying all changes immediately for featured business:', updates)
         
         const { error } = await supabase
           .from('providers')
@@ -718,7 +727,8 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         setMessage('✅ All changes applied immediately! (Featured business)')
       } else {
         // Non-featured businesses: Create change request for admin approval
-        console.log('[MyBusiness] Creating change request for non-featured business:', updates)
+        console.log('[MyBusiness] 📋 Creating change request for non-featured business (NO CHANGES APPLIED YET):', updates)
+        console.log('[MyBusiness] ⚠️ Changes will NOT be applied to database until admin approves')
         
         const { error, id } = await createProviderChangeRequest({
           provider_id: listingId,
