@@ -16,17 +16,26 @@ export default function CreateBusinessForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    
+    // Prevent duplicate submissions - check if already busy
+    if (busy) {
+      console.log('[CreateBusinessForm] Already submitting, ignoring duplicate click')
+      return
+    }
+    
     setBusy(true)
     setMessage(null)
     
     try {
       if (!auth.email || !auth.userId) {
         setMessage('You must be signed in to submit a business listing.')
+        setBusy(false)
         return
       }
 
       if (!businessName || !category) {
         setMessage('Please fill in Business Name and Category.')
+        setBusy(false)
         return
       }
 
@@ -106,8 +115,31 @@ export default function CreateBusinessForm() {
         placeholder="Business Phone (optional)" 
       />
 
-      <button disabled={busy} className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">
-        {busy ? 'Submitting…' : 'Submit Business Listing'}
+      <button 
+        type="submit"
+        disabled={busy} 
+        className={`rounded-full py-3 elevate w-full font-medium transition-all flex items-center justify-center gap-2 ${
+          busy 
+            ? 'bg-blue-500 text-white cursor-wait shadow-lg' 
+            : 'bg-neutral-900 text-white hover:bg-neutral-800 hover:shadow-md cursor-pointer'
+        }`}
+      >
+        {busy ? (
+          <>
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Submitting Application...</span>
+          </>
+        ) : (
+          <>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Submit Business Listing</span>
+          </>
+        )}
       </button>
       
       {message && <div className="text-sm text-neutral-700">{message}</div>}
