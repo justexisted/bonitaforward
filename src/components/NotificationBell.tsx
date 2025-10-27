@@ -27,7 +27,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 })
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right?: number | string; left?: number | string }>({ top: 0, right: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -195,10 +195,23 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
-      setDropdownPosition({
-        top: rect.bottom + 8, // 8px gap below button
-        right: window.innerWidth - rect.right // Align right edge
-      })
+      const isMobile = window.innerWidth < 768 // Tailwind 'md' breakpoint
+      
+      if (isMobile) {
+        // On mobile: center the dropdown horizontally
+        setDropdownPosition({
+          top: rect.bottom + 8,
+          right: undefined,
+          left: '1rem' // 16px from left edge (matching max-w padding)
+        })
+      } else {
+        // On desktop: align to right edge of button
+        setDropdownPosition({
+          top: rect.bottom + 8,
+          right: window.innerWidth - rect.right,
+          left: undefined
+        })
+      }
     }
   }, [isOpen])
 
@@ -280,8 +293,9 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
           ref={dropdownRef}
           className="fixed w-[calc(100vw-2rem)] max-w-80 bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden z-[9999]"
           style={{ 
-            top: `${dropdownPosition.top}px`, 
-            right: `${dropdownPosition.right}px` 
+            top: `${dropdownPosition.top}px`,
+            ...(dropdownPosition.right !== undefined && { right: typeof dropdownPosition.right === 'number' ? `${dropdownPosition.right}px` : dropdownPosition.right }),
+            ...(dropdownPosition.left !== undefined && { left: typeof dropdownPosition.left === 'number' ? `${dropdownPosition.left}px` : dropdownPosition.left })
           }}
         >
           <div className="bg-neutral-50 px-4 py-3 border-b border-neutral-200">
