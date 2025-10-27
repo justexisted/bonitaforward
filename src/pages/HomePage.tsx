@@ -56,7 +56,7 @@ const categories: Category[] = [
     key: 'home-services',
     name: 'Home Services',
     description: 'Landscaping, solar, cleaning, and remodeling by trusted local pros.',
-    icon: '/images/categories/Home.png',
+    icon: '/images/categories/Building2.png',
   },
   {
     key: 'health-wellness',
@@ -68,7 +68,7 @@ const categories: Category[] = [
     key: 'real-estate',
     name: 'Real Estate',
     description: 'Find your dream home or sell with Bonita\'s top real estate professionals.',
-    icon: '/images/categories/Building2.png',
+    icon: '/images/categories/Home.png',
   },
   {
     key: 'professional-services',

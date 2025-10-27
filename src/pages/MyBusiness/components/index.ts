@@ -6,6 +6,8 @@
 export { PlanSelector } from './PlanSelector'
 export { BusinessListingForm } from './BusinessListingForm'
 export { JobPostForm } from './JobPostForm'
+export { FeaturedUpgradeCard } from './FeaturedUpgradeCard'
+export { PlanSelectionSection } from './PlanSelectionSection'
 
 // TODO: Extract these large components from MyBusiness.tsx
 // export { BusinessListingCard } from './BusinessListingCard'

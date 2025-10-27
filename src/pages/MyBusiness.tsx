@@ -76,8 +76,7 @@ import { type ProviderChangeRequest, dismissNotification as dismissNotificationD
 import './MyBusiness/mobile-optimizations.css'
 
 // Import extracted components
-import { BusinessListingForm } from './MyBusiness/components/BusinessListingForm'
-import { JobPostForm } from './MyBusiness/components/JobPostForm'
+import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection } from './MyBusiness/components'
 // import { PlanSelector } from './MyBusiness/components/PlanSelector' // Available but not used yet
 // import { useBusinessData, useImageUpload } from './MyBusiness/hooks' // Available but not integrated yet
 // import { BUSINESS_CATEGORIES } from './MyBusiness/utils' // Available but not used yet
@@ -747,203 +746,15 @@ export default function MyBusinessPage() {
 
         {/* Featured Upgrade Confirmation - Inline Card */}
         {showFeaturedUpgradeModal && (
-          <div className="my-business-mb-6 rounded-2xl border-2 border-yellow-400 bg-gradient-to-r from-yellow-50 to-amber-50 p-6 shadow-lg">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100">
-                    <svg className="h-7 w-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-neutral-900">Featured Upgrade Requested!</h3>
-                </div>
-                
-                <div className="space-y-3 mb-4">
-                  <div className="bg-white border border-amber-200 rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-semibold text-amber-900">Pending Admin Approval</p>
-                        <p className="text-xs text-amber-700 mt-1">
-                          Your request is in the queue. We'll review it and contact you about payment options and setup.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm font-semibold text-blue-900 mb-2">What happens next?</p>
-                    <ul className="text-xs text-blue-700 space-y-1">
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600">•</span>
-                        <span>Admin will review your request</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600">•</span>
-                        <span>We'll contact you about payment ($97/year)</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600">•</span>
-                        <span>Once approved, you'll get priority placement & instant updates</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => setShowFeaturedUpgradeModal(false)}
-                className="flex-shrink-0 px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
-              >
-                Got it!
-              </button>
-            </div>
-          </div>
+          <FeaturedUpgradeCard onDismiss={() => setShowFeaturedUpgradeModal(false)} />
         )}
 
         {/* Subscription Comparison Section - hidden if any listing is featured */}
         {showSubscriptionCard && listings.every(l => !l.is_member) && (
-          <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm my-business-plan-card">
-          <h2 className="text-xl font-semibold text-neutral-900 mb-6 text-center my-business-heading-xl">Choose Your Business Plan</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Free Account Section */}
-            <div className="space-y-4">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-neutral-900 flex items-center justify-center">
-                  <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
-                  Free Account
-                </h3>
-                <p className="text-2xl font-bold text-green-600 mt-2">$0/month</p>
-              </div>
-              <ul className="text-sm text-neutral-700 space-y-2">
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Business name, category, phone, email
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Website and address
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Basic business description (up to 200 characters)
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Basic tags and specialties
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  1 business image
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-amber-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-amber-700"><strong>Changes require admin approval</strong> (1-2 business days)</span>
-                </li>
-              </ul>
-              <button
-                onClick={selectFreeAccount}
-                className="w-full mt-4 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium my-business-btn-lg"
-              >
-                Choose Free Account
-              </button>
-            </div>
-            
-            {/* Featured Account Section */}
-            <div className="space-y-4">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-neutral-900 flex items-center justify-center">
-                  <span className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></span>
-                  Featured Account
-                </h3>
-                <p className="text-2xl font-bold text-yellow-600 mt-2">$97/year</p>
-              </div>
-              <ul className="text-sm text-neutral-700 space-y-2">
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Everything in Free, plus:</strong>
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Priority placement</strong> - appears at top of search results
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Enhanced description</strong> - up to 500 characters
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Social media links</strong> - Facebook, Instagram, etc.
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Google Maps integration</strong> - interactive location
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Multiple images</strong> - showcase your business
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Booking system</strong> - direct appointment scheduling
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Exclusive coupons</strong> - create special offers for customers
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <strong>Analytics</strong> - view customer interactions
-                </li>
-                <li className="flex items-start">
-                  <svg className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-green-700"><strong>No admin approval needed</strong> - make changes instantly</span>
-                </li>
-              </ul>
-              <button
-                onClick={() => upgradeToFeatured()}
-                className="w-full mt-4 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition-colors font-medium my-business-btn-lg"
-              >
-                Choose Featured Account
-              </button>
-            </div>
-          </div>
-          </div>
+          <PlanSelectionSection
+            onSelectFree={selectFreeAccount}
+            onSelectFeatured={() => upgradeToFeatured()}
+          />
         )}
 
         {/* Change Requests Status Section - Shows pending, approved, and rejected requests 
