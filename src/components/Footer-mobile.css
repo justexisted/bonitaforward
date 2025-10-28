@@ -11,7 +11,7 @@
   /* Footer container optimizations */
   .footer-mobile-container {
     margin-top: -2rem !important; /* 32px instead of 64px (mt-16) - 50% reduction */
-    margin-bottom: -1rem !important;
+    margin-bottom: -0.5rem !important;
     padding-top: 1rem !important; /* 16px instead of 32px (py-8) - 50% reduction */
     padding-bottom: 1rem !important; /* 64px to sit above dock (dock is ~50px + 4px bottom + 8px buffer = 62px) */
   }
