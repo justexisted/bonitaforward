@@ -13,4 +13,6 @@ export { ApplicationCard, ApplicationsEmptyState } from './ApplicationCard'
 export { JobPostCard, JobPostsNoListingsState, JobPostsEmptyState } from './JobPostCard'
 export { ChangeRequestsNotifications } from './ChangeRequestsNotifications'
 export { ChangeRequestsList } from './ChangeRequestsList'
+export { UserActivityTab } from './UserActivityTab'
+export { ListingsTab } from './ListingsTab'
 

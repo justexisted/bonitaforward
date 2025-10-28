@@ -76,7 +76,7 @@ import { type ProviderChangeRequest, dismissNotification as dismissNotificationD
 import './MyBusiness/mobile-optimizations.css'
 
 // Import extracted components
-import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, BusinessListingCard, ApplicationCard, ApplicationsEmptyState, JobPostCard, JobPostsNoListingsState, JobPostsEmptyState, ChangeRequestsNotifications, ChangeRequestsList } from './MyBusiness/components'
+import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, JobPostCard, JobPostsNoListingsState, JobPostsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, UserActivityTab, ListingsTab } from './MyBusiness/components'
 // import { PlanSelector } from './MyBusiness/components/PlanSelector' // Available but not used yet
 // import { useBusinessData, useImageUpload } from './MyBusiness/hooks' // Available but not integrated yet
 // import { BUSINESS_CATEGORIES } from './MyBusiness/utils' // Available but not used yet
@@ -850,63 +850,19 @@ export default function MyBusinessPage() {
 
         {/* Business Listings Tab */}
         {activeTab === 'listings' && (
-          <div className="space-y-4 my-business-space-y-4">
-            {/* Header with Create Button */}
-            <div className="flex flex-wrap items-center justify-between my-business-gap-2">
-              <div className="p-[1vh] m-[1vh]">
-                <h2 className="text-lg font-semibold my-business-heading-lg">Your Business Listings</h2>
-                <p className="text-sm text-neutral-600 my-business-text-sm">Manage your business listings and details</p>
-              </div>
-              <button
-                onClick={() => setShowCreateForm(true)}
-                className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 my-business-btn"
-              >
-                + Create New Listing
-              </button>
-            </div>
-
-            {listings.length === 0 ? (
-              <div className="rounded-2xl border border-neutral-100 p-3 sm:p-4 md:p-6 lg:p-8 bg-white text-center my-business-empty-state">
-                <div className="max-w-md mx-auto">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 my-business-empty-icon">
-                    <svg className="w-8 h-8 text-blue-600 my-business-icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-neutral-900 mb-2 my-business-heading-xl">No Business Listings</h3>
-                  <p className="text-neutral-600 mb-6 my-business-text-sm">You don't have any business listings yet. Create your first one to get started!</p>
-                  <button
-                    onClick={() => setShowCreateForm(true)}
-                    className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors my-business-btn-lg"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Your First Listing
-                  </button>
-                </div>
-              </div>
-            ) : (
-              listings.map((listing) => (
-                <BusinessListingCard
-                  key={listing.id}
-                  listing={listing}
-                  changeRequests={changeRequests}
-                  onEdit={(listing) => {
-                    console.log('[MyBusiness] Edit button clicked for listing:', listing.id, listing.name)
-                    setEditingListing(listing)
-                  }}
-                  onUpgradeToFeatured={upgradeToFeatured}
-                  onPromptAndUploadImages={promptAndUploadImages}
-                  onConnectGoogleCalendar={connectGoogleCalendar}
-                  onDisconnectGoogleCalendar={disconnectGoogleCalendar}
-                  onDowngradeToFree={downgradeToFree}
-                  onDelete={deleteBusinessListing}
-                  connectingCalendar={connectingCalendar}
-                />
-              ))
-            )}
-          </div>
+          <ListingsTab
+            listings={listings}
+            changeRequests={changeRequests}
+            onCreateNew={() => setShowCreateForm(true)}
+            onEdit={setEditingListing}
+            onUpgradeToFeatured={upgradeToFeatured}
+            onPromptAndUploadImages={promptAndUploadImages}
+            onConnectGoogleCalendar={connectGoogleCalendar}
+            onDisconnectGoogleCalendar={disconnectGoogleCalendar}
+            onDowngradeToFree={downgradeToFree}
+            onDelete={deleteBusinessListing}
+            connectingCalendar={connectingCalendar}
+          />
         )}
 
         {/* Applications Tab */}
@@ -980,124 +936,7 @@ export default function MyBusinessPage() {
 
         {/* User Activity Tab */}
         {activeTab === 'user-activity' && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-neutral-100 p-2 sm:p-3 md:p-4 lg:p-6 bg-white">
-              <h3 className="text-lg font-semibold text-neutral-900 mb-4">Customer Interactions</h3>
-              <p className="text-sm text-neutral-600 mb-6">
-                Track how customers interact with your business listings - profile views, discount copies, booking requests, and questions.
-              </p>
-              
-              {userActivity.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-100 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  </div>
-                  <h4 className="text-lg font-medium text-neutral-900 mb-2">No Activity Yet</h4>
-                  <p className="text-neutral-600">
-                    Customer interactions will appear here once people start viewing your listings and engaging with your business.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {userActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-4 p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors">
-                      <div className="flex-shrink-0">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          activity.activity_type === 'profile_view' ? 'bg-blue-100 text-blue-600' :
-                          activity.activity_type === 'discount_copy' ? 'bg-green-100 text-green-600' :
-                          activity.activity_type === 'booking_request' ? 'bg-purple-100 text-purple-600' :
-                          activity.type === 'booking_received' ? 'bg-emerald-100 text-emerald-600' :
-                          activity.type === 'booking_updated' ? 'bg-amber-100 text-amber-600' :
-                          'bg-orange-100 text-orange-600'
-                        }`}>
-                          {activity.activity_type === 'profile_view' && (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                          {activity.activity_type === 'discount_copy' && (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                          )}
-                          {activity.activity_type === 'booking_request' && (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          )}
-                          {activity.activity_type === 'question_asked' && (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                          {activity.type === 'booking_received' && (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                          {activity.type === 'booking_updated' && (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-neutral-900">
-                            {activity.user_name || activity.user_email || 'Anonymous User'}
-                          </span>
-                          <span className="text-xs text-neutral-500">
-                            {new Date(activity.created_at).toLocaleDateString()} at {new Date(activity.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        
-                        <div className="text-sm text-neutral-600 mb-1">
-                          {activity.type === 'booking_received' ? (
-                            <div>
-                              <span className="font-medium">New Booking Received</span>
-                              <div className="text-xs text-neutral-500 mt-1">
-                                {activity.message || `Booking from ${activity.user_name || activity.user_email || 'Customer'}`}
-                              </div>
-                            </div>
-                          ) : activity.type === 'booking_updated' ? (
-                            <div>
-                              <span className="font-medium">Booking Details Updated</span>
-                              <div className="text-xs text-neutral-500 mt-1">
-                                {activity.message || 'Booking details have been updated.'}
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <span className="font-medium">
-                                {activity.activity_type === 'profile_view' && 'Viewed profile'}
-                                {activity.activity_type === 'discount_copy' && 'Copied discount code'}
-                                {activity.activity_type === 'booking_request' && 'Requested booking'}
-                                {activity.activity_type === 'question_asked' && 'Asked a question'}
-                              </span>
-                              {' for '}
-                              <span className="font-medium text-blue-600">{activity.provider_name}</span>
-                            </>
-                          )}
-                        </div>
-                        
-                        {activity.activity_details && activity.type !== 'booking_received' && activity.type !== 'booking_updated' && (
-                          <div className="text-sm text-neutral-500 bg-neutral-50 p-2 rounded border-l-2 border-neutral-200">
-                            {activity.activity_details}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <UserActivityTab userActivity={userActivity} />
         )}
 
         {/* Analytics Tab */}
