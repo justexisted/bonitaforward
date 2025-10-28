@@ -101,6 +101,23 @@ export function AdminAuthGuard({
     )
   }
 
+  // Wait for admin verification to complete before showing unauthorized message
+  if (adminStatus.loading) {
+    console.log('[Admin] ⏳ Admin verification loading - showing skeleton')
+    return (
+      <section className="py-8">
+        <div className="container-px mx-auto max-w-3xl">
+          <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
+            <div className="animate-pulse">
+              <div className="h-4 bg-neutral-200 rounded w-3/4"></div>
+              <div className="h-4 bg-neutral-200 rounded w-1/2 mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   if (!isAdmin) {
     console.log('[Admin] 🚫 NOT ADMIN - Showing unauthorized message')
     console.log('[Admin] isAdmin:', isAdmin, 'adminStatus:', adminStatus)
