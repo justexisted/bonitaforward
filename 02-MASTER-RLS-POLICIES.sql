@@ -14,6 +14,9 @@ BEGIN;
 -- HELPER FUNCTIONS
 -- ============================================================================
 
+-- Drop existing function first (in case signature changed)
+DROP FUNCTION IF EXISTS is_admin_user(uuid);
+
 -- Check if user is admin (using admin_emails table)
 CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
 RETURNS boolean AS $$
@@ -99,6 +102,16 @@ DROP POLICY IF EXISTS "Owners can update their own job posts" ON public.provider
 -- Enable RLS
 ALTER TABLE public.provider_job_posts ENABLE ROW LEVEL SECURITY;
 
+-- Drop new policy names (in case they exist)
+DROP POLICY IF EXISTS "job_posts_select_approved" ON public.provider_job_posts;
+DROP POLICY IF EXISTS "job_posts_select_owner" ON public.provider_job_posts;
+DROP POLICY IF EXISTS "job_posts_select_admin" ON public.provider_job_posts;
+DROP POLICY IF EXISTS "job_posts_insert_auth" ON public.provider_job_posts;
+DROP POLICY IF EXISTS "job_posts_update_owner" ON public.provider_job_posts;
+DROP POLICY IF EXISTS "job_posts_update_admin" ON public.provider_job_posts;
+DROP POLICY IF EXISTS "job_posts_delete_owner" ON public.provider_job_posts;
+DROP POLICY IF EXISTS "job_posts_delete_admin" ON public.provider_job_posts;
+
 -- Create clean policies
 CREATE POLICY "job_posts_select_approved" 
 ON public.provider_job_posts FOR SELECT
@@ -147,6 +160,15 @@ DROP POLICY IF EXISTS "Admin full UPDATE on provider_change_requests" ON public.
 DROP POLICY IF EXISTS "change_requests_update_owner" ON public.provider_change_requests;
 
 ALTER TABLE public.provider_change_requests ENABLE ROW LEVEL SECURITY;
+
+-- Drop new policy names (in case they exist)
+DROP POLICY IF EXISTS "change_requests_select_owner" ON public.provider_change_requests;
+DROP POLICY IF EXISTS "change_requests_select_admin" ON public.provider_change_requests;
+DROP POLICY IF EXISTS "change_requests_insert_auth" ON public.provider_change_requests;
+DROP POLICY IF EXISTS "change_requests_update_owner" ON public.provider_change_requests;
+DROP POLICY IF EXISTS "change_requests_update_admin" ON public.provider_change_requests;
+DROP POLICY IF EXISTS "change_requests_delete_owner" ON public.provider_change_requests;
+DROP POLICY IF EXISTS "change_requests_delete_admin" ON public.provider_change_requests;
 
 CREATE POLICY "change_requests_select_owner" 
 ON public.provider_change_requests FOR SELECT

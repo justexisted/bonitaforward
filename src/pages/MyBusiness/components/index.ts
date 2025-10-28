@@ -11,7 +11,6 @@ export { PlanSelectionSection } from './PlanSelectionSection'
 export { BusinessListingCard } from './BusinessListingCard'
 export { ApplicationCard, ApplicationsEmptyState } from './ApplicationCard'
 export { JobPostCard, JobPostsNoListingsState, JobPostsEmptyState } from './JobPostCard'
-
-// TODO: Extract these additional components from MyBusiness.tsx
-// export { ChangeRequestsNotifications } from './ChangeRequestsNotifications'
+export { ChangeRequestsNotifications } from './ChangeRequestsNotifications'
+export { ChangeRequestsList } from './ChangeRequestsList'
 
