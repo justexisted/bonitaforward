@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import type { BusinessListing, } from '../types'
+import type { BusinessListing } from '../types'
 import type { ProviderChangeRequest } from '../../../lib/supabaseData'
 
 /**
