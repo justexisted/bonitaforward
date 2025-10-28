@@ -56,7 +56,7 @@ export default function BusinessPage() {
   }, [])
   return (
     <ScrollStack className="max-h-[70vh] mt-[-25px]">
-    <section className="py-4 sm:py-6 md:py-8">
+    <section className="pt-4 pb-0 sm:pt-6 md:pt-8">
       <Container>
           <div className="text-center">
             <SplitText 
@@ -395,9 +395,9 @@ export default function BusinessPage() {
             )}
           </div>
 
-          <div className="mt-6 sm:mt-8 md:mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-4 sm:p-5 md:p-6 text-center">
+          <div className="mt-2 mb-0 rounded-2xl bg-neutral-50 border border-neutral-100 p-3 sm:p-4 text-center">
             <h3 className="text-base sm:text-lg font-semibold">Bonita Residents Are Searching. Will They Find You?</h3>
-            <a href="#apply" className="inline-block mt-3 rounded-full bg-neutral-900 text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base elevate">Get Started Today</a>
+            <a href="#apply" className="inline-block mt-2 rounded-full bg-neutral-900 text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base elevate">Get Started Today</a>
           </div>
         
       </Container>

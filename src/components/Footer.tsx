@@ -17,11 +17,11 @@ import './Footer-mobile.css'
  */
 export default function Footer() {
   return (
-    <footer className="mt-16 border-t border-neutral-100 bg-white footer-mobile-container">
-      <div className="container-px mx-auto max-w-6xl py-8 text-xs text-neutral-500 footer-mobile-text">
-        <div className="flex flex-col items-center justify-between gap-4 p-4 text-center md:flex-row md:text-left footer-mobile-content">
+    <footer className="mt-2 mb-16 border-t border-neutral-100 bg-white footer-mobile-container">
+      <div className="container-px mx-auto max-w-6xl py-3 text-xs text-neutral-500 footer-mobile-text">
+        <div className="flex flex-col items-center justify-between gap-2 p-0 text-center md:flex-row md:text-left footer-mobile-content">
           <div>© {new Date().getFullYear()} Bonita Forward — Community powered, locally focused.</div>
-          <div className="flex flex-wrap items-center gap-3 footer-mobile-links">
+          <div className="flex flex-wrap items-center gap-2 footer-mobile-links">
             <Link to="/business" className="text-neutral-700 hover:text-neutral-900">📈 Have a Business?</Link>
             <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Privacy Policy</a>
             <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-neutral-700 hover:text-neutral-900">Terms</a>
