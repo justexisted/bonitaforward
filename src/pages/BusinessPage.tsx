@@ -55,12 +55,12 @@ export default function BusinessPage() {
     }
   }, [])
   return (
-    <ScrollStack className="min-w-[100vw]">
-    <section className="py-8">
+    <ScrollStack className="max-h-[70vh] mt-[-25px]">
+    <section className="py-4 sm:py-6 md:py-8">
       <Container>
           <div className="text-center">
             <SplitText 
-              className="text-3xl sm:text-4xl font-semibold tracking-tight text-black relative z-1" 
+              className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-black relative z-1" 
               text="Grow Your Bonita Business!" 
               duration={0.1}
               ease="power3.out"
@@ -68,15 +68,15 @@ export default function BusinessPage() {
               from={{ opacity: 0, y: 40 }}
               to={{ opacity: 1, y: 0 }}
             />
-            <p className="mt-3 text-neutral-600">Bonita Forward helps you reach thousands of Bonita, San Diego residents and turns them into paying customers.</p>
-            <a href="#apply" className="inline-block mt-5 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Featured</a>
+            <p className="mt-2 sm:mt-3 text-sm sm:text-base text-neutral-600">Bonita Forward helps you reach thousands of Bonita, San Diego residents and turns them into paying customers.</p>
+            <a href="#apply" className="inline-block mt-3 sm:mt-4 md:mt-5 rounded-full bg-neutral-900 text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base elevate">Get Featured</a>
             <div>
-              <a href="#how" className="mt-2 inline-block text-sm text-neutral-700 hover:text-neutral-900">See How It Works ↓</a>
+              <a href="#how" className="mt-2 inline-block text-xs sm:text-sm text-neutral-700 hover:text-neutral-900">See How It Works ↓</a>
             </div>
           </div>
             <ScrollStackItem>
-              <h3>Step 1: Exposure</h3>
-              <p>Your business gets featured on Bonita Forward. The local hub residents already trust.</p>
+              <h3 className="text-lg sm:text-xl md:text-2xl">Step 1: Exposure</h3>
+              <p className="text-sm sm:text-base">Your business gets featured on Bonita Forward. The local hub residents already trust.</p>
               <div className="stack-img-container">
                 <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                   <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
@@ -86,8 +86,8 @@ export default function BusinessPage() {
               </div>
             </ScrollStackItem>
             <ScrollStackItem>
-              <h3>Step 2: Customers Find You</h3>
-              <p>We ask Bonita residents what they want.</p>
+              <h3 className="text-lg sm:text-xl md:text-2xl">Step 2: Customers Find You</h3>
+              <p className="text-sm sm:text-base">We ask Bonita residents what they want.</p>
               <div className="stack-img-container">
                 <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                   <path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z"></path>
@@ -98,8 +98,8 @@ export default function BusinessPage() {
               </div>
             </ScrollStackItem>
             <ScrollStackItem>
-              <h3>Step 3: Growth</h3>
-              <p>You receive local repeat-customers weekly.</p>
+              <h3 className="text-lg sm:text-xl md:text-2xl">Step 3: Growth</h3>
+              <p className="text-sm sm:text-base">You receive local repeat-customers weekly.</p>
               <div className="stack-img-container">
                 <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 2a10 10 0 0 1 8.66 5" />
@@ -115,11 +115,11 @@ export default function BusinessPage() {
 
             </ScrollStackItem>
             <ScrollStackItem>
-              <h3>Step 4: Your Business Grows</h3>
-              <p>Locals enjoy discovering your business and you get to enjoy the benefits.</p>
+              <h3 className="text-lg sm:text-xl md:text-2xl">Step 4: Your Business Grows</h3>
+              <p className="text-sm sm:text-base">Locals enjoy discovering your business and you get to enjoy the benefits.</p>
             </ScrollStackItem>
             <ScrollStackItem>
-              <h3>Bonita's Economy Grows</h3>
+              <h3 className="text-lg sm:text-xl md:text-2xl">Bonita's Economy Grows</h3>
               <div className="stack-img-container">
                 <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 2 L6 10 H9 L4 16 H10 L2 22 H22 L14 16 H20 L15 10 H18 Z" />
@@ -128,20 +128,20 @@ export default function BusinessPage() {
               </div>
             </ScrollStackItem>
           
-          <div className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade scroll-stack-end">
-            <h2 className="text-xl font-semibold tracking-tight">What's a New Customer Worth to You?</h2>
+          <div className="mt-6 sm:mt-8 md:mt-10 rounded-2xl border border-neutral-100 p-4 sm:p-5 bg-white elevate form-fade scroll-stack-end">
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">What's a New Customer Worth to You?</h2>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
               <div>
-                <label className="block text-sm text-neutral-600">Avg. Sale Value ($)</label>
-                <input id="avg" type="number" defaultValue={250} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" />
+                <label className="block text-xs sm:text-sm text-neutral-600">Avg. Sale Value ($)</label>
+                <input id="avg" type="number" defaultValue={250} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
               </div>
               <div>
-                <label className="block text-sm text-neutral-600">Monthly New Customers Goal</label>
-                <input id="goal" type="number" defaultValue={5} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2" />
+                <label className="block text-xs sm:text-sm text-neutral-600">Monthly New Customers Goal</label>
+                <input id="goal" type="number" defaultValue={5} className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
               </div>
               <div className="rounded-xl border border-neutral-200 p-3 bg-neutral-50">
-                <div className="text-sm text-neutral-600">Estimated Monthly Value</div>
-                <div id="roi" className="text-lg font-semibold">
+                <div className="text-xs sm:text-sm text-neutral-600">Estimated Monthly Value</div>
+                <div id="roi" className="text-base sm:text-lg font-semibold">
                 <CountUp
                   from={0}
                   to={1250}
@@ -167,44 +167,44 @@ export default function BusinessPage() {
             </button>
           </div>
 
-          <div className="mt-10">
-            <h2 className="text-xl font-semibold tracking-tight z-10">Bonita Businesses Already Growing</h2>
+          <div className="mt-6 sm:mt-8 md:mt-10">
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Bonita Businesses Already Growing</h2>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 '"Our real estate leads doubled in 30 days."',
                 '"We had 47 new diners book in the first month."',
                 '"Finally, a marketing solution built for Bonita."',
               ].map((t) => (
-                <div key={t} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate text-sm text-neutral-700">{t}</div>
+                <div key={t} className="rounded-2xl border border-neutral-100 p-4 sm:p-5 bg-white elevate text-xs sm:text-sm text-neutral-700">{t}</div>
               ))}
             </div>
           </div>
 
-          <div className="mt-10">
-            <h2 className="text-xl font-semibold tracking-tight">Plans That Fit Your Business</h2>
+          <div className="mt-6 sm:mt-8 md:mt-10">
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Plans That Fit Your Business</h2>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { name: 'Starter', price: 'Free', blurb: 'Free Listing' },
                 { name: 'Growth', price: '$97/year', blurb: 'Featured Listing' },
               ].map((p) => (
-                <div key={p.name} className="rounded-2xl border border-neutral-100 p-5 bg-white elevate">
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-2xl font-semibold mt-1">{p.price}</div>
-                  <div className="text-sm text-neutral-600 mt-1">{p.blurb}</div>
+                <div key={p.name} className="rounded-2xl border border-neutral-100 p-4 sm:p-5 bg-white elevate">
+                  <div className="text-sm sm:text-base font-medium">{p.name}</div>
+                  <div className="text-xl sm:text-2xl font-semibold mt-1">{p.price}</div>
+                  <div className="text-xs sm:text-sm text-neutral-600 mt-1">{p.blurb}</div>
                 </div>
               ))}
             </div>
             
             <details className="mt-6 rounded-2xl border border-neutral-200 bg-white overflow-hidden">
-              <summary className="cursor-pointer select-none p-4 hover:bg-neutral-50 transition-colors flex items-center justify-between">
-                <span className="text-sm font-medium text-neutral-700">See plan details below</span>
-                <svg className="w-5 h-5 text-neutral-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <summary className="cursor-pointer select-none p-3 sm:p-4 hover:bg-neutral-50 transition-colors flex items-center justify-between">
+                <span className="text-xs sm:text-sm font-medium text-neutral-700">See plan details below</span>
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
               
-              <div className="p-6 border-t border-neutral-200">
-                <h3 className="text-lg font-semibold text-neutral-900 mb-6 text-center">Compare Plans</h3>
+              <div className="p-4 sm:p-5 md:p-6 border-t border-neutral-200">
+                <h3 className="text-base sm:text-lg font-semibold text-neutral-900 mb-4 sm:mb-6 text-center">Compare Plans</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="text-center">
@@ -312,10 +312,10 @@ export default function BusinessPage() {
             </details>
           </div>
 
-          <div id="apply" className="mt-10 rounded-2xl border border-neutral-100 p-5 bg-white elevate form-fade">
+          <div id="apply" className="mt-6 sm:mt-8 md:mt-10 rounded-2xl border border-neutral-100 p-4 sm:p-5 bg-white elevate">
             {!auth.isAuthed || String((auth as any)?.role || '').toLowerCase() !== 'business' ? (
               <>
-                <h2 className="text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
                 <form
                   className="mt-4 grid grid-cols-1 gap-3"
                   onSubmit={async (e) => {
@@ -347,13 +347,13 @@ export default function BusinessPage() {
                     }
                   }}
                 >
-                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Full Name" defaultValue={urlParams.get('full_name') || ''} />
-                  <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Business Name" defaultValue={urlParams.get('business_name') || ''} />
+                  <input className="rounded-xl border border-neutral-200 px-3 py-2 text-sm sm:text-base" placeholder="Full Name" defaultValue={urlParams.get('full_name') || ''} />
+                  <input className="rounded-xl border border-neutral-200 px-3 py-2 text-sm sm:text-base" placeholder="Business Name" defaultValue={urlParams.get('business_name') || ''} />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Email" defaultValue={urlParams.get('email') || ''} />
-                    <input className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="Phone" defaultValue={urlParams.get('phone') || ''} />
+                    <input type="email" className="rounded-xl border border-neutral-200 px-3 py-2 text-sm sm:text-base" placeholder="Email" defaultValue={urlParams.get('email') || ''} />
+                    <input className="rounded-xl border border-neutral-200 px-3 py-2 text-sm sm:text-base" placeholder="Phone" defaultValue={urlParams.get('phone') || ''} />
                   </div>
-                  <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white" defaultValue={urlParams.get('category') || ''}>
+                  <select className="rounded-xl border border-neutral-200 px-3 py-2 bg-white text-sm sm:text-base" defaultValue={urlParams.get('category') || ''}>
                     <option value="">Select category…</option>
                     <option value="Real Estate">Real Estate</option>
                     <option value="Home Services">Home Services</option>
@@ -380,24 +380,24 @@ export default function BusinessPage() {
                       </label>
                     </div>
                   </div>
-                  <textarea className="rounded-xl border border-neutral-200 px-3 py-2" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={urlParams.get('challenge') || ''} />
-                  <button className="rounded-full bg-neutral-900 text-white py-2.5 elevate w-full">Submit Application</button>
+                  <textarea className="rounded-xl border border-neutral-200 px-3 py-2 text-sm sm:text-base" placeholder="What's your biggest growth challenge?" rows={4} defaultValue={urlParams.get('challenge') || ''} />
+                  <button className="rounded-full bg-neutral-900 text-white py-2 sm:py-2.5 elevate w-full text-sm sm:text-base">Submit Application</button>
                 </form>
-                {msg && <p className="mt-2 text-sm text-neutral-700">{msg}</p>}
+                {msg && <p className="mt-2 text-xs sm:text-sm text-neutral-700">{msg}</p>}
                 <p className="mt-2 text-xs text-neutral-500"></p>
               </>
             ) : (
               <>
-                <h2 className="text-xl font-semibold tracking-tight">Get My Business Listed</h2>
-                <p className="mt-2 text-sm text-neutral-700">You're signed in as a business. Share your business details below to get listed on Bonita Forward.</p>
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Get My Business Listed</h2>
+                <p className="mt-2 text-xs sm:text-sm text-neutral-700">You're signed in as a business. Share your business details below to get listed on Bonita Forward.</p>
                 <CreateBusinessForm />
               </>
             )}
           </div>
 
-          <div className="mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-15 text-center">
-            <h3 className="text-lg font-semibold">Bonita Residents Are Searching. Will They Find You?</h3>
-            <a href="#apply" className="inline-block mt-3 rounded-full bg-neutral-900 text-white px-5 py-2.5 elevate">Get Started Today</a>
+          <div className="mt-6 sm:mt-8 md:mt-10 rounded-2xl bg-neutral-50 border border-neutral-100 p-4 sm:p-5 md:p-6 text-center">
+            <h3 className="text-base sm:text-lg font-semibold">Bonita Residents Are Searching. Will They Find You?</h3>
+            <a href="#apply" className="inline-block mt-3 rounded-full bg-neutral-900 text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base elevate">Get Started Today</a>
           </div>
         
       </Container>
