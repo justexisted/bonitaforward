@@ -4,6 +4,8 @@
  * Sent to business owner when a customer books their service.
  */
 
+// @ts-expect-error - React is needed for email rendering in Netlify functions
+import React from 'react'
 import { Heading, Text, Section } from '@react-email/components'
 import { EmailLayout } from '../components/EmailLayout'
 import { EmailButton } from '../components/EmailButton'

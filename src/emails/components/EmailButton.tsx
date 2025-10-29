@@ -4,6 +4,8 @@
  * Reusable button for email templates with consistent styling.
  */
 
+// @ts-expect-error - React is needed for email rendering in Netlify functions
+import React from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '@react-email/components'
 

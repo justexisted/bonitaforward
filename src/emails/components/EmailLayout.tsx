@@ -5,6 +5,8 @@
  * Provides consistent branding, header, footer, and styling.
  */
 
+// @ts-expect-error - React is needed for email rendering in Netlify functions
+import React from 'react'
 import type { ReactNode } from 'react'
 import {
   Html,
