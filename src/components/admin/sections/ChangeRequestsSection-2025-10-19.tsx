@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { ProviderChangeRequest } from '../../../lib/supabaseData'
 import type { ProviderRow } from '../../../types/admin'
+import { notifyChangeRequestApproved, notifyChangeRequestRejected } from '../../../services/emailNotificationService'
 
 /**
  * CHANGE REQUESTS SECTION
@@ -232,6 +233,22 @@ export function ChangeRequestsSection({
       
       await notifyUser(req.owner_user_id, notificationTitle, notificationMessage, { reqId: req.id })
       
+      // Send email notification
+      if (req.profiles?.email) {
+        try {
+          await notifyChangeRequestApproved(
+            req.profiles.email,
+            req.providers?.name || 'Your Business',
+            req.type,
+            changedFields
+          )
+          console.log('[ChangeRequestsSection] Email notification sent for approved request')
+        } catch (emailErr) {
+          console.error('[ChangeRequestsSection] Failed to send email notification:', emailErr)
+          // Don't fail the whole approval if email fails
+        }
+      }
+      
       onMessage('Change request approved')
       
       try { 
@@ -287,6 +304,22 @@ export function ChangeRequestsSection({
       }
       
       await notifyUser(req.owner_user_id, notificationTitle, notificationMessage, { reqId: req.id })
+      
+      // Send email notification
+      if (req.profiles?.email) {
+        try {
+          await notifyChangeRequestRejected(
+            req.profiles.email,
+            req.providers?.name || 'Your Business',
+            req.type,
+            reason
+          )
+          console.log('[ChangeRequestsSection] Email notification sent for rejected request')
+        } catch (emailErr) {
+          console.error('[ChangeRequestsSection] Failed to send email notification:', emailErr)
+          // Don't fail the whole rejection if email fails
+        }
+      }
       
       onMessage('Change request rejected')
       
