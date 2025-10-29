@@ -14,6 +14,7 @@ import PricingPage from './pages/Pricing'
 import JobsPage from './pages/Jobs'
 import CalendarPage from './pages/Calendar'
 import NotFoundPage from './pages/NotFound'
+import UnsubscribePage from './pages/Unsubscribe'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
@@ -104,6 +105,7 @@ export default function App() {
               </ProtectedRoute>
             } />
             <Route path="account" element={<AccountPage />} />
+            <Route path="unsubscribe" element={<UnsubscribePage />} />
             <Route path="book" element={<BookPage categories={categories} scoreProviders={(category, answers) => scoreProviders(category, answers, providersByCategory)} providersByCategory={providersByCategory} />} />
             <Route path="business" element={<BusinessPage />} />
             <Route path="category/:id" element={<CategoryPage categories={categories} scoreProviders={(category, answers) => scoreProviders(category, answers, providersByCategory)} />} />

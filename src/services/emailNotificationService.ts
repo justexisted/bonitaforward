@@ -4,19 +4,79 @@
  * This service provides easy-to-use functions for sending email notifications.
  * All emails are sent via the Netlify function that uses Resend.
  * 
+ * IMPORTANT: Respects user email preferences. Will not send to users who have
+ * unsubscribed, except for critical security/legal emails.
+ * 
  * Usage:
  * import { notifyChangeRequestApproved } from '@/services/emailNotificationService'
  * await notifyChangeRequestApproved(userEmail, businessName, 'update', ['name', 'phone'])
  */
 
+import { supabase } from '../lib/supabase'
+
 const SEND_EMAIL_ENDPOINT = '/.netlify/functions/send-email'
 
 /**
- * Base function to send emails via Netlify function
+ * Check if user has email notifications enabled
+ * Returns true if user can receive emails, false if unsubscribed
  */
-async function sendEmail(type: string, to: string, data: any): Promise<{ success: boolean; id?: string; error?: string }> {
+async function canSendEmail(email: string, isCritical: boolean = false): Promise<boolean> {
+  try {
+    // Critical emails (security, legal) always send
+    if (isCritical) {
+      console.log('[EmailService] Critical email - bypassing preference check')
+      return true
+    }
+
+    // Check user's email preferences
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('email_notifications_enabled')
+      .eq('email', email.toLowerCase().trim())
+      .single()
+
+    if (error || !profile) {
+      // If user not found, allow email (they might not have an account yet)
+      console.log('[EmailService] User not found, allowing email')
+      return true
+    }
+
+    if (!profile.email_notifications_enabled) {
+      console.log('[EmailService] User has unsubscribed, blocking email')
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('[EmailService] Error checking email preferences:', error)
+    // On error, allow email to ensure important notifications get through
+    return true
+  }
+}
+
+/**
+ * Base function to send emails via Netlify function
+ * Checks user preferences before sending (unless email is critical)
+ */
+async function sendEmail(
+  type: string, 
+  to: string, 
+  data: any, 
+  isCritical: boolean = false
+): Promise<{ success: boolean; id?: string; error?: string; blocked?: boolean }> {
   try {
     console.log(`[EmailService] Sending ${type} email to:`, to)
+    
+    // Check if user can receive emails
+    const allowed = await canSendEmail(to, isCritical)
+    if (!allowed) {
+      console.log('[EmailService] Email blocked - user has unsubscribed')
+      return {
+        success: false,
+        blocked: true,
+        error: 'User has unsubscribed from emails',
+      }
+    }
     
     const response = await fetch(SEND_EMAIL_ENDPOINT, {
       method: 'POST',
