@@ -54,7 +54,7 @@ export function ChangeRequestRejected({
       </Section>
 
       <Section style={buttonSection}>
-        <EmailButton href="https://bonitaforward.com/my-business" variant="primary">
+        <EmailButton href="https://www.bonitaforward.com/my-business" variant="primary">
           View My Business
         </EmailButton>
       </Section>

@@ -58,7 +58,7 @@ export function ChangeRequestApproved({
       )}
 
       <Section style={buttonSection}>
-        <EmailButton href="https://bonitaforward.com/my-business" variant="success">
+        <EmailButton href="https://www.bonitaforward.com/my-business" variant="success">
           View Your Business
         </EmailButton>
       </Section>

@@ -56,7 +56,7 @@ export function ApplicationApproved({
       </Section>
 
       <Section style={buttonSection}>
-        <EmailButton href="https://bonitaforward.com/my-business" variant="success">
+        <EmailButton href="https://www.bonitaforward.com/my-business" variant="success">
           Manage My Business
         </EmailButton>
       </Section>

@@ -165,7 +165,7 @@ export const handler = async (event: any) => {
         reply_to: 'hello@bonitaforward.com',
         headers: {
           'X-Entity-Ref-ID': `bf-${Date.now()}`,
-          'List-Unsubscribe': '<https://bonitaforward.com/unsubscribe>',
+          'List-Unsubscribe': '<https://www.bonitaforward.com/unsubscribe>',
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
       })
@@ -184,7 +184,7 @@ export const handler = async (event: any) => {
             reply_to: 'hello@bonitaforward.com',
             headers: {
               'X-Entity-Ref-ID': `bf-${Date.now()}`,
-              'List-Unsubscribe': '<https://bonitaforward.com/unsubscribe>',
+              'List-Unsubscribe': '<https://www.bonitaforward.com/unsubscribe>',
               'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
             },
           })

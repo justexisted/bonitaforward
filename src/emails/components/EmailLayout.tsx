@@ -50,19 +50,19 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
               © {new Date().getFullYear()} Bonita Forward. All rights reserved.
             </Text>
             <Text style={footerText}>
-              <Link href="https://bonitaforward.com" style={link}>
+              <Link href="https://www.bonitaforward.com" style={link}>
                 Visit Website
               </Link>
               {' · '}
-              <Link href="https://bonitaforward.com/my-business" style={link}>
+              <Link href="https://www.bonitaforward.com/my-business" style={link}>
                 Manage Business
               </Link>
               {' · '}
-              <Link href="https://bonitaforward.com/account" style={link}>
+              <Link href="https://www.bonitaforward.com/account" style={link}>
                 Account Settings
               </Link>
               {' · '}
-              <Link href="https://bonitaforward.com/unsubscribe" style={link}>
+              <Link href="https://www.bonitaforward.com/unsubscribe" style={link}>
                 Unsubscribe
               </Link>
             </Text>

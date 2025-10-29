@@ -100,12 +100,12 @@ export function BookingConfirmation({
 
       <Section style={actionBox}>
         <Text style={actionText}>
-          ⚡ <strong>Next Steps:</strong> Please contact the customer directly to confirm the booking and discuss any details.
+          <strong>Next Steps:</strong> Please contact the customer directly to confirm the booking and discuss any details.
         </Text>
       </Section>
 
       <Section style={buttonSection}>
-        <EmailButton href="https://bonitaforward.com/my-business" variant="primary">
+        <EmailButton href="https://www.bonitaforward.com/my-business" variant="primary">
           View All Bookings
         </EmailButton>
       </Section>
