@@ -4,7 +4,6 @@
  * Sent when an admin approves a business change request.
  */
 
-import React from 'react'
 import { Heading, Text, Section } from '@react-email/components'
 import { EmailLayout } from '../components/EmailLayout'
 import { EmailButton } from '../components/EmailButton'

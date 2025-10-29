@@ -8,7 +8,8 @@
  * - RESEND_API_KEY: Your Resend API key
  */
 
-import React from 'react'
+// React is required here for React.createElement() calls in serverless environment
+import * as React from 'react'
 import { Resend } from 'resend'
 import { render } from '@react-email/render'
 import { 

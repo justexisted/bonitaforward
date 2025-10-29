@@ -4,12 +4,12 @@
  * Reusable button for email templates with consistent styling.
  */
 
-import React from 'react'
+import type { ReactNode } from 'react'
 import { Button } from '@react-email/components'
 
 interface EmailButtonProps {
   href: string
-  children: React.ReactNode
+  children: ReactNode
   variant?: 'primary' | 'secondary' | 'success' | 'danger'
 }
 

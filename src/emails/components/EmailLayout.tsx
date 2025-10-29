@@ -5,7 +5,7 @@
  * Provides consistent branding, header, footer, and styling.
  */
 
-import React from 'react'
+import type { ReactNode } from 'react'
 import {
   Html,
   Head,
@@ -20,7 +20,7 @@ import {
 
 interface EmailLayoutProps {
   preview: string
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export function EmailLayout({ preview, children }: EmailLayoutProps) {
