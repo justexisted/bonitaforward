@@ -33,7 +33,7 @@ export function BookingConfirmation({
 }: BookingConfirmationProps) {
   return (
     <EmailLayout preview={`New booking for ${businessName}!`}>
-      <Heading style={h1}>📅 New Booking Request!</Heading>
+      <Heading style={h1}>New Booking Request</Heading>
       
       <Text style={text}>
         You have a new booking request for <strong>{businessName}</strong>.

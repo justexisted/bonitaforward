@@ -34,7 +34,7 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Text style={logo}>✨ Bonita Forward</Text>
+            <Text style={logo}>Bonita Forward</Text>
             <Text style={tagline}>Your Community, Your Businesses</Text>
           </Section>
 

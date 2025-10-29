@@ -30,7 +30,7 @@ export function ChangeRequestApproved({
 
   return (
     <EmailLayout preview={`Your ${requestTypeLabel} was approved!`}>
-      <Heading style={h1}>✅ Request Approved!</Heading>
+      <Heading style={h1}>Request Approved</Heading>
       
       <Text style={text}>
         Great news! Your {requestTypeLabel.toLowerCase()} for <strong>{businessName}</strong> has been approved by our team.
@@ -52,7 +52,7 @@ export function ChangeRequestApproved({
       {requestType === 'feature_request' && (
         <Section style={successBox}>
           <Text style={successText}>
-            🎉 <strong>Congratulations!</strong> Your business is now a Featured listing with premium placement and enhanced visibility.
+            <strong>Congratulations!</strong> Your business is now a Featured listing with premium placement and enhanced visibility.
           </Text>
         </Section>
       )}

@@ -30,7 +30,7 @@ export function ChangeRequestRejected({
 
   return (
     <EmailLayout preview={`Update on your ${requestTypeLabel}`}>
-      <Heading style={h1}>❌ Request Not Approved</Heading>
+      <Heading style={h1}>Request Not Approved</Heading>
       
       <Text style={text}>
         We've reviewed your {requestTypeLabel.toLowerCase()} for <strong>{businessName}</strong>.
@@ -49,7 +49,7 @@ export function ChangeRequestRejected({
 
       <Section style={helpBox}>
         <Text style={helpText}>
-          💡 <strong>Need help?</strong> If you have questions about this decision or need to make changes, please contact our support team.
+          <strong>Need help?</strong> If you have questions about this decision or need to make changes, please contact our support team.
         </Text>
       </Section>
 

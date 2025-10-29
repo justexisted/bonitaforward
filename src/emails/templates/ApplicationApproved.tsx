@@ -23,14 +23,14 @@ export function ApplicationApproved({
 }: ApplicationApprovedProps) {
   return (
     <EmailLayout preview={`${businessName} is now live on Bonita Forward!`}>
-      <Heading style={h1}>🎉 Congratulations!</Heading>
+      <Heading style={h1}>Congratulations!</Heading>
       
       <Text style={text}>
         Your business application for <strong>{businessName}</strong> has been approved!
       </Text>
 
       <Section style={successBox}>
-        <Text style={successTitle}>✨ Your Listing is Now Live</Text>
+        <Text style={successTitle}>Your Listing is Now Live</Text>
         <Text style={successText}>
           {businessName} is now listed in the <strong>{category}</strong> category and is visible to all Bonita Forward users.
         </Text>

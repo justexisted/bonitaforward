@@ -80,8 +80,8 @@ export const handler = async (event: any) => {
           html = String(approvedHtml)
           console.log('[SendEmail] Rendered HTML type:', typeof html, 'Length:', html?.length)
           subject = data.requestType === 'feature_request'
-            ? '🎉 Your Featured Upgrade Request Was Approved!'
-            : `✅ Your ${data.businessName} Update Was Approved!`
+            ? 'Your Featured Upgrade Request Was Approved'
+            : `Your ${data.businessName} Update Was Approved`
           break
 
         case 'change_request_rejected':
@@ -108,7 +108,7 @@ export const handler = async (event: any) => {
           })
           const bookingHtml = await render(bookingElement, { pretty: false })
           html = String(bookingHtml)
-          subject = `📅 New Booking Request for ${data.businessName}!`
+          subject = `New Booking Request for ${data.businessName}`
           break
 
         case 'application_approved':
@@ -119,7 +119,7 @@ export const handler = async (event: any) => {
           })
           const approvedAppHtml = await render(approvedAppElement, { pretty: false })
           html = String(approvedAppHtml)
-          subject = `🎉 ${data.businessName} is Now Live on Bonita Forward!`
+          subject = `${data.businessName} is Now Live on Bonita Forward`
           break
 
         default:
