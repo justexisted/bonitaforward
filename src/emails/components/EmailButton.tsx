@@ -4,6 +4,7 @@
  * Reusable button for email templates with consistent styling.
  */
 
+import React from 'react'
 import { Button } from '@react-email/components'
 
 interface EmailButtonProps {

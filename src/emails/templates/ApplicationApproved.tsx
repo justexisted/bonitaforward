@@ -4,6 +4,7 @@
  * Sent when a business application is approved and listing is created.
  */
 
+import React from 'react'
 import { Heading, Text, Section } from '@react-email/components'
 import { EmailLayout } from '../components/EmailLayout'
 import { EmailButton } from '../components/EmailButton'

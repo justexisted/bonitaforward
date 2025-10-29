@@ -22,8 +22,8 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Email sender (must be verified in Resend)
 const FROM_EMAIL = 'Bonita Forward <notifications@bonitaforward.com>'
-// Fallback to Gmail while setting up custom domain
-const FROM_EMAIL_FALLBACK = 'Bonita Forward <bonitaforward@gmail.com>'
+// Fallback to Resend's test domain (works immediately for testing)
+const FROM_EMAIL_FALLBACK = 'Bonita Forward <onboarding@resend.dev>'
 
 interface SendEmailRequest {
   type: 'change_request_approved' | 'change_request_rejected' | 'booking_confirmation' | 'application_approved'
@@ -67,55 +67,87 @@ export const handler = async (event: any) => {
     let html: string
     let subject: string
 
-    switch (type) {
-      case 'change_request_approved':
-        html = render(ChangeRequestApproved({
-          businessName: data.businessName,
-          requestType: data.requestType,
-          changedFields: data.changedFields,
-        }))
-        subject = data.requestType === 'feature_request'
-          ? '🎉 Your Featured Upgrade Request Was Approved!'
-          : `✅ Your ${data.businessName} Update Was Approved!`
-        break
+    try {
+      switch (type) {
+        case 'change_request_approved':
+          const approvedElement = React.createElement(ChangeRequestApproved, {
+            businessName: data.businessName,
+            requestType: data.requestType,
+            changedFields: data.changedFields,
+          })
+          const approvedHtml = await render(approvedElement, { pretty: false })
+          html = String(approvedHtml)
+          console.log('[SendEmail] Rendered HTML type:', typeof html, 'Length:', html?.length)
+          subject = data.requestType === 'feature_request'
+            ? '🎉 Your Featured Upgrade Request Was Approved!'
+            : `✅ Your ${data.businessName} Update Was Approved!`
+          break
 
-      case 'change_request_rejected':
-        html = render(ChangeRequestRejected({
-          businessName: data.businessName,
-          requestType: data.requestType,
-          reason: data.reason,
-        }))
-        subject = `Update on Your ${data.businessName} Request`
-        break
+        case 'change_request_rejected':
+          const rejectedElement = React.createElement(ChangeRequestRejected, {
+            businessName: data.businessName,
+            requestType: data.requestType,
+            reason: data.reason,
+          })
+          const rejectedHtml = await render(rejectedElement, { pretty: false })
+          html = String(rejectedHtml)
+          subject = `Update on Your ${data.businessName} Request`
+          break
 
-      case 'booking_confirmation':
-        html = render(BookingConfirmation({
-          businessName: data.businessName,
-          customerName: data.customerName,
-          customerEmail: data.customerEmail,
-          customerPhone: data.customerPhone,
-          serviceRequested: data.serviceRequested,
-          bookingDate: data.bookingDate,
-          bookingTime: data.bookingTime,
-          message: data.message,
-        }))
-        subject = `📅 New Booking Request for ${data.businessName}!`
-        break
+        case 'booking_confirmation':
+          const bookingElement = React.createElement(BookingConfirmation, {
+            businessName: data.businessName,
+            customerName: data.customerName,
+            customerEmail: data.customerEmail,
+            customerPhone: data.customerPhone,
+            serviceRequested: data.serviceRequested,
+            bookingDate: data.bookingDate,
+            bookingTime: data.bookingTime,
+            message: data.message,
+          })
+          const bookingHtml = await render(bookingElement, { pretty: false })
+          html = String(bookingHtml)
+          subject = `📅 New Booking Request for ${data.businessName}!`
+          break
 
-      case 'application_approved':
-        html = render(ApplicationApproved({
-          businessName: data.businessName,
-          category: data.category,
-          tier: data.tier,
-        }))
-        subject = `🎉 ${data.businessName} is Now Live on Bonita Forward!`
-        break
+        case 'application_approved':
+          const approvedAppElement = React.createElement(ApplicationApproved, {
+            businessName: data.businessName,
+            category: data.category,
+            tier: data.tier,
+          })
+          const approvedAppHtml = await render(approvedAppElement, { pretty: false })
+          html = String(approvedAppHtml)
+          subject = `🎉 ${data.businessName} is Now Live on Bonita Forward!`
+          break
 
-      default:
-        return {
-          statusCode: 400,
-          body: JSON.stringify({ error: `Unknown email type: ${type}` })
-        }
+        default:
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ error: `Unknown email type: ${type}` })
+          }
+      }
+    } catch (renderError: any) {
+      console.error('[SendEmail] Render error:', renderError)
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'Failed to render email template',
+          details: renderError.message 
+        })
+      }
+    }
+
+    // Ensure html is a string
+    if (typeof html !== 'string' || !html || html.length < 10) {
+      console.error('[SendEmail] Invalid HTML output:', typeof html, html?.substring(0, 100))
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'Failed to generate email HTML',
+          details: `Render returned ${typeof html} with length ${html?.length || 0}`
+        })
+      }
     }
 
     // Send email via Resend

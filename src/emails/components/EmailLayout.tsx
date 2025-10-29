@@ -5,6 +5,7 @@
  * Provides consistent branding, header, footer, and styling.
  */
 
+import React from 'react'
 import {
   Html,
   Head,
