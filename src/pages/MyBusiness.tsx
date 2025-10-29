@@ -76,7 +76,7 @@ import { type ProviderChangeRequest, dismissNotification as dismissNotificationD
 import './MyBusiness/mobile-optimizations.css'
 
 // Import extracted components
-import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, JobPostCard, JobPostsNoListingsState, JobPostsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, UserActivityTab, ListingsTab } from './MyBusiness/components'
+import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, UserActivityTab, ListingsTab, HistoricalRequestsTab, JobPostsTab, TabDropdownNav } from './MyBusiness/components'
 // import { PlanSelector } from './MyBusiness/components/PlanSelector' // Available but not used yet
 // import { useBusinessData, useImageUpload } from './MyBusiness/hooks' // Available but not integrated yet
 // import { BUSINESS_CATEGORIES } from './MyBusiness/utils' // Available but not used yet
@@ -180,9 +180,6 @@ export default function MyBusinessPage() {
    */
   const tabs = createTabsConfig(listings, applications, jobPosts, changeRequests, userActivity)
   const nonFeaturedChangeRequests = getNonFeaturedChangeRequests(listings, changeRequests)
-  
-  // Get current tab information for dropdown display
-  const currentTab = tabs.find(tab => tab.key === activeTab) || tabs[0]
 
   /**
    * HANDLE TAB SELECTION
@@ -769,84 +766,13 @@ export default function MyBusinessPage() {
         />
 
         {/* Mobile-Friendly Dropdown Navigation */}
-        <div className="mb-6">
-          <div className="relative inline-block text-left w-full" data-dropdown-container>
-            <div>
-              <button
-                type="button"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                onKeyDown={(e) => {
-                  // Close dropdown on Escape key
-                  if (e.key === 'Escape') {
-                    setIsDropdownOpen(false)
-                  }
-                }}
-                className="inline-flex justify-between w-full rounded-xl border border-neutral-300 shadow-sm px-4 py-3 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-100 focus:ring-blue-500 my-business-dropdown-btn"
-                aria-expanded={isDropdownOpen}
-                aria-haspopup="true"
-              >
-                <span className="flex items-center">
-                  {currentTab.label}
-                  {('count' in currentTab) && currentTab.count! > 0 && (
-                    <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-xs">
-                      {currentTab.count}
-                    </span>
-                  )}
-                </span>
-                <svg
-                  className={`-mr-1 ml-2 h-5 w-5 transition-transform duration-200 ${
-                    isDropdownOpen ? 'rotate-180' : ''
-                  }`}
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Dropdown Menu */}
-            {isDropdownOpen && (
-              <div
-                className="origin-top-right absolute right-0 mt-2 w-full rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
-                role="menu"
-                aria-orientation="vertical"
-                aria-labelledby="menu-button"
-              >
-                <div className="py-1" role="none">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.key}
-                      onClick={() => handleTabSelect(tab.key as any)}
-                      className={`w-full text-left px-4 py-3 text-sm transition-colors ${
-                        activeTab === tab.key
-                          ? 'bg-blue-50 text-blue-700 font-medium'
-                          : 'text-neutral-700 hover:bg-neutral-50'
-                      }`}
-                      role="menuitem"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span>{tab.label}</span>
-                        {('count' in tab) && tab.count! > 0 && (
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-xs">
-                            {tab.count}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                  
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <TabDropdownNav
+          tabs={tabs}
+          activeTab={activeTab}
+          isDropdownOpen={isDropdownOpen}
+          onToggleDropdown={() => setIsDropdownOpen(!isDropdownOpen)}
+          onSelectTab={handleTabSelect}
+        />
 
         {/* Business Listings Tab */}
         {activeTab === 'listings' && (
@@ -884,45 +810,20 @@ export default function MyBusinessPage() {
 
         {/* Job Posts Tab */}
         {activeTab === 'jobs' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Job Posts</h2>
-                <p className="text-sm text-neutral-600">Manage job postings for your business</p>
-              </div>
-              {listings.length > 0 && (
-                <button
-                  onClick={() => setShowJobForm(true)}
-                  className="rounded-full bg-neutral-900 text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800"
-                >
-                  + Create Job Post
-                </button>
-              )}
-            </div>
-
-            {listings.length === 0 ? (
-              <JobPostsNoListingsState 
-                onCreateListing={() => {
-                  setShowCreateForm(true)
-                  setActiveTab('listings')
-                }}
-              />
-            ) : jobPosts.length === 0 ? (
-              <JobPostsEmptyState onCreateJob={() => setShowJobForm(true)} />
-            ) : (
-              jobPosts.map((job) => (
-                <JobPostCard
-                  key={job.id}
-                  job={job}
-                  onEdit={(job) => {
-                    setEditingJob(job)
-                    setShowJobForm(true)
-                  }}
-                  onDelete={deleteJobPost}
-                />
-              ))
-            )}
-          </div>
+          <JobPostsTab
+            jobPosts={jobPosts}
+            listings={listings}
+            onCreateJob={() => setShowJobForm(true)}
+            onCreateListing={() => {
+              setShowCreateForm(true)
+              setActiveTab('listings')
+            }}
+            onEditJob={(job) => {
+              setEditingJob(job)
+              setShowJobForm(true)
+            }}
+            onDeleteJob={deleteJobPost}
+          />
         )}
 
         {/* Change Requests Tab */}
@@ -951,132 +852,20 @@ export default function MyBusinessPage() {
 
         {/* Recently Approved Tab */}
         {activeTab === 'recently-approved' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Recently Approved Requests</h2>
-                <p className="text-sm text-neutral-600">Change requests that have been approved in the last 30 days</p>
-              </div>
-            </div>
-
-            {nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && 
-              new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length === 0 ? (
-              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-                <h3 className="text-lg font-medium text-neutral-900">No Recently Approved Requests</h3>
-                <p className="mt-2 text-neutral-600">
-                  Approved change requests from the last 30 days will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {nonFeaturedChangeRequests.filter(req => req.status === 'approved' && req.decided_at && 
-                  new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map((request) => (
-                  <div key={request.id} className="rounded-xl border border-green-200 p-4 bg-green-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-green-900">
-                          {request.type === 'update' ? 'Business Listing Update' : 
-                           request.type === 'delete' ? 'Business Listing Deletion' :
-                           request.type === 'feature_request' ? 'Featured Upgrade Request' :
-                           request.type === 'claim' ? 'Business Claim Request' : request.type}
-                        </h3>
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          approved
-                        </span>
-                      </div>
-                      <div className="text-xs text-green-600">
-                        Approved {request.decided_at ? new Date(request.decided_at).toLocaleString() : 'recently'}
-                      </div>
-                    </div>
-
-                    {/* Show the changes that were approved */}
-                    {request.changes && Object.keys(request.changes).length > 0 && (
-                      <div className="mb-3 p-3 bg-white rounded-lg border border-green-200">
-                        <div className="text-sm font-medium text-green-700 mb-2">Approved Changes:</div>
-                        <div className="text-sm text-green-600 space-y-1">
-                          {Object.keys(request.changes).map((field) => (
-                            <div key={field} className="capitalize">
-                              {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="text-xs text-green-600">
-                      <div>Provider ID: {request.provider_id}</div>
-                      {request.reason && <div>Reason: {request.reason}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <HistoricalRequestsTab
+            status="approved"
+            nonFeaturedChangeRequests={nonFeaturedChangeRequests}
+            listings={listings}
+          />
         )}
 
         {/* Recently Rejected Tab */}
         {activeTab === 'recently-rejected' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Recently Rejected Requests</h2>
-                <p className="text-sm text-neutral-600">Change requests that have been rejected in the last 30 days</p>
-              </div>
-            </div>
-
-            {nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
-              new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length === 0 ? (
-              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-                <h3 className="text-lg font-medium text-neutral-900">No Recently Rejected Requests</h3>
-                <p className="mt-2 text-neutral-600">
-                  Rejected change requests from the last 30 days will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {nonFeaturedChangeRequests.filter(req => req.status === 'rejected' && req.decided_at && 
-                  new Date(req.decided_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).map((request) => (
-                  <div key={request.id} className="rounded-xl border border-red-200 p-4 bg-red-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-red-900">
-                          {request.type === 'update' ? 'Business Listing Update' : 
-                           request.type === 'delete' ? 'Business Listing Deletion' :
-                           request.type === 'feature_request' ? 'Featured Upgrade Request' :
-                           request.type === 'claim' ? 'Business Claim Request' : request.type}
-                        </h3>
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          rejected
-                        </span>
-                      </div>
-                      <div className="text-xs text-red-600">
-                        Rejected {request.decided_at ? new Date(request.decided_at).toLocaleString() : 'recently'}
-                      </div>
-                    </div>
-
-                    {/* Show the changes that were rejected */}
-                    {request.changes && Object.keys(request.changes).length > 0 && (
-                      <div className="mb-3 p-3 bg-white rounded-lg border border-red-200">
-                        <div className="text-sm font-medium text-red-700 mb-2">Rejected Changes:</div>
-                        <div className="text-sm text-red-600 space-y-1">
-                          {Object.keys(request.changes).map((field) => (
-                            <div key={field} className="capitalize">
-                              {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="text-xs text-red-600">
-                      <div>Provider ID: {request.provider_id}</div>
-                      {request.reason && <div>Reason: {request.reason}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <HistoricalRequestsTab
+            status="rejected"
+            nonFeaturedChangeRequests={nonFeaturedChangeRequests}
+            listings={listings}
+          />
         )}
 
         {/* Pending Requests Tab */}

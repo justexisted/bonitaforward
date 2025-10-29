@@ -15,4 +15,7 @@ export { ChangeRequestsNotifications } from './ChangeRequestsNotifications'
 export { ChangeRequestsList } from './ChangeRequestsList'
 export { UserActivityTab } from './UserActivityTab'
 export { ListingsTab } from './ListingsTab'
+export { HistoricalRequestsTab } from './HistoricalRequestsTab'
+export { JobPostsTab } from './JobPostsTab'
+export { TabDropdownNav } from './TabDropdownNav'
 

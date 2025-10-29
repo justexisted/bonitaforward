@@ -25,16 +25,24 @@ export interface TabConfig {
 /**
  * Helper function to get change requests for non-featured businesses only
  * Featured businesses (is_member: true) have direct edit access and don't use change requests
+ * 
+ * IMPORTANT: This includes change requests with null provider_id (new listing requests)
  */
 export function getNonFeaturedChangeRequests(
   listings: BusinessListing[],
   changeRequests: ProviderChangeRequest[]
 ): ProviderChangeRequest[] {
-  const nonFeaturedBusinessIds = listings
-    .filter(listing => !listing.is_member)
+  // Get IDs of featured listings
+  const featuredBusinessIds = listings
+    .filter(listing => listing.is_member)
     .map(listing => listing.id)
   
-  return changeRequests.filter(req => nonFeaturedBusinessIds.includes(req.provider_id))
+  // Return all change requests EXCEPT those for featured listings
+  // Include requests with null provider_id (new listing requests)
+  return changeRequests.filter(req => 
+    !req.provider_id || // Include if no provider_id (new listing request)
+    !featuredBusinessIds.includes(req.provider_id) // Or if not a featured listing
+  )
 }
 
 /**
