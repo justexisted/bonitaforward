@@ -203,20 +203,52 @@ export async function requestApplicationUpdate(applicationId: string, message: s
   }
 }
 
-export async function loadMyBusinesses(userId: string): Promise<MyBusiness[]> {
+export async function loadMyBusinesses(userId: string, userEmail?: string): Promise<MyBusiness[]> {
   try {
-    const { data, error } = await supabase
+    // First try to load by owner_user_id
+    const { data: ownerData, error: ownerError } = await supabase
       .from('providers')
       .select('id, name, category_key, address, phone, email, website, published, created_at')
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false })
     
-    if (error) {
-      console.log('[Account] Error loading user businesses:', error)
-      return []
+    if (ownerError) {
+      console.log('[Account] Error loading businesses by owner_user_id:', ownerError)
     }
     
-    return (data || []) as MyBusiness[]
+    // If user has an email, also try to find businesses by email (fallback for older businesses)
+    if (userEmail) {
+      const { data: emailData, error: emailError } = await supabase
+        .from('providers')
+        .select('id, name, category_key, address, phone, email, website, published, created_at')
+        .ilike('email', userEmail.trim())
+        .is('owner_user_id', null) // Only get businesses not already linked
+        .order('created_at', { ascending: false })
+      
+      if (emailError) {
+        console.log('[Account] Error loading businesses by email:', emailError)
+      }
+      
+      // Combine results and deduplicate by id
+      const allBusinesses = [...(ownerData || []), ...(emailData || [])]
+      const uniqueBusinesses = Array.from(
+        new Map(allBusinesses.map(b => [b.id, b])).values()
+      )
+      
+      // If we found businesses by email, log a warning that they need to be linked
+      if (emailData && emailData.length > 0) {
+        console.warn('[Account] Found businesses by email but not linked to user:', {
+          userId,
+          userEmail,
+          unlinkedCount: emailData.length,
+          businessNames: emailData.map(b => b.name)
+        })
+      }
+      
+      return uniqueBusinesses as MyBusiness[]
+    }
+    
+    return (ownerData || []) as MyBusiness[]
   } catch (err) {
     console.log('[Account] Error loading user businesses:', err)
     return []

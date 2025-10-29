@@ -58,7 +58,7 @@ export default function AccountPage() {
         loadSavedBusinesses(auth.userId),
         loadMyEvents(auth.userId),
         loadPendingApplications(auth.email || ''),
-        loadMyBusinesses(auth.userId),
+        loadMyBusinesses(auth.userId, auth.email || ''),
       ])
       
       setData({ bookings, savedBusinesses, myEvents, pendingApps, myBusinesses })
