@@ -61,10 +61,19 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
               <Link href="https://bonitaforward.com/account" style={link}>
                 Account Settings
               </Link>
+              {' · '}
+              <Link href="https://bonitaforward.com/unsubscribe" style={link}>
+                Unsubscribe
+              </Link>
             </Text>
             <Text style={footerTextSmall}>
-              This email was sent to you because you have a business account with Bonita Forward.
-              To stop receiving these notifications, please update your preferences in your account settings.
+              This transactional email was sent to you because you have a business listing with Bonita Forward.
+              You're receiving this notification about your business account activity.
+            </Text>
+            <Text style={footerTextSmall}>
+              Bonita Forward<br />
+              San Diego, CA 92108<br />
+              United States
             </Text>
           </Section>
         </Container>

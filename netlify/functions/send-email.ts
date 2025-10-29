@@ -154,7 +154,7 @@ export const handler = async (event: any) => {
     // Send email via Resend
     console.log('[SendEmail] Sending email via Resend...')
     
-    // Try custom domain first, fall back to Gmail if not verified yet
+    // Try custom domain first, fall back to test domain if not verified yet
     let fromEmail = FROM_EMAIL
     try {
       const { data: emailData, error } = await resend.emails.send({
@@ -162,6 +162,12 @@ export const handler = async (event: any) => {
         to: [to],
         subject: subject,
         html: html,
+        reply_to: 'hello@bonitaforward.com',
+        headers: {
+          'X-Entity-Ref-ID': `bf-${Date.now()}`,
+          'List-Unsubscribe': '<https://bonitaforward.com/unsubscribe>',
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
       })
 
       if (error) {
@@ -175,6 +181,12 @@ export const handler = async (event: any) => {
             to: [to],
             subject: subject,
             html: html,
+            reply_to: 'hello@bonitaforward.com',
+            headers: {
+              'X-Entity-Ref-ID': `bf-${Date.now()}`,
+              'List-Unsubscribe': '<https://bonitaforward.com/unsubscribe>',
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+            },
           })
           
           if (fallbackResult.error) {
