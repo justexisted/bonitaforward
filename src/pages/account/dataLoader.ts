@@ -126,6 +126,10 @@ export async function loadSavedBusinesses(userId: string): Promise<SavedBusiness
   }
 }
 
+/**
+ * Load events CREATED by the user
+ * Shows in "My Events" section on account page
+ */
 export async function loadMyEvents(userId: string): Promise<CalendarEvent[]> {
   try {
     const { data, error } = await supabase
@@ -135,13 +139,55 @@ export async function loadMyEvents(userId: string): Promise<CalendarEvent[]> {
       .order('created_at', { ascending: false })
     
     if (error) {
-      console.log('[Account] Error loading user events:', error)
+      console.log('[Account] Error loading created events:', error)
       return []
     }
     
     return (data || []) as CalendarEvent[]
   } catch (err) {
-    console.log('[Account] Error loading user events:', err)
+    console.log('[Account] Error loading created events:', err)
+    return []
+  }
+}
+
+/**
+ * Load events SAVED/BOOKMARKED by the user (from user_saved_events table)
+ * Shows in "Saved Events" section on account page
+ */
+export async function loadSavedEvents(userId: string): Promise<CalendarEvent[]> {
+  try {
+    // Get event IDs that user has saved
+    const { data: savedData, error: savedError } = await supabase
+      .from('user_saved_events')
+      .select('event_id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    if (savedError) {
+      console.log('[Account] Error loading saved event IDs:', savedError)
+      return []
+    }
+    
+    if (!savedData || savedData.length === 0) {
+      return []
+    }
+    
+    // Get the full event details for those IDs
+    const eventIds = savedData.map(s => s.event_id)
+    const { data: eventsData, error: eventsError } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .in('id', eventIds)
+      .order('date', { ascending: true })
+    
+    if (eventsError) {
+      console.log('[Account] Error loading saved events:', eventsError)
+      return []
+    }
+    
+    return (eventsData || []) as CalendarEvent[]
+  } catch (err) {
+    console.log('[Account] Error loading saved events:', err)
     return []
   }
 }

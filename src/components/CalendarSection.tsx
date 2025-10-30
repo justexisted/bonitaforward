@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar as CalendarIcon, X } from 'lucide-react'
+import { Calendar as CalendarIcon, X, Flag } from 'lucide-react'
 import { EventCard } from './EventCard'
 import { fetchCalendarEvents, type CalendarEvent } from '../pages/Calendar'
 import { useAuth } from '../contexts/AuthContext'
@@ -16,6 +16,7 @@ import {
   unsaveEventFromLocalStorage
 } from '../utils/savedEventsDb'
 import { useHideDock } from '../hooks/useHideDock'
+import { supabase } from '../lib/supabase'
 
 interface LoadingSpinnerProps {
   message?: string
@@ -60,8 +61,15 @@ export default function CalendarSection() {
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set())
   const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
 
-  // Hide Dock when modal is open
-  useHideDock(Boolean(selectedEvent))
+  // State for flag/report feature
+  const [showFlagModal, setShowFlagModal] = useState(false)
+  const [eventToFlag, setEventToFlag] = useState<CalendarEvent | null>(null)
+  const [flagReason, setFlagReason] = useState('')
+  const [flagDetails, setFlagDetails] = useState('')
+  const [submittingFlag, setSubmittingFlag] = useState(false)
+
+  // Hide Dock when any modal is open
+  useHideDock(Boolean(selectedEvent || showFlagModal))
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -174,6 +182,75 @@ export default function CalendarSection() {
         }
         return newSet
       })
+    }
+  }
+
+  // Handle flag event click
+  const handleFlagEventClick = (event: CalendarEvent) => {
+    if (!auth.isAuthed) {
+      alert('Please sign in to report events')
+      return
+    }
+    setEventToFlag(event)
+    setFlagReason('')
+    setFlagDetails('')
+    setSelectedEvent(null) // Close event detail modal
+    setShowFlagModal(true)
+  }
+
+  // Handle flag submission
+  const handleSubmitFlag = async () => {
+    if (!flagReason) {
+      alert('Please select a reason for reporting this event')
+      return
+    }
+
+    if (!eventToFlag || !auth.userId) return
+
+    setSubmittingFlag(true)
+
+    try {
+      // Check if user already flagged this event
+      const { data: existing } = await supabase
+        .from('event_flags')
+        .select('id')
+        .eq('event_id', eventToFlag.id)
+        .eq('user_id', auth.userId)
+        .maybeSingle()
+
+      if (existing) {
+        alert('You have already reported this event. Our admin team will review it.')
+        setShowFlagModal(false)
+        setEventToFlag(null)
+        return
+      }
+
+      // Insert flag
+      const { error } = await supabase
+        .from('event_flags')
+        .insert([{
+          event_id: eventToFlag.id,
+          user_id: auth.userId,
+          reason: flagReason,
+          details: flagDetails || null,
+          created_at: new Date().toISOString()
+        }])
+
+      if (error) throw error
+
+      alert('Thank you for reporting this event. Our admin team has been notified and will review it shortly.')
+      
+      // Reset and close
+      setShowFlagModal(false)
+      setEventToFlag(null)
+      setFlagReason('')
+      setFlagDetails('')
+
+    } catch (error: any) {
+      console.error('Error flagging event:', error)
+      alert('Failed to submit report: ' + error.message)
+    } finally {
+      setSubmittingFlag(false)
     }
   }
 
@@ -344,11 +421,131 @@ export default function CalendarSection() {
                     </p>
                   </div>
                 )}
+
+                {/* Flag/Report Button */}
+                <button
+                  onClick={() => handleFlagEventClick(selectedEvent)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 border border-red-200 transition-colors text-sm font-medium"
+                  title="Report this event"
+                >
+                  <Flag className="w-4 h-4" />
+                  <span>Report Event</span>
+                </button>
               </div>
             </div>
           </div>
         )
       })()}
+
+      {/* Flag/Report Event Modal */}
+      {showFlagModal && eventToFlag && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowFlagModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-6 rounded-t-2xl relative">
+              <button
+                onClick={() => setShowFlagModal(false)}
+                className="absolute top-4 right-4 bg-red-800 hover:bg-red-900 rounded-full p-2 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h2 className="text-2xl font-bold">Report Event</h2>
+              <p className="text-red-100 text-sm mt-1">Help us keep our calendar accurate and appropriate</p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Event Info */}
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                <h3 className="font-semibold text-neutral-900 mb-1">{eventToFlag.title}</h3>
+                <p className="text-sm text-neutral-600">
+                  {new Date(eventToFlag.date).toLocaleDateString()} • {eventToFlag.source}
+                </p>
+              </div>
+
+              {/* Warning Box */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-sm text-amber-800">
+                  <strong>Before reporting:</strong> This should only be used for events that violate our guidelines 
+                  (spam, inappropriate content, incorrect information, etc.). For general inquiries, please contact us directly.
+                </p>
+              </div>
+
+              {/* Reason Dropdown */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Why are you reporting this event? <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="spam">Spam or misleading</option>
+                  <option value="inappropriate">Inappropriate content</option>
+                  <option value="incorrect">Incorrect information</option>
+                  <option value="duplicate">Duplicate event</option>
+                  <option value="cancelled">Event was cancelled</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* Details Textarea */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Additional Details (Optional)
+                </label>
+                <textarea
+                  value={flagDetails}
+                  onChange={(e) => setFlagDetails(e.target.value)}
+                  placeholder="Provide more context to help us understand the issue..."
+                  rows={3}
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                  maxLength={300}
+                />
+                <p className="text-xs text-neutral-500 mt-1">{flagDetails.length}/300 characters</p>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  Our admin team will review your report within 24-48 hours. Thank you for helping us maintain quality content.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowFlagModal(false)}
+                  className="flex-1 px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 font-medium transition-colors"
+                  disabled={submittingFlag}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitFlag}
+                  disabled={submittingFlag || !flagReason}
+                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
+                    submittingFlag || !flagReason
+                      ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                >
+                  {submittingFlag ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

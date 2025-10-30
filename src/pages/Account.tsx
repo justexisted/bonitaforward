@@ -8,7 +8,8 @@ import type { DashboardSection, AccountData } from './account/types'
 import { 
   loadBookings, 
   loadSavedBusinesses, 
-  loadMyEvents, 
+  loadMyEvents,
+  loadSavedEvents,
   loadPendingApplications,
   loadMyBusinesses,
   requestApplicationUpdate
@@ -32,6 +33,7 @@ export default function AccountPage() {
     bookings: [],
     savedBusinesses: [],
     myEvents: [],
+    savedEvents: [],
     pendingApps: [],
     myBusinesses: [],
   })
@@ -53,15 +55,16 @@ export default function AccountPage() {
       
       setLoading(true)
       
-      const [bookings, savedBusinesses, myEvents, pendingApps, myBusinesses] = await Promise.all([
+      const [bookings, savedBusinesses, myEvents, savedEvents, pendingApps, myBusinesses] = await Promise.all([
         loadBookings(auth.email || ''),
         loadSavedBusinesses(auth.userId),
         loadMyEvents(auth.userId),
+        loadSavedEvents(auth.userId),
         loadPendingApplications(auth.email || ''),
         loadMyBusinesses(auth.userId, auth.email || ''),
       ])
       
-      setData({ bookings, savedBusinesses, myEvents, pendingApps, myBusinesses })
+      setData({ bookings, savedBusinesses, myEvents, savedEvents, pendingApps, myBusinesses })
       setLoading(false)
     }
     
@@ -171,8 +174,8 @@ export default function AccountPage() {
               <button onClick={() => setMessage(null)} className="text-blue-600 hover:text-blue-700">
                 <X className="w-4 h-4" />
               </button>
-                </div>
-              )}
+            </div>
+          )}
 
           {/* 4x2 Icon Grid (Mobile Only) */}
           {activeSection === 'dashboard' && (
@@ -362,64 +365,140 @@ export default function AccountPage() {
                   <div className="text-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                   </div>
-                ) : data.myEvents.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-12 text-center">
-                    <CalendarDays className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                    <p className="text-neutral-600 mb-4">No events created yet</p>
-                    <Link 
-                      to="/calendar" 
-                      className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      Create Event
-                    </Link>
-                  </div>
                 ) : (
-                  <div className="space-y-4">
-                    {data.myEvents.map((event) => (
-                      <div key={event.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
-                            <div className="space-y-1 text-sm text-neutral-600">
-                              <p className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span>{new Date(event.date).toLocaleDateString()}</span>
-                              </p>
-                              {event.time && (
-                                <p className="flex items-center gap-2">
-                                  <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <span>{event.time}</span>
-                                </p>
-                              )}
-                              {event.location && (
-                                <p className="flex items-center gap-2">
-                                  <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  </svg>
-                                  <span>{event.location}</span>
-                                </p>
-                              )}
-                              {event.category && (
-                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mt-2">
-                                  {event.category}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <Link
-                            to="/calendar"
-                            className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  <div className="space-y-8">
+                    {/* Created Events Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-800 mb-4 border-b pb-2">Events I Created</h3>
+                      {data.myEvents.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-8 text-center">
+                          <CalendarDays className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                          <p className="text-neutral-600 mb-3">No events created yet</p>
+                          <Link 
+                            to="/calendar" 
+                            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                           >
-                            View
+                            Create Event
                           </Link>
                         </div>
-                      </div>
-                    ))}
+                      ) : (
+                        <div className="space-y-4">
+                          {data.myEvents.map((event) => (
+                            <div key={event.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
+                                  <div className="space-y-1 text-sm text-neutral-600">
+                                    <p className="flex items-center gap-2">
+                                      <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                      <span>{new Date(event.date).toLocaleDateString()}</span>
+                                    </p>
+                                    {event.time && (
+                                      <p className="flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span>{event.time}</span>
+                                      </p>
+                                    )}
+                                    {event.location && (
+                                      <p className="flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <span>{event.location}</span>
+                                      </p>
+                                    )}
+                                    {event.category && (
+                                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mt-2">
+                                        {event.category}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Link
+                                  to="/calendar"
+                                  className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                  View
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Saved Events Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-800 mb-4 border-b pb-2">Saved Events</h3>
+                      {data.savedEvents.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-8 text-center">
+                          <CalendarDays className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                          <p className="text-neutral-600 mb-3">No saved events yet</p>
+                          <p className="text-sm text-neutral-500 mb-3">
+                            Browse the calendar and save events you're interested in attending
+                          </p>
+                          <Link 
+                            to="/calendar" 
+                            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                          >
+                            Browse Calendar
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {data.savedEvents.map((event) => (
+                            <div key={event.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
+                                  <div className="space-y-1 text-sm text-neutral-600">
+                                    <p className="flex items-center gap-2">
+                                      <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                      <span>{new Date(event.date).toLocaleDateString()}</span>
+                                    </p>
+                                    {event.time && (
+                                      <p className="flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span>{event.time}</span>
+                                      </p>
+                                    )}
+                                    {event.location && (
+                                      <p className="flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <span>{event.location}</span>
+                                      </p>
+                                    )}
+                                    {event.category && (
+                                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mt-2">
+                                        {event.category}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Link
+                                  to="/calendar"
+                                  className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                  View
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -427,7 +506,7 @@ export default function AccountPage() {
             
             {activeSection === 'applications' && (
               <div>
-                <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Business Applications</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">Pending Applications</h2>
                 {data.pendingApps.length === 0 ? (
                   <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 text-center">
                     <FileText className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
@@ -829,20 +908,25 @@ export default function AccountPage() {
                   <div className="text-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                   </div>
-                ) : data.myEvents.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-12 text-center">
-                    <CalendarDays className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                    <p className="text-neutral-600 mb-4">No events created yet</p>
-                    <Link 
-                      to="/calendar" 
-                      className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      Create Event
-                    </Link>
-                  </div>
                 ) : (
-                  <div className="space-y-4">
-                    {data.myEvents.map((event) => (
+                  <div className="space-y-8">
+                    {/* Created Events Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-800 mb-4 border-b pb-2">Events I Created</h3>
+                      {data.myEvents.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-8 text-center">
+                          <CalendarDays className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                          <p className="text-neutral-600 mb-3">No events created yet</p>
+                          <Link 
+                            to="/calendar" 
+                            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                          >
+                            Create Event
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {data.myEvents.map((event) => (
                       <div key={event.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -888,6 +972,77 @@ export default function AccountPage() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/* Saved Events Section */}
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-800 mb-4 border-b pb-2">Saved Events</h3>
+                {data.savedEvents.length === 0 ? (
+                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-8 text-center">
+                    <CalendarDays className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                    <p className="text-neutral-600 mb-3">No saved events yet</p>
+                    <p className="text-sm text-neutral-500 mb-3">
+                      Browse the calendar and save events you're interested in attending
+                    </p>
+                    <Link 
+                      to="/calendar" 
+                      className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      Browse Calendar
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {data.savedEvents.map((event) => (
+                      <div key={event.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
+                            <div className="space-y-1 text-sm text-neutral-600">
+                              <p className="flex items-center gap-2">
+                                <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span>{new Date(event.date).toLocaleDateString()}</span>
+                              </p>
+                              {event.time && (
+                                <p className="flex items-center gap-2">
+                                  <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>{event.time}</span>
+                                </p>
+                              )}
+                              {event.location && (
+                                <p className="flex items-center gap-2">
+                                  <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                  <span>{event.location}</span>
+                                </p>
+                              )}
+                              {event.category && (
+                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mt-2">
+                                  {event.category}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Link
+                            to="/calendar"
+                            className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            View
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
                 )}
               </div>
             )}

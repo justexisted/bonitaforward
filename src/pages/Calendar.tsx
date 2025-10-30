@@ -212,6 +212,7 @@ export default function CalendarPage() {
 
   // State for saved/bookmarked events
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set())
+  const [showSavedEvents, setShowSavedEvents] = useState(false) // Toggle for showing saved events section
 
   // State for dynamically loaded event images (Unsplash + gradients)
   const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
@@ -826,13 +827,25 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {/* Saved Events Section */}
+            {/* Toggle Button for Saved Events */}
             {auth.isAuthed && savedEvents.length > 0 && (
-              <>
-                <h2 className="text-xl md:text-2xl font-semibold tracking-tight font-display mb-4 md:mb-6">
-                  Your Saved Events
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h2 className="text-xl md:text-2xl font-semibold tracking-tight font-display">
+                  {showSavedEvents ? 'Your Saved Events' : ''}
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12">
+                <button
+                  onClick={() => setShowSavedEvents(!showSavedEvents)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 transition-colors font-medium"
+                >
+                  <BookmarkCheck className="w-4 h-4" />
+                  <span>{showSavedEvents ? 'Hide' : 'Show'} Saved Events ({savedEvents.length})</span>
+                </button>
+              </div>
+            )}
+
+            {/* Saved Events Section (Hidden by Default) */}
+            {auth.isAuthed && savedEvents.length > 0 && showSavedEvents && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12">
                   {savedEvents.map((event) => {
                     const eventUrl = extractEventUrl(event)
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
@@ -974,7 +987,6 @@ export default function CalendarPage() {
                     )
                   })}
                 </div>
-              </>
             )}
 
             {/* Regular Events Section */}

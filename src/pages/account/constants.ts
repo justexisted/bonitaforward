@@ -3,7 +3,7 @@ import {
   Briefcase, 
   Calendar, 
   Heart, 
-  CalendarDays, 
+  CalendarDays,
   FileText, 
   Shield, 
   Trash2 

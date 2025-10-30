@@ -10,7 +10,7 @@ export type DashboardSection =
   | 'business' 
   | 'bookings' 
   | 'saved-businesses' 
-  | 'my-events' 
+  | 'my-events'
   | 'applications' 
   | 'security' 
   | 'delete'
@@ -78,6 +78,7 @@ export interface AccountData {
   bookings: Booking[]
   savedBusinesses: SavedBusiness[]
   myEvents: CalendarEvent[]
+  savedEvents: CalendarEvent[]
   pendingApps: PendingApplication[]
   myBusinesses: MyBusiness[]
 }
