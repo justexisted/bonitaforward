@@ -446,10 +446,10 @@ export default function AccountPage() {
                                     )}
                                   </div>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-shrink-0 ml-4">
                                   <Link
                                     to="/calendar"
-                                    className="px-3 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                    className="px-3 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
                                   >
                                     View
                                   </Link>
@@ -463,7 +463,7 @@ export default function AccountPage() {
                                       location: (event as any).location || '',
                                       address: (event as any).address || ''
                                     })}
-                                    className="px-3 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                                    className="px-3 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 whitespace-nowrap"
                                   >
                                     Edit
                                   </button>
@@ -478,7 +478,7 @@ export default function AccountPage() {
                                         setMessage(res.error || 'Failed to delete event')
                                       }
                                     }}
-                                    className="px-3 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                                    className="px-3 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 whitespace-nowrap"
                                   >
                                     Delete
                                   </button>
