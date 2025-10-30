@@ -1,49 +1,49 @@
--- ============================================
--- Cleanup Duplicate Analytics Events
--- Created: 2025-10-30
--- Purpose: Remove duplicate tracking events (keep most recent)
--- ============================================
+-- Clean up duplicate listing_analytics 'view' events
+-- This script identifies and removes duplicate 'view' events
+-- based on provider_id, session_id, and user_id within a short timeframe.
 
--- This removes duplicates that were created due to React StrictMode
--- Keeps the MOST RECENT event when there are duplicates
+-- Shows duplicates before deletion (run this first to see what will be removed)
+SELECT 
+  provider_id,
+  session_id,
+  user_id,
+  event_type,
+  COUNT(*) as duplicate_count,
+  MIN(created_at) as first_view,
+  MAX(created_at) as last_view
+FROM listing_analytics
+WHERE event_type = 'view'
+GROUP BY provider_id, session_id, user_id, event_type
+HAVING COUNT(*) > 1
+ORDER BY duplicate_count DESC;
 
-BEGIN;
-
--- Find and delete duplicate views (keeping the newest one)
-WITH duplicates AS (
-  SELECT 
-    id,
-    ROW_NUMBER() OVER (
-      PARTITION BY session_id, provider_id, event_type 
-      ORDER BY created_at DESC
-    ) as row_num
-  FROM listing_analytics
-  WHERE session_id IS NOT NULL
-)
+-- Delete duplicates (keeps the most recent view)
 DELETE FROM listing_analytics
 WHERE id IN (
-  SELECT id FROM duplicates WHERE row_num > 1
+    SELECT id
+    FROM (
+        SELECT
+            id,
+            ROW_NUMBER() OVER(
+                PARTITION BY provider_id, session_id, user_id, event_type 
+                ORDER BY created_at DESC
+            ) as rn
+        FROM listing_analytics
+        WHERE event_type = 'view'
+    ) t
+    WHERE t.rn > 1
 );
 
--- Show how many rows were deleted
--- (Run this after the DELETE to see the count)
-
-COMMIT;
-
--- ============================================
--- Verification
--- ============================================
-
--- Check for remaining duplicates (should return 0 rows)
+-- Verify no duplicates remain
 SELECT 
-  session_id,
   provider_id,
+  session_id,
+  user_id,
   event_type,
-  COUNT(*) as duplicate_count
+  COUNT(*) as count
 FROM listing_analytics
-WHERE session_id IS NOT NULL
-GROUP BY session_id, provider_id, event_type
+WHERE event_type = 'view'
+GROUP BY provider_id, session_id, user_id, event_type
 HAVING COUNT(*) > 1;
 
--- Expected: No rows (all duplicates removed)
-
+-- Should return 0 rows if successful

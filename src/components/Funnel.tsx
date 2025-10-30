@@ -45,6 +45,7 @@ function trackChoice(category: CategoryKey, questionId: string, optionId: string
 
 /**
  * Persist funnel answers per user to Supabase (if tables exist)
+ * Also tracks funnel attribution to the last viewed provider
  */
 async function persistFunnelForUser(params: { email?: string | null; category: CategoryKey; answers: Record<string, string> }) {
   const { email, category, answers } = params
@@ -52,6 +53,7 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
 
   try {
     const { supabase } = await import('../lib/supabase')
+    const { getLastViewedProvider, trackFunnelAttribution } = await import('../services/analyticsService')
     
     // Check if a record already exists for this user and category
     const { data: existing } = await supabase
@@ -61,17 +63,42 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
       .eq('category', category)
       .maybeSingle()
 
+    let funnelResponseId: string | null = null
+
     if (existing) {
       // Update existing record
       await supabase
         .from('funnel_responses')
         .update({ answers })
         .eq('id', existing.id)
+      
+      funnelResponseId = existing.id
     } else {
-      // Insert new record
-      await supabase
+      // Insert new record and get its ID
+      const { data: inserted, error } = await supabase
         .from('funnel_responses')
         .insert({ user_email: email, category, answers })
+        .select('id')
+        .single()
+      
+      if (!error && inserted) {
+        funnelResponseId = inserted.id
+      }
+    }
+
+    // Track funnel attribution to last viewed provider (within 30 minute window)
+    if (funnelResponseId) {
+      const lastViewedProviderId = getLastViewedProvider(30) // 30 minute attribution window
+      
+      if (lastViewedProviderId) {
+        // Track attribution (failures are non-blocking)
+        await trackFunnelAttribution(funnelResponseId, lastViewedProviderId, document.referrer)
+        console.log('[Analytics] Funnel attributed to provider:', lastViewedProviderId)
+      } else {
+        // No recent provider view - track as direct funnel submission
+        await trackFunnelAttribution(funnelResponseId, null, document.referrer)
+        console.log('[Analytics] Funnel tracked (no attribution)')
+      }
     }
   } catch (err) {
     console.warn('[Supabase] persist funnel_responses failed (safe to ignore if table missing)', err)

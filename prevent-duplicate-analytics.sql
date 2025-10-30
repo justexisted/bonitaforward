@@ -1,49 +1,45 @@
--- ============================================
--- Prevent Duplicate Analytics Events
--- Created: 2025-10-30
--- Purpose: Add unique constraints to prevent duplicate tracking
--- ============================================
+-- Add unique constraint to prevent duplicate 'view' events
+-- This ensures that a user/session combination can only log one 'view' event
+-- for a specific provider within a reasonable timeframe (implicitly handled by session_id).
 
--- This prevents the same session from tracking the same event
--- on the same provider multiple times
+-- Note: This constraint will PREVENT future duplicates at the database level
+-- The useRef in the code is the first line of defense, this is backup protection
 
 BEGIN;
 
--- Add unique constraint to listing_analytics
--- This will prevent: same session + same provider + same event type
-CREATE UNIQUE INDEX IF NOT EXISTS idx_listing_analytics_unique_session
-  ON listing_analytics(session_id, provider_id, event_type)
-  WHERE session_id IS NOT NULL;
+-- Add unique constraint (will fail if duplicates exist - run cleanup-duplicate-analytics.sql first)
+ALTER TABLE listing_analytics
+ADD CONSTRAINT unique_listing_view_per_session_user 
+UNIQUE (provider_id, session_id, user_id, event_type);
 
--- Note: We use a partial index (WHERE session_id IS NOT NULL)
--- because we still want to allow multiple NULL session_ids
--- (different anonymous users with no session tracking)
+-- Verify the constraint was created
+SELECT
+  conname as constraint_name,
+  contype as constraint_type,
+  pg_get_constraintdef(oid) as definition
+FROM pg_constraint
+WHERE conrelid = 'listing_analytics'::regclass
+  AND conname = 'unique_listing_view_per_session_user';
 
 COMMIT;
 
--- ============================================
--- Verification
--- ============================================
+-- Test: Try to insert a duplicate (should fail)
+-- Uncomment to test:
+/*
+INSERT INTO listing_analytics (provider_id, session_id, user_id, event_type)
+VALUES (
+  'test-provider-id',
+  'test-session-id', 
+  'test-user-id',
+  'view'
+);
 
--- Check the constraint exists
-SELECT
-  schemaname,
-  tablename,
-  indexname,
-  indexdef
-FROM pg_indexes
-WHERE indexname = 'idx_listing_analytics_unique_session';
-
--- Test it works (should succeed first time, fail second time)
--- INSERT INTO listing_analytics (provider_id, event_type, session_id)
--- VALUES ('531922d2-a8b2-45a3-ae7f-5afa6823d637', 'view', 'test_session_123');
-
--- Try to insert duplicate (should fail with unique constraint violation)
--- INSERT INTO listing_analytics (provider_id, event_type, session_id)
--- VALUES ('531922d2-a8b2-45a3-ae7f-5afa6823d637', 'view', 'test_session_123');
-
--- Expected error: duplicate key value violates unique constraint
-
--- Cleanup test
--- DELETE FROM listing_analytics WHERE session_id = 'test_session_123';
-
+-- This second insert should fail with unique constraint violation:
+INSERT INTO listing_analytics (provider_id, session_id, user_id, event_type)
+VALUES (
+  'test-provider-id',
+  'test-session-id', 
+  'test-user-id',
+  'view'
+);
+*/

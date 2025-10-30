@@ -130,6 +130,48 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
   const isAnyModalOpen = Boolean(selectedImage || bookingOpen)
   useHideDock(isAnyModalOpen)
 
+  // ============================================================================
+  // ANALYTICS TRACKING FUNCTIONS
+  // ============================================================================
+
+  /**
+   * Track phone click event
+   * Called when user clicks any phone link (contact info or CTA button)
+   */
+  const handlePhoneClick = async () => {
+    if (!provider?.id) return
+    
+    try {
+      await trackListingEvent(provider.id, 'phone_click', {
+        category: provider.category_key,
+        is_featured: provider.isMember,
+        phone: provider.phone,
+      })
+      console.log('[Analytics] Phone click tracked for:', provider.name)
+    } catch (err) {
+      console.error('[Analytics] Failed to track phone click:', err)
+    }
+  }
+
+  /**
+   * Track website click event
+   * Called when user clicks website link
+   */
+  const handleWebsiteClick = async () => {
+    if (!provider?.id) return
+    
+    try {
+      await trackListingEvent(provider.id, 'website_click', {
+        category: provider.category_key,
+        is_featured: provider.isMember,
+        website: provider.website,
+      })
+      console.log('[Analytics] Website click tracked for:', provider.name)
+    } catch (err) {
+      console.error('[Analytics] Failed to track website click:', err)
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
     async function loadJobs() {
@@ -219,7 +261,7 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
     setSaveMsg(null)
     try {
       if (isSaved) {
-        // console.log('[Provider] unsave', { userId: auth.userId, providerId: provider.id })
+        // Unsave - remove from saved_providers
         const { error } = await supabase
           .from('saved_providers')
           .delete()
@@ -228,12 +270,26 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
         if (error) setSaveMsg(error.message)
         else setIsSaved(false)
       } else {
-        // console.log('[Provider] save', { userId: auth.userId, providerId: provider.id })
+        // Save - add to saved_providers
         const { error } = await supabase
           .from('saved_providers')
           .insert([{ user_id: auth.userId, provider_id: provider.id }])
-        if (error) setSaveMsg(error.message)
-        else setIsSaved(true)
+        if (error) {
+          setSaveMsg(error.message)
+        } else {
+          setIsSaved(true)
+          
+          // Track save analytics (only on successful save, not unsave)
+          try {
+            await trackListingEvent(provider.id, 'save', {
+              category: provider.category_key,
+              is_featured: provider.isMember,
+            })
+            console.log('[Analytics] Save tracked for:', provider.name)
+          } catch (err) {
+            console.error('[Analytics] Failed to track save:', err)
+          }
+        }
       }
     } finally {
       setSaving(false)
@@ -273,7 +329,21 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
         setBookingMsg(`Failed to create booking: ${text}`)
         return
       }
-      await res.json()
+      
+      const result = await res.json()
+      const bookingId = result.booking_id
+      
+      // Track booking attribution (non-blocking)
+      if (bookingId && provider?.id) {
+        try {
+          const { trackBookingAttribution } = await import('../services/analyticsService')
+          await trackBookingAttribution(bookingId, provider.id, 'listing_view')
+          console.log('[Analytics] Booking attributed to provider:', provider.id)
+        } catch (err) {
+          console.error('[Analytics] Failed to track booking attribution:', err)
+        }
+      }
+      
       setBookingMsg('✅ Booking requested! You will receive a confirmation email if provided.')
       // Close modal and redirect to account page after short delay
       setTimeout(() => {
@@ -496,7 +566,11 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                         <svg className="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.964 5.964l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
-                        <a href={`tel:${provider.phone}`} className="text-neutral-700 hover:text-neutral-900">
+                        <a 
+                          href={`tel:${provider.phone}`} 
+                          onClick={handlePhoneClick}
+                          className="text-neutral-700 hover:text-neutral-900"
+                        >
                           {provider.phone}
                         </a>
                       </div>
@@ -522,6 +596,7 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                           href={provider.website.startsWith('http') ? provider.website : `https://${provider.website}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
+                          onClick={handleWebsiteClick}
                           className="text-neutral-700 hover:text-neutral-900"
                         >
                           {provider.website}
@@ -801,6 +876,7 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
                               {provider.phone && provider.enable_call_contact && (
                                 <a
                                   href={`tel:${provider.phone}`}
+                                  onClick={handlePhoneClick}
                                   className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
