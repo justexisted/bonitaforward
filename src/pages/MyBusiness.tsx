@@ -76,7 +76,7 @@ import { type ProviderChangeRequest, dismissNotification as dismissNotificationD
 import './MyBusiness/mobile-optimizations.css'
 
 // Import extracted components
-import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, UserActivityTab, ListingsTab, HistoricalRequestsTab, JobPostsTab, TabDropdownNav } from './MyBusiness/components'
+import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, UserActivityTab, ListingsTab, HistoricalRequestsTab, JobPostsTab, TabDropdownNav, AnalyticsTab } from './MyBusiness/components'
 // import { PlanSelector } from './MyBusiness/components/PlanSelector' // Available but not used yet
 // import { useBusinessData, useImageUpload } from './MyBusiness/hooks' // Available but not integrated yet
 // import { BUSINESS_CATEGORIES } from './MyBusiness/utils' // Available but not used yet
@@ -842,12 +842,7 @@ export default function MyBusinessPage() {
 
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
-          <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-            <h3 className="text-lg font-medium text-neutral-900">Analytics Coming Soon</h3>
-            <p className="mt-2 text-neutral-600">
-              View your business listing performance, customer inquiries, and booking statistics.
-            </p>
-          </div>
+          <AnalyticsTab listings={listings} />
         )}
 
         {/* Recently Approved Tab */}

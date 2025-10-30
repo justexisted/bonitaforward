@@ -19,3 +19,10 @@ export { HistoricalRequestsTab } from './HistoricalRequestsTab'
 export { JobPostsTab } from './JobPostsTab'
 export { TabDropdownNav } from './TabDropdownNav'
 
+// Analytics Components
+export { AnalyticsTab } from './AnalyticsTab'
+export { AnalyticsSummaryCards } from './AnalyticsSummaryCards'
+export { AnalyticsEventTable } from './AnalyticsEventTable'
+export { AnalyticsFunnelAttribution } from './AnalyticsFunnelAttribution'
+export { AnalyticsBookingConversions } from './AnalyticsBookingConversions'
+
