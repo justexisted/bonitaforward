@@ -1,24 +1,41 @@
-# Business Management Icons Update - 2025-10-28
+# Account Page Icons Update - 2025-10-28
 
 ## ✅ **Change Summary**
 
-Replaced cheap emojis with professional monoline SVG icons in the Business Management section of the `/account` page.
+Replaced ALL cheap emojis with professional monoline SVG icons across the entire `/account` page, including:
+- **Business Management** section
+- **My Bookings** section  
+- **Saved Businesses** section
+- **Saved Events** section
+- **Pending Applications** section
 
 ---
 
 ## 🔄 **What Was Replaced**
 
-### Before (Emojis):
-- 📍 Address
-- 📞 Phone
-- ✉️ Email
-- 🌐 Website
+### Business Management Section:
+- 📍 Address → Location pin icon (Heroicons)
+- 📞 Phone → Phone icon (Heroicons)
+- ✉️ Email → Mail/envelope icon (Heroicons)
+- 🌐 Website → Globe/internet icon (Heroicons)
 
-### After (Professional SVG Icons):
-- 📍 → Location pin icon (Heroicons)
-- 📞 → Phone icon (Heroicons)
-- ✉️ → Mail/envelope icon (Heroicons)
-- 🌐 → Globe/internet icon (Heroicons)
+### My Bookings Section:
+- 📅 Booked date → Calendar icon (Heroicons)
+- 📍 Address → Location pin icon (Heroicons)
+- 📝 Notes → Edit/document icon (Heroicons)
+
+### Saved Businesses Section:
+- 🏢 Category → Building/office icon (Heroicons)
+- 📍 Address → Location pin icon (Heroicons)
+
+### Saved Events Section:
+- 📅 Event date → Calendar icon (Heroicons)
+- 🕐 Event time → Clock icon (Heroicons)
+- 📍 Event location → Location pin icon (Heroicons)
+
+### Pending Applications Section:
+- ⭐ Featured tier → Star icon (filled)
+- 🆓 Free tier → Checkmark icon
 
 ---
 
@@ -33,15 +50,18 @@ All icons are now consistent with the following properties:
 
 ---
 
-## 📍 **Location**
+## 📍 **Files Updated**
 
-**File:** `src/pages/Account.tsx`
+1. **`src/pages/Account.tsx`**
+   - Business Management section (desktop & mobile)
+   - Saved Events section (desktop & mobile)
+   - Pending Applications section (desktop & mobile)
 
-**Section:** Business Management (both desktop and mobile views)
+2. **`src/pages/account/components/MyBookings.tsx`**
+   - Booking date, address, and notes
 
-**Lines affected:**
-- Desktop view: ~262-277
-- Mobile view: ~670-685
+3. **`src/pages/account/components/SavedBusinesses.tsx`**
+   - Business category and address
 
 ---
 
@@ -57,18 +77,29 @@ All icons are now consistent with the following properties:
 
 ## 🧪 **Testing**
 
-To verify the change:
+To verify all changes:
 
-1. Go to `/account`
-2. Navigate to **Business Management** section
-3. View any business card
-4. Verify icons appear next to:
-   - Address
-   - Phone number
-   - Email
-   - Website
+### 1. **Business Management** tab:
+- View business cards
+- Check for icons next to: Address, Phone, Email, Website
 
-All icons should be clean, monoline SVG graphics in neutral gray.
+### 2. **My Bookings** tab:
+- View booking cards
+- Check for icons next to: Booked date, Address, Notes
+
+### 3. **Saved Businesses** tab:
+- View saved business cards
+- Check for icons next to: Category, Address
+
+### 4. **Saved Events** tab:
+- View event cards
+- Check for icons next to: Date, Time, Location
+
+### 5. **Pending Applications** tab:
+- View application cards
+- Check for Featured/Free tier badges with star/checkmark icons
+
+**Expected:** All icons should be clean, monoline SVG graphics in neutral gray (`text-neutral-500`).
 
 ---
 
@@ -108,7 +139,54 @@ All icons should be clean, monoline SVG graphics in neutral gray.
 </svg>
 ```
 
+### Calendar Icon:
+```jsx
+<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+</svg>
+```
+
+### Clock Icon:
+```jsx
+<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+</svg>
+```
+
+### Document/Note Icon:
+```jsx
+<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+</svg>
+```
+
+### Building/Office Icon:
+```jsx
+<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+</svg>
+```
+
+### Star Icon (Featured):
+```jsx
+<svg fill="currentColor" viewBox="0 0 20 20">
+  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+</svg>
+```
+
+### Checkmark Icon (Free):
+```jsx
+<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+    d="M5 13l4 4L19 7" />
+</svg>
+```
+
 ---
 
-**Status:** ✅ **DEPLOYED** - Commit 9bc4760
+**Status:** ✅ **DEPLOYED** - Commit fb63cdb
 
