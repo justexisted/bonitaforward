@@ -28,6 +28,7 @@ export interface Booking {
   time?: string | null
   status?: string | null
   created_at?: string | null
+  booking_date?: string | null
   customer_name?: string | null
   customer_email?: string | null
   booking_duration_minutes?: number | null

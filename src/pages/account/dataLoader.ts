@@ -15,6 +15,7 @@ export async function loadBookings(email: string): Promise<Booking[]> {
         id,
         status,
         created_at,
+        booking_date,
         customer_name,
         customer_email,
         booking_duration_minutes,
@@ -29,7 +30,7 @@ export async function loadBookings(email: string): Promise<Booking[]> {
         )
       `)
       .eq('customer_email', email)
-      .order('created_at', { ascending: false })
+      .order('booking_date', { ascending: false })
     
     if (!eventsError && eventsData && eventsData.length > 0) {
       return eventsData.map((b: any) => ({
@@ -39,6 +40,7 @@ export async function loadBookings(email: string): Promise<Booking[]> {
         time: null,
         status: b.status,
         created_at: b.created_at,
+          booking_date: b.booking_date,
         customer_name: b.customer_name,
         customer_email: b.customer_email,
         booking_duration_minutes: b.booking_duration_minutes,
