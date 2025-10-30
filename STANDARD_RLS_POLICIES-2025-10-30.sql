@@ -190,3 +190,52 @@ CREATE POLICY "coupon_redemptions_delete_admin"
   USING (is_admin_user(auth.uid()));
 
 COMMIT;
+
+-- ========================================
+-- saved_providers (user saved businesses)
+-- ========================================
+-- Note: Keeping this block after COMMIT so it can be run independently as well.
+BEGIN;
+
+ALTER TABLE IF EXISTS public.saved_providers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "saved_providers_insert_authed" ON public.saved_providers;
+DROP POLICY IF EXISTS "saved_providers_select_owner" ON public.saved_providers;
+DROP POLICY IF EXISTS "saved_providers_delete_owner" ON public.saved_providers;
+DROP POLICY IF EXISTS "saved_providers_select_admin" ON public.saved_providers;
+DROP POLICY IF EXISTS "saved_providers_delete_admin" ON public.saved_providers;
+
+-- Users can create their own saves
+CREATE POLICY "saved_providers_insert_authed"
+  ON public.saved_providers
+  FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- Users can read their own saves
+CREATE POLICY "saved_providers_select_owner"
+  ON public.saved_providers
+  FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- Users can remove their own saves
+CREATE POLICY "saved_providers_delete_owner"
+  ON public.saved_providers
+  FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Optional admin visibility
+CREATE POLICY "saved_providers_select_admin"
+  ON public.saved_providers
+  FOR SELECT
+  USING (is_admin_user(auth.uid()));
+
+CREATE POLICY "saved_providers_delete_admin"
+  ON public.saved_providers
+  FOR DELETE
+  USING (is_admin_user(auth.uid()));
+
+-- Prevent duplicates (safe to re-run)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_providers_unique
+  ON public.saved_providers(user_id, provider_id);
+
+COMMIT;

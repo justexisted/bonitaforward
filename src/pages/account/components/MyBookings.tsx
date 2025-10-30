@@ -72,12 +72,20 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
                   </h3>
                 )}
                 
-                {booking.created_at && (
+                {(booking as any).booking_date && (
                   <p className="flex items-center gap-2 text-sm text-neutral-600 mb-1">
                     <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span>Booked: {new Date(booking.created_at).toLocaleString()}</span>
+                    <span>For: {new Date((booking as any).booking_date).toLocaleString()}</span>
+                  </p>
+                )}
+                {!(booking as any).booking_date && booking.created_at && (
+                  <p className="flex items-center gap-2 text-sm text-neutral-600 mb-1">
+                    <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>For: {new Date(booking.created_at).toLocaleString()}</span>
                   </p>
                 )}
                 {booking.provider_address && (
