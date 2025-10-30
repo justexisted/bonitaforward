@@ -159,14 +159,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
       }
     }
 
-    // Get valid access token
+    // Get valid access token (gracefully handle missing/expired tokens)
     const accessToken = await getValidAccessToken(provider_id)
-    if (!accessToken) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Failed to get valid access token' })
-      }
-    }
 
     // Calculate end time
     const startTime = new Date(booking_date)
@@ -202,34 +196,32 @@ export const handler: Handler = async (event: HandlerEvent) => {
         ]
       }
     }
+    let createdEvent: any | null = null
+    if (accessToken) {
+      const calendarResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${provider.google_calendar_id}/events?sendUpdates=all`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(calendarEvent)
+        }
+      )
 
-    const calendarResponse = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${provider.google_calendar_id}/events?sendUpdates=all`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(calendarEvent)
+      if (calendarResponse.ok) {
+        createdEvent = await calendarResponse.json()
+      } else {
+        const errorData = await calendarResponse.text()
+        console.error('Failed to create calendar event:', errorData)
+        // Continue with local booking storage as pending
       }
-    )
-
-    if (!calendarResponse.ok) {
-      const errorData = await calendarResponse.text()
-      console.error('Failed to create calendar event:', errorData)
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ 
-          error: 'Failed to create calendar event',
-          details: errorData 
-        })
-      }
+    } else {
+      console.warn('No valid Google access token. Storing booking as pending and prompting reconnect.')
     }
 
-    const createdEvent = await calendarResponse.json()
-
-    // Store booking in database
+    // Store booking in database (confirmed if Google event created, otherwise pending)
     const { data: booking, error: bookingError } = await supabase
       .from('booking_events')
       .insert([{
@@ -239,8 +231,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
         booking_date: startTime.toISOString(),
         booking_duration_minutes: duration_minutes,
         booking_notes: notes,
-        google_event_id: createdEvent.id,
-        status: 'confirmed'
+        google_event_id: createdEvent?.id || null,
+        status: createdEvent ? 'confirmed' : 'pending'
       }])
       .select()
       .single()
@@ -267,12 +259,14 @@ export const handler: Handler = async (event: HandlerEvent) => {
     }
 
     return {
-      statusCode: 200,
+      statusCode: createdEvent ? 200 : 200,
       body: JSON.stringify({
         success: true,
         booking_id: booking?.id,
-        google_event_id: createdEvent.id,
-        google_event_link: createdEvent.htmlLink
+        status: createdEvent ? 'confirmed' : 'pending',
+        message: createdEvent ? undefined : 'Google connection expired. Booking saved as pending. Please reconnect Google Calendar in My Business.',
+        google_event_id: createdEvent?.id,
+        google_event_link: createdEvent?.htmlLink
       })
     }
   } catch (error: any) {
