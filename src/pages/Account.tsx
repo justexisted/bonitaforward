@@ -314,7 +314,7 @@ export default function AccountPage() {
                             </span>
                             {business.published && (
                               <Link
-                                to={`/providers/${business.id}`}
+                                to={`/${business.category_key}`}
                                 className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -857,7 +857,7 @@ export default function AccountPage() {
                             </span>
                             {business.published && (
                               <Link
-                                to={`/providers/${business.id}`}
+                                to={`/${business.category_key}`}
                                 className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               >
