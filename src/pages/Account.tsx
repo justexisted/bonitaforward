@@ -12,7 +12,9 @@ import {
   loadSavedEvents,
   loadPendingApplications,
   loadMyBusinesses,
-  requestApplicationUpdate
+  requestApplicationUpdate,
+  updateEvent,
+  deleteEvent
 } from './account/dataLoader'
 import { AccountSettings, MyBookings, SavedBusinesses } from './account/components'
 
@@ -37,6 +39,16 @@ export default function AccountPage() {
     pendingApps: [],
     myBusinesses: [],
   })
+  const [editingEvent, setEditingEvent] = useState<null | {
+    id: string
+    title: string
+    description: string
+    date: string
+    time: string
+    location: string
+    address: string
+  }>(null)
+  const [submittingEventEdit, setSubmittingEventEdit] = useState(false)
 
   // Handle navigation from notifications
   useEffect(() => {
@@ -113,6 +125,21 @@ export default function AccountPage() {
     } catch (err: any) {
       setMessage(`Error cancelling application: ${err.message}`)
     }
+  }
+
+  // Helper: remove event locally
+  function handleEventDeleted(eventId: string) {
+    setData(prev => ({
+      ...prev,
+      myEvents: prev.myEvents.filter(ev => ev.id !== eventId)
+    }))
+  }
+  // Helper: update event locally
+  function handleEventUpdated(updated: any) {
+    setData(prev => ({
+      ...prev,
+      myEvents: prev.myEvents.map(ev => ev.id === updated.id ? { ...ev, ...updated } : ev)
+    }))
   }
 
   // Filter sidebar items based on user type
@@ -419,12 +446,43 @@ export default function AccountPage() {
                                     )}
                                   </div>
                                 </div>
-                                <Link
-                                  to="/calendar"
-                                  className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                                >
-                                  View
-                                </Link>
+                                <div className="flex gap-2">
+                                  <Link
+                                    to="/calendar"
+                                    className="px-3 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                  >
+                                    View
+                                  </Link>
+                                  <button
+                                    onClick={() => setEditingEvent({
+                                      id: event.id,
+                                      title: (event as any).title || '',
+                                      description: (event as any).description || '',
+                                      date: (event as any).date || new Date().toISOString().split('T')[0],
+                                      time: (event as any).time || '',
+                                      location: (event as any).location || '',
+                                      address: (event as any).address || ''
+                                    })}
+                                    className="px-3 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm('Delete this event? This cannot be undone.')) return
+                                      const res = await deleteEvent(event.id)
+                                      if (res.success) {
+                                        handleEventDeleted(event.id)
+                                        setMessage('Event deleted')
+                                      } else {
+                                        setMessage(res.error || 'Failed to delete event')
+                                      }
+                                    }}
+                                    className="px-3 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -693,6 +751,108 @@ export default function AccountPage() {
             )}
           </div>
         </main>
+
+        {/* Edit Event Modal */}
+        {editingEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="w-full max-w-lg bg-white rounded-xl shadow-xl border border-neutral-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-neutral-900">Edit Event</h3>
+                <button onClick={() => setEditingEvent(null)} className="text-neutral-500 hover:text-neutral-700">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <label className="block text-sm">
+                  <span className="text-neutral-700">Title</span>
+                  <input
+                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                    value={editingEvent.title}
+                    onChange={e => setEditingEvent(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-neutral-700">Date</span>
+                  <input
+                    type="date"
+                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                    value={editingEvent.date?.toString().split('T')[0] || ''}
+                    onChange={e => setEditingEvent(prev => prev ? { ...prev, date: e.target.value } : prev)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-neutral-700">Time</span>
+                  <input
+                    type="time"
+                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                    value={editingEvent.time || ''}
+                    onChange={e => setEditingEvent(prev => prev ? { ...prev, time: e.target.value } : prev)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-neutral-700">Location</span>
+                  <input
+                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                    value={editingEvent.location}
+                    onChange={e => setEditingEvent(prev => prev ? { ...prev, location: e.target.value } : prev)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-neutral-700">Address</span>
+                  <input
+                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                    value={editingEvent.address}
+                    onChange={e => setEditingEvent(prev => prev ? { ...prev, address: e.target.value } : prev)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-neutral-700">Description</span>
+                  <textarea
+                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                    rows={4}
+                    value={editingEvent.description}
+                    onChange={e => setEditingEvent(prev => prev ? { ...prev, description: e.target.value } : prev)}
+                  />
+                </label>
+              </div>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setEditingEvent(null)}
+                  className="px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={submittingEventEdit}
+                  onClick={async () => {
+                    if (!editingEvent) return
+                    setSubmittingEventEdit(true)
+                    const payload = {
+                      title: editingEvent.title,
+                      description: editingEvent.description,
+                      date: editingEvent.date,
+                      time: editingEvent.time,
+                      location: editingEvent.location,
+                      address: editingEvent.address,
+                    }
+                    const res = await updateEvent(editingEvent.id, payload)
+                    setSubmittingEventEdit(false)
+                    if (res.success) {
+                      handleEventUpdated({ id: editingEvent.id, ...payload })
+                      setEditingEvent(null)
+                      setMessage('Event updated')
+                    } else {
+                      setMessage(res.error || 'Failed to update event')
+                    }
+                  }}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {submittingEventEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Desktop Sidebar Layout */}
