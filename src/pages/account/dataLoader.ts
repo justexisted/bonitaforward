@@ -305,15 +305,29 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
 
 export async function cancelBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: 'cancelled' })
-      .eq('id', bookingId)
-    
-    if (error) {
-      return { success: false, error: error.message }
+    // Use server function to cancel booking in booking_events with service role
+    const { data: userData } = await supabase.auth.getUser()
+    const userEmail = userData.user?.email
+    if (!userEmail) {
+      return { success: false, error: 'Not signed in' }
     }
-    
+
+    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const url = isLocal
+      ? 'http://localhost:8888/.netlify/functions/manage-booking'
+      : '/.netlify/functions/manage-booking'
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel', bookingId, userEmail })
+    })
+
+    if (!res.ok) {
+      const details = await res.json().catch(() => ({} as any))
+      return { success: false, error: details?.error || 'Cancel failed' }
+    }
+
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }
