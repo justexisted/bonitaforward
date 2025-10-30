@@ -4,8 +4,7 @@
  * Displays a table of all listing analytics events with:
  * - Event type (view, phone_click, website_click, save)
  * - Timestamp
- * - User info (if available)
- * - Session data
+ * - Privacy: no user or source details displayed
  * - Filtering by event type
  */
 
@@ -174,12 +173,7 @@ export function AnalyticsEventTable({ events }: AnalyticsEventTableProps) {
               <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                 Date & Time
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
-                User
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
-                Source
-              </th>
+              {/* Intentionally omit User and Source columns for privacy compliance */}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-200">
@@ -194,16 +188,7 @@ export function AnalyticsEventTable({ events }: AnalyticsEventTableProps) {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-700">
                   {formatDate(event.created_at)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-700">
-                  {event.user_id ? (
-                    <span className="text-green-600">Logged In</span>
-                  ) : (
-                    <span className="text-neutral-400">Anonymous</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
-                  {event.referrer || event.metadata?.search_source || 'Direct'}
-                </td>
+                {/* Omitted sensitive/user-identifying and source data */}
               </tr>
             ))}
           </tbody>
