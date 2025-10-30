@@ -37,8 +37,7 @@ export default function Unsubscribe() {
         .update({ 
           email_notifications_enabled: false,
           marketing_emails_enabled: false,
-          email_unsubscribe_date: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          email_unsubscribe_date: new Date().toISOString()
         })
         .eq('id', profile.id)
 

@@ -407,7 +407,7 @@ export async function updateEmailPreferences(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const updateData: any = { ...preferences, updated_at: new Date().toISOString() }
+    const updateData: any = { ...preferences }
     
     // If disabling notifications, set unsubscribe date
     if (preferences.email_notifications_enabled === false) {
