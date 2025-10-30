@@ -369,3 +369,72 @@ export async function updateProfile(userId: string, name: string): Promise<{ suc
   }
 }
 
+export async function loadEmailPreferences(userId: string): Promise<{
+  email_notifications_enabled: boolean
+  marketing_emails_enabled: boolean
+  email_consent_date: string | null
+  email_unsubscribe_date: string | null
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('email_notifications_enabled, marketing_emails_enabled, email_consent_date, email_unsubscribe_date')
+      .eq('id', userId)
+      .single()
+
+    if (error) {
+      console.error('[Account] Error loading email preferences:', error)
+      return null
+    }
+
+    return {
+      email_notifications_enabled: data.email_notifications_enabled ?? true,
+      marketing_emails_enabled: data.marketing_emails_enabled ?? false,
+      email_consent_date: data.email_consent_date,
+      email_unsubscribe_date: data.email_unsubscribe_date
+    }
+  } catch (error) {
+    console.error('[Account] Exception loading email preferences:', error)
+    return null
+  }
+}
+
+export async function updateEmailPreferences(
+  userId: string,
+  preferences: {
+    email_notifications_enabled?: boolean
+    marketing_emails_enabled?: boolean
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const updateData: any = { ...preferences, updated_at: new Date().toISOString() }
+    
+    // If disabling notifications, set unsubscribe date
+    if (preferences.email_notifications_enabled === false) {
+      updateData.email_unsubscribe_date = new Date().toISOString()
+    }
+    
+    // If re-enabling notifications, clear unsubscribe date and set consent date
+    if (preferences.email_notifications_enabled === true) {
+      updateData.email_unsubscribe_date = null
+      updateData.email_consent_date = new Date().toISOString()
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', userId)
+
+    if (error) {
+      console.error('[Account] Error updating email preferences:', error)
+      return { success: false, error: error.message }
+    }
+
+    console.log('[Account] Email preferences updated successfully')
+    return { success: true }
+  } catch (error: any) {
+    console.error('[Account] Exception updating email preferences:', error)
+    return { success: false, error: error.message }
+  }
+}
+
