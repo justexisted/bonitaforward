@@ -160,6 +160,12 @@ export async function trackFunnelAttribution(
       .insert(record)
     
     if (error) {
+      // Handle duplicate key error gracefully (already attributed)
+      if (error.code === '23505') {
+        console.log('[Analytics] Funnel attribution already exists (skipping):', funnelResponseId)
+        return { success: true, blocked: true }
+      }
+      
       console.error('[Analytics] Failed to track funnel attribution:', error)
       return { success: false, error: error.message }
     }
@@ -234,6 +240,12 @@ export async function trackBookingAttribution(
       .insert(record)
     
     if (error) {
+      // Handle duplicate key error gracefully (already attributed)
+      if (error.code === '23505') {
+        console.log('[Analytics] Booking attribution already exists (skipping):', bookingId)
+        return { success: true, blocked: true }
+      }
+      
       console.error('[Analytics] Failed to track booking attribution:', error)
       return { success: false, error: error.message }
     }

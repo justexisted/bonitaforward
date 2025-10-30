@@ -64,15 +64,18 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
       .maybeSingle()
 
     let funnelResponseId: string | null = null
+    let isNewResponse = false
 
     if (existing) {
-      // Update existing record
+      // Update existing record (don't track attribution again)
       await supabase
         .from('funnel_responses')
         .update({ answers })
         .eq('id', existing.id)
       
       funnelResponseId = existing.id
+      isNewResponse = false
+      console.log('[Analytics] Updated existing funnel response (no new attribution)')
     } else {
       // Insert new record and get its ID
       const { data: inserted, error } = await supabase
@@ -83,11 +86,12 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
       
       if (!error && inserted) {
         funnelResponseId = inserted.id
+        isNewResponse = true
       }
     }
 
-    // Track funnel attribution to last viewed provider (within 30 minute window)
-    if (funnelResponseId) {
+    // Track funnel attribution ONLY for NEW responses (prevents duplicate key violations)
+    if (funnelResponseId && isNewResponse) {
       const lastViewedProviderId = getLastViewedProvider(30) // 30 minute attribution window
       
       if (lastViewedProviderId) {
