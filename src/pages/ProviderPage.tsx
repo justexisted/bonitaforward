@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { fixImageUrl } from '../utils/imageUtils'
 import { useHideDock } from '../hooks/useHideDock'
+import { 
+  trackListingEvent, 
+  hasTrackedViewThisSession, 
+  markViewTracked,
+  storeLastViewedProvider 
+} from '../services/analyticsService'
 
 // ============================================================================
 // TYPES
@@ -117,6 +123,9 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
   const [bookingBusy, setBookingBusy] = useState(false)
   const [bookingMsg, setBookingMsg] = useState<string | null>(null)
 
+  // Prevent duplicate tracking (React StrictMode in dev runs effects twice)
+  const trackingInProgress = useRef(false)
+
   // Hide Dock when any modal is open
   const isAnyModalOpen = Boolean(selectedImage || bookingOpen)
   useHideDock(isAnyModalOpen)
@@ -159,6 +168,50 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
     }
     void checkSaved()
   }, [auth.userId, provider?.id])
+
+  // Track view analytics (once per session)
+  useEffect(() => {
+    async function trackView() {
+      try {
+        if (!provider?.id) return
+        
+        // Check if already tracked this session
+        if (hasTrackedViewThisSession(provider.id)) {
+          return
+        }
+        
+        // Prevent concurrent tracking (React StrictMode protection)
+        if (trackingInProgress.current) {
+          console.log('[Analytics] Tracking already in progress, skipping duplicate')
+          return
+        }
+        
+        trackingInProgress.current = true
+        
+        // Track the view
+        const result = await trackListingEvent(provider.id, 'view', {
+          category: provider.category_key,
+          is_featured: provider.isMember,
+          search_source: new URLSearchParams(window.location.search).get('from'),
+        })
+        
+        if (result.success) {
+          // Mark as tracked for this session
+          markViewTracked(provider.id)
+          // Store for funnel attribution
+          storeLastViewedProvider(provider.id)
+          console.log('[Analytics] View tracked for:', provider.name)
+        }
+        
+        trackingInProgress.current = false
+      } catch (err) {
+        // Tracking failures should not break the page
+        console.error('[Analytics] Failed to track view:', err)
+        trackingInProgress.current = false
+      }
+    }
+    void trackView()
+  }, [provider?.id, provider?.category_key, provider?.isMember, provider?.name])
 
   async function toggleSaveProvider() {
     if (!auth.userId || !provider?.id) { setSaveMsg('Please sign in'); return }
