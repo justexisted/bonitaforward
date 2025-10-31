@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { CATEGORY_OPTIONS } from '../constants/categories'
 
 export default function CreateBusinessForm() {
   const auth = useAuth()
@@ -86,11 +87,9 @@ export default function CreateBusinessForm() {
         className="rounded-xl border border-neutral-200 px-3 py-2 bg-white"
       >
         <option value="">Select Category *</option>
-        <option value="real-estate">Real Estate</option>
-        <option value="home-services">Home Services</option>
-        <option value="health-wellness">Health & Wellness</option>
-        <option value="restaurants-cafes">Restaurants & Cafes</option>
-        <option value="professional-services">Professional Services</option>
+        {CATEGORY_OPTIONS.map((cat) => (
+          <option key={cat.key} value={cat.key}>{cat.name}</option>
+        ))}
       </select>
 
       <input 
