@@ -282,6 +282,25 @@ body {
 	}
 }
 
+/* Safari compatibility: Add -webkit-user-select for user-select */
+/* Apply to all elements with select-none class (including via Tailwind) */
+/* Also apply globally to ensure all select-none usage is covered */
+.select-none,
+[class*="select-none"],
+[class~="select-none"],
+*[class*="select-none"] {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Add text-size-adjust fallback for cross-browser compatibility */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 .animated-gradient-text {
 	position: relative;
 	margin: 0 auto;
@@ -345,8 +364,8 @@ body {
 	position: relative;
 	z-index: 2;
 	background-size: 300% 100%;
-	background-clip: text;
 	-webkit-background-clip: text;
+	background-clip: text;
 	color: transparent;
 	animation: gradient linear infinite;
   }

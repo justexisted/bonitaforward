@@ -41,11 +41,11 @@ export default function CategoryCard({ cat }: CategoryCardProps) {
     >
       <Link to={`/category/${cat.key}`} className="block rounded-2xl bg-white p-4">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-12 w-13 md:h-20 md:w-25 items-center justify-center rounded-2xl bg-neutral-50">
+          <span className="inline-flex h-12 w-14 md:h-20 md:w-24 items-center justify-center rounded-2xl bg-neutral-50">
             <img 
               src={cat.icon} 
               alt={`${cat.name} icon`}
-              className="h-12 w-16 md:h-20 md:w-25 object-contain"
+              className="h-12 w-16 md:h-20 md:w-24 object-contain"
               style={{ scale: 1.3 }}
             />
           </span>

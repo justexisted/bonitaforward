@@ -19,6 +19,7 @@ export type DockItemData = {
   onClick: () => void;
   className?: string;
   notificationCount?: number;
+  ariaLabel?: string; // Optional accessible name for ARIA compliance
 };
 
 export type DockProps = {
@@ -42,6 +43,7 @@ type DockItemProps = {
   baseItemSize: number;
   magnification: number;
   notificationCount?: number;
+  ariaLabel?: string; // Accessible name for ARIA compliance
 };
 
 function DockItem({
@@ -53,7 +55,8 @@ function DockItem({
   distance,
   magnification,
   baseItemSize,
-  notificationCount = 0
+  notificationCount = 0,
+  ariaLabel
 }: DockItemProps) {
   const ref = useRef<HTMLDivElement>(null);
   const isHovered = useMotionValue(0);
@@ -85,6 +88,8 @@ function DockItem({
       tabIndex={0}
       role="button"
       aria-haspopup="true"
+      aria-label={ariaLabel}
+      title={ariaLabel}
     >
       {Children.map(children, child =>
         React.isValidElement(child)
@@ -186,22 +191,28 @@ export default function Dock({
         role="toolbar"
         aria-label="Application dock"
       >
-        {items.map((item, index) => (
-          <DockItem
-            key={index}
-            onClick={item.onClick}
-            className={item.className}
-            mouseX={mouseX}
-            spring={spring}
-            distance={distance}
-            magnification={magnification}
-            baseItemSize={baseItemSize}
-            notificationCount={item.notificationCount}
-          >
-            <DockIcon>{item.icon}</DockIcon>
-            <DockLabel>{item.label}</DockLabel>
-          </DockItem>
-        ))}
+        {items.map((item, index) => {
+          // Generate accessible name from label (text content or fallback)
+          const accessibleLabel = item.ariaLabel || (typeof item.label === 'string' ? item.label : `Dock item ${index + 1}`)
+          
+          return (
+            <DockItem
+              key={index}
+              onClick={item.onClick}
+              className={item.className}
+              mouseX={mouseX}
+              spring={spring}
+              distance={distance}
+              magnification={magnification}
+              baseItemSize={baseItemSize}
+              notificationCount={item.notificationCount}
+              ariaLabel={accessibleLabel}
+            >
+              <DockIcon>{item.icon}</DockIcon>
+              <DockLabel>{item.label}</DockLabel>
+            </DockItem>
+          )
+        })}
       </motion.div>
     </motion.div>
   );

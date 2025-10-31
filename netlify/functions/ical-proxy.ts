@@ -6,6 +6,7 @@ export const handler: Handler = async (event, context) => {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'X-Content-Type-Options': 'nosniff',
   }
 
   // Handle preflight requests

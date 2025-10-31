@@ -128,6 +128,8 @@ export default function ProviderFormModal({
                 Phone Number
               </label>
               <input 
+                id="provider-phone"
+                name="phone"
                 value={newProviderForm.phone || ''} 
                 onChange={(e) => updateField('phone', e.target.value)}
                 className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
@@ -141,6 +143,9 @@ export default function ProviderFormModal({
                 Email Address
               </label>
               <input 
+                id="provider-email"
+                name="email"
+                type="email"
                 value={newProviderForm.email || ''} 
                 onChange={(e) => updateField('email', e.target.value)}
                 className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
@@ -154,6 +159,9 @@ export default function ProviderFormModal({
                 Website
               </label>
               <input 
+                id="provider-website"
+                name="website"
+                type="url"
                 value={newProviderForm.website || ''} 
                 onChange={(e) => updateField('website', e.target.value)}
                 className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
@@ -167,6 +175,8 @@ export default function ProviderFormModal({
                 Address
               </label>
               <input 
+                id="provider-address"
+                name="address"
                 value={newProviderForm.address || ''} 
                 onChange={(e) => updateField('address', e.target.value)}
                 className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
@@ -183,6 +193,8 @@ export default function ProviderFormModal({
             <span className="text-xs text-green-600 ml-2">(Comma-separated)</span>
           </label>
           <input 
+            id="provider-specialties"
+            name="specialties"
             defaultValue={(newProviderForm.specialties || []).join(', ')} 
             onBlur={(e) => updateField('specialties', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
             className="w-full rounded-lg border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 

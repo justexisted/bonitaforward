@@ -70,37 +70,18 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
 
   // Listen for provider updates to trigger re-renders when data loads
   useProviderUpdates(() => { 
-    console.log('[Hero] Provider update event received, incrementing version')
     setVersion((v: number) => v + 1) 
   }, [])
 
-  // Debug: Log providers data on every render
-  console.log('[Hero] Render - providersByCategory:', providersByCategory)
-  const allProviders = getAllProviders(providersByCategory)
-  console.log('[Hero] Render - Total providers:', allProviders.length)
-  
-  // Debug: Log sample providers to verify data structure
-  if (allProviders.length > 0) {
-    console.log('[Hero] Sample provider:', allProviders[0])
-  }
-
-  // Re-run search when providers data changes
+  // Re-run search when query or providers data changes (debounced via state updates)
   useEffect(() => {
-    if (query.trim()) {
-      recompute(query)
+    if (!query.trim()) {
+      setResults([])
+      return
     }
-  }, [providersByCategory, version])
-
-  function recompute(q: string) {
-    const text = q.trim().toLowerCase()
-    console.log('[Hero] recompute called with:', text)
-    if (!text) { setResults([]); return }
-    const all = getAllProviders(providersByCategory)
-    console.log('[Hero] Total providers for search:', all.length)
     
-    // Debug: Show all restaurant providers and their tags
-    // const restaurants = all.filter(p => p.category_key === 'restaurants-cafes')
-    // console.log('[Search] Restaurant providers:', restaurants.map(p => ({ name: p.name, tags: p.tags })))
+    const text = query.trim().toLowerCase()
+    const all = getAllProviders(providersByCategory)
     
     const scored = all
       .map((p) => {
@@ -112,17 +93,6 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
         const featuredBonus = (baseMatch > 0 && p.isMember) ? 1.5 : 0
         const match = baseMatch + featuredBonus
         
-        // Debug: Log any restaurant matches
-        // if (p.category_key === 'restaurants-cafes' && (matchName > 0 || matchTag > 0)) {
-        //   console.log('[Search] Restaurant match found:', { 
-        //     name: p.name, 
-        //     tags: p.tags, 
-        //     matchName, 
-        //     matchTag, 
-        //     totalMatch: match 
-        //   })
-        // }
-        
         return { p, match }
       })
       .filter((s) => s.match > 0)
@@ -130,21 +100,14 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
       .slice(0, 8)
       .map((s) => s.p)
     
-    console.log('[Hero] Search results:', scored.length, 'matches')
-    if (scored.length > 0) {
-      console.log('[Hero] Sample search result:', scored[0])
-    }
     setResults(scored)
-  }
-
-  // Debug: Log current state values
-  console.log('[Hero] Current state - open:', open, 'results.length:', results.length, 'query:', query)
+  }, [query, providersByCategory, version])
 
   return (
     <section className="relative overflow-hidden" style={{ minHeight: '33vh', overflow: 'visible' }}>
       <img
         src="/images/bonita-cartoon-hero.jpeg"
-        alt=""
+        alt="Bonita community landscape"
         loading="eager"
         decoding="async"
         className="absolute inset-0 h-full w-full object-cover"
@@ -177,15 +140,14 @@ export default function Hero({ providersByCategory, useProviderUpdates }: HeroPr
                   <input
                     value={query}
                     onChange={(e) => { 
-                      console.log('[Hero] Input onChange triggered:', e.target.value)
                       setQuery(e.target.value); 
                       setOpen(true); 
-                      recompute(e.target.value) 
                     }}
                     onFocus={() => { if (results.length) setOpen(true) }}
                     onBlur={() => setTimeout(() => setOpen(false), 120)}
                     placeholder="Discover Bonita"
                     className="flex-1 outline-none text-base bg-transparent placeholder:text-neutral-400"
+                    aria-label="Search for businesses in Bonita"
                   />
                 </div>
                 {open && results.length > 0 && (

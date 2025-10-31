@@ -39,7 +39,7 @@ export function CommunityIndex() {
             postsByCategory[category] = posts
           }
         } catch (error) {
-          console.warn(`Failed to fetch posts for ${category}:`, error)
+          // Silently handle errors - empty array for failed categories
           if (!cancelled) {
             postsByCategory[category] = []
           }
@@ -72,10 +72,11 @@ export function CommunityIndex() {
                 <div className="md:hidden relative rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
                   <img
                     src={imageUrl}
-                    alt=""
+                    alt={categoryToTitle[ck] || `${ck} category`}
                     className="w-full h-48 object-cover scale-115 -translate-x-5"
                     onError={(e) => {
                       const img = e.currentTarget as HTMLImageElement
+                      img.onerror = null
                       img.src = `https://picsum.photos/seed/${ck}/800/400`
                     }}
                   />
@@ -103,10 +104,11 @@ export function CommunityIndex() {
                   <div className="w-1/2 relative">
                     <img
                       src={imageUrl}
-                      alt=""
+                      alt={categoryToTitle[ck] || `${ck} category`}
                       className="w-full h-full object-cover scale-115 -translate-x-5"
                       onError={(e) => {
                         const img = e.currentTarget as HTMLImageElement
+                        img.onerror = null
                         img.src = `https://picsum.photos/seed/${ck}/800/400`
                       }}
                     />
@@ -160,14 +162,20 @@ export function CommunityPost() {
     setLoading(true)
     setError(null)
     ;(async () => {
-      const data = await fetchBlogPostsByCategory(categoryKey)
-      if (cancelled) return
-      setPosts(data)
-      // Automatically expand the first (most recent) post
-      if (data.length > 0) {
-        setExpandedPosts(new Set([data[0].id]))
+      try {
+        const data = await fetchBlogPostsByCategory(categoryKey)
+        if (cancelled) return
+        setPosts(data)
+        // Automatically expand the first (most recent) post
+        if (data.length > 0) {
+          setExpandedPosts(new Set([data[0].id]))
+        }
+        setLoading(false)
+      } catch (err: any) {
+        if (cancelled) return
+        setError(err?.message || 'Failed to load blog posts')
+        setLoading(false)
       }
-      setLoading(false)
     })()
     return () => { cancelled = true }
   }, [categoryKey])
@@ -304,8 +312,13 @@ export function CommunityPost() {
                                 <img
                                   key={imgIndex}
                                   src={imageUrl}
-                                  alt={`Blog image ${imgIndex + 1}`}
+                                  alt={`${post.title} - Image ${imgIndex + 1}`}
                                   className="w-full h-48 object-cover rounded-lg border border-neutral-200"
+                                  onError={(e) => {
+                                    const img = e.currentTarget as HTMLImageElement
+                                    img.onerror = null
+                                    img.style.display = 'none'
+                                  }}
                                 />
                               ))}
                             </div>
@@ -414,6 +427,10 @@ function sanitizePostHtml(html: string): string {
     d.body.innerHTML = html
     // Remove script/style
     d.body.querySelectorAll('script,style,link,iframe').forEach((n) => n.remove())
+    // Remove aria-label from p elements (not allowed on p without role)
+    d.body.querySelectorAll('p[aria-label]').forEach((p) => {
+      p.removeAttribute('aria-label')
+    })
     // Whitelist attributes
     d.body.querySelectorAll('*').forEach((el) => {
       ;[...el.attributes].forEach((attr) => {

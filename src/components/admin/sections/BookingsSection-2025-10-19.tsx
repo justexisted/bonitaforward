@@ -87,6 +87,8 @@ export const BookingsSection: React.FC<BookingsSectionProps> = ({
             <div className="text-neutral-500 text-xs">{new Date(row.created_at).toLocaleString()}</div>
             
             <input 
+              id={`booking-name-${row.id}`}
+              name={`booking-name-${row.id}`}
               className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" 
               defaultValue={row.name || ''} 
               placeholder="Name" 
@@ -97,6 +99,8 @@ export const BookingsSection: React.FC<BookingsSectionProps> = ({
             />
             
             <textarea 
+              id={`booking-notes-${row.id}`}
+              name={`booking-notes-${row.id}`}
               className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm" 
               defaultValue={row.notes || ''} 
               placeholder="Notes" 
@@ -108,6 +112,8 @@ export const BookingsSection: React.FC<BookingsSectionProps> = ({
             
             {row.answers && (
               <textarea 
+                id={`booking-answers-${row.id}`}
+                name={`booking-answers-${row.id}`}
                 className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs" 
                 defaultValue={JSON.stringify(row.answers, null, 2)} 
                 onChange={(e) => setEditBooking((m) => ({ 

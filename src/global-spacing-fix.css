@@ -310,8 +310,9 @@ section.py-8 {
    ============================================================================ */
 
 /* Prevent excessive min-height */
+/* Firefox compatibility: Use 0 instead of auto (auto is not supported) */
 .min-h-screen {
-  min-height: auto !important;
+  min-height: 0 !important;
 }
 
 /* Keep min-h-screen only for actual full-page layouts */
