@@ -8,7 +8,7 @@
 import { supabase } from '../../../lib/supabase'
 import { createProviderChangeRequest, getDismissedNotifications, type ProviderChangeRequest, type DismissedNotification } from '../../../lib/supabaseData'
 import { getUserPlanChoice, setUserPlanChoice as savePlanChoice, migratePlanChoiceToDatabase, type PlanChoice } from '../../../utils/planChoiceDb'
-import type { BusinessListing, BusinessApplication, JobPost, UserActivity } from '../types'
+import type { BusinessListing, BusinessApplication, JobPost } from '../types'
 
 /**
  * Props interface for the hook
