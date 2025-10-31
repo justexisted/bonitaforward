@@ -3,7 +3,8 @@
  */
 
 import { supabase } from '../../lib/supabase'
-import type { Booking, SavedBusiness, PendingApplication, MyBusiness } from './types'
+import { generateSlug } from '../../utils/helpers'
+import type { Booking, SavedBusiness, SavedCoupon, PendingApplication, MyBusiness } from './types'
 import type { CalendarEvent } from '../Calendar'
 
 export async function loadBookings(email: string): Promise<Booking[]> {
@@ -124,6 +125,50 @@ export async function loadSavedBusinesses(userId: string): Promise<SavedBusiness
     }))
   } catch (err) {
     console.log('[Account] Error loading saved businesses:', err)
+    return []
+  }
+}
+
+/**
+ * Load saved coupons for the user
+ * Shows in "Saved" section on account page
+ */
+export async function loadSavedCoupons(userId: string): Promise<SavedCoupon[]> {
+  try {
+    const { data, error } = await supabase
+      .from('coupon_redemptions')
+      .select(`
+        id,
+        provider_id,
+        code,
+        created_at,
+        providers (
+          name,
+          coupon_code,
+          coupon_discount,
+          coupon_description
+        )
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.log('[Account] Error loading saved coupons:', error)
+      return []
+    }
+    
+    return (data || []).map((c: any) => ({
+      id: c.id,
+      provider_id: c.provider_id,
+      code: c.code,
+      created_at: c.created_at,
+      provider_name: c.providers?.name,
+      coupon_code: c.providers?.coupon_code || c.code,
+      coupon_discount: c.providers?.coupon_discount,
+      coupon_description: c.providers?.coupon_description,
+    }))
+  } catch (err) {
+    console.log('[Account] Error loading saved coupons:', err)
     return []
   }
 }
@@ -293,10 +338,10 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
         })
       }
       
-      return uniqueBusinesses as MyBusiness[]
+      return uniqueBusinesses.map((b: any) => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]
     }
     
-    return (ownerData || []) as MyBusiness[]
+    return ((ownerData || []) as any[]).map(b => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]
   } catch (err) {
     console.log('[Account] Error loading user businesses:', err)
     return []

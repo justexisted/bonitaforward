@@ -49,6 +49,17 @@ export interface SavedBusiness {
   provider_tags?: string[] | null
 }
 
+export interface SavedCoupon {
+  id: string
+  provider_id: string
+  code?: string | null
+  created_at?: string | null
+  provider_name?: string | null
+  coupon_code?: string | null
+  coupon_discount?: string | null
+  coupon_description?: string | null
+}
+
 export interface PendingApplication {
   id: string
   business_name: string | null
@@ -66,6 +77,7 @@ export interface PendingApplication {
 export interface MyBusiness {
   id: string
   name: string
+  slug?: string | null
   category_key: string
   address?: string | null
   phone?: string | null
@@ -78,6 +90,7 @@ export interface MyBusiness {
 export interface AccountData {
   bookings: Booking[]
   savedBusinesses: SavedBusiness[]
+  savedCoupons: SavedCoupon[]
   myEvents: CalendarEvent[]
   savedEvents: CalendarEvent[]
   pendingApps: PendingApplication[]

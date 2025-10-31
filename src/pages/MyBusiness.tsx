@@ -706,7 +706,7 @@ export default function MyBusinessPage() {
           <div className="rounded-2xl border border-neutral-100 p-1 bg-white">
             <h1 className="text-xl font-semibold">Access Restricted</h1>
             <p className="mt-2 text-neutral-600">This page is only available for business accounts.</p>
-            <Link to="/account" className="mt-4 inline-block rounded-full bg-neutral-900 text-white px-4 py-2">
+            <Link to="/account" className="mt-4 inline-block rounded-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 transition-colors">
               Back to Account
             </Link>
           </div>

@@ -13,6 +13,7 @@ interface MyBookingsProps {
 
 export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }: MyBookingsProps) {
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [showPastBookings, setShowPastBookings] = useState(false)
 
   async function handleCancel(bookingId: string) {
     if (!confirm('Are you sure you want to cancel this booking?')) return
@@ -29,6 +30,37 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
     
     setCancellingId(null)
   }
+
+  // Filter bookings: active vs archived
+  const now = new Date()
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+
+  const activeBookings = bookings.filter(booking => {
+    const bookingDate = (booking as any).booking_date ? new Date((booking as any).booking_date) : null
+    const isCancelled = booking.status === 'cancelled'
+    
+    // If no booking date, consider it active if not cancelled
+    if (!bookingDate) {
+      return !isCancelled
+    }
+    
+    // Active: not cancelled AND booking date is within 3 days or in the future
+    const isWithinThreeDaysOrFuture = bookingDate >= threeDaysAgo
+    return !isCancelled && isWithinThreeDaysOrFuture
+  })
+
+  const archivedBookings = bookings.filter(booking => {
+    const bookingDate = (booking as any).booking_date ? new Date((booking as any).booking_date) : null
+    const isCancelled = booking.status === 'cancelled'
+    const isPastThreeDays = bookingDate && bookingDate < threeDaysAgo
+    
+    // Archived: cancelled OR more than 3 days old
+    return isCancelled || isPastThreeDays
+  })
+
+  const displayedBookings = showPastBookings 
+    ? [...activeBookings, ...archivedBookings]
+    : activeBookings
 
   if (loading) {
     return (
@@ -52,9 +84,38 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
 
   return (
     <div>
-      <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-6">My Bookings</h2>
-      <div className="space-y-4">
-        {bookings.map((booking) => (
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl md:text-3xl font-bold text-neutral-900">My Bookings</h2>
+        {archivedBookings.length > 0 && (
+          <button
+            onClick={() => setShowPastBookings(!showPastBookings)}
+            className="px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
+          >
+            {showPastBookings ? 'Hide Past Bookings' : `Show Past Bookings (${archivedBookings.length})`}
+          </button>
+        )}
+      </div>
+      
+      {displayedBookings.length === 0 && !showPastBookings && archivedBookings.length > 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-12 text-center">
+          <Calendar className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+          <p className="text-neutral-600 mb-4">No active bookings</p>
+          <button
+            onClick={() => setShowPastBookings(true)}
+            className="px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
+          >
+            Show Past Bookings ({archivedBookings.length})
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+        {displayedBookings.map((booking) => {
+          const bookingDate = (booking as any).booking_date ? new Date((booking as any).booking_date) : null
+          const isCancelled = booking.status === 'cancelled'
+          const isPastThreeDays = bookingDate && bookingDate < threeDaysAgo
+          const isArchived = isCancelled || isPastThreeDays
+          
+          return (
           <div key={booking.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -116,7 +177,7 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
               
               {/* Action buttons */}
               <div className="flex flex-col gap-2 ml-4">
-                {booking.status !== 'cancelled' && (
+                {!isArchived && booking.status !== 'cancelled' && (
                   <>
                     <button
                       onClick={() => {
@@ -135,11 +196,16 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
                     </button>
                   </>
                 )}
+                {isArchived && (
+                  <span className="px-3 py-2 text-xs text-neutral-500 text-center">Archived</span>
+                )}
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          )
+        })}
+        </div>
+      )}
     </div>
   )
 }

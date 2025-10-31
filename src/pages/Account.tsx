@@ -7,7 +7,8 @@ import { SIDEBAR_ITEMS } from './account/constants'
 import type { DashboardSection, AccountData } from './account/types'
 import { 
   loadBookings, 
-  loadSavedBusinesses, 
+  loadSavedBusinesses,
+  loadSavedCoupons,
   loadMyEvents,
   loadSavedEvents,
   loadPendingApplications,
@@ -16,7 +17,7 @@ import {
   updateEvent,
   deleteEvent
 } from './account/dataLoader'
-import { AccountSettings, MyBookings, SavedBusinesses } from './account/components'
+import { AccountSettings, MyBookings, SavedBusinesses, SavedCoupons } from './account/components'
 
 export default function AccountPage() {
   const auth = useAuth()
@@ -34,6 +35,7 @@ export default function AccountPage() {
   const [data, setData] = useState<AccountData>({
     bookings: [],
     savedBusinesses: [],
+    savedCoupons: [],
     myEvents: [],
     savedEvents: [],
     pendingApps: [],
@@ -67,16 +69,17 @@ export default function AccountPage() {
       
       setLoading(true)
       
-      const [bookings, savedBusinesses, myEvents, savedEvents, pendingApps, myBusinesses] = await Promise.all([
+      const [bookings, savedBusinesses, savedCoupons, myEvents, savedEvents, pendingApps, myBusinesses] = await Promise.all([
         loadBookings(auth.email || ''),
         loadSavedBusinesses(auth.userId),
+        loadSavedCoupons(auth.userId),
         loadMyEvents(auth.userId),
         loadSavedEvents(auth.userId),
         loadPendingApplications(auth.email || ''),
         loadMyBusinesses(auth.userId, auth.email || ''),
       ])
       
-      setData({ bookings, savedBusinesses, myEvents, savedEvents, pendingApps, myBusinesses })
+      setData({ bookings, savedBusinesses, savedCoupons, myEvents, savedEvents, pendingApps, myBusinesses })
       setLoading(false)
     }
     
@@ -98,6 +101,14 @@ export default function AccountPage() {
     setData(prev => ({
       ...prev,
       savedBusinesses: prev.savedBusinesses.filter(b => b.id !== savedId)
+    }))
+  }
+
+  // Remove coupon locally
+  function handleCouponRemoved(couponId: string) {
+    setData(prev => ({
+      ...prev,
+      savedCoupons: prev.savedCoupons.filter(c => c.id !== couponId)
     }))
   }
 
@@ -228,7 +239,7 @@ export default function AccountPage() {
           {activeSection !== 'dashboard' && (
             <button
               onClick={() => setActiveSection('dashboard')}
-              className="mb-6 flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors"
+              className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               <span>←</span>
               <span>Back to Account</span>
@@ -341,11 +352,11 @@ export default function AccountPage() {
                             </span>
                             {business.published && (
                               <Link
-                                to={`/${business.category_key}`}
+                                to={`/provider/${encodeURIComponent(business.slug || '')}`}
                                 className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                View Listing in {business.category_key?.replace('-', ' ') || 'Category'}
+                                View Listing
                               </Link>
                             )}
                           </div>
@@ -377,12 +388,20 @@ export default function AccountPage() {
             )}
             
             {activeSection === 'saved-businesses' && (
-              <SavedBusinesses
-                businesses={data.savedBusinesses}
-                loading={loading}
-                onBusinessRemoved={handleBusinessRemoved}
-                onMessage={setMessage}
-              />
+              <div className="space-y-8">
+                <SavedBusinesses
+                  businesses={data.savedBusinesses}
+                  loading={loading}
+                  onBusinessRemoved={handleBusinessRemoved}
+                  onMessage={setMessage}
+                />
+                <SavedCoupons
+                  coupons={data.savedCoupons}
+                  loading={loading}
+                  onCouponRemoved={handleCouponRemoved}
+                  onMessage={setMessage}
+                />
+              </div>
             )}
             
             {activeSection === 'my-events' && (
@@ -1017,11 +1036,11 @@ export default function AccountPage() {
                             </span>
                             {business.published && (
                               <Link
-                                to={`/${business.category_key}`}
+                                to={`/providers/${business.id}`}
                                 className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                View Listing in {business.category_key?.replace('-', ' ') || 'Category'}
+                                View Listing
                               </Link>
                             )}
                           </div>
@@ -1053,12 +1072,20 @@ export default function AccountPage() {
             )}
             
             {activeSection === 'saved-businesses' && (
-              <SavedBusinesses
-                businesses={data.savedBusinesses}
-                loading={loading}
-                onBusinessRemoved={handleBusinessRemoved}
-                onMessage={setMessage}
-              />
+              <div className="space-y-8">
+                <SavedBusinesses
+                  businesses={data.savedBusinesses}
+                  loading={loading}
+                  onBusinessRemoved={handleBusinessRemoved}
+                  onMessage={setMessage}
+                />
+                <SavedCoupons
+                  coupons={data.savedCoupons}
+                  loading={loading}
+                  onCouponRemoved={handleCouponRemoved}
+                  onMessage={setMessage}
+                />
+              </div>
             )}
             
             {activeSection === 'my-events' && (
