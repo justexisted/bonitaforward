@@ -102,7 +102,6 @@ export async function trackListingEvent(
       return { success: false, error: error.message }
     }
     
-    console.log(`[Analytics] Tracked ${eventType} for provider:`, providerId)
     return { success: true }
   } catch (err) {
     console.error('[Analytics] Exception tracking event:', err)
@@ -162,7 +161,6 @@ export async function trackFunnelAttribution(
     if (error) {
       // Handle duplicate key error gracefully (already attributed)
       if (error.code === '23505') {
-        console.log('[Analytics] Funnel attribution already exists (skipping):', funnelResponseId)
         return { success: true, blocked: true }
       }
       
@@ -170,7 +168,6 @@ export async function trackFunnelAttribution(
       return { success: false, error: error.message }
     }
     
-    console.log('[Analytics] Tracked funnel attribution:', funnelResponseId)
     return { success: true }
   } catch (err) {
     console.error('[Analytics] Exception tracking funnel:', err)
@@ -242,7 +239,6 @@ export async function trackBookingAttribution(
     if (error) {
       // Handle duplicate key error gracefully (already attributed)
       if (error.code === '23505') {
-        console.log('[Analytics] Booking attribution already exists (skipping):', bookingId)
         return { success: true, blocked: true }
       }
       
@@ -250,7 +246,6 @@ export async function trackBookingAttribution(
       return { success: false, error: error.message }
     }
     
-    console.log('[Analytics] Tracked booking attribution:', bookingId)
     return { success: true }
   } catch (err) {
     console.error('[Analytics] Exception tracking booking:', err)
@@ -330,25 +325,33 @@ export async function getProviderAnalyticsSummary(
     const total_phone_clicks = events.filter(e => e.event_type === 'phone_click').length
     const total_website_clicks = events.filter(e => e.event_type === 'website_click').length
     
-    // Get funnel responses
+    // Get funnel responses (with date range filtering)
     let funnelQuery = supabase
       .from('funnel_attribution')
       .select('*', { count: 'exact' })
       .eq('provider_id', providerId)
     
-    if (startDate) funnelQuery = funnelQuery.gte('created_at', startDate.toISOString())
-    if (endDate) funnelQuery = funnelQuery.lte('created_at', endDate.toISOString())
+    if (startDate) {
+      funnelQuery = funnelQuery.gte('created_at', startDate.toISOString())
+    }
+    if (endDate) {
+      funnelQuery = funnelQuery.lte('created_at', endDate.toISOString())
+    }
     
     const { count: total_funnel_responses } = await funnelQuery
     
-    // Get bookings
+    // Get bookings (with date range filtering)
     let bookingQuery = supabase
       .from('booking_attribution')
       .select('*', { count: 'exact' })
       .eq('provider_id', providerId)
     
-    if (startDate) bookingQuery = bookingQuery.gte('created_at', startDate.toISOString())
-    if (endDate) bookingQuery = bookingQuery.lte('created_at', endDate.toISOString())
+    if (startDate) {
+      bookingQuery = bookingQuery.gte('created_at', startDate.toISOString())
+    }
+    if (endDate) {
+      bookingQuery = bookingQuery.lte('created_at', endDate.toISOString())
+    }
     
     const { count: total_bookings } = await bookingQuery
     
@@ -383,16 +386,29 @@ export async function getProviderAnalyticsSummary(
  * Get funnel responses attributed to a provider
  * 
  * @param providerId - Provider UUID
+ * @param startDate - Optional start date filter
+ * @param endDate - Optional end date filter
  */
 export async function getFunnelResponsesFromProvider(
-  providerId: string
+  providerId: string,
+  startDate?: Date,
+  endDate?: Date
 ): Promise<AnalyticsResult<FunnelAttribution[]>> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('funnel_attribution')
       .select('*')
       .eq('provider_id', providerId)
-      .order('created_at', { ascending: false })
+    
+    // Apply date range filtering if provided
+    if (startDate) {
+      query = query.gte('created_at', startDate.toISOString())
+    }
+    if (endDate) {
+      query = query.lte('created_at', endDate.toISOString())
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false })
     
     if (error) {
       console.error('[Analytics] Failed to fetch funnel attribution:', error)
@@ -410,16 +426,29 @@ export async function getFunnelResponsesFromProvider(
  * Get bookings attributed to a provider
  * 
  * @param providerId - Provider UUID
+ * @param startDate - Optional start date filter
+ * @param endDate - Optional end date filter
  */
 export async function getBookingsFromProvider(
-  providerId: string
+  providerId: string,
+  startDate?: Date,
+  endDate?: Date
 ): Promise<AnalyticsResult<BookingAttribution[]>> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('booking_attribution')
       .select('*')
       .eq('provider_id', providerId)
-      .order('created_at', { ascending: false })
+    
+    // Apply date range filtering if provided
+    if (startDate) {
+      query = query.gte('created_at', startDate.toISOString())
+    }
+    if (endDate) {
+      query = query.lte('created_at', endDate.toISOString())
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false })
     
     if (error) {
       console.error('[Analytics] Failed to fetch booking attribution:', error)

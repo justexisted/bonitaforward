@@ -148,7 +148,6 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
         is_featured: provider.isMember,
         phone: provider.phone,
       })
-      console.log('[Analytics] Phone click tracked for:', provider.name)
     } catch (err) {
       console.error('[Analytics] Failed to track phone click:', err)
     }
@@ -167,7 +166,6 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
         is_featured: provider.isMember,
         website: provider.website,
       })
-      console.log('[Analytics] Website click tracked for:', provider.name)
     } catch (err) {
       console.error('[Analytics] Failed to track website click:', err)
     }
@@ -225,7 +223,6 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
         
         // Prevent concurrent tracking (React StrictMode protection)
         if (trackingInProgress.current) {
-          console.log('[Analytics] Tracking already in progress, skipping duplicate')
           return
         }
         
@@ -243,7 +240,6 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
           markViewTracked(provider.id)
           // Store for funnel attribution
           storeLastViewedProvider(provider.id)
-          console.log('[Analytics] View tracked for:', provider.name)
         }
         
         trackingInProgress.current = false
@@ -286,7 +282,6 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
               category: provider.category_key,
               is_featured: provider.isMember,
             })
-            console.log('[Analytics] Save tracked for:', provider.name)
           } catch (err) {
             console.error('[Analytics] Failed to track save:', err)
           }
@@ -339,7 +334,6 @@ export default function ProviderPage({ providersByCategory }: ProviderPageProps)
         try {
           const { trackBookingAttribution } = await import('../services/analyticsService')
           await trackBookingAttribution(bookingId, provider.id, 'listing_view')
-          console.log('[Analytics] Booking attributed to provider:', provider.id)
         } catch (err) {
           console.error('[Analytics] Failed to track booking attribution:', err)
         }

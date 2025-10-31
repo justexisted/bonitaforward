@@ -75,7 +75,6 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
       
       funnelResponseId = existing.id
       isNewResponse = false
-      console.log('[Analytics] Updated existing funnel response (no new attribution)')
     } else {
       // Insert new record and get its ID
       const { data: inserted, error } = await supabase
@@ -97,11 +96,9 @@ async function persistFunnelForUser(params: { email?: string | null; category: C
       if (lastViewedProviderId) {
         // Track attribution (failures are non-blocking)
         await trackFunnelAttribution(funnelResponseId, lastViewedProviderId, document.referrer)
-        console.log('[Analytics] Funnel attributed to provider:', lastViewedProviderId)
       } else {
         // No recent provider view - track as direct funnel submission
         await trackFunnelAttribution(funnelResponseId, null, document.referrer)
-        console.log('[Analytics] Funnel tracked (no attribution)')
       }
     }
   } catch (err) {

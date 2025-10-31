@@ -43,6 +43,12 @@ export function AnalyticsTab({ listings }: AnalyticsTabProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
+  // Per-section error states for better user feedback
+  const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [eventsError, setEventsError] = useState<string | null>(null)
+  const [funnelError, setFunnelError] = useState<string | null>(null)
+  const [bookingError, setBookingError] = useState<string | null>(null)
+  
   // Analytics data
   const [summary, setSummary] = useState<ProviderAnalyticsSummary | null>(null)
   const [events, setEvents] = useState<ListingAnalytics[]>([])
@@ -88,38 +94,65 @@ export function AnalyticsTab({ listings }: AnalyticsTabProps) {
       
       setLoading(true)
       setError(null)
+      // Clear per-section errors when reloading
+      setSummaryError(null)
+      setEventsError(null)
+      setFunnelError(null)
+      setBookingError(null)
       
       try {
         const { start, end } = getDateRangeValues()
         
-        // Load all analytics data in parallel
+        // Load all analytics data in parallel with consistent date range filtering
         const [summaryResult, eventsResult, funnelResult, bookingResult] = await Promise.all([
           getProviderAnalyticsSummary(selectedListing.id, start, end),
           getProviderAnalytics(selectedListing.id, start, end),
-          getFunnelResponsesFromProvider(selectedListing.id),
-          getBookingsFromProvider(selectedListing.id)
+          getFunnelResponsesFromProvider(selectedListing.id, start, end),
+          getBookingsFromProvider(selectedListing.id, start, end)
         ])
         
+        // Handle summary result
         if (summaryResult.success && summaryResult.data) {
           setSummary({ ...summaryResult.data, provider_name: selectedListing.name })
+          setSummaryError(null)
         } else {
-          setError(summaryResult.error || 'Failed to load summary')
+          const errorMsg = summaryResult.error || 'Failed to load analytics summary'
+          setSummaryError(errorMsg)
+          setError(errorMsg) // Also set main error for backward compatibility
         }
         
+        // Handle events result
         if (eventsResult.success && eventsResult.data) {
           setEvents(eventsResult.data)
+          setEventsError(null)
+        } else {
+          setEventsError(eventsResult.error || 'Failed to load events')
         }
         
+        // Handle funnel result
         if (funnelResult.success && funnelResult.data) {
           setFunnelAttributions(funnelResult.data)
+          setFunnelError(null)
+        } else {
+          setFunnelError(funnelResult.error || 'Failed to load funnel attribution')
         }
         
+        // Handle booking result
         if (bookingResult.success && bookingResult.data) {
           setBookingAttributions(bookingResult.data)
+          setBookingError(null)
+        } else {
+          setBookingError(bookingResult.error || 'Failed to load booking attribution')
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('[AnalyticsTab] Failed to load analytics:', err)
-        setError('Failed to load analytics data')
+        const errorMsg = err?.message || 'Failed to load analytics data'
+        setError(errorMsg)
+        // Set all section errors if the whole operation fails
+        setSummaryError(errorMsg)
+        setEventsError(errorMsg)
+        setFunnelError(errorMsg)
+        setBookingError(errorMsg)
       } finally {
         setLoading(false)
       }
@@ -237,29 +270,53 @@ export function AnalyticsTab({ listings }: AnalyticsTabProps) {
       )}
 
       {/* Analytics content */}
-      {!loading && selectedListing && summary && (
+      {!loading && selectedListing && (
         <>
           {/* Summary cards */}
-          <AnalyticsSummaryCards summary={summary} />
+          {summary ? (
+            <AnalyticsSummaryCards summary={summary} />
+          ) : summaryError ? (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+              <p className="font-medium">Unable to load analytics summary</p>
+              <p className="text-sm mt-1">{summaryError}</p>
+            </div>
+          ) : null}
 
           {/* Event breakdown table */}
-          <AnalyticsEventTable events={events} />
+          {eventsError ? (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+              <p className="font-medium">Unable to load events</p>
+              <p className="text-sm mt-1">{eventsError}</p>
+            </div>
+          ) : (
+            <AnalyticsEventTable events={events} />
+          )}
 
           {/* Funnel attribution */}
-          {funnelAttributions.length > 0 && (
+          {funnelError ? (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+              <p className="font-medium">Unable to load funnel attribution</p>
+              <p className="text-sm mt-1">{funnelError}</p>
+            </div>
+          ) : funnelAttributions.length > 0 ? (
             <AnalyticsFunnelAttribution 
               attributions={funnelAttributions} 
               providerName={selectedListing.name}
             />
-          )}
+          ) : null}
 
           {/* Booking conversions */}
-          {bookingAttributions.length > 0 && (
+          {bookingError ? (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
+              <p className="font-medium">Unable to load booking attribution</p>
+              <p className="text-sm mt-1">{bookingError}</p>
+            </div>
+          ) : bookingAttributions.length > 0 ? (
             <AnalyticsBookingConversions 
               attributions={bookingAttributions}
               providerName={selectedListing.name}
             />
-          )}
+          ) : null}
 
           {/* Export button */}
           <div className="flex justify-end">
@@ -276,8 +333,8 @@ export function AnalyticsTab({ listings }: AnalyticsTabProps) {
         </>
       )}
 
-      {/* No data state */}
-      {!loading && !error && summary && summary.total_views === 0 && (
+      {/* No data state - only show if we successfully loaded data but have no results */}
+      {!loading && !error && !summaryError && summary && summary.total_views === 0 && events.length === 0 && (
         <div className="text-center py-12 bg-neutral-50 rounded-lg">
           <svg className="w-16 h-16 mx-auto text-neutral-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
