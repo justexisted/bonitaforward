@@ -155,6 +155,7 @@ export type CalendarEvent = {
   updated_at?: string | null
   user_id?: string | null
   provider_id?: string | null
+  created_by_user_id?: string | null
   is_flagged?: boolean | null
   flag_count?: number | null
   url?: string | null

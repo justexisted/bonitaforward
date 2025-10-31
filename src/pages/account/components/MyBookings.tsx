@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar } from 'lucide-react'
+import { generateSlug } from '../../../utils/helpers'
 import type { Booking } from '../types'
 import { cancelBooking } from '../dataLoader'
 
@@ -120,12 +121,12 @@ export function MyBookings({ bookings, loading, onBookingCancelled, onMessage }:
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 {/* Business name - clickable if provider_id exists */}
-                {booking.provider_id ? (
+                {booking.provider_id && booking.provider_name ? (
                   <Link 
-                    to={`/providers/${booking.provider_id}`}
+                    to={`/provider/${encodeURIComponent(generateSlug(booking.provider_name))}`}
                     className="font-semibold text-lg text-blue-600 hover:text-blue-700 hover:underline mb-2 inline-block"
                   >
-                    {booking.provider_name || 'Unknown Business'}
+                    {booking.provider_name}
                   </Link>
                 ) : (
                   <h3 className="font-semibold text-lg text-neutral-900 mb-2">

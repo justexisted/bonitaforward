@@ -1,6 +1,7 @@
 import { Tag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
+import { generateSlug } from '../../../utils/helpers'
 import type { SavedCoupon } from '../types'
 
 interface SavedCouponsProps {
@@ -58,12 +59,12 @@ export function SavedCoupons({ coupons, loading, onCouponRemoved, onMessage }: S
           <div key={coupon.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                {coupon.provider_id ? (
+                {coupon.provider_id && coupon.provider_name ? (
                   <Link
-                    to={`/providers/${coupon.provider_id}`}
+                    to={`/provider/${encodeURIComponent(generateSlug(coupon.provider_name))}`}
                     className="font-semibold text-lg text-blue-600 hover:text-blue-700 hover:underline mb-2 inline-block"
                   >
-                    {coupon.provider_name || 'Unknown Business'}
+                    {coupon.provider_name}
                   </Link>
                 ) : (
                   <h3 className="font-semibold text-lg text-neutral-900 mb-2">

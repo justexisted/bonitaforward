@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ChevronUp, ChevronDown, MapPin, Calendar, Clock, X, ExternalLink, Bookmark, BookmarkCheck } from 'lucide-react'
@@ -10,6 +10,8 @@ import { getEventGradient, preloadEventImages, getEventHeaderImage } from '../ut
 import { fetchSavedEvents, saveEvent, unsaveEvent, migrateLocalStorageToDatabase } from '../utils/savedEventsDb'
 import { useHideDock } from '../hooks/useHideDock'
 import { hasAcceptedEventTerms, acceptEventTerms, migrateEventTermsToDatabase } from '../utils/eventTermsDb'
+import { updateEvent, deleteEvent } from './account/dataLoader'
+import { CreateEventForm } from '../components/CreateEventForm'
 
 // Re-export type for backward compatibility
 export type { CalendarEvent }
@@ -193,15 +195,6 @@ export default function CalendarPage() {
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [submittingEvent, setSubmittingEvent] = useState(false)
-  const [newEvent, setNewEvent] = useState({
-    title: '',
-    description: '',
-    date: '',
-    time: '',
-    location: '',
-    address: '',
-    category: 'Community'
-  })
   
   // State for flag/report feature
   const [showFlagModal, setShowFlagModal] = useState(false)
@@ -209,6 +202,19 @@ export default function CalendarPage() {
   const [flagReason, setFlagReason] = useState('')
   const [flagDetails, setFlagDetails] = useState('')
   const [submittingFlag, setSubmittingFlag] = useState(false)
+
+  // State for edit event feature
+  const [editingEvent, setEditingEvent] = useState<null | {
+    id: string
+    title: string
+    description: string
+    date: string
+    time: string
+    location: string
+    address: string
+    category: string
+  }>(null)
+  const [submittingEventEdit, setSubmittingEventEdit] = useState(false)
 
   // State for saved/bookmarked events
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set())
@@ -218,7 +224,7 @@ export default function CalendarPage() {
   const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
 
   // Hide Dock when any modal is open
-  const isAnyModalOpen = Boolean(selectedEvent || showCreateEvent || showTermsModal || showFlagModal)
+  const isAnyModalOpen = Boolean(selectedEvent || showCreateEvent || showTermsModal || showFlagModal || editingEvent)
   useHideDock(isAnyModalOpen)
 
   // Load saved events from database and migrate localStorage data
@@ -393,13 +399,15 @@ export default function CalendarPage() {
   }
 
   // Handle event submission
-  const handleSubmitEvent = async () => {
-    // Validation
-    if (!newEvent.title || !newEvent.date) {
-      alert('Please fill in at least the title and date')
-      return
-    }
-
+  const handleSubmitEvent = useCallback(async (newEvent: {
+    title: string
+    description: string
+    date: string
+    time: string
+    location: string
+    address: string
+    category: string
+  }) => {
     setSubmittingEvent(true)
 
     try {
@@ -439,16 +447,6 @@ export default function CalendarPage() {
 
       alert('Event created successfully! It will appear on the calendar shortly.')
       
-      // Reset form
-      setNewEvent({
-        title: '',
-        description: '',
-        date: '',
-        time: '',
-        location: '',
-        address: '',
-        category: 'Community'
-      })
       setShowCreateEvent(false)
 
       // Reload events
@@ -461,7 +459,7 @@ export default function CalendarPage() {
     } finally {
       setSubmittingEvent(false)
     }
-  }
+  }, [auth.userId])
 
   // Handle flag event click
   const handleFlagEventClick = (event: CalendarEvent) => {
@@ -1515,12 +1513,194 @@ export default function CalendarPage() {
                   {!auth.isAuthed && (
                     <p className="text-xs text-neutral-500 mt-3">Sign in to vote on events</p>
                   )}
+                  
+                  {/* Edit/Delete buttons for event owner */}
+                  {auth.isAuthed && auth.userId && selectedEvent.created_by_user_id === auth.userId && (
+                    <div className="pt-4 mt-4 border-t border-neutral-200">
+                      <p className="text-xs md:text-sm text-neutral-500 mb-3">Manage Your Event</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedEvent(null)
+                            const eventDate = selectedEvent.date.includes('T') 
+                              ? selectedEvent.date.split('T')[0]
+                              : new Date(selectedEvent.date).toISOString().split('T')[0]
+                            setEditingEvent({
+                              id: selectedEvent.id,
+                              title: selectedEvent.title,
+                              description: selectedEvent.description || '',
+                              date: eventDate,
+                              time: selectedEvent.time || '',
+                              location: selectedEvent.location || '',
+                              address: selectedEvent.address || '',
+                              category: selectedEvent.category
+                            })
+                          }}
+                          className="flex-1 px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors text-sm font-medium"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            if (!confirm('Delete this event? This cannot be undone.')) return
+                            
+                            const res = await deleteEvent(selectedEvent.id)
+                            if (res.success) {
+                              setSelectedEvent(null)
+                              // Reload events
+                              const allEvents = await fetchCalendarEvents()
+                              setEvents(allEvents)
+                              alert('Event deleted successfully')
+                            } else {
+                              alert('Failed to delete event: ' + (res.error || 'Unknown error'))
+                            }
+                          }}
+                          className="flex-1 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )
       })()}
+
+      {/* Edit Event Modal */}
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-neutral-200 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-neutral-900">Edit Event</h3>
+              <button 
+                onClick={() => setEditingEvent(null)} 
+                className="text-neutral-500 hover:text-neutral-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <label className="block text-sm">
+                <span className="text-neutral-700">Title</span>
+                <input
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.title}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Date</span>
+                <input
+                  type="date"
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.date?.toString().split('T')[0] || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, date: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Time</span>
+                <input
+                  type="time"
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.time || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, time: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Location</span>
+                <input
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.location}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, location: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Address</span>
+                <input
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.address}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, address: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Category</span>
+                <select
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.category}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, category: e.target.value } : prev)}
+                >
+                  <option value="Community">Community</option>
+                  <option value="Business">Business</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Sports">Sports</option>
+                  <option value="Education">Education</option>
+                  <option value="Health & Wellness">Health & Wellness</option>
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Description</span>
+                <textarea
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  rows={4}
+                  value={editingEvent.description}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, description: e.target.value } : prev)}
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={submittingEventEdit}
+                onClick={async () => {
+                  if (!editingEvent) return
+                  setSubmittingEventEdit(true)
+                  
+                  try {
+                    const payload = {
+                      title: editingEvent.title,
+                      description: editingEvent.description,
+                      date: editingEvent.date,
+                      time: editingEvent.time,
+                      location: editingEvent.location,
+                      address: editingEvent.address,
+                      category: editingEvent.category,
+                    }
+                    const res = await updateEvent(editingEvent.id, payload)
+                    
+                    if (res.success) {
+                      setEditingEvent(null)
+                      // Reload events
+                      const allEvents = await fetchCalendarEvents()
+                      setEvents(allEvents)
+                      alert('Event updated successfully')
+                    } else {
+                      alert('Failed to update event: ' + (res.error || 'Unknown error'))
+                    }
+                  } catch (err: any) {
+                    console.error('Error updating event:', err)
+                    alert('Failed to update event: ' + err.message)
+                  } finally {
+                    setSubmittingEventEdit(false)
+                  }
+                }}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {submittingEventEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Terms Acceptance Modal */}
       {showTermsModal && (
@@ -1638,166 +1818,11 @@ export default function CalendarPage() {
 
       {/* Create Event Form Modal */}
       {showCreateEvent && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowCreateEvent(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl relative">
-              <button
-                onClick={() => setShowCreateEvent(false)}
-                className="absolute top-4 right-4 bg-blue-800 hover:bg-blue-900 rounded-full p-2 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <h2 className="text-2xl font-bold pr-10">Create Community Event</h2>
-              <p className="text-blue-100 mt-2 text-sm">Share your event with the Bonita community</p>
-            </div>
-
-            {/* Form Body */}
-            <div className="p-6 space-y-4">
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-900 mb-2">
-                  Event Title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newEvent.title}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="e.g., Bonita Farmers Market"
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  maxLength={100}
-                />
-              </div>
-
-              {/* Date and Time */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900 mb-2">
-                    Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={newEvent.date}
-                    onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900 mb-2">
-                    Time
-                  </label>
-                  <input
-                    type="time"
-                    value={newEvent.time}
-                    onChange={(e) => setNewEvent(prev => ({ ...prev, time: e.target.value }))}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-900 mb-2">
-                  Location Name
-                </label>
-                <input
-                  type="text"
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                  placeholder="e.g., Bonita Community Center"
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Address */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-900 mb-2">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  value={newEvent.address}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="e.g., 123 Main St, Bonita, CA 91902"
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-900 mb-2">
-                  Category
-                </label>
-                <select
-                  value={newEvent.category}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="Community">Community</option>
-                  <option value="Family">Family</option>
-                  <option value="Business">Business</option>
-                  <option value="Culture">Culture</option>
-                  <option value="Education">Education</option>
-                  <option value="Sports">Sports</option>
-                  <option value="Food">Food</option>
-                </select>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-900 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={newEvent.description}
-                  onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Tell us more about your event..."
-                  rows={4}
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                  maxLength={500}
-                />
-                <p className="text-xs text-neutral-500 mt-1">{newEvent.description.length}/500 characters</p>
-              </div>
-
-              {/* Reminder */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-900">
-                  <strong>Reminder:</strong> Make sure your event information is accurate. 
-                  You've agreed to post only appropriate, community-friendly content.
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowCreateEvent(false)}
-                  className="flex-1 px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 font-medium transition-colors"
-                  disabled={submittingEvent}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmitEvent}
-                  disabled={submittingEvent || !newEvent.title || !newEvent.date}
-                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
-                    submittingEvent || !newEvent.title || !newEvent.date
-                      ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                >
-                  {submittingEvent ? 'Creating...' : 'Create Event'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CreateEventForm
+          onClose={() => setShowCreateEvent(false)}
+          onSubmit={handleSubmitEvent}
+          submitting={submittingEvent}
+        />
       )}
 
       {/* Flag/Report Event Modal */}

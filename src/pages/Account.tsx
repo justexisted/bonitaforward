@@ -350,9 +350,9 @@ export default function AccountPage() {
                             <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700">
                               Manage Business →
                             </span>
-                            {business.published && (
+                            {business.published && business.slug && (
                               <Link
-                                to={`/provider/${encodeURIComponent(business.slug || '')}`}
+                                to={`/provider/${encodeURIComponent(business.slug)}`}
                                 className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -770,108 +770,6 @@ export default function AccountPage() {
             )}
           </div>
         </main>
-
-        {/* Edit Event Modal */}
-        {editingEvent && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="w-full max-w-lg bg-white rounded-xl shadow-xl border border-neutral-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-neutral-900">Edit Event</h3>
-                <button onClick={() => setEditingEvent(null)} className="text-neutral-500 hover:text-neutral-700">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Title</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
-                    value={editingEvent.title}
-                    onChange={e => setEditingEvent(prev => prev ? { ...prev, title: e.target.value } : prev)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Date</span>
-                  <input
-                    type="date"
-                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
-                    value={editingEvent.date?.toString().split('T')[0] || ''}
-                    onChange={e => setEditingEvent(prev => prev ? { ...prev, date: e.target.value } : prev)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Time</span>
-                  <input
-                    type="time"
-                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
-                    value={editingEvent.time || ''}
-                    onChange={e => setEditingEvent(prev => prev ? { ...prev, time: e.target.value } : prev)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Location</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
-                    value={editingEvent.location}
-                    onChange={e => setEditingEvent(prev => prev ? { ...prev, location: e.target.value } : prev)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Address</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
-                    value={editingEvent.address}
-                    onChange={e => setEditingEvent(prev => prev ? { ...prev, address: e.target.value } : prev)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Description</span>
-                  <textarea
-                    className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
-                    rows={4}
-                    value={editingEvent.description}
-                    onChange={e => setEditingEvent(prev => prev ? { ...prev, description: e.target.value } : prev)}
-                  />
-                </label>
-              </div>
-              <div className="mt-5 flex items-center justify-end gap-2">
-                <button
-                  onClick={() => setEditingEvent(null)}
-                  className="px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  disabled={submittingEventEdit}
-                  onClick={async () => {
-                    if (!editingEvent) return
-                    setSubmittingEventEdit(true)
-                    const payload = {
-                      title: editingEvent.title,
-                      description: editingEvent.description,
-                      date: editingEvent.date,
-                      time: editingEvent.time,
-                      location: editingEvent.location,
-                      address: editingEvent.address,
-                    }
-                    const res = await updateEvent(editingEvent.id, payload)
-                    setSubmittingEventEdit(false)
-                    if (res.success) {
-                      handleEventUpdated({ id: editingEvent.id, ...payload })
-                      setEditingEvent(null)
-                      setMessage('Event updated')
-                    } else {
-                      setMessage(res.error || 'Failed to update event')
-                    }
-                  }}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {submittingEventEdit ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Desktop Sidebar Layout */}
@@ -1034,9 +932,9 @@ export default function AccountPage() {
                             <span className="text-sm text-blue-600 font-medium group-hover:text-blue-700">
                               Manage Business →
                             </span>
-                            {business.published && (
+                            {business.published && business.slug && (
                               <Link
-                                to={`/providers/${business.id}`}
+                                to={`/provider/${encodeURIComponent(business.slug)}`}
                                 className="ml-auto px-3 py-1.5 text-xs bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -1149,12 +1047,43 @@ export default function AccountPage() {
                               )}
                             </div>
                           </div>
-                          <Link
-                            to="/calendar"
-                            className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                          >
-                            View
-                          </Link>
+                          <div className="flex gap-2 flex-shrink-0 ml-4">
+                            <Link
+                              to="/calendar"
+                              className="px-3 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+                            >
+                              View
+                            </Link>
+                            <button
+                              onClick={() => setEditingEvent({
+                                id: event.id,
+                                title: (event as any).title || '',
+                                description: (event as any).description || '',
+                                date: (event as any).date || new Date().toISOString().split('T')[0],
+                                time: (event as any).time || '',
+                                location: (event as any).location || '',
+                                address: (event as any).address || ''
+                              })}
+                              className="px-3 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 whitespace-nowrap"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Delete this event? This cannot be undone.')) return
+                                const res = await deleteEvent(event.id)
+                                if (res.success) {
+                                  handleEventDeleted(event.id)
+                                  setMessage('Event deleted')
+                                } else {
+                                  setMessage(res.error || 'Failed to delete event')
+                                }
+                              }}
+                              className="px-3 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 whitespace-nowrap"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1162,74 +1091,74 @@ export default function AccountPage() {
                 )}
               </div>
 
-              {/* Saved Events Section */}
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-800 mb-4 border-b pb-2">Saved Events</h3>
-                {data.savedEvents.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-8 text-center">
-                    <CalendarDays className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-                    <p className="text-neutral-600 mb-3">No saved events yet</p>
-                    <p className="text-sm text-neutral-500 mb-3">
-                      Browse the calendar and save events you're interested in attending
-                    </p>
-                    <Link 
-                      to="/calendar" 
-                      className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      Browse Calendar
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {data.savedEvents.map((event) => (
-                      <div key={event.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
-                            <div className="space-y-1 text-sm text-neutral-600">
-                              <p className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span>{new Date(event.date).toLocaleDateString()}</span>
-                              </p>
-                              {event.time && (
-                                <p className="flex items-center gap-2">
-                                  <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <span>{event.time}</span>
-                                </p>
-                              )}
-                              {event.location && (
-                                <p className="flex items-center gap-2">
-                                  <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  </svg>
-                                  <span>{event.location}</span>
-                                </p>
-                              )}
-                              {event.category && (
-                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mt-2">
-                                  {event.category}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <Link
-                            to="/calendar"
-                            className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    {/* Saved Events Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-800 mb-4 border-b pb-2">Saved Events</h3>
+                      {data.savedEvents.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-8 text-center">
+                          <CalendarDays className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                          <p className="text-neutral-600 mb-3">No saved events yet</p>
+                          <p className="text-sm text-neutral-500 mb-3">
+                            Browse the calendar and save events you're interested in attending
+                          </p>
+                          <Link 
+                            to="/calendar" 
+                            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                           >
-                            View
+                            Browse Calendar
                           </Link>
                         </div>
-                      </div>
-                    ))}
+                      ) : (
+                        <div className="space-y-4">
+                          {data.savedEvents.map((event) => (
+                            <div key={event.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-lg text-neutral-900 mb-2">{event.title}</h3>
+                                  <div className="space-y-1 text-sm text-neutral-600">
+                                    <p className="flex items-center gap-2">
+                                      <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                      <span>{new Date(event.date).toLocaleDateString()}</span>
+                                    </p>
+                                    {event.time && (
+                                      <p className="flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span>{event.time}</span>
+                                      </p>
+                                    )}
+                                    {event.location && (
+                                      <p className="flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <span>{event.location}</span>
+                                      </p>
+                                    )}
+                                    {event.category && (
+                                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mt-2">
+                                        {event.category}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Link
+                                  to="/calendar"
+                                  className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                  View
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
                 )}
               </div>
             )}
@@ -1240,32 +1169,125 @@ export default function AccountPage() {
                 {data.pendingApps.length === 0 ? (
                   <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 text-center">
                     <FileText className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                    <p className="text-neutral-600">No pending applications</p>
+                    <p className="text-neutral-600">No applications</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {data.pendingApps.map((app) => (
                       <div key={app.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between mb-4">
                           <div className="flex-1">
-                            <h3 className="font-semibold text-lg text-neutral-900 mb-2">
+                            <h3 className="font-semibold text-xl text-neutral-900 mb-2">
                               {app.business_name || 'Untitled Application'}
                             </h3>
-                            <p className="text-sm text-neutral-600">
-                              Submitted: {new Date(app.created_at).toLocaleDateString()}
-                            </p>
-                            <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium mt-2">
-                              Pending Review
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                app.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {app.status === 'approved' ? '✓ Approved' :
+                                 app.status === 'rejected' ? '✗ Rejected' :
+                                 '⏳ Pending Review'}
+                              </span>
+                              {app.tier_requested && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                  {app.tier_requested === 'featured' ? (
+                                    <>
+                                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                      Featured
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                      Free
+                                    </>
+                                  )}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <button
-                            onClick={() => cancelApplication(app.id, app.business_name || 'Untitled Application')}
-                            className="flex-shrink-0 ml-4 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
-                            title="Cancel application"
-                          >
-                            <X className="w-4 h-4" />
-                            Cancel
-                          </button>
+                          <div className="flex gap-2">
+                            {app.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={async () => {
+                                    const message = prompt('What would you like to ask the admin about your application?')
+                                    if (message) {
+                                      const result = await requestApplicationUpdate(app.id, message)
+                                      if (result.success) {
+                                        setMessage('Update request sent to admin')
+                                        // Reload data
+                                        const pendingApps = await loadPendingApplications(auth.email || '')
+                                        setData(prev => ({ ...prev, pendingApps }))
+                                      } else {
+                                        setMessage('Failed to send update request: ' + (result.error || 'Unknown error'))
+                                      }
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors whitespace-nowrap"
+                                >
+                                  Request Update
+                                </button>
+                                <button
+                                  onClick={() => cancelApplication(app.id, app.business_name || 'Untitled Application')}
+                                  className="flex-shrink-0 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
+                                  title="Cancel application"
+                                >
+                                  <X className="w-4 h-4" />
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Application Details */}
+                        <div className="border-t border-neutral-100 pt-4 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            {app.full_name && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Contact Name:</span>
+                                <p className="text-neutral-600">{app.full_name}</p>
+                              </div>
+                            )}
+                            {app.email && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Email:</span>
+                                <p className="text-neutral-600">{app.email}</p>
+                              </div>
+                            )}
+                            {app.phone && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Phone:</span>
+                                <p className="text-neutral-600">{app.phone}</p>
+                              </div>
+                            )}
+                            {app.category && (
+                              <div>
+                                <span className="font-medium text-neutral-700">Category:</span>
+                                <p className="text-neutral-600 capitalize">{app.category.replace('-', ' ')}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {app.challenge && (
+                            <div className="text-sm">
+                              <span className="font-medium text-neutral-700">Message/Notes:</span>
+                              <p className="text-neutral-600 mt-1 bg-neutral-50 p-3 rounded-lg">{app.challenge}</p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-xs text-neutral-500 pt-2 border-t border-neutral-100">
+                            <span>Submitted: {new Date(app.created_at).toLocaleString()}</span>
+                            {app.updated_at && (
+                              <span>Updated: {new Date(app.updated_at).toLocaleString()}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1331,6 +1353,108 @@ export default function AccountPage() {
           </div>
         </main>
       </div>
+
+      {/* Edit Event Modal - Shared between mobile and desktop */}
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg bg-white rounded-xl shadow-xl border border-neutral-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-neutral-900">Edit Event</h3>
+              <button onClick={() => setEditingEvent(null)} className="text-neutral-500 hover:text-neutral-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <label className="block text-sm">
+                <span className="text-neutral-700">Title</span>
+                <input
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.title}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Date</span>
+                <input
+                  type="date"
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.date?.toString().split('T')[0] || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, date: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Time</span>
+                <input
+                  type="time"
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.time || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, time: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Location</span>
+                <input
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.location}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, location: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Address</span>
+                <input
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  value={editingEvent.address}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, address: e.target.value } : prev)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-700">Description</span>
+                <textarea
+                  className="mt-1 w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                  rows={4}
+                  value={editingEvent.description}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, description: e.target.value } : prev)}
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="px-4 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={submittingEventEdit}
+                onClick={async () => {
+                  if (!editingEvent) return
+                  setSubmittingEventEdit(true)
+                  const payload = {
+                    title: editingEvent.title,
+                    description: editingEvent.description,
+                    date: editingEvent.date,
+                    time: editingEvent.time,
+                    location: editingEvent.location,
+                    address: editingEvent.address,
+                  }
+                  const res = await updateEvent(editingEvent.id, payload)
+                  setSubmittingEventEdit(false)
+                  if (res.success) {
+                    handleEventUpdated({ id: editingEvent.id, ...payload })
+                    setEditingEvent(null)
+                    setMessage('Event updated successfully')
+                  } else {
+                    setMessage(res.error || 'Failed to update event')
+                  }
+                }}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submittingEventEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
