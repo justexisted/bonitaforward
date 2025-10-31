@@ -25,7 +25,6 @@ interface UseBusinessOperationsProps {
   setApplications: React.Dispatch<React.SetStateAction<BusinessApplication[]>>
   setJobPosts: React.Dispatch<React.SetStateAction<JobPost[]>>
   setChangeRequests: React.Dispatch<React.SetStateAction<ProviderChangeRequest[]>>
-  setUserActivity: React.Dispatch<React.SetStateAction<UserActivity[]>>
   setDismissedNotifications: React.Dispatch<React.SetStateAction<DismissedNotification[]>>
   setShowSubscriptionCard: (show: boolean) => void
   setUserPlanChoice: (choice: PlanChoice) => void
@@ -49,7 +48,6 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
     setApplications,
     setJobPosts,
     setChangeRequests,
-    setUserActivity,
     setDismissedNotifications,
     setShowSubscriptionCard,
     setUserPlanChoice,
@@ -69,7 +67,6 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
    * - Business applications
    * - Job posts
    * - Change requests
-   * - User activity/notifications
    */
   const loadBusinessData = async () => {
     if (!auth.userId || !auth.email) {
@@ -230,37 +227,10 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         )
       ]
 
-      // Load user activity data for all owned businesses
-      const ownedBusinessIds = allListings.map(listing => listing.id)
-      let userActivityData: UserActivity[] = []
-      
-      if (ownedBusinessIds.length > 0) {
-        // Fetch notifications without embedded join; enrich with provider names locally
-        const { data: activityData, error: activityError } = await supabase
-          .from('user_notifications')
-          .select('*')
-          .in('provider_id', ownedBusinessIds)
-          .order('created_at', { ascending: false })
-          .limit(100) // Limit to recent 100 activities
-
-        // Build a quick lookup of provider id -> name from the listings we already loaded
-        const providerIdToName = new Map<string, string>(allListings.map((l: any) => [l.id, l.name]))
-
-        if (activityError) {
-          console.warn('[MyBusiness] User activity error (non-critical):', activityError)
-        } else {
-          userActivityData = (activityData || []).map((activity: any) => ({
-            ...activity,
-            provider_name: providerIdToName.get(activity.provider_id) || 'Unknown Business'
-          })) as UserActivity[]
-        }
-      }
-
       setListings((allListings as BusinessListing[]) || [])
       setApplications((appsData as BusinessApplication[]) || [])
       setJobPosts(jobPostsData)
       setChangeRequests((changeRequestsData as ProviderChangeRequest[]) || [])
-      setUserActivity(userActivityData)
       
       // Load dismissed notifications from database
       const dismissedData = await getDismissedNotifications(auth.userId)

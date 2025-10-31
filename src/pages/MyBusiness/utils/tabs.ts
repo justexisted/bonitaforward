@@ -6,12 +6,12 @@
  */
 
 import type { ProviderChangeRequest } from '../../../lib/supabaseData'
-import type { BusinessListing, BusinessApplication, JobPost, UserActivity } from '../types'
+import type { BusinessListing, BusinessApplication, JobPost } from '../types'
 
 /**
  * Tab key type definition
  */
-export type TabKey = 'listings' | 'applications' | 'jobs' | 'change-requests' | 'user-activity' | 'analytics' | 'recently-approved' | 'recently-rejected' | 'pending-requests'
+export type TabKey = 'listings' | 'applications' | 'jobs' | 'change-requests' | 'analytics' | 'recently-approved' | 'recently-rejected' | 'pending-requests'
 
 /**
  * Tab configuration interface
@@ -48,30 +48,41 @@ export function getNonFeaturedChangeRequests(
 /**
  * Creates the tab configuration for the dashboard
  * Calculates counts and filters based on current data
+ * 
+ * IMPORTANT: Approval-related tabs (Recently Approved, Recently Rejected, Pending Requests)
+ * are only shown if the business owner has at least one FREE business (not featured).
+ * Featured businesses get instant updates and don't need approval, so these tabs are irrelevant.
  */
 export function createTabsConfig(
   listings: BusinessListing[],
   applications: BusinessApplication[],
   jobPosts: JobPost[],
-  changeRequests: ProviderChangeRequest[],
-  userActivity: UserActivity[]
+  changeRequests: ProviderChangeRequest[]
 ): readonly TabConfig[] {
   const nonFeaturedChangeRequests = getNonFeaturedChangeRequests(listings, changeRequests)
+  
+  // Check if user has any free (non-featured) businesses
+  // If all businesses are featured, approval-related tabs don't make sense
+  const hasFreeBusinesses = listings.some(listing => !listing.is_member)
   
   // 30 days ago threshold for recent approvals/rejections
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
   
-  return [
+  // Base tabs that are always shown
+  const baseTabs: TabConfig[] = [
     { key: 'listings', label: 'Business Listings', count: listings.length },
     { key: 'applications', label: 'Applications', count: applications.length },
     { key: 'jobs', label: 'Job Posts', count: jobPosts.length },
+    { key: 'analytics', label: 'Analytics' },
+  ]
+  
+  // Approval-related tabs - only show if user has free businesses
+  const approvalTabs: TabConfig[] = hasFreeBusinesses ? [
     { 
       key: 'change-requests', 
       label: 'Change Requests', 
       count: nonFeaturedChangeRequests.filter(req => req.status === 'pending').length 
     },
-    { key: 'user-activity', label: 'User Activity', count: userActivity.length },
-    { key: 'analytics', label: 'Analytics' },
     { 
       key: 'recently-approved', 
       label: 'Recently Approved', 
@@ -95,6 +106,23 @@ export function createTabsConfig(
       label: 'Pending Requests', 
       count: nonFeaturedChangeRequests.filter(req => req.status === 'pending').length 
     }
-  ] as const
+  ] : []
+  
+  // Combine base tabs with approval tabs (if applicable)
+  // Insert change-requests after jobs, then the others at the end
+  const tabs: TabConfig[] = []
+  tabs.push(...baseTabs.slice(0, 3)) // listings, applications, jobs
+  
+  if (hasFreeBusinesses) {
+    tabs.push(approvalTabs[0]) // change-requests
+  }
+  
+  tabs.push(baseTabs[3]) // analytics
+  
+  if (hasFreeBusinesses) {
+    tabs.push(...approvalTabs.slice(1)) // recently-approved, recently-rejected, pending-requests
+  }
+  
+  return tabs as readonly TabConfig[]
 }
 

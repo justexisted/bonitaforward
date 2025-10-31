@@ -18,6 +18,7 @@ export { ListingsTab } from './ListingsTab'
 export { HistoricalRequestsTab } from './HistoricalRequestsTab'
 export { JobPostsTab } from './JobPostsTab'
 export { TabDropdownNav } from './TabDropdownNav'
+export { SidebarNav } from './SidebarNav'
 
 // Analytics Components
 export { AnalyticsTab } from './AnalyticsTab'

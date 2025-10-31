@@ -76,13 +76,13 @@ import { type ProviderChangeRequest, dismissNotification as dismissNotificationD
 import './MyBusiness/mobile-optimizations.css'
 
 // Import extracted components
-import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, UserActivityTab, ListingsTab, HistoricalRequestsTab, JobPostsTab, TabDropdownNav, AnalyticsTab } from './MyBusiness/components'
+import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, ListingsTab, HistoricalRequestsTab, JobPostsTab, SidebarNav, AnalyticsTab } from './MyBusiness/components'
 // import { PlanSelector } from './MyBusiness/components/PlanSelector' // Available but not used yet
 // import { useBusinessData, useImageUpload } from './MyBusiness/hooks' // Available but not integrated yet
 // import { BUSINESS_CATEGORIES } from './MyBusiness/utils' // Available but not used yet
 
 // Import type definitions from centralized types file
-import type { BusinessListing, BusinessApplication, JobPost, UserActivity } from './MyBusiness/types'
+import type { BusinessListing, BusinessApplication, JobPost } from './MyBusiness/types'
 
 // Import tab configuration utilities
 import { createTabsConfig, getNonFeaturedChangeRequests, type TabKey } from './MyBusiness/utils/tabs'
@@ -97,7 +97,6 @@ export default function MyBusinessPage() {
   const [applications, setApplications] = useState<BusinessApplication[]>([])
   const [jobPosts, setJobPosts] = useState<JobPost[]>([])
   const [changeRequests, setChangeRequests] = useState<ProviderChangeRequest[]>([])
-  const [userActivity, setUserActivity] = useState<UserActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('listings')
@@ -106,8 +105,6 @@ export default function MyBusinessPage() {
   const [showJobForm, setShowJobForm] = useState(false)
   const [editingJob, setEditingJob] = useState<JobPost | null>(null) // State for editing existing job posts
   const [isUpdating, setIsUpdating] = useState(false)
-  // Dropdown state for mobile-friendly tab navigation
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   // Google Calendar connection state
   const [connectingCalendar, setConnectingCalendar] = useState(false)
   // State to control subscription card visibility
@@ -136,7 +133,6 @@ export default function MyBusinessPage() {
     setApplications,
     setJobPosts,
     setChangeRequests,
-    setUserActivity,
     setDismissedNotifications,
     setShowSubscriptionCard,
     setUserPlanChoice,
@@ -178,39 +174,37 @@ export default function MyBusinessPage() {
    * Uses utility function to create tab configuration with counts.
    * Tabs are used for both the dropdown menu and tab display logic.
    */
-  const tabs = createTabsConfig(listings, applications, jobPosts, changeRequests, userActivity)
+  const tabs = createTabsConfig(listings, applications, jobPosts, changeRequests)
   const nonFeaturedChangeRequests = getNonFeaturedChangeRequests(listings, changeRequests)
+  
+  // Check if user has any free (non-featured) businesses
+  // Featured businesses get instant updates and don't need approval
+  const hasFreeBusinesses = listings.some(listing => !listing.is_member)
+  
+  // Approval-related tabs that should only be visible for free businesses
+  const approvalTabs: TabKey[] = ['change-requests', 'recently-approved', 'recently-rejected', 'pending-requests']
+  
+  // If current active tab is an approval tab but user only has featured businesses, redirect to listings
+  useEffect(() => {
+    if (!hasFreeBusinesses && approvalTabs.includes(activeTab)) {
+      setActiveTab('listings')
+    }
+  }, [hasFreeBusinesses, activeTab])
 
   /**
    * HANDLE TAB SELECTION
    * 
-   * This function handles tab selection from the dropdown menu.
-   * It closes the dropdown and updates the active tab.
+   * This function handles tab selection from the sidebar navigation.
+   * Prevents featured business owners from accessing approval-related tabs.
    */
   const handleTabSelect = (tabKey: TabKey) => {
+    // If trying to select an approval tab but user only has featured businesses, redirect to listings
+    if (!hasFreeBusinesses && approvalTabs.includes(tabKey)) {
+      setActiveTab('listings')
+      return
+    }
     setActiveTab(tabKey)
-    setIsDropdownOpen(false) // Close dropdown after selection
   }
-
-  /**
-   * CLICK OUTSIDE HANDLER
-   * 
-   * This effect adds a click-outside listener to close the dropdown
-   * when clicking anywhere outside of it. This improves UX on mobile.
-   */
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element
-      if (isDropdownOpen && !target.closest('[data-dropdown-container]')) {
-        setIsDropdownOpen(false)
-      }
-    }
-
-    if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isDropdownOpen])
 
   /**
    * AUTHENTICATION & ROLE CHECK
@@ -243,15 +237,27 @@ export default function MyBusinessPage() {
    * 
    * This effect handles automatic tab selection when URL has a hash (e.g., #jobs).
    * Used when redirecting from Jobs page "Post a Job" button.
+   * 
+   * IMPORTANT: Approval-related tabs are ignored for featured business owners.
    */
   useEffect(() => {
     const hash = window.location.hash.slice(1) // Remove the '#'
-    if (hash === 'jobs' || hash === 'listings' || hash === 'applications' || hash === 'change-requests' || hash === 'user-activity' || hash === 'analytics' || hash === 'recently-approved' || hash === 'recently-rejected' || hash === 'pending-requests') {
-      setActiveTab(hash as typeof activeTab)
+    const validTabs: TabKey[] = ['jobs', 'listings', 'applications', 'change-requests', 'analytics', 'recently-approved', 'recently-rejected', 'pending-requests']
+    
+    if (validTabs.includes(hash as TabKey)) {
+      const requestedTab = hash as TabKey
+      
+      // If requesting an approval tab but user only has featured businesses, default to listings
+      if (!hasFreeBusinesses && approvalTabs.includes(requestedTab)) {
+        setActiveTab('listings')
+      } else {
+        setActiveTab(requestedTab)
+      }
+      
       // Clear the hash after setting the tab so it doesn't persist on refresh
       window.history.replaceState(null, '', window.location.pathname)
     }
-  }, [])
+  }, [hasFreeBusinesses])
 
   /**
    * HANDLE GOOGLE CALENDAR OAUTH CALLBACK
@@ -731,15 +737,19 @@ export default function MyBusinessPage() {
   }
 
   return (
-    <section className="py-2 sm:py-4 md:py-8 px-2 sm:px-4 md:px-6 my-business-container">
-      <div className="mx-auto max-w-6xl">
+    <section className="py-2 sm:py-4 md:py-8 px-2 sm:px-4 md:px-6 my-business-container bg-neutral-50">
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <div className="mb-6 lg:mb-8">
+          <h1 className="text-2xl lg:text-3xl font-bold text-neutral-900 mb-2">My Business</h1>
+          <p className="text-neutral-600">Manage your business listings, applications, and analytics</p>
+        </div>
 
         {message && (
-          <div className="my-business-mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 my-business-card">
-            <p className="text-blue-800 my-business-text-sm">{message}</p>
+          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-blue-800 text-sm">{message}</p>
           </div>
         )}
-
 
         {/* Featured Upgrade Confirmation - Inline Card */}
         {showFeaturedUpgradeModal && (
@@ -765,180 +775,179 @@ export default function MyBusinessPage() {
           setActiveTab={setActiveTab}
         />
 
-        {/* Mobile-Friendly Dropdown Navigation */}
-        <TabDropdownNav
-          tabs={tabs}
-          activeTab={activeTab}
-          isDropdownOpen={isDropdownOpen}
-          onToggleDropdown={() => setIsDropdownOpen(!isDropdownOpen)}
-          onSelectTab={handleTabSelect}
-        />
-
-        {/* Business Listings Tab */}
-        {activeTab === 'listings' && (
-          <ListingsTab
-            listings={listings}
-            changeRequests={changeRequests}
-            onCreateNew={() => setShowCreateForm(true)}
-            onEdit={setEditingListing}
-            onUpgradeToFeatured={upgradeToFeatured}
-            onPromptAndUploadImages={promptAndUploadImages}
-            onConnectGoogleCalendar={connectGoogleCalendar}
-            onDisconnectGoogleCalendar={disconnectGoogleCalendar}
-            onDowngradeToFree={downgradeToFree}
-            onDelete={deleteBusinessListing}
-            connectingCalendar={connectingCalendar}
+        {/* Main Content Area with Sidebar */}
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+          {/* Sidebar Navigation */}
+          <SidebarNav
+            tabs={tabs}
+            activeTab={activeTab}
+            onSelectTab={handleTabSelect}
           />
-        )}
 
-        {/* Applications Tab */}
-        {activeTab === 'applications' && (
-          <div className="space-y-4">
-            {applications.length === 0 ? (
-              <ApplicationsEmptyState />
-            ) : (
-              applications.map((app) => (
-                <ApplicationCard
-                  key={app.id}
-                  application={app}
-                  onRequestFreeListing={requestFreeListingFromApp}
-                />
-              ))
+          {/* Main Content */}
+          <main className="flex-1 min-w-0">
+            {/* Business Listings Tab */}
+            {activeTab === 'listings' && (
+              <ListingsTab
+                listings={listings}
+                changeRequests={changeRequests}
+                onCreateNew={() => setShowCreateForm(true)}
+                onEdit={setEditingListing}
+                onUpgradeToFeatured={upgradeToFeatured}
+                onPromptAndUploadImages={promptAndUploadImages}
+                onConnectGoogleCalendar={connectGoogleCalendar}
+                onDisconnectGoogleCalendar={disconnectGoogleCalendar}
+                onDowngradeToFree={downgradeToFree}
+                onDelete={deleteBusinessListing}
+                connectingCalendar={connectingCalendar}
+              />
             )}
-          </div>
-        )}
 
-        {/* Job Posts Tab */}
-        {activeTab === 'jobs' && (
-          <JobPostsTab
-            jobPosts={jobPosts}
-            listings={listings}
-            onCreateJob={() => setShowJobForm(true)}
-            onCreateListing={() => {
-              setShowCreateForm(true)
-              setActiveTab('listings')
-            }}
-            onEditJob={(job) => {
-              setEditingJob(job)
-              setShowJobForm(true)
-            }}
-            onDeleteJob={deleteJobPost}
-          />
-        )}
-
-        {/* Change Requests Tab */}
-        {activeTab === 'change-requests' && (
-          <ChangeRequestsList
-            nonFeaturedChangeRequests={nonFeaturedChangeRequests}
-            listings={listings}
-            cancelChangeRequest={cancelChangeRequest}
-          />
-        )}
-
-        {/* User Activity Tab */}
-        {activeTab === 'user-activity' && (
-          <UserActivityTab userActivity={userActivity} />
-        )}
-
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <AnalyticsTab listings={listings} />
-        )}
-
-        {/* Recently Approved Tab */}
-        {activeTab === 'recently-approved' && (
-          <HistoricalRequestsTab
-            status="approved"
-            nonFeaturedChangeRequests={nonFeaturedChangeRequests}
-            listings={listings}
-          />
-        )}
-
-        {/* Recently Rejected Tab */}
-        {activeTab === 'recently-rejected' && (
-          <HistoricalRequestsTab
-            status="rejected"
-            nonFeaturedChangeRequests={nonFeaturedChangeRequests}
-            listings={listings}
-          />
-        )}
-
-        {/* Pending Requests Tab */}
-        {activeTab === 'pending-requests' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Pending Requests</h2>
-                <p className="text-sm text-neutral-600">Change requests waiting for admin approval</p>
+            {/* Applications Tab */}
+            {activeTab === 'applications' && (
+              <div className="space-y-4">
+                {applications.length === 0 ? (
+                  <ApplicationsEmptyState />
+                ) : (
+                  applications.map((app) => (
+                    <ApplicationCard
+                      key={app.id}
+                      application={app}
+                      onRequestFreeListing={requestFreeListingFromApp}
+                    />
+                  ))
+                )}
               </div>
-            </div>
+            )}
 
-            {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length === 0 ? (
-              <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-                <h3 className="text-lg font-medium text-neutral-900">No Pending Requests</h3>
-                <p className="mt-2 text-neutral-600">
-                  Change requests waiting for admin approval will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {nonFeaturedChangeRequests.filter(req => req.status === 'pending').map((request) => (
-                  <div key={request.id} className="rounded-xl border border-amber-200 p-4 bg-amber-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-amber-900">
-                          {request.type === 'update' ? 'Business Listing Update' : 
-                           request.type === 'delete' ? 'Business Listing Deletion' :
-                           request.type === 'feature_request' ? 'Featured Upgrade Request' :
-                           request.type === 'claim' ? 'Business Claim Request' : request.type}
-                        </h3>
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                          pending
-                        </span>
-                      </div>
-                      <div className="text-xs text-amber-600">
-                        Submitted {new Date(request.created_at).toLocaleString()}
-                      </div>
-                    </div>
+            {/* Job Posts Tab */}
+            {activeTab === 'jobs' && (
+              <JobPostsTab
+                jobPosts={jobPosts}
+                listings={listings}
+                onCreateJob={() => setShowJobForm(true)}
+                onCreateListing={() => {
+                  setShowCreateForm(true)
+                  setActiveTab('listings')
+                }}
+                onEditJob={(job) => {
+                  setEditingJob(job)
+                  setShowJobForm(true)
+                }}
+                onDeleteJob={deleteJobPost}
+              />
+            )}
 
-                    {/* Show the changes being requested */}
-                    {request.changes && Object.keys(request.changes).length > 0 && (
-                      <div className="mb-3 p-3 bg-white rounded-lg border border-amber-200">
-                        <div className="text-sm font-medium text-amber-700 mb-2">Requested Changes:</div>
-                        <div className="text-sm text-amber-600 space-y-1">
-                          {Object.keys(request.changes).map((field) => (
-                            <div key={field} className="capitalize">
-                              {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            </div>
-                          ))}
+            {/* Change Requests Tab */}
+            {activeTab === 'change-requests' && (
+              <ChangeRequestsList
+                nonFeaturedChangeRequests={nonFeaturedChangeRequests}
+                listings={listings}
+                cancelChangeRequest={cancelChangeRequest}
+              />
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <AnalyticsTab listings={listings} />
+            )}
+
+            {/* Recently Approved Tab */}
+            {activeTab === 'recently-approved' && (
+              <HistoricalRequestsTab
+                status="approved"
+                nonFeaturedChangeRequests={nonFeaturedChangeRequests}
+                listings={listings}
+              />
+            )}
+
+            {/* Recently Rejected Tab */}
+            {activeTab === 'recently-rejected' && (
+              <HistoricalRequestsTab
+                status="rejected"
+                nonFeaturedChangeRequests={nonFeaturedChangeRequests}
+                listings={listings}
+              />
+            )}
+
+            {/* Pending Requests Tab */}
+            {activeTab === 'pending-requests' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">Pending Requests</h2>
+                    <p className="text-sm text-neutral-600">Change requests waiting for admin approval</p>
+                  </div>
+                </div>
+
+              {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length === 0 ? (
+                <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                  <h3 className="text-lg font-medium text-neutral-900">No Pending Requests</h3>
+                  <p className="mt-2 text-neutral-600">
+                    Change requests waiting for admin approval will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {nonFeaturedChangeRequests.filter(req => req.status === 'pending').map((request) => (
+                    <div key={request.id} className="rounded-xl border border-amber-200 p-4 bg-amber-50">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-amber-900">
+                            {request.type === 'update' ? 'Business Listing Update' : 
+                             request.type === 'delete' ? 'Business Listing Deletion' :
+                             request.type === 'feature_request' ? 'Featured Upgrade Request' :
+                             request.type === 'claim' ? 'Business Claim Request' : request.type}
+                          </h3>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            pending
+                          </span>
+                        </div>
+                        <div className="text-xs text-amber-600">
+                          Submitted {new Date(request.created_at).toLocaleString()}
                         </div>
                       </div>
-                    )}
 
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="text-xs text-amber-600">
-                        <div>Provider ID: {request.provider_id}</div>
-                        {request.reason && <div>Reason: {request.reason}</div>}
+                      {/* Show the changes being requested */}
+                      {request.changes && Object.keys(request.changes).length > 0 && (
+                        <div className="mb-3 p-3 bg-white rounded-lg border border-amber-200">
+                          <div className="text-sm font-medium text-amber-700 mb-2">Requested Changes:</div>
+                          <div className="text-sm text-amber-600 space-y-1">
+                            {Object.keys(request.changes).map((field) => (
+                              <div key={field} className="capitalize">
+                                {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="text-xs text-amber-600">
+                          <div>Provider ID: {request.provider_id}</div>
+                          {request.reason && <div>Reason: {request.reason}</div>}
+                        </div>
+                        
+                        {/* Cancel button for pending requests */}
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to cancel this change request? This action cannot be undone.')) {
+                              cancelChangeRequest(request.id)
+                            }
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                        >
+                          Cancel Request
+                        </button>
                       </div>
-                      
-                      {/* Cancel button for pending requests */}
-                      <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to cancel this change request? This action cannot be undone.')) {
-                            cancelChangeRequest(request.id)
-                          }
-                        }}
-                        className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                      >
-                        Cancel Request
-                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
+            </div>
             )}
-          </div>
-        )}
+          </main>
+        </div>
 
         {/* Business Listing Creation/Edit Modal */}
         {(showCreateForm || editingListing) && (
