@@ -12,6 +12,10 @@ export const ADMIN_SECTIONS: Record<AdminSection, { label: string; description: 
     label: 'Providers',
     description: 'Manage business providers and listings'
   },
+  'restaurant-tagging': {
+    label: 'Restaurant Tagging',
+    description: 'Tag restaurants with price range, cuisine, occasions, and dietary options'
+  },
   'contact-leads': {
     label: 'Contact / Get Featured',
     description: 'Manage contact leads and featured requests'
