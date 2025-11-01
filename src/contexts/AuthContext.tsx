@@ -140,7 +140,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               resident_verified_at?: string | null
             }
             if (pref?.role === 'business' || pref?.role === 'community') role = pref.role
-            if (!name && pref?.name) name = pref.name
+            // CRITICAL FIX: Always use name from localStorage during signup, even if name already exists
+            // This ensures the name entered during signup is saved, not overwritten by empty/null values
+            if (pref?.name && pref?.name.trim()) {
+              name = pref.name.trim()
+            }
             if (pref && (pref.email === email || !pref.email)) {
               // Extract resident verification data
               if (pref.is_bonita_resident !== undefined) {
@@ -178,6 +182,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[Auth] Saving resident verification data:', residentVerification)
         }
         
+        // Log name being saved for debugging
+        if (name) {
+          console.log('[Auth] Saving name to profile:', name)
+        }
+        
         if (existingProfile) {
           // Profile exists - use UPDATE
           // Don't use .select() immediately after update - it can fail due to RLS
@@ -191,6 +200,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('[Auth] Error updating profile:', updateError)
             console.error('[Auth] Update payload was:', updatePayload)
             return
+          }
+          
+          // CRITICAL FIX: Refresh profile state after update so name is immediately available
+          const profileData = await fetchUserProfile(userId)
+          if (profileData.name) {
+            if (mounted) {
+              setProfile(prev => ({ ...prev, name: profileData.name }))
+              profileRef.current = { ...profileRef.current, name: profileData.name } as any
+            }
           }
           
           // Verify update with a separate query (small delay for eventual consistency)
@@ -223,6 +241,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('[Auth] Error creating profile:', insertError)
             console.error('[Auth] Insert payload was:', insertPayload)
             return
+          }
+          
+          // CRITICAL FIX: Refresh profile state after insert so name is immediately available
+          const profileData = await fetchUserProfile(userId)
+          if (profileData.name) {
+            if (mounted) {
+              setProfile(prev => ({ ...prev, name: profileData.name }))
+              profileRef.current = { ...profileRef.current, name: profileData.name } as any
+            }
           }
           
           // Verify insert with a separate query (small delay for eventual consistency)
