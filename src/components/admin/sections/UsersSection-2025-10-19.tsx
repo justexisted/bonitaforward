@@ -6,6 +6,9 @@ interface UsersSectionProps {
     email: string | null
     name: string | null
     role?: string | null
+    is_bonita_resident?: boolean | null
+    resident_zip_code?: string | null
+    resident_verification_method?: string | null
   }>
   deletingUserId: string | null
   currentUserEmail: string | null
@@ -36,7 +39,15 @@ export const UsersSection: React.FC<UsersSectionProps> = ({
             <div key={p.id} className="flex items-center justify-between py-1 border-b border-neutral-100 last:border-0">
               <div>
                 <div className="font-medium text-sm">{p.email || '(no email)'}</div>
-                <div className="text-xs text-neutral-500">{p.name || '—'} • business</div>
+                <div className="text-xs text-neutral-500">
+                  {p.name || '—'} • business
+                  {p.is_bonita_resident && (
+                    <span className="ml-2 text-green-600">• Verified Resident</span>
+                  )}
+                  {p.resident_zip_code && (
+                    <span className="ml-2 font-mono">• {p.resident_zip_code}</span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {deletingUserId === p.id ? (
@@ -82,6 +93,12 @@ export const UsersSection: React.FC<UsersSectionProps> = ({
                 <div className="text-xs text-neutral-500">
                   {p.name || '—'}
                   {p.role ? ` • ${p.role}` : ''}
+                  {p.is_bonita_resident && (
+                    <span className="ml-2 text-green-600">• Verified Resident</span>
+                  )}
+                  {p.resident_zip_code && (
+                    <span className="ml-2 font-mono">• {p.resident_zip_code}</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">

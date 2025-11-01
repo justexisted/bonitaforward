@@ -1,16 +1,19 @@
 -- ============================================================================
 -- ADD BONITA RESIDENT VERIFICATION FIELDS
+-- Date: 2025-01-XX
+-- Purpose: Add resident verification fields to profiles table (Phase 1)
 -- ============================================================================
 -- 
 -- This migration adds fields to the profiles table to support Bonita resident
 -- verification via ZIP code and self-declaration (Phase 1).
--- 
+--
 -- Phase 1 Fields:
 -- - is_bonita_resident: Boolean flag indicating if user is verified as Bonita resident
 -- - resident_verification_method: How the user was verified ('self-declared', 'zip-verified', etc.)
 -- - resident_zip_code: ZIP code provided by user for verification
 -- - resident_verified_at: Timestamp when verification was completed
 --
+-- IMPORTANT: This is IDEMPOTENT - safe to run multiple times
 -- Run this migration in Supabase SQL Editor
 -- ============================================================================
 
@@ -52,4 +55,15 @@ COMMENT ON COLUMN profiles.resident_verified_at IS 'Timestamp when resident veri
 -- - 'document-verified': Verified via document upload (Phase 3)
 -- - 'admin-verified': Manually verified by admin
 -- ============================================================================
+
+-- Verify the changes
+SELECT 
+  column_name,
+  data_type,
+  column_default,
+  is_nullable
+FROM information_schema.columns 
+WHERE table_name = 'profiles' 
+  AND column_name LIKE '%resident%'
+ORDER BY ordinal_position;
 

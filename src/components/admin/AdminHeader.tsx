@@ -98,6 +98,7 @@ export function AdminHeader({
               <option value="customer-users">Customer Users</option>
               <option value="business-accounts">Business Accounts</option>
               <option value="users">Users</option>
+              <option value="resident-verification">Resident Verification</option>
               <option value="business-applications">Business Applications</option>
               <option value="owner-change-requests">Owner Change Requests</option>
               <option value="job-posts">Job Posts</option>

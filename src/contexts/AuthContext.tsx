@@ -173,8 +173,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...residentVerification
         }
         
+        // Log resident verification data for debugging
+        if (Object.keys(residentVerification).length > 0) {
+          console.log('[Auth] Saving resident verification data:', residentVerification)
+        }
+        
         if (existingProfile) {
           // Profile exists - use UPDATE
+          // Don't use .select() immediately after update - it can fail due to RLS
+          // Instead, verify with a separate query if needed
           const { error: updateError } = await supabase
             .from('profiles')
             .update(updatePayload)
@@ -182,8 +189,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           if (updateError) {
             console.error('[Auth] Error updating profile:', updateError)
+            console.error('[Auth] Update payload was:', updatePayload)
             return
           }
+          
+          // Verify update with a separate query (small delay for eventual consistency)
+          setTimeout(async () => {
+            const { data: verifyData } = await supabase
+              .from('profiles')
+              .select('is_bonita_resident, resident_verification_method, resident_zip_code')
+              .eq('id', userId)
+              .maybeSingle()
+            
+            if (verifyData) {
+              console.log('[Auth] Profile update verified:', verifyData)
+            } else {
+              console.warn('[Auth] Profile update verification returned no data')
+            }
+          }, 500)
         } else {
           // Profile doesn't exist - use INSERT
           const insertPayload: any = {
@@ -191,14 +214,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ...updatePayload
           }
           
+          // Don't use .select() immediately after insert - it can fail due to RLS
           const { error: insertError } = await supabase
             .from('profiles')
             .insert(insertPayload)
           
           if (insertError) {
             console.error('[Auth] Error creating profile:', insertError)
+            console.error('[Auth] Insert payload was:', insertPayload)
             return
           }
+          
+          // Verify insert with a separate query (small delay for eventual consistency)
+          setTimeout(async () => {
+            const { data: verifyData } = await supabase
+              .from('profiles')
+              .select('is_bonita_resident, resident_verification_method, resident_zip_code')
+              .eq('id', userId)
+              .maybeSingle()
+            
+            if (verifyData) {
+              console.log('[Auth] Profile creation verified:', verifyData)
+            } else {
+              console.warn('[Auth] Profile creation verification returned no data')
+            }
+          }, 500)
         }
         
         // Clear pending profile data after successful save

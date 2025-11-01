@@ -36,6 +36,10 @@ export const ADMIN_SECTIONS: Record<AdminSection, { label: string; description: 
     label: 'Users',
     description: 'Manage all user accounts'
   },
+  'resident-verification': {
+    label: 'Resident Verification',
+    description: 'View Bonita resident verification statistics and details'
+  },
   'business-applications': {
     label: 'Business Applications',
     description: 'Review business listing applications'

@@ -29,6 +29,7 @@ import { CustomerUsersSection } from '../components/admin/sections/CustomerUsers
 import { ContactLeadsSection } from '../components/admin/sections/ContactLeadsSection-2025-10-19'
 import { BusinessAccountsSection } from '../components/admin/sections/BusinessAccountsSection-2025-10-19'
 import { UsersSection } from '../components/admin/sections/UsersSection-2025-10-19'
+import { ResidentVerificationSection } from '../components/admin/sections/ResidentVerificationSection'
 import { FunnelResponsesSection } from '../components/admin/sections/FunnelResponsesSection-2025-10-19'
 import { BookingsSection } from '../components/admin/sections/BookingsSection-2025-10-19'
 import { BusinessApplicationsSection } from '../components/admin/sections/BusinessApplicationsSection-2025-10-19'
@@ -185,7 +186,7 @@ export default function AdminPage() {
         const validSections: AdminSection[] = [
           'providers', 'restaurant-tagging', 'business-applications', 'contact-leads',
           'customer-users', 'business-accounts', 'business-owners', 'users',
-          'owner-change-requests', 'job-posts', 'funnel-responses', 'bookings',
+          'resident-verification', 'owner-change-requests', 'job-posts', 'funnel-responses', 'bookings',
           'booking-events', 'blog', 'calendar-events', 'flagged-events'
         ]
         
@@ -619,6 +620,13 @@ export default function AdminPage() {
                 currentUserEmail={auth.email ?? null}
                 onSetDeletingUserId={setDeletingUserId}
                 onDeleteUser={deleteUser}
+              />
+            </AdminErrorBoundary>
+          )}
+          {isAdmin && section === 'resident-verification' && (
+            <AdminErrorBoundary section="resident-verification">
+              <ResidentVerificationSection
+                profiles={profiles}
               />
             </AdminErrorBoundary>
           )}

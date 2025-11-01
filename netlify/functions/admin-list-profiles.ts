@@ -81,8 +81,33 @@ export const handler: Handler = async (event) => {
       // audit log table doesn't exist yet, that's okay for now
     }
 
-    const { data, error } = await sb.from('profiles').select('id,email,name,role,is_admin').order('email', { ascending: true })
-    if (error) return { statusCode: 400, body: error.message }
+    // Select all profile fields including resident verification data
+    // Try with resident verification fields first, fallback to basic fields if columns don't exist
+    let query = sb
+      .from('profiles')
+      .select('id,email,name,role,is_admin,is_bonita_resident,resident_verification_method,resident_zip_code,resident_verified_at')
+      .order('email', { ascending: true })
+    
+    let { data, error } = await query
+    
+    // If error is about missing columns, try again with just basic fields
+    if (error && (error.message?.includes('column') || error.message?.includes('does not exist'))) {
+      console.warn('[admin-list-profiles] Resident verification columns not found, using basic fields:', error.message)
+      const basicQuery = sb
+        .from('profiles')
+        .select('id,email,name,role,is_admin')
+        .order('email', { ascending: true })
+      const basicResult = await basicQuery
+      if (basicResult.error) {
+        console.error('[admin-list-profiles] Error fetching profiles:', basicResult.error)
+        return { statusCode: 400, body: JSON.stringify({ error: basicResult.error.message, details: 'Failed to fetch profiles' }) }
+      }
+      data = basicResult.data
+    } else if (error) {
+      console.error('[admin-list-profiles] Error fetching profiles:', error)
+      return { statusCode: 400, body: JSON.stringify({ error: error.message, details: 'Database query failed' }) }
+    }
+    
     return { statusCode: 200, body: JSON.stringify({ profiles: data || [] }) }
   } catch (err: any) {
     return { statusCode: 500, body: err?.message || 'Server error' }
