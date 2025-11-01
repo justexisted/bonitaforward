@@ -93,31 +93,16 @@ export default function Navbar() {
     return baseItems
   }
 
-  // Handle CTA button click with useEffect
-  useEffect(() => {
-    const handleCtaClick = () => {
-      if (!auth.isAuthed) {
-        saveReturnUrl()
-        // Redirect to sign up page instead of sign in
-        window.location.href = '/signin?mode=signup'
-      } else {
-        window.location.href = '/account'
-      }
+  // Handle CTA button click
+  const handleCtaClick = () => {
+    if (!auth.isAuthed) {
+      saveReturnUrl()
+      // Redirect to sign up page instead of sign in
+      window.location.href = '/signin?mode=signup'
+    } else {
+      window.location.href = '/account'
     }
-
-    // Add event listener to CTA button when component mounts
-    const ctaButton = document.querySelector('.card-nav-cta-button')
-    if (ctaButton) {
-      ctaButton.addEventListener('click', handleCtaClick)
-    }
-
-    // Cleanup event listener on unmount
-    return () => {
-      if (ctaButton) {
-        ctaButton.removeEventListener('click', handleCtaClick)
-      }
-    }
-  }, [auth.isAuthed])
+  }
 
   // Handle sign out link click
   useEffect(() => {
@@ -171,6 +156,7 @@ export default function Navbar() {
           buttonTextColor="#000"
           ease="power3.out"
           customButton={getCustomButton()}
+          onCtaClick={handleCtaClick}
         />
       </div>
     </header>

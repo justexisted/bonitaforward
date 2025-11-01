@@ -26,6 +26,7 @@ export interface CardNavProps {
   buttonBgColor?: string;
   buttonTextColor?: string;
   customButton?: React.ReactNode;
+  onCtaClick?: () => void;
 }
 
 const CardNav: React.FC<CardNavProps> = ({
@@ -38,7 +39,8 @@ const CardNav: React.FC<CardNavProps> = ({
   menuColor,
   buttonBgColor,
   buttonTextColor,
-  customButton
+  customButton,
+  onCtaClick
 }) => {
   const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -233,6 +235,7 @@ const CardNav: React.FC<CardNavProps> = ({
           ) : (
             <button
               type="button"
+              onClick={onCtaClick}
               className="card-nav-cta-button hidden md:inline-flex border-0 rounded-[calc(0.75rem-0.2rem)] px-4 h-full font-medium cursor-pointer transition-colors duration-300"
               style={{ backgroundColor: buttonBgColor, color: buttonTextColor }}
             >
