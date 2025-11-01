@@ -77,6 +77,7 @@ import './MyBusiness/mobile-optimizations.css'
 
 // Import extracted components
 import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, ListingsTab, HistoricalRequestsTab, JobPostsTab, SidebarNav, AnalyticsTab } from './MyBusiness/components'
+import { AdminErrorBoundary } from '../components/admin/AdminErrorBoundary'
 // import { PlanSelector } from './MyBusiness/components/PlanSelector' // Available but not used yet
 // import { useBusinessData, useImageUpload } from './MyBusiness/hooks' // Available but not integrated yet
 // import { BUSINESS_CATEGORIES } from './MyBusiness/utils' // Available but not used yet
@@ -215,8 +216,6 @@ export default function MyBusinessPage() {
    * Debug logging helps troubleshoot role assignment issues.
    */
   useEffect(() => {
-    console.log('MyBusiness: Auth state:', { role: auth.role, email: auth.email, userId: auth.userId, isAuthed: auth.isAuthed })
-    
     if (!auth.isAuthed) {
       setMessage('Please sign in to access this page.')
       setLoading(false)
@@ -306,8 +305,6 @@ export default function MyBusinessPage() {
     const state = location.state as { autoSelectPlan?: 'free' | 'featured' } | null
     
     if (state?.autoSelectPlan && auth.userId) {
-      console.log('[MyBusiness] Auto-selecting plan from pricing page:', state.autoSelectPlan)
-      
       // Hide subscription card immediately since user already saw pricing info on pricing page
       setShowSubscriptionCard(false)
       
@@ -625,7 +622,6 @@ export default function MyBusinessPage() {
         return [...filtered, newDismissal]
       })
       
-      console.log(`[MyBusiness] Successfully dismissed ${notificationType} notification`)
     } catch (error: any) {
       console.error(`[MyBusiness] Error dismissing ${notificationType} notification:`, error)
       setMessage(`Error dismissing notification: ${error.message}`)
@@ -849,7 +845,9 @@ export default function MyBusinessPage() {
 
             {/* Analytics Tab */}
             {activeTab === 'analytics' && (
-              <AnalyticsTab listings={listings} />
+              <AdminErrorBoundary section="analytics">
+                <AnalyticsTab listings={listings} />
+              </AdminErrorBoundary>
             )}
 
             {/* Recently Approved Tab */}
@@ -955,17 +953,14 @@ export default function MyBusinessPage() {
             listing={editingListing}
             onSave={editingListing ? 
               (updates) => {
-                console.log('[MyBusiness] Updating listing:', editingListing.id, updates)
                 updateBusinessListing(editingListing.id, updates)
               } :
               (data) => {
-                console.log('[MyBusiness] Creating listing:', data)
                 createBusinessListing(data)
               }
             }
             isUpdating={isUpdating}
             onCancel={() => {
-              console.log('[MyBusiness] Form cancelled')
               setShowCreateForm(false)
               setEditingListing(null)
             }}

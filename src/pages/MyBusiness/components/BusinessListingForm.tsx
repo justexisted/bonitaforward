@@ -211,7 +211,6 @@ export function BusinessListingForm({
       
       // Prevent multiple submissions
       if (isUpdating) {
-        console.log('[BusinessListingForm] Form submission blocked - update in progress')
         return
       }
       
@@ -239,14 +238,8 @@ export function BusinessListingForm({
         }
       })
       
-      console.log('[BusinessListingForm] Original listing data:', listing)
-      console.log('[BusinessListingForm] Form data:', formData)
-      console.log('[BusinessListingForm] Detected changes:', changes)
-      console.log('[BusinessListingForm] Number of changed fields:', Object.keys(changes).length)
-      
       // Only proceed if there are actual changes
       if (Object.keys(changes).length === 0) {
-        console.log('[BusinessListingForm] No changes detected, skipping submission')
         return
       }
       

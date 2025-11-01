@@ -180,14 +180,6 @@ export async function fetchBookings(): Promise<BookingRow[]> {
  */
 export async function fetchBookingEvents(): Promise<BookingEventRow[]> {
   try {
-    // DEBUG: Log current user info to diagnose RLS issues
-    const { data: { user } } = await supabase.auth.getUser()
-    console.log('[DEBUG] Fetching booking_events as user:', {
-      id: user?.id,
-      email: user?.email,
-      role: user?.role
-    })
-    
     // Select specific columns to avoid permission errors on related tables (like users)
     // This prevents Supabase from trying to follow foreign keys we don't have access to
     const { data, error } = await supabase
@@ -196,25 +188,11 @@ export async function fetchBookingEvents(): Promise<BookingEventRow[]> {
       .order('created_at', { ascending: false })
     
     if (error) {
-      // ⚠️ RLS PERMISSION ERROR - DIAGNOSE THE ISSUE
-      console.error('[AdminDataService] ⚠️ BOOKING EVENTS RLS ERROR')
-      console.error('[DEBUG] Error details:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      })
-      console.error('[DEBUG] Current user email:', user?.email)
-      console.error('[DEBUG] User ID:', user?.id)
-      console.error('[DIAGNOSTIC] To check if RLS policies exist, run this SQL in Supabase:')
-      console.error('SELECT * FROM pg_policies WHERE tablename = \'booking_events\';')
-      console.error('[DIAGNOSTIC] To check if is_admin_user() function exists, run:')
-      console.error('SELECT is_admin_user();')
-      console.error('[DIAGNOSTIC] If SQL was already run, check if your email matches the one in is_admin_user() function')
+      // RLS PERMISSION ERROR - log error details for troubleshooting
+      console.error('[AdminDataService] Booking events RLS error:', error.message)
       return [] // Return empty array, admin panel will still function
     }
     
-    console.log('[DEBUG] Successfully fetched booking_events:', data?.length || 0, 'records')
     return (data || []) as BookingEventRow[]
   } catch (error) {
     console.error('[AdminDataService] Booking events fetch failed:', error)
