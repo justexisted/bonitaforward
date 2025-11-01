@@ -124,6 +124,9 @@ export default function ProvidersSection({ isAdmin, section }: ProvidersSectionP
                   Subscription
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tags
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -196,6 +199,32 @@ export default function ProvidersSection({ isAdmin, section }: ProvidersSectionP
                       <option value="monthly">Monthly</option>
                       <option value="yearly">Yearly</option>
                     </select>
+                  </td>
+                  <td className="px-6 py-4">
+                    {(provider.tags && provider.tags.length > 0) ? (
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {provider.tags.map((tag, idx) => {
+                          // Highlight restaurant classification tags
+                          const isRestaurantTag = ['$', '$$', '$$$', '$$$$', 'budget', 'moderate', 'upscale', 'fine-dining', 'american', 'italian', 'mexican', 'asian', 'mediterranean', 'casual', 'date-night', 'family', 'business', 'celebration', 'quick-bite', 'vegetarian', 'vegan', 'gluten-free', 'keto'].includes(tag.toLowerCase())
+                          
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                                isRestaurantTag
+                                  ? 'bg-green-100 text-green-700 border border-green-200'
+                                  : 'bg-gray-100 text-gray-600 border border-gray-200'
+                              }`}
+                              title={isRestaurantTag ? 'Restaurant classification tag' : 'Other tag'}
+                            >
+                              {tag}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">No tags</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">

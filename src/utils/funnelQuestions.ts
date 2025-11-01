@@ -317,7 +317,14 @@ export function getFunnelQuestions(
     return list.slice(0, 4)
   }
   
+  // Validate category exists in config before accessing
+  if (!funnelConfig[categoryKey]) {
+    console.warn(`[Funnel] Category '${categoryKey}' not found in funnelConfig, returning empty array`)
+    return []
+  }
+  
   // Other categories use their standard configuration
-  return funnelConfig[categoryKey].slice(0, 4)
+  const questions = funnelConfig[categoryKey]
+  return questions && Array.isArray(questions) ? questions.slice(0, 4) : []
 }
 

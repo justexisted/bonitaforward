@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 // iCalendar parsing moved to server-side Netlify function for reliability
 // import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
 // Type imports (extracted from Admin.tsx for better organization)
-import type { ProviderRow, ProviderChangeRequestWithDetails, ProviderJobPostWithDetails } from '../types/admin'
+import type { ProviderRow, ProviderChangeRequestWithDetails, ProviderJobPostWithDetails, AdminSection } from '../types/admin'
 // Provider management utilities (extracted for better organization)
 import * as ProviderUtils from '../utils/adminProviderUtils'
 // User management utilities (extracted for better organization)
@@ -34,6 +34,7 @@ import { BookingsSection } from '../components/admin/sections/BookingsSection-20
 import { BusinessApplicationsSection } from '../components/admin/sections/BusinessApplicationsSection-2025-10-19'
 import { BookingEventsSection } from '../components/admin/sections/BookingEventsSection-2025-10-19'
 import { ProvidersSection } from '../components/admin/sections/ProvidersSection-2025-10-19'
+import { RestaurantTaggingSection } from '../components/admin/sections/RestaurantTaggingSection'
 import { PendingApprovalsDashboard } from '../components/admin/PendingApprovalsDashboard'
 import { AdminHeader } from '../components/admin/AdminHeader'
 import { AdminAuthGuard } from '../components/admin/AdminAuthGuard'
@@ -45,8 +46,6 @@ import { AdminAuthGuard } from '../components/admin/AdminAuthGuard'
 // The hook runs in parallel with existing state - both systems work together
 // This allows incremental migration without breaking existing functionality
 import { useAdminData } from '../hooks/useAdminData'
-// Type imported for future use in Phase 2 (section type safety)
-import type { AdminSection as _AdminSection } from '../types/admin'
 // ============================================================================
 
 // REFACTORED: Type definitions moved to types/admin.ts for better organization
@@ -195,7 +194,7 @@ export default function AdminPage() {
   
   // State for section and user filtering (declared BEFORE verification hook to avoid ordering issues)
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
-  const [section, setSection] = useState< 'providers' |'business-applications' | 'contact-leads' | 'customer-users' | 'business-accounts' | 'business-owners' | 'users' | 'owner-change-requests' | 'job-posts' | 'funnel-responses' | 'bookings' | 'booking-events' | 'blog' | 'calendar-events' | 'flagged-events'>('providers')
+  const [section, setSection] = useState<AdminSection>('providers')
   
   // Restore admin state when page loads
   useEffect(() => {
@@ -404,6 +403,30 @@ export default function AdminPage() {
   const retrySaveProvider = () => {
     if (retryProvider) {
       saveProvider(retryProvider)
+    }
+  }
+
+  // Helper function to update provider tags only (for restaurant tagging section)
+  const updateProviderTags = async (providerId: string, tags: string[]) => {
+    try {
+      // Find the provider
+      const provider = providers.find(p => p.id === providerId)
+      if (!provider) {
+        setError(`Provider not found: ${providerId}`)
+        return
+      }
+
+      // Update provider with new tags
+      // saveProvider is a wrapper that takes 1 argument and calls the utility function
+      const updatedProvider = { ...provider, tags }
+      await saveProvider(updatedProvider)
+      
+      // Refresh providers list to show updated tags immediately
+      // The saveProvider function already refreshes, but we ensure it's visible
+    } catch (error: any) {
+      console.error('[Admin] Error updating provider tags:', error)
+      setError(`Failed to update tags: ${error.message}`)
+      throw error
     }
   }
 
@@ -673,6 +696,13 @@ export default function AdminPage() {
           />
         )}
 
+        {isAdmin && section === 'restaurant-tagging' && (
+          <RestaurantTaggingSection
+            providers={providers}
+            onUpdateProvider={updateProviderTags}
+            loading={loading}
+          />
+        )}
 
         {isAdmin && section === 'owner-change-requests' && (
           <ChangeRequestsSection

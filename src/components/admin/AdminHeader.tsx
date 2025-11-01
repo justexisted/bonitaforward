@@ -93,6 +93,7 @@ export function AdminHeader({
               aria-label="Select admin section"
             >
               <option value="providers">Providers</option>
+              <option value="restaurant-tagging">Restaurant Tagging</option>
               <option value="contact-leads">Contact / Get Featured</option>
               <option value="customer-users">Customer Users</option>
               <option value="business-accounts">Business Accounts</option>

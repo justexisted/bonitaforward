@@ -17,6 +17,7 @@ import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData
  */
 export type AdminSection = 
   | 'providers'
+  | 'restaurant-tagging'
   | 'business-applications'
   | 'contact-leads'
   | 'customer-users'
