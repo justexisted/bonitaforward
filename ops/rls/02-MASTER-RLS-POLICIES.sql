@@ -522,11 +522,13 @@ WITH CHECK (id = auth.uid());
 
 CREATE POLICY "profiles_update_own" 
 ON public.profiles FOR UPDATE
-USING (id = auth.uid());
+USING (id = auth.uid())
+WITH CHECK (id = auth.uid());
 
 CREATE POLICY "profiles_update_admin" 
 ON public.profiles FOR UPDATE
-USING (is_admin_user(auth.uid()));
+USING (is_admin_user(auth.uid()))
+WITH CHECK (is_admin_user(auth.uid()));
 
 CREATE POLICY "profiles_delete_admin" 
 ON public.profiles FOR DELETE

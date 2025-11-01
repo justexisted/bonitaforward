@@ -223,6 +223,11 @@ export type Profile = {
   role?: 'customer' | 'business' | 'admin' | 'community' | null
   created_at?: string | null
   updated_at?: string | null
+  // Bonita resident verification fields (Phase 1)
+  is_bonita_resident?: boolean | null
+  resident_verification_method?: 'self-declared' | 'zip-verified' | 'address-verified' | 'document-verified' | 'admin-verified' | null
+  resident_zip_code?: string | null
+  resident_verified_at?: string | null
 }
 
 /**

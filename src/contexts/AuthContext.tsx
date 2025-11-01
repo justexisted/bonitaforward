@@ -115,17 +115,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true
 
     // Helper: ensure a profile row exists with role/name
+    // CRITICAL FIX: Use separate INSERT/UPDATE instead of upsert to avoid RLS 403 errors
     async function ensureProfile(userId?: string | null, email?: string | null, name?: string | null, metadataRole?: any) {
       if (!userId || !email) return
       try {
         let role: 'business' | 'community' | undefined
+        let residentVerification: {
+          is_bonita_resident?: boolean | null
+          resident_verification_method?: string | null
+          resident_zip_code?: string | null
+          resident_verified_at?: string | null
+        } = {}
+        
         try {
           const raw = localStorage.getItem('bf-pending-profile')
           if (raw) {
-            const pref = JSON.parse(raw) as { name?: string; email?: string; role?: 'business' | 'community' }
+            const pref = JSON.parse(raw) as {
+              name?: string
+              email?: string
+              role?: 'business' | 'community'
+              is_bonita_resident?: boolean
+              resident_verification_method?: string
+              resident_zip_code?: string | null
+              resident_verified_at?: string | null
+            }
             if (pref?.role === 'business' || pref?.role === 'community') role = pref.role
             if (!name && pref?.name) name = pref.name
             if (pref && (pref.email === email || !pref.email)) {
+              // Extract resident verification data
+              if (pref.is_bonita_resident !== undefined) {
+                residentVerification = {
+                  is_bonita_resident: pref.is_bonita_resident,
+                  resident_verification_method: pref.resident_verification_method || null,
+                  resident_zip_code: pref.resident_zip_code || null,
+                  resident_verified_at: pref.resident_verified_at || null
+                }
+              }
               // keep until successfully saved
             }
           }
@@ -133,9 +158,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!role && (metadataRole === 'business' || metadataRole === 'community')) {
           role = metadataRole
         }
-        const payload: any = { id: userId, email, name: name || null }
-        if (role) payload.role = role
-        await supabase.from('profiles').upsert([payload], { onConflict: 'id' })
+        
+        // Check if profile already exists to avoid RLS issues with upsert
+        const { data: existingProfile, error: checkError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle()
+        
+        const updatePayload: any = {
+          email,
+          name: name || null,
+          role: role || metadataRole || null,
+          ...residentVerification
+        }
+        
+        if (existingProfile) {
+          // Profile exists - use UPDATE
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update(updatePayload)
+            .eq('id', userId)
+          
+          if (updateError) {
+            console.error('[Auth] Error updating profile:', updateError)
+            return
+          }
+        } else {
+          // Profile doesn't exist - use INSERT
+          const insertPayload: any = {
+            id: userId,
+            ...updatePayload
+          }
+          
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert(insertPayload)
+          
+          if (insertError) {
+            console.error('[Auth] Error creating profile:', insertError)
+            return
+          }
+        }
+        
+        // Clear pending profile data after successful save
         try { localStorage.removeItem('bf-pending-profile') } catch {}
       } catch (error) {
         console.error('Error ensuring profile:', error)

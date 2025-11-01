@@ -440,39 +440,129 @@ export async function updateEvent(eventId: string, event: Partial<CalendarEvent>
 
 export async function updateProfile(userId: string, name: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Update the profile
-    const { error } = await supabase
+    // CRITICAL FIX: Don't use .select() on UPDATE - it causes 406 error when RLS blocks update
+    // Instead: Do UPDATE without select, then verify separately
+    // This approach matches how admin-sync-profile.ts handles profile updates
+    
+    const trimmedName = name.trim()
+    
+    // CRITICAL: Verify session is valid and matches userId
+    // RLS policies check auth.uid() - if session is invalid or doesn't match, UPDATE will silently fail
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error('[Account] Error getting session:', sessionError)
+      return { success: false, error: 'Session expired. Please refresh the page and try again.' }
+    }
+    
+    if (!session) {
+      return { success: false, error: 'Not signed in. Please refresh the page and try again.' }
+    }
+    
+    const sessionUserId = session.user?.id
+    if (sessionUserId !== userId) {
+      console.error('[Account] Session userId mismatch:', { sessionUserId, userId })
+      return { success: false, error: 'Session mismatch. Please refresh the page and try again.' }
+    }
+    
+    // First verify profile exists and user has permission to read it
+    const { data: existingProfile, error: checkError } = await supabase
       .from('profiles')
-      .update({ name })
+      .select('id, name')
+      .eq('id', userId)
+      .maybeSingle()
+    
+    if (checkError) {
+      console.error('[Account] Error checking profile:', checkError)
+      return { success: false, error: `Unable to access profile: ${checkError.message}` }
+    }
+    
+    if (!existingProfile) {
+      return { success: false, error: 'Profile not found' }
+    }
+    
+    // Check if name is actually changing
+    const currentName = (existingProfile.name || '').trim()
+    if (currentName === trimmedName) {
+      // Name is already set to this value - no update needed
+      return { success: true }
+    }
+    
+    // Update without .select() to avoid 406 errors when RLS blocks
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ name: trimmedName })
       .eq('id', userId)
     
-    if (error) {
-      console.error('[Account] Profile update error:', error)
-      return { success: false, error: error.message }
+    if (updateError) {
+      console.error('[Account] Profile update error:', updateError)
+      return { success: false, error: updateError.message }
     }
     
-    // Verify the update succeeded
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('profiles')
-      .select('name')
-      .eq('id', userId)
-      .single()
+    // CRITICAL: Verify the update succeeded with retries
+    // RLS might silently block UPDATE (0 rows affected) without throwing an error
+    // We need to verify that the value actually changed
     
-    if (verifyError || !verifyData) {
-      console.error('[Account] Could not verify update:', verifyError)
-      return { success: false, error: 'Update may not have saved' }
+    const maxRetries = 3
+    let verifyData: { name: string | null } | null = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Wait longer on each retry for eventual consistency
+      await new Promise(resolve => setTimeout(resolve, 100 * attempt))
+      
+      const { data: verify, error: verifyError } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', userId)
+        .maybeSingle()
+      
+      if (verifyError) {
+        console.error(`[Account] Verification query error (attempt ${attempt}):`, verifyError)
+        continue
+      }
+      
+      if (!verify) {
+        console.warn(`[Account] Verification returned no data (attempt ${attempt})`)
+        continue
+      }
+      
+      verifyData = verify
+      const verifiedName = (verify.name || '').trim()
+      
+      if (verifiedName === trimmedName) {
+        // Update succeeded!
+        return { success: true }
+      }
+      
+      console.warn(`[Account] Update verification failed (attempt ${attempt}). Expected: "${trimmedName}", Got: "${verifiedName}"`)
     }
     
-    if (verifyData.name !== name) {
-      console.error('[Account] Update verification failed. Expected:', name, 'Got:', verifyData.name)
-      return { success: false, error: 'Update did not persist' }
+    // All retries failed - update did not persist
+    // Get current session for debugging
+    const { data: { session: debugSession } } = await supabase.auth.getSession()
+    console.error('[Account] Update verification failed after all retries', {
+      userId,
+      sessionUserId: debugSession?.user?.id || null,
+      currentName,
+      expectedName: trimmedName,
+      verifiedName: verifyData?.name || null
+    })
+    
+    // Check if RLS might be blocking the update
+    // If we can read but not update, it's likely an RLS issue
+    // The RLS policy "profiles_update_own" requires: USING (id = auth.uid())
+    // If this fails, the UPDATE affects 0 rows without throwing an error
+    if (existingProfile && currentName !== trimmedName) {
+      return { 
+        success: false, 
+        error: 'Update was blocked by security policy. This usually means the Row Level Security (RLS) policy for profiles UPDATE is not configured correctly. Please contact support to verify your RLS policies are set up correctly.' 
+      }
     }
     
-    console.log('[Account] Profile updated and verified successfully')
-    return { success: true }
+    return { success: false, error: 'Update did not persist. Please try again.' }
   } catch (error: any) {
     console.error('[Account] Exception during update:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error.message || 'Failed to update profile' }
   }
 }
 

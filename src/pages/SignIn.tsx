@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { verifyByZipCode, verifyBySelfDeclaration, type VerificationMethod } from '../utils/residentVerification'
 
 /**
  * SignIn page: modern, minimal auth screen with
@@ -40,6 +41,9 @@ export default function SignInPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  // Bonita resident verification fields
+  const [zipCode, setZipCode] = useState('')
+  const [isBonitaResident, setIsBonitaResident] = useState(false)
 
   const handleResetPassword = async () => {
     if (!email) { setMessage('Enter your email'); return }
@@ -216,7 +220,51 @@ export default function SignInPage() {
             
             try {
               localStorage.removeItem('bf-signup-prefill')
-              localStorage.setItem('bf-pending-profile', JSON.stringify({ name, email, role: accountType }))
+              
+              // Handle Bonita resident verification
+              let verificationData: {
+                is_bonita_resident?: boolean
+                resident_verification_method?: VerificationMethod
+                resident_zip_code?: string | null
+                resident_verified_at?: string | null
+              } = {}
+
+              if (isBonitaResident) {
+                if (zipCode.trim()) {
+                  const zipResult = verifyByZipCode(zipCode)
+                  if (zipResult.isBonitaResident) {
+                    verificationData = {
+                      is_bonita_resident: true,
+                      resident_verification_method: 'zip-verified',
+                      resident_zip_code: zipResult.zipCode,
+                      resident_verified_at: zipResult.verifiedAt || new Date().toISOString()
+                    }
+                  } else {
+                    const selfResult = verifyBySelfDeclaration(zipCode)
+                    verificationData = {
+                      is_bonita_resident: true,
+                      resident_verification_method: 'self-declared',
+                      resident_zip_code: selfResult.zipCode,
+                      resident_verified_at: selfResult.verifiedAt || new Date().toISOString()
+                    }
+                  }
+                } else {
+                  const selfResult = verifyBySelfDeclaration()
+                  verificationData = {
+                    is_bonita_resident: true,
+                    resident_verification_method: 'self-declared',
+                    resident_zip_code: null,
+                    resident_verified_at: selfResult.verifiedAt || new Date().toISOString()
+                  }
+                }
+              }
+              
+              localStorage.setItem('bf-pending-profile', JSON.stringify({
+                name,
+                email,
+                role: accountType,
+                ...verificationData
+              }))
             } catch {}
 
             if (!session) {
@@ -474,6 +522,43 @@ export default function SignInPage() {
                   className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2"
                   placeholder="••••••••"
                 />
+              </div>
+            )}
+
+            {/* Bonita Resident Verification */}
+            {mode === 'signup' && (
+              <div className="pt-2 border-t border-neutral-200">
+                <div className="flex items-start gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    id="is-bonita-resident-signup"
+                    checked={isBonitaResident}
+                    onChange={(e) => setIsBonitaResident(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-neutral-900 border-neutral-300 rounded focus:ring-neutral-500"
+                  />
+                  <label htmlFor="is-bonita-resident-signup" className="text-sm text-neutral-700 cursor-pointer">
+                    I am a Bonita resident
+                  </label>
+                </div>
+                
+                {isBonitaResident && (
+                  <div className="ml-7 mb-3">
+                    <label className="block text-sm text-neutral-600 mb-1">
+                      ZIP Code (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={zipCode}
+                      onChange={(e) => setZipCode(e.target.value)}
+                      placeholder="91902"
+                      maxLength={10}
+                      className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Valid Bonita ZIP codes: 91902, 91908, 91909
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
