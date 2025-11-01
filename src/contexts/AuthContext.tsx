@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         
         // Check if profile already exists to avoid RLS issues with upsert
-        const { data: existingProfile, error: checkError } = await supabase
+        const { data: existingProfile } = await supabase
           .from('profiles')
           .select('id')
           .eq('id', userId)
