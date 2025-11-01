@@ -38,6 +38,7 @@ import { RestaurantTaggingSection } from '../components/admin/sections/Restauran
 import { PendingApprovalsDashboard } from '../components/admin/PendingApprovalsDashboard'
 import { AdminHeader } from '../components/admin/AdminHeader'
 import { AdminAuthGuard } from '../components/admin/AdminAuthGuard'
+import { AdminErrorBoundary } from '../components/admin/AdminErrorBoundary'
 
 // ============================================================================
 // GRADUAL MIGRATION: New Service Layer
@@ -64,44 +65,21 @@ import { useAdminData } from '../hooks/useAdminData'
 export default function AdminPage() {
   const auth = useAuth()
   
-  // DEBUG: Log on mount
-  useEffect(() => {
-    console.log('=== ADMIN PAGE MOUNTED ===')
-    console.log('[Admin] Initial auth state:', {
-      email: auth.email,
-      loading: auth.loading,
-      isAuthed: auth.isAuthed,
-      userId: auth.userId
-    })
-  }, [])
-  
   // ============================================================================
   // NEW: Service-Based Data Management (Phase 1)
   // ============================================================================
   // This hook loads all admin data in parallel and provides refresh capabilities
   // Currently running alongside existing state - both systems work together
   const { 
-    data: adminData, 
-    loading: adminDataLoading,
-    error: adminDataError,
+    data: _adminData,  // Prefixed: For future migration (Phase 2)
+    loading: _adminDataLoading,  // Prefixed: For future migration (Phase 2)
+    error: _adminDataError,  // Prefixed: For future migration (Phase 2)
     refresh: _refreshAdminData,  // Prefixed: Will use in refresh buttons (Phase 2)
     refreshEntity: _refreshEntity  // Prefixed: Will use after updates (Phase 2)
   } = useAdminData()
   
-  // Log hook status for debugging during migration
-  useEffect(() => {
-    if (adminData) {
-      console.log('[Admin Migration] New data service loaded:', {
-        providers: adminData.providers?.length || 0,
-        bookings: adminData.bookings?.length || 0,
-        funnels: adminData.funnels?.length || 0,
-        calendarEvents: adminData.calendarEvents?.length || 0
-      })
-    }
-    if (adminDataError) {
-      console.error('[Admin Migration] Data service error:', adminDataError)
-    }
-  }, [adminData, adminDataError])
+  // Admin data hook for future migration (Phase 2)
+  // Currently unused but prepared for gradual migration
   
   // ============================================================================
   // REFACTORED: Data loading extracted to useAdminDataLoader hook
@@ -203,13 +181,26 @@ export default function AdminPage() {
       try {
         const { section: savedSection, selectedProviderId: savedProviderId, timestamp } = JSON.parse(savedState)
         
-        // Only restore if it's recent (within 2 hours)
-        if (Date.now() - timestamp < 2 * 60 * 60 * 1000) {
-          setSection(savedSection)
-          setSelectedProviderId(savedProviderId)
+        // Validate savedSection is a valid AdminSection
+        const validSections: AdminSection[] = [
+          'providers', 'restaurant-tagging', 'business-applications', 'contact-leads',
+          'customer-users', 'business-accounts', 'business-owners', 'users',
+          'owner-change-requests', 'job-posts', 'funnel-responses', 'bookings',
+          'booking-events', 'blog', 'calendar-events', 'flagged-events'
+        ]
+        
+        // Only restore if it's recent (within 2 hours) and section is valid
+        if (
+          Date.now() - timestamp < 2 * 60 * 60 * 1000 &&
+          validSections.includes(savedSection as AdminSection)
+        ) {
+          setSection(savedSection as AdminSection)
+          if (selectedProviderId && typeof savedProviderId === 'string') {
+            setSelectedProviderId(savedProviderId)
+          }
         }
       } catch (err) {
-        console.error('Failed to restore admin state:', err)
+        // Silently fail - invalid localStorage data, just don't restore
       }
     }
   }, [])
@@ -303,7 +294,7 @@ export default function AdminPage() {
   
   // Combine error and loading states
   const combinedError = error || dataLoadError
-  const isLoading = loading || adminDataLoading
+  const isLoading = loading // adminDataLoading for future migration (Phase 2)
 
   // Type-safe setter wrappers (hooks return Dispatch<SetStateAction<T>>, utilities expect (T) => void)
   // Using type casts to bridge type compatibility between hooks and utility functions
@@ -424,8 +415,7 @@ export default function AdminPage() {
       // Refresh providers list to show updated tags immediately
       // The saveProvider function already refreshes, but we ensure it's visible
     } catch (error: any) {
-      console.error('[Admin] Error updating provider tags:', error)
-      setError(`Failed to update tags: ${error.message}`)
+      setError(`Failed to update tags: ${error.message || 'Unknown error'}`)
       throw error
     }
   }
@@ -578,167 +568,197 @@ export default function AdminPage() {
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-1 gap-4">
           {isAdmin && section === 'contact-leads' && (
-            <ContactLeadsSection
-              contactLeads={contactLeads}
-              providers={providers as any}
-              onMessage={setMessage}
-              onError={setError}
-              onContactLeadsUpdate={setContactLeads}
-              onToggleFeaturedStatus={toggleFeaturedStatus}
-              onUpdateSubscriptionType={updateSubscriptionType}
-            />
+            <AdminErrorBoundary section="contact-leads">
+              <ContactLeadsSection
+                contactLeads={contactLeads}
+                providers={providers as any}
+                onMessage={setMessage}
+                onError={setError}
+                onContactLeadsUpdate={setContactLeads}
+                onToggleFeaturedStatus={toggleFeaturedStatus}
+                onUpdateSubscriptionType={updateSubscriptionType}
+              />
+            </AdminErrorBoundary>
           )}
           {isAdmin && section === 'customer-users' && (
-            <CustomerUsersSection
-              customerUsers={customerUsers}
-              funnels={funnels}
-              bookings={bookings}
-              bookingEvents={bookingEvents}
-              profiles={profiles}
-              businessEmails={businessEmails}
-              deletingCustomerEmail={deletingCustomerEmail}
-              onSetDeletingCustomerEmail={setDeletingCustomerEmail}
-              onDeleteCustomerUser={deleteCustomerUser}
-            />
+            <AdminErrorBoundary section="customer-users">
+              <CustomerUsersSection
+                customerUsers={customerUsers}
+                funnels={funnels}
+                bookings={bookings}
+                bookingEvents={bookingEvents}
+                profiles={profiles}
+                businessEmails={businessEmails}
+                deletingCustomerEmail={deletingCustomerEmail}
+                onSetDeletingCustomerEmail={setDeletingCustomerEmail}
+                onDeleteCustomerUser={deleteCustomerUser}
+              />
+            </AdminErrorBoundary>
           )}
 
           {isAdmin && section === 'business-accounts' && (
-            <BusinessAccountsSection
-              profiles={profiles}
-              expandedBusinessDetails={expandedBusinessDetails}
-              loadingBusinessDetails={loadingBusinessDetails}
-              deletingUserId={deletingUserId}
-              onSetDeletingUserId={setDeletingUserId}
-              onFetchBusinessDetails={fetchBusinessDetails}
-              onCollapseBusinessDetails={collapseBusinessDetails}
-              onDeleteUser={deleteUser}
-            />
+            <AdminErrorBoundary section="business-accounts">
+              <BusinessAccountsSection
+                profiles={profiles}
+                expandedBusinessDetails={expandedBusinessDetails}
+                loadingBusinessDetails={loadingBusinessDetails}
+                deletingUserId={deletingUserId}
+                onSetDeletingUserId={setDeletingUserId}
+                onFetchBusinessDetails={fetchBusinessDetails}
+                onCollapseBusinessDetails={collapseBusinessDetails}
+                onDeleteUser={deleteUser}
+              />
+            </AdminErrorBoundary>
           )}
 
           {isAdmin && section === 'business-owners' && (
-            <UsersSection
-              profiles={profiles}
-              deletingUserId={deletingUserId}
-              currentUserEmail={auth.email ?? null}
-              onSetDeletingUserId={setDeletingUserId}
-              onDeleteUser={deleteUser}
-            />
+            <AdminErrorBoundary section="business-owners">
+              <UsersSection
+                profiles={profiles}
+                deletingUserId={deletingUserId}
+                currentUserEmail={auth.email ?? null}
+                onSetDeletingUserId={setDeletingUserId}
+                onDeleteUser={deleteUser}
+              />
+            </AdminErrorBoundary>
           )}
           {section === 'funnel-responses' && (
-            <FunnelResponsesSection
-              funnels={funnels}
-              onMessage={setMessage}
-              onError={setError}
-              onFunnelsUpdate={setFunnels}
-            />
+            <AdminErrorBoundary section="funnel-responses">
+              <FunnelResponsesSection
+                funnels={funnels}
+                onMessage={setMessage}
+                onError={setError}
+                onFunnelsUpdate={setFunnels}
+              />
+            </AdminErrorBoundary>
           )}
 
           {section === 'bookings' && (
-            <BookingsSection
-              bookings={bookings}
-              onMessage={setMessage}
-              onError={setError}
-              onBookingsUpdate={setBookings}
-            />
+            <AdminErrorBoundary section="bookings">
+              <BookingsSection
+                bookings={bookings}
+                onMessage={setMessage}
+                onError={setError}
+                onBookingsUpdate={setBookings}
+              />
+            </AdminErrorBoundary>
           )}
 
           {isAdmin && section === 'booking-events' && (
-            <BookingEventsSection
-              bookingEvents={bookingEvents}
-              loading={loading}
-              onMessage={setMessage}
-              onError={setError}
-              onBookingEventsUpdate={setBookingEvents}
-              onLoadBookingEvents={loadBookingEvents}
-            />
+            <AdminErrorBoundary section="booking-events">
+              <BookingEventsSection
+                bookingEvents={bookingEvents}
+                loading={loading}
+                onMessage={setMessage}
+                onError={setError}
+                onBookingEventsUpdate={setBookingEvents}
+                onLoadBookingEvents={loadBookingEvents}
+              />
+            </AdminErrorBoundary>
           )}
         </div>
 
         {/* Main Business Applications Section */}
         {isAdmin && section === 'business-applications' && (
-          <BusinessApplicationsSection
-            bizApps={bizApps}
-            appEdits={appEdits}
-            catOptions={catOptions}
-            onAppEditsUpdate={(appId, category, tagsInput) => {
-              setAppEdits(prev => ({ ...prev, [appId]: { category, tagsInput } }))
-            }}
-            onApproveApplication={approveApplication}
-            onDeleteApplication={deleteApplication}
-          />
+          <AdminErrorBoundary section="business-applications">
+            <BusinessApplicationsSection
+              bizApps={bizApps}
+              appEdits={appEdits}
+              catOptions={catOptions}
+              onAppEditsUpdate={(appId, category, tagsInput) => {
+                setAppEdits(prev => ({ ...prev, [appId]: { category, tagsInput } }))
+              }}
+              onApproveApplication={approveApplication}
+              onDeleteApplication={deleteApplication}
+            />
+          </AdminErrorBoundary>
         )}
 
         {isAdmin && section === 'providers' && (
-          <ProvidersSection
-            providers={providers}
-            selectedProviderId={selectedProviderId}
-            isCreatingNewProvider={isCreatingNewProvider}
-            newProviderForm={newProviderForm}
-            savingProvider={savingProvider}
-            uploadingImages={uploadingImages}
-            retryProvider={retryProvider}
-            confirmDeleteProviderId={confirmDeleteProviderId}
-            catOptions={catOptions}
-            message={message}
-            error={error}
-            onSetSelectedProviderId={setSelectedProviderId}
-            onStartCreateNewProvider={startCreateNewProvider}
-            onCancelCreateProvider={cancelCreateProvider}
-            onSetNewProviderForm={setNewProviderForm}
-            onSaveProvider={saveProvider}
-            onDeleteProvider={deleteProvider}
-            onRetrySaveProvider={retrySaveProvider}
-            onHandleImageUpload={handleImageUpload}
-            onRemoveImage={removeImage}
-            onToggleBookingEnabled={toggleBookingEnabled}
-            onSetProviders={setProvidersSimple as any}
-            onSetConfirmDeleteProviderId={setConfirmDeleteProviderId}
-          />
+          <AdminErrorBoundary section="providers">
+            <ProvidersSection
+              providers={providers}
+              selectedProviderId={selectedProviderId}
+              isCreatingNewProvider={isCreatingNewProvider}
+              newProviderForm={newProviderForm}
+              savingProvider={savingProvider}
+              uploadingImages={uploadingImages}
+              retryProvider={retryProvider}
+              confirmDeleteProviderId={confirmDeleteProviderId}
+              catOptions={catOptions}
+              message={message}
+              error={error}
+              onSetSelectedProviderId={setSelectedProviderId}
+              onStartCreateNewProvider={startCreateNewProvider}
+              onCancelCreateProvider={cancelCreateProvider}
+              onSetNewProviderForm={setNewProviderForm}
+              onSaveProvider={saveProvider}
+              onDeleteProvider={deleteProvider}
+              onRetrySaveProvider={retrySaveProvider}
+              onHandleImageUpload={handleImageUpload}
+              onRemoveImage={removeImage}
+              onToggleBookingEnabled={toggleBookingEnabled}
+              onSetProviders={setProvidersSimple as any}
+              onSetConfirmDeleteProviderId={setConfirmDeleteProviderId}
+            />
+          </AdminErrorBoundary>
         )}
 
         {isAdmin && section === 'restaurant-tagging' && (
-          <RestaurantTaggingSection
-            providers={providers}
-            onUpdateProvider={updateProviderTags}
-            loading={loading}
-          />
+          <AdminErrorBoundary section="restaurant-tagging">
+            <RestaurantTaggingSection
+              providers={providers}
+              onUpdateProvider={updateProviderTags}
+              loading={loading}
+            />
+          </AdminErrorBoundary>
         )}
 
         {isAdmin && section === 'owner-change-requests' && (
-          <ChangeRequestsSection
-            providers={providers}
-            onMessage={(msg) => setMessage(msg)}
-            onError={(err) => setError(err)}
-          />
+          <AdminErrorBoundary section="owner-change-requests">
+            <ChangeRequestsSection
+              providers={providers}
+              onMessage={(msg) => setMessage(msg)}
+              onError={(err) => setError(err)}
+            />
+          </AdminErrorBoundary>
         )}
 
         {isAdmin && section === 'job-posts' && (
-          <JobPostsSection
-            onMessage={(msg) => setMessage(msg)}
-            onError={(err) => setError(err)}
-          />
+          <AdminErrorBoundary section="job-posts">
+            <JobPostsSection
+              onMessage={(msg) => setMessage(msg)}
+              onError={(err) => setError(err)}
+            />
+          </AdminErrorBoundary>
         )}
         </div>
 
         {isAdmin && section === 'blog' && (
-          <BlogSection
-            onMessage={(msg) => setMessage(msg)}
-            onError={(err) => setError(err)}
-          />
+          <AdminErrorBoundary section="blog">
+            <BlogSection
+              onMessage={(msg) => setMessage(msg)}
+              onError={(err) => setError(err)}
+            />
+          </AdminErrorBoundary>
         )}
 
         {isAdmin && section === 'calendar-events' && (
-          <CalendarEventsSection
-            onMessage={(msg) => setMessage(msg)}
-            onError={(err) => setError(err)}
-          />
+          <AdminErrorBoundary section="calendar-events">
+            <CalendarEventsSection
+              onMessage={(msg) => setMessage(msg)}
+              onError={(err) => setError(err)}
+            />
+          </AdminErrorBoundary>
         )}
 
         {isAdmin && section === 'flagged-events' && (
-          <FlaggedEventsSection
-            onMessage={(msg) => setMessage(msg)}
-            onError={(err) => setError(err)}
-          />
+          <AdminErrorBoundary section="flagged-events">
+            <FlaggedEventsSection
+              onMessage={(msg) => setMessage(msg)}
+              onError={(err) => setError(err)}
+            />
+          </AdminErrorBoundary>
         )}
     </section>
     </AdminAuthGuard>

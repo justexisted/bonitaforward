@@ -16,8 +16,6 @@ import type { ReactNode } from 'react'
  * 
  * Features:
  * - Prevents flash of "Please sign in" during auth loading
- * - Debug information for troubleshooting auth issues
- * - Console logging for monitoring auth flow
  * - Consistent error UI across admin pages
  * 
  * Critical Fix:
@@ -62,16 +60,8 @@ export function AdminAuthGuard({
    * Fix: Check auth.loading state to prevent premature "sign in" message.
    */
   if (!auth.email) {
-    console.log('[Admin] 🚫 NO EMAIL - Rendering auth check UI')
-    console.log('[Admin] Auth state:', { 
-      email: auth.email, 
-      loading: auth.loading, 
-      isAuthed: auth.isAuthed 
-    })
-    
     // Don't show "please sign in" message while auth is still loading
     if (auth.loading) {
-      console.log('[Admin] ⏳ Auth loading - showing skeleton')
       return (
         <section className="py-8">
           <div className="container-px mx-auto max-w-3xl">
@@ -86,15 +76,11 @@ export function AdminAuthGuard({
       )
     }
     
-    console.log('[Admin] 🚫 Auth not loading but no email - showing "Please sign in"')
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-3xl">
           <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
             Please sign in to view your data.
-            <div className="mt-2 text-sm text-neutral-600">
-              Debug: email={auth.email || 'none'}, loading={String(auth.loading)}, isAuthed={String(auth.isAuthed)}
-            </div>
           </div>
         </div>
       </section>
@@ -103,7 +89,6 @@ export function AdminAuthGuard({
 
   // Wait for admin verification to complete before showing unauthorized message
   if (adminStatus.loading) {
-    console.log('[Admin] ⏳ Admin verification loading - showing skeleton')
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-3xl">
@@ -119,23 +104,16 @@ export function AdminAuthGuard({
   }
 
   if (!isAdmin) {
-    console.log('[Admin] 🚫 NOT ADMIN - Showing unauthorized message')
-    console.log('[Admin] isAdmin:', isAdmin, 'adminStatus:', adminStatus)
     return (
       <section className="py-8">
         <div className="container-px mx-auto max-w-3xl">
           <div className="rounded-2xl border border-neutral-100 p-5 bg-white">
             Unauthorized. This page is restricted to administrators.
-            <div className="mt-2 text-sm text-neutral-600">
-              Debug: isAdmin={String(isAdmin)}, email={auth.email}, adminStatus={JSON.stringify(adminStatus)}
-            </div>
           </div>
         </div>
       </section>
     )
   }
-  
-  /* console.log('[Admin] ✅ Auth checks passed - rendering admin panel') */
 
   // All authentication checks passed - render the protected content
   return <>{children}</>

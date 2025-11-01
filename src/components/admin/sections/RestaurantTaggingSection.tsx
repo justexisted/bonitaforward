@@ -11,7 +11,7 @@
  * the funnel question IDs for accurate matching in the booking flow.
  */
 
-import React, { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import type { ProviderRow } from '../../../types/admin'
 
 interface RestaurantTaggingSectionProps {
@@ -83,21 +83,6 @@ export function RestaurantTaggingSection({
       r.tags?.some(tag => tag.toLowerCase().includes(term))
     )
   }, [restaurants, searchTerm])
-
-  // Helper to get current tag values from provider tags
-  const getCurrentTag = (provider: ProviderRow, tagPrefix: string): string => {
-    const tags = provider.tags || []
-    return tags.find(t => 
-      t === tagPrefix || 
-      t.toLowerCase().startsWith(tagPrefix.toLowerCase())
-    ) || ''
-  }
-
-  // Helper to check if tag exists (for multi-select dietary)
-  const hasTag = (provider: ProviderRow, tagValue: string): boolean => {
-    const tags = provider.tags || []
-    return tags.some(t => t.toLowerCase() === tagValue.toLowerCase())
-  }
 
   // Track pending changes locally (doesn't save to database yet)
   const trackPendingChange = (
@@ -230,94 +215,6 @@ export function RestaurantTaggingSection({
       console.error('[RestaurantTagging] Error saving pending changes:', error)
     } finally {
       setUpdatingIds(new Set())
-    }
-  }
-
-  // Helper to update tags - removes old values and adds new ones
-  const updateRestaurantTags = async (
-    providerId: string,
-    updates: {
-      priceRange?: string
-      cuisine?: string
-      occasions?: string[]
-      dietary?: string[]
-    }
-  ) => {
-    setUpdatingIds(prev => new Set(prev).add(providerId))
-
-    try {
-      const provider = restaurants.find(p => p.id === providerId)
-      if (!provider) return
-
-      let tags = [...(provider.tags || [])]
-
-      // CRITICAL: Only remove tags from categories being updated
-      // This preserves other tags (like price range when updating cuisine, etc.)
-
-      // If price range is being updated, remove only old price range tags
-      if (updates.priceRange !== undefined) {
-        tags = tags.filter(t => {
-          const tagLower = t.toLowerCase()
-          // Remove only old price range tags
-          return !['$', '$$', '$$$', '$$$$', 'budget', 'moderate', 'upscale', 'fine-dining'].includes(tagLower)
-        })
-        // Add new price range tag
-        if (updates.priceRange) {
-          const priceOption = PRICE_RANGE_OPTIONS.find(o => o.id === updates.priceRange)
-          if (priceOption) {
-            tags.push(priceOption.tagValue) // Use $, $$, etc. format
-          }
-        }
-      }
-
-      // If cuisine is being updated, remove only old cuisine tags
-      if (updates.cuisine !== undefined) {
-        tags = tags.filter(t => {
-          const tagLower = t.toLowerCase()
-          // Remove only old cuisine tags (funnel cuisines)
-          return !['american', 'italian', 'mexican', 'asian', 'mediterranean'].includes(tagLower)
-        })
-        // Add new cuisine tag
-        if (updates.cuisine) {
-          tags.push(updates.cuisine)
-        }
-      }
-
-      // If occasions are being updated, remove only old occasion tags
-      if (updates.occasions !== undefined) {
-        tags = tags.filter(t => {
-          const tagLower = t.toLowerCase()
-          // Remove only old occasion tags
-          return !['casual', 'date-night', 'family', 'business', 'celebration', 'quick-bite'].includes(tagLower)
-        })
-        // Add new occasion tags
-        updates.occasions.forEach(occasion => {
-          tags.push(occasion)
-        })
-      }
-
-      // If dietary options are being updated, remove only old dietary tags
-      if (updates.dietary !== undefined) {
-        tags = tags.filter(t => {
-          const tagLower = t.toLowerCase()
-          // Remove only old dietary tags
-          return !['vegetarian', 'vegan', 'gluten-free', 'keto'].includes(tagLower)
-        })
-        // Add new dietary tags
-        updates.dietary.forEach(dietary => {
-          tags.push(dietary)
-        })
-      }
-
-      await onUpdateProvider(providerId, tags)
-    } catch (error) {
-      console.error('[RestaurantTagging] Error updating tags:', error)
-    } finally {
-      setUpdatingIds(prev => {
-        const next = new Set(prev)
-        next.delete(providerId)
-        return next
-      })
     }
   }
 
