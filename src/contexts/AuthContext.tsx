@@ -451,12 +451,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // console.log('User signed in:', { email, userId })
 
-        // CRITICAL FIX: Fetch name and role from database, not session metadata
-        // This ensures we always have the latest profile data
-        if (userId) {
+        /**
+         * CRITICAL: Async Operation Order Matters!
+         * 
+         * During signup, we must save the name BEFORE trying to read it.
+         * 
+         * CORRECT Order (prevents "Hi, User"):
+         * 1. Read from localStorage (bf-pending-profile) - get name from signup form
+         * 2. Save to database (ensureProfile) - INSERT/UPDATE profiles table with name
+         * 3. Read from database (fetchUserProfile) - SELECT from profiles table
+         * 4. Update auth state with name
+         * 
+         * WRONG Order (causes "Hi, User"):
+         * 1. Read from database (name is empty/null) ❌
+         * 2. Save to database (name saved too late) ❌
+         * 
+         * Why: We can't read data we haven't written yet!
+         * 
+         * See: docs/prevention/ASYNC_FLOW_PREVENTION.md
+         */
+        if (userId && email) {
+          // Step 1: Read from localStorage (signup flow)
+          // This contains the name entered during signup
+          try {
+            const raw = localStorage.getItem('bf-pending-profile')
+            if (raw) {
+              const pref = JSON.parse(raw) as {
+                name?: string
+                role?: 'business' | 'community'
+              }
+              // Use name from localStorage if available (signup flow)
+              if (pref?.name && pref.name.trim()) {
+                name = pref.name.trim()
+              }
+              if (pref?.role === 'business' || pref?.role === 'community') {
+                role = pref.role
+              }
+            }
+          } catch {}
+          
+          // Step 2: Save to database FIRST (with name from localStorage)
+          // This ensures the name is in the database before we try to read it
+          await ensureProfile(userId, email, name, role)
+          
+          // Step 3: THEN read from database (now it has the name)
+          // This reads the name we just saved
           const profileData = await fetchUserProfile(userId)
-          name = profileData.name
-          role = profileData.role
+          // Use database name if it exists, otherwise keep localStorage name
+          name = profileData.name || name
+          role = profileData.role || role
           // console.log('Profile fetched from database on sign in:', { name, role })
         }
 
@@ -469,11 +512,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // This ensures isAuthed becomes true and user gets redirected
         // console.log('[Auth] Setting loading to false after successful sign-in')
         setLoading(false)
-
-        // Ensure profile exists in database
-        if (userId && email) {
-          await ensureProfile(userId, email, name, role)
-        }
         
         // console.log('[Auth] Sign-in process complete, user should now be authenticated')
       } else if (event === 'SIGNED_OUT' || !session) {
