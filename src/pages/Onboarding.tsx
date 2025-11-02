@@ -209,15 +209,40 @@ export default function OnboardingPage() {
         // Get name from multiple sources (localStorage, auth metadata)
         const name = await getNameFromMultipleSources(email, sess.session?.user)
         
+        // Read email preferences from localStorage (bf-pending-profile)
+        let emailPreferences: {
+          email_notifications_enabled?: boolean
+          marketing_emails_enabled?: boolean
+        } = {}
+        
+        try {
+          const raw = localStorage.getItem('bf-pending-profile')
+          if (raw) {
+            const pref = JSON.parse(raw) as {
+              email_notifications_enabled?: boolean
+              marketing_emails_enabled?: boolean
+            }
+            if (pref.email_notifications_enabled !== undefined) {
+              emailPreferences.email_notifications_enabled = pref.email_notifications_enabled
+            }
+            if (pref.marketing_emails_enabled !== undefined) {
+              emailPreferences.marketing_emails_enabled = pref.marketing_emails_enabled
+            }
+          }
+        } catch {
+          // localStorage access failed, continue without email preferences
+        }
+        
         // Use shared utility to update profile
-        // This ensures ALL fields (name, email, role, resident verification) are included
+        // This ensures ALL fields (name, email, role, resident verification, email preferences) are included
         const result = await updateUserProfile(
           userId,
           {
             email,
             name,
             role,
-            ...verificationResult
+            ...verificationResult,
+            ...emailPreferences
           },
           'onboarding'
         )
@@ -225,6 +250,24 @@ export default function OnboardingPage() {
         if (!result.success) {
           console.error('[Onboarding] Failed to update profile:', result.error)
           // Don't fail the flow, but log error for debugging
+        } else {
+          // If email preferences were set during signup, also set email_consent_date
+          // This tracks when user consented to receive emails
+          if (emailPreferences.email_notifications_enabled === true || emailPreferences.marketing_emails_enabled === true) {
+            try {
+              const { error: consentError } = await supabase
+                .from('profiles')
+                .update({ email_consent_date: new Date().toISOString() })
+                .eq('id', userId)
+              
+              if (consentError) {
+                console.warn('[Onboarding] Failed to set email_consent_date:', consentError)
+                // Don't fail the flow, but log warning
+              }
+            } catch (err) {
+              console.warn('[Onboarding] Exception setting email_consent_date:', err)
+            }
+          }
         }
       }
       

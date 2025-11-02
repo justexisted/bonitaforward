@@ -91,6 +91,8 @@ export interface CompleteProfileData {
   resident_verification_method?: string | null
   resident_zip_code?: string | null
   resident_verified_at?: string | null
+  email_notifications_enabled?: boolean | null
+  marketing_emails_enabled?: boolean | null
 }
 
 /**
@@ -107,7 +109,9 @@ export function createProfilePayload(data: Partial<CompleteProfileData>): Comple
     is_bonita_resident: data.is_bonita_resident ?? null,
     resident_verification_method: data.resident_verification_method || null,
     resident_zip_code: data.resident_zip_code || null,
-    resident_verified_at: data.resident_verified_at || null
+    resident_verified_at: data.resident_verified_at || null,
+    email_notifications_enabled: data.email_notifications_enabled ?? null,
+    marketing_emails_enabled: data.marketing_emails_enabled ?? null
   }
 }
 
@@ -233,18 +237,27 @@ export async function updateUserProfile(
       .eq('id', userId)
       .maybeSingle()
     
+    let existingProfileRole: 'business' | 'community' | null | undefined = undefined
+    let existingProfileName: string | null | undefined = undefined
+    
     if (existing) {
       // Profile exists - use UPDATE
       // CRITICAL: profiles.role is IMMUTABLE once set - we cannot update it
       // Check existing profile to see if role is already set, and exclude it from update if so
       const { data: existingProfile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, name, email_notifications_enabled, marketing_emails_enabled')
         .eq('id', userId)
         .maybeSingle()
       
+      // Store existing role and name for completeness check
+      existingProfileRole = existingProfile?.role as 'business' | 'community' | null | undefined
+      existingProfileName = existingProfile?.name ?? null
+      
       // Create update payload, excluding role if it's already set (immutable field)
+      // CRITICAL: Also preserve existing name if payload.name is null/undefined to prevent clearing names
       const updatePayload: any = { ...payload }
+      
       if (existingProfile?.role) {
         // Role already set - exclude from update to prevent "immutable" error
         // profiles.role is IMMUTABLE once set - we cannot update it, even to null
@@ -252,6 +265,27 @@ export async function updateUserProfile(
         if (payload.role && payload.role !== existingProfile.role) {
           console.log(`[Profile Update from ${source}] Role already set (${existingProfile.role}), excluding from update (immutable field). Attempted to set: ${payload.role}`)
         }
+      }
+      
+      // CRITICAL: Preserve existing name if payload.name is null/undefined
+      // This prevents clearing names during auth refresh or login when name isn't provided
+      // Only exclude name from update if it's explicitly null/undefined AND there's an existing name
+      // If payload has a name (even empty string), use it - otherwise preserve existing
+      if ((payload.name === null || payload.name === undefined) && existingProfile?.name) {
+        // Name not provided in payload but exists in database - preserve it by excluding from update
+        delete updatePayload.name
+      }
+      
+      // CRITICAL: Preserve existing email preferences if payload.email_notifications_enabled/marketing_emails_enabled is null/undefined
+      // This prevents clearing email preferences during auth refresh when preferences aren't provided
+      // Only exclude from update if they're explicitly null/undefined AND there's an existing value
+      if ((payload.email_notifications_enabled === null || payload.email_notifications_enabled === undefined) && existingProfile?.email_notifications_enabled !== undefined) {
+        // Email notification preference not provided in payload but exists in database - preserve it
+        delete updatePayload.email_notifications_enabled
+      }
+      if ((payload.marketing_emails_enabled === null || payload.marketing_emails_enabled === undefined) && existingProfile?.marketing_emails_enabled !== undefined) {
+        // Marketing email preference not provided in payload but exists in database - preserve it
+        delete updatePayload.marketing_emails_enabled
       }
       
       const { error } = await supabase
@@ -278,26 +312,39 @@ export async function updateUserProfile(
     }
     
     // Log success with completeness check
+    // CRITICAL: For UPDATE, check existing role/name from database if they were excluded from update
+    // For INSERT, check payload values
+    const finalRole = existing ? (existingProfileRole ?? payload.role) : payload.role
+    // For UPDATE, use existing name from database if name was preserved (excluded from update)
+    // If payload.name is null/undefined, we preserved the existing name by excluding it from update
+    const finalName = existing && (payload.name === null || payload.name === undefined)
+      ? existingProfileName ?? payload.name
+      : payload.name
     const completeness = {
       hasEmail: !!payload.email,
-      hasName: !!payload.name,
-      hasRole: payload.role !== null && payload.role !== undefined
+      hasName: !!finalName,
+      hasRole: finalRole !== null && finalRole !== undefined
     }
     
-    // Log warning if profile is incomplete
-    if (!completeness.hasName || !completeness.hasRole) {
+    // Only log warning in development mode to reduce console spam
+    // Also only warn if this is a new profile (INSERT) - UPDATE might be intentionally partial
+    if (import.meta.env.DEV && !existing && (!completeness.hasName || !completeness.hasRole)) {
       console.warn(`[Profile Update from ${source}] Incomplete profile update:`, {
         userId,
         email: payload.email,
         completeness
       })
-    } else {
-      console.log(`[Profile Update from ${source}] Success:`, {
-        userId,
-        email: payload.email,
-        name: payload.name ? 'present' : 'missing',
-        role: payload.role || 'null'
-      })
+    } else if (import.meta.env.DEV && existing && (!completeness.hasName || !completeness.hasRole)) {
+      // For UPDATE, only log if it's actually incomplete (not just because role was excluded)
+      // If role exists in database, completeness check should use that
+      if (!completeness.hasName || (!completeness.hasRole && !existingProfileRole)) {
+        console.warn(`[Profile Update from ${source}] Profile may be incomplete after update:`, {
+          userId,
+          email: payload.email,
+          completeness,
+          note: 'Role exists in database but may be missing from payload'
+        })
+      }
     }
     
     return { success: true }

@@ -572,18 +572,185 @@ async function deleteUser(userId: string) {
 
 ### 12. **Users Without Profiles** ⭐ MISSING PROFILE ISSUE
 
-**What:** Users exist in funnels/bookings but have no profile, causing deletion failures when trying to delete by email.
+**Problem:** Cannot delete users who only exist in funnels/bookings/booking_events without a profile.
 
-**Example Failure:**
+**Example:**
+- User filled out funnel form but never completed signup
+- User has email in `funnel_responses`, `bookings`, `booking_events` tables
+- But no `profiles` row exists (no `user_id` in `auth.users`)
+- Admin tries to delete → "User not found" error
+
+**Fix:** Handle both cases:
+- **With profile:** Delete everything (auth user, profile, all data)
+- **Without profile:** Delete email-keyed data only (`funnel_responses`, `bookings`, `booking_events`)
+
+**Wrong Code:**
 ```typescript
-// WRONG: Assumes all users have profiles
+// Only handles users with profiles
 async function deleteUserByEmail(email: string) {
-  const profile = profiles.find(p => p.email === email)
+  const profile = await getProfileByEmail(email)
   if (!profile) {
-    // ❌ Error: User not found, can't delete
-    throw new Error('User not found')
+    throw new Error('User not found') // ❌ Fails for users without profiles
   }
-  await deleteUser(profile.id) // Requires userId from profile
+  await deleteUserAndRelatedData(profile.id)
+}
+```
+
+**Correct Code:**
+```typescript
+// Handles both cases
+async function deleteUserByEmail(email: string) {
+  const profile = await getProfileByEmail(email)
+  if (profile?.id) {
+    // User has profile - delete everything
+    await deleteUserAndRelatedData(profile.id)
+  } else {
+    // User only in email-keyed tables - delete email-keyed data only
+    await deleteUserByEmailOnly(email) // Deletes from funnels, bookings, booking_events
+  }
+}
+
+// Separate function for email-only deletion
+async function deleteUserByEmailOnly(email: string) {
+  await supabase.from('funnel_responses').delete().eq('user_email', email)
+  await supabase.from('bookings').delete().eq('user_email', email)
+  // Note: booking_events uses customer_email, not user_email!
+  await supabase.from('booking_events').delete().eq('customer_email', email)
+}
+```
+
+**Prevention Checklist:**
+- [ ] Check if profile exists before attempting full deletion
+- [ ] Create separate function for email-only deletion
+- [ ] Remember `booking_events` uses `customer_email` column (not `user_email`)
+- [ ] Show appropriate message explaining what was deleted
+- [ ] Cannot delete auth user without profile (no `user_id`)
+
+**Rule of Thumb:**
+> When deleting by email, handle both cases:
+> 1. Check if profile exists for this email
+> 2. If profile exists: Delete everything (auth user, profile, all data)
+> 3. If no profile: Delete email-keyed data only (funnels, bookings, booking_events)
+> 4. Note: `booking_events` table uses `customer_email` column, not `user_email`
+> 5. Cannot delete auth user without profile (no `user_id`)
+
+**Files to Watch:**
+- `src/utils/adminUserUtils.ts` - deleteUserByEmailOnly()
+- `src/pages/Admin.tsx` - deleteCustomerUserByEmail handler
+- `netlify/functions/utils/userDeletion.ts` - Comprehensive deletion utility
+
+**Related:**
+- Section #11: Stale Data After Deletion
+- Section #9: Incomplete Deletion Logic
+
+---
+
+### 13. **Clearing Existing Data During Updates** ⭐ DATA LOSS BUG
+
+**Problem:** Existing data (like user names) gets cleared during auth refresh/login when no new value is provided.
+
+**Example:**
+- User logs in (name exists in database: "John Doe")
+- During auth refresh, `ensureProfile()` is called
+- No name in localStorage (not during signup)
+- Code passes `name: null` to `updateUserProfile()`
+- Database updates with `name: null`, clearing existing name
+- User sees name disappeared
+
+**Fix:** Preserve existing data when null/undefined is passed during UPDATE operations.
+
+**Wrong Code:**
+```typescript
+// In ensureProfile() - during auth refresh
+const result = await updateUserProfile(userId, {
+  email,
+  name: name || null, // ❌ Sets name to null if name is undefined
+  role: role || null,
+}, 'auth-context')
+
+// In updateUserProfile() - UPDATE operation
+const updatePayload = { ...payload } // payload.name is null
+await supabase.from('profiles').update(updatePayload) // ❌ Clears name!
+```
+
+**Correct Code:**
+```typescript
+// In ensureProfile() - fetch existing name if not provided
+if (!name) {
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('name')
+    .eq('id', userId)
+    .maybeSingle()
+  
+  if (existingProfile?.name) {
+    name = existingProfile.name // Preserve existing name
+  }
+}
+
+// Only include name if we have one
+const updatePayload: any = { email, role }
+if (name) {
+  updatePayload.name = name // Only update if we have a name
+}
+await updateUserProfile(userId, updatePayload, 'auth-context')
+
+// In updateUserProfile() - preserve existing name if payload.name is null
+if (existing) {
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('name')
+    .eq('id', userId)
+    .maybeSingle()
+  
+  const updatePayload: any = { ...payload }
+  
+  // Preserve existing name if payload.name is null/undefined
+  if ((payload.name === null || payload.name === undefined) && existingProfile?.name) {
+    delete updatePayload.name // Exclude from update to preserve it
+  }
+  
+  await supabase.from('profiles').update(updatePayload)
+}
+```
+
+**Prevention Checklist:**
+- [ ] Fetch existing data before UPDATE if new value is not provided
+- [ ] Exclude null/undefined fields from UPDATE payload (don't update them)
+- [ ] Only include fields in update payload if they have values
+- [ ] For UPDATE operations, preserve existing data when payload is null/undefined
+- [ ] Similar pattern to immutable fields (exclude role if already set)
+
+**Rule of Thumb:**
+> When updating existing records:
+> 1. If new value is provided → update with new value
+> 2. If new value is null/undefined → preserve existing value (exclude from update)
+> 3. Only include fields in update payload that should actually change
+> 4. For immutable fields (like role), always exclude from update if already set
+> 5. This prevents accidental data loss during auth refresh or partial updates
+
+**Files to Watch:**
+- `src/contexts/AuthContext.tsx` - ensureProfile() function
+- `src/utils/profileUtils.ts` - updateUserProfile() function
+- Any UPDATE operations that might pass null/undefined values
+
+**Common Patterns:**
+- Passing `name: null` during auth refresh clears existing name
+- UPDATE with null values overwrites existing data
+- Not checking if data exists before clearing it
+- Similar to immutable field issue but for any existing data
+
+**Testing Verified (2025-01-XX):**
+- ✅ Names preserved during auth refresh/login
+- ✅ Names still saved correctly during signup
+- ✅ Names can still be updated in account settings
+- ✅ No accidental data clearing during normal operations
+
+**Related:**
+- Section #8: Immutable Database Fields (similar pattern - exclude from update)
+- Section #11: Stale Data After Deletion (data preservation patterns)
+
+---
 }
 ```
 

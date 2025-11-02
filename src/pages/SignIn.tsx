@@ -112,6 +112,9 @@ export default function SignInPage() {
   // Bonita resident verification fields
   const [zipCode, setZipCode] = useState('')
   const [isBonitaResident, setIsBonitaResident] = useState(false)
+  // Email preferences fields
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true) // Default to true
+  const [marketingEmailsEnabled, setMarketingEmailsEnabled] = useState(false) // Default to false
 
   const handleResetPassword = async () => {
     if (!email) { setMessage('Enter your email'); return }
@@ -331,7 +334,10 @@ export default function SignInPage() {
                 name,
                 email,
                 role: accountType,
-                ...verificationData
+                ...verificationData,
+                // Email preferences from signup form
+                email_notifications_enabled: emailNotificationsEnabled,
+                marketing_emails_enabled: marketingEmailsEnabled
               }))
             } catch {}
 
@@ -627,6 +633,43 @@ export default function SignInPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Email Preferences */}
+            {mode === 'signup' && (
+              <div className="pt-2 border-t border-neutral-200 space-y-3">
+                <p className="text-sm font-medium text-neutral-700 mb-2">Email Preferences</p>
+                
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="email-notifications-signup"
+                    checked={emailNotificationsEnabled}
+                    onChange={(e) => setEmailNotificationsEnabled(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-neutral-900 border-neutral-300 rounded focus:ring-neutral-500"
+                  />
+                  <label htmlFor="email-notifications-signup" className="text-sm text-neutral-700 cursor-pointer flex-1">
+                    I would like to receive email notifications about my account, bookings, and important updates
+                  </label>
+                </div>
+                
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="marketing-emails-signup"
+                    checked={marketingEmailsEnabled}
+                    onChange={(e) => setMarketingEmailsEnabled(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-neutral-900 border-neutral-300 rounded focus:ring-neutral-500"
+                  />
+                  <label htmlFor="marketing-emails-signup" className="text-sm text-neutral-700 cursor-pointer flex-1">
+                    I would like to receive marketing emails about events, promotions, and community news
+                  </label>
+                </div>
+                
+                <p className="text-xs text-neutral-500 ml-7">
+                  You can change these preferences anytime in your account settings.
+                </p>
               </div>
             )}
 

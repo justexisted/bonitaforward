@@ -313,10 +313,14 @@ Each dependency tracking comment includes:
 12. ✅ Fixed incomplete user deletion - added deletion for all missing user-related tables (completed)
 13. ✅ Fixed missing props in destructuring in `CustomerUsersSection-2025-10-19.tsx` - added missing props and guard checks (completed)
 14. ✅ Fixed stale data after deletion in `adminUserUtils.ts` - added profile reload after deletion to verify deletion worked (completed, tested with business and customer accounts)
-15. ✅ Fixed users without profiles deletion in `adminUserUtils.ts` - added `deleteUserByEmailOnly()` to handle users without profiles (completed, tested successfully)
-    - ✅ Successfully deletes from `funnel_responses`, `bookings`, and `booking_events` tables
-    - ✅ Note: `booking_events` uses `customer_email` column, not `user_email`
-16. ⏳ Set up integration tests that verify dependencies (future)
+  15. ✅ Fixed users without profiles deletion in `adminUserUtils.ts` - added `deleteUserByEmailOnly()` to handle users without profiles (completed, tested successfully)
+        - ✅ Successfully deletes from `funnel_responses`, `bookings`, and `booking_events` tables
+        - ✅ Note: `booking_events` uses `customer_email` column, not `user_email`
+  16. ✅ Fixed name clearing during auth refresh in `AuthContext.tsx` and `profileUtils.ts` - preserve existing data when null/undefined is passed (completed, tested successfully)
+        - ✅ Names preserved during auth refresh/login
+        - ✅ Names still saved correctly during signup
+        - ✅ Names can still be updated in account settings
+  17. ⏳ Set up integration tests that verify dependencies (future)
 
 ---
 

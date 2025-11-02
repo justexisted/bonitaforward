@@ -202,6 +202,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               resident_verification_method?: string
               resident_zip_code?: string | null
               resident_verified_at?: string | null
+              email_notifications_enabled?: boolean
+              marketing_emails_enabled?: boolean
             }
             if (pref?.role === 'business' || pref?.role === 'community') role = pref.role
             // CRITICAL FIX: Always use name from localStorage during signup, even if name already exists
@@ -242,20 +244,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
         
+        // CRITICAL: Preserve existing name from database if no name is provided
+        // This prevents clearing the name during login/auth refresh when name isn't in localStorage
+        // Only fetch existing profile if we don't have a name to save (not during signup)
+        if (!name) {
+          try {
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('name')
+              .eq('id', userId)
+              .maybeSingle()
+            
+            if (existingProfile?.name) {
+              // Use existing name from database to preserve it
+              name = existingProfile.name
+            }
+          } catch {
+            // If fetch fails, continue without name (won't clear it, just won't set it)
+          }
+        }
+        
         // Use centralized updateUserProfile utility to ensure ALL fields are saved
         // This prevents missing fields like name or resident verification from being omitted
         // CRITICAL: updateUserProfile() automatically handles immutable fields like role
         // (it checks if role is already set and excludes it from update if immutable)
+        // CRITICAL: Only include name in payload if we have one - if name is null/undefined,
+        // updateUserProfile will preserve existing name (won't clear it) for UPDATE operations
+        // Read email preferences from localStorage (bf-pending-profile) if available
+        let emailPreferences: {
+          email_notifications_enabled?: boolean
+          marketing_emails_enabled?: boolean
+        } = {}
+        
+        try {
+          const raw = localStorage.getItem('bf-pending-profile')
+          if (raw) {
+            const pref = JSON.parse(raw) as {
+              email_notifications_enabled?: boolean
+              marketing_emails_enabled?: boolean
+            }
+            if (pref.email_notifications_enabled !== undefined) {
+              emailPreferences.email_notifications_enabled = pref.email_notifications_enabled
+            }
+            if (pref.marketing_emails_enabled !== undefined) {
+              emailPreferences.marketing_emails_enabled = pref.marketing_emails_enabled
+            }
+          }
+        } catch {
+          // localStorage access failed, continue without email preferences
+        }
+        
+        const updatePayload: any = {
+          email,
+          role: role || metadataRole || null,
+          ...residentVerification,
+          ...emailPreferences
+        }
+        
+        // Only include name if we have one - this prevents clearing existing names
+        // If name is not provided, updateUserProfile will preserve the existing name from database
+        if (name) {
+          updatePayload.name = name
+        }
+        
         const result = await updateUserProfile(
           userId,
-          {
-            email,
-            name: name || null,
-            role: role || metadataRole || null,
-            ...residentVerification
-          },
+          updatePayload,
           'auth-context'
         )
+        
+        // If email preferences were set during signup, also set email_consent_date
+        // This tracks when user consented to receive emails
+        if ((emailPreferences.email_notifications_enabled === true || emailPreferences.marketing_emails_enabled === true) && result.success) {
+          try {
+            const { error: consentError } = await supabase
+              .from('profiles')
+              .update({ email_consent_date: new Date().toISOString() })
+              .eq('id', userId)
+            
+            if (consentError) {
+              console.warn('[Auth] Failed to set email_consent_date:', consentError)
+              // Don't fail the flow, but log warning
+            }
+          } catch (err) {
+            console.warn('[Auth] Exception setting email_consent_date:', err)
+          }
+        }
         
         if (!result.success) {
           console.error('[Auth] Error updating profile:', result.error)
