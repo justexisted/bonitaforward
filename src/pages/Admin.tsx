@@ -490,18 +490,6 @@ export default function AdminPage() {
     )
 
   // REFACTORED: Moved to adminUserUtils.ts
-  const deleteCustomerUser = (email: string) =>
-    UserUtils.deleteCustomerUser(
-      email,
-      setMessage,
-      setError,
-      setDeletingCustomerEmail,
-      setProfilesSimple as any,
-      setFunnels as any,
-      setBookings as any
-    )
-
-  // REFACTORED: Moved to adminUserUtils.ts
   const fetchBusinessDetails = (userId: string) =>
     UserUtils.fetchBusinessDetails(
       userId,
