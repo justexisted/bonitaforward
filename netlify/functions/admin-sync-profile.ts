@@ -1,111 +1,40 @@
-// Local minimal Netlify Handler type
-type Handler = (event: {
-  httpMethod: string
-  headers: Record<string, string>
-  body?: string | null
-  clientContext?: any
-}, context: any) => Promise<{ statusCode: number; headers?: Record<string, string>; body?: string }> 
-
-import { createClient } from '@supabase/supabase-js'
-
-// Netlify function to sync/create a missing profile from auth.users table
-// This fixes the "Unknown Owner" issue when profiles are missing
-// Required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-
-function requireEnv(name: string): string {
-  const v = process.env[name]
-  if (!v) throw new Error(`Missing env ${name}`)
-  return v
-}
+import { Handler } from '@netlify/functions'
+import { verifyAuthAndAdmin, authAdminErrorResponse } from './utils/authAdmin'
+import { errorResponse, successResponse, handleOptions } from './utils/response'
 
 export const handler: Handler = async (event) => {
-  // CORS headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'X-Content-Type-Options': 'nosniff',
-  }
-  
-  // Handle preflight request
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' }
-  }
+  // Handle OPTIONS/preflight
+  if (event.httpMethod === 'OPTIONS') return handleOptions()
   
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers, body: 'Method Not Allowed' }
+    return errorResponse(405, 'Method Not Allowed')
   }
-  
+
   try {
-    // Verify admin authorization
-    const authHeader = event.headers['authorization'] || event.headers['Authorization']
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
-    if (!token) return { statusCode: 401, headers, body: 'Unauthorized' }
-
-    const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-    const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY')
+    // Verify auth and admin status
+    const authAdminResult = await verifyAuthAndAdmin(event)
     
-    // Create two clients: one for auth verification (anon), one for data operations (service role)
-    const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
-
-    // Verify the JWT token using ANON key (service role can't verify user tokens)
-    const { data: adminUserData, error: getAdminErr } = await (sbAnon as any).auth.getUser(token)
-    if (getAdminErr || !adminUserData?.user?.id) {
-      console.error('[admin-sync-profile] Token verification failed:', getAdminErr)
-      return { statusCode: 401, headers, body: 'Invalid token' }
+    if (!authAdminResult.success || !authAdminResult.supabaseClient) {
+      return authAdminErrorResponse(authAdminResult)
     }
 
-    const adminEmail = adminUserData.user.email?.toLowerCase()
-
-    // Check if user is admin
-    const adminEmails = (process.env.VITE_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map((s: string) => s.trim().toLowerCase())
-      .filter(Boolean)
-    
-    const isEmailAdmin = adminEmails.length > 0 ? 
-      adminEmails.includes(adminEmail || '') : 
-      adminEmail === 'justexisted@gmail.com'
-
-    // Check database for is_admin flag
-    let isDatabaseAdmin = false
-    try {
-      const { data: profile } = await sb
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', adminUserData.user.id)
-        .single()
-      
-      isDatabaseAdmin = Boolean(profile?.is_admin)
-    } catch {
-      // is_admin column doesn't exist yet, that's okay
-    }
-
-    if (!isEmailAdmin && !isDatabaseAdmin) {
-      return { statusCode: 403, headers, body: 'Admin access required' }
-    }
+    const { supabaseClient } = authAdminResult
 
     // Get user_id from request body
     const body = JSON.parse(event.body || '{}') as { user_id?: string }
     const user_id = body.user_id
     if (!user_id) {
-      return { statusCode: 400, headers, body: 'Missing user_id' }
+      return errorResponse(400, 'Missing user_id')
     }
 
     console.log(`[admin-sync-profile] Syncing profile for user: ${user_id}`)
 
     // Step 1: Fetch user from auth.users table
-    const { data: { user }, error: userError } = await (sb as any).auth.admin.getUserById(user_id)
+    const { data: { user }, error: userError } = await (supabaseClient as any).auth.admin.getUserById(user_id)
     
     if (userError || !user) {
       console.error(`[admin-sync-profile] User not found in auth.users:`, userError)
-      return {
-        statusCode: 404,
-        headers,
-        body: `User not found in auth system: ${userError?.message || 'Unknown error'}`
-      }
+      return errorResponse(404, 'User not found in auth system', userError?.message || 'Unknown error')
     }
 
     console.log(`[admin-sync-profile] Found user in auth.users:`, {
@@ -115,53 +44,42 @@ export const handler: Handler = async (event) => {
     })
 
     // Step 2: Check if profile already exists
-    const { data: existingProfile } = await sb
+    const { data: existingProfile } = await supabaseClient
       .from('profiles')
       .select('id')
       .eq('id', user_id)
       .maybeSingle()
 
     if (existingProfile) {
-      console.log(`[admin-sync-profile] Profile already exists, updating with auth data...`)
+      console.log(`[admin-sync-profile] Profile already exists, updating...`)
       
-      // Update existing profile with auth data
-      const { error: updateError } = await sb
+      // Update existing profile
+      const { error: updateError } = await supabaseClient
         .from('profiles')
         .update({
           email: user.email,
           name: user.user_metadata?.name || user.user_metadata?.full_name || null,
+          role: user.user_metadata?.role || 'business',
           updated_at: new Date().toISOString()
         })
         .eq('id', user_id)
-      
+
       if (updateError) {
         console.error(`[admin-sync-profile] Error updating profile:`, updateError)
-        return {
-          statusCode: 500,
-          headers,
-          body: `Failed to update profile: ${updateError.message}`
-        }
+        return errorResponse(500, 'Failed to update profile', updateError.message)
       }
-      
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          message: 'Profile updated successfully',
-          profile: {
-            id: user.id,
-            email: user.email,
-            name: user.user_metadata?.name || user.user_metadata?.full_name
-          }
-        })
-      }
+
+      return successResponse({ 
+        success: true, 
+        message: 'Profile updated successfully',
+        user_id,
+        email: user.email
+      })
     }
 
-    // Step 3: Create new profile from auth user data
-    console.log(`[admin-sync-profile] Creating new profile from auth data...`)
-    
-    const { error: insertError } = await sb
+    // Step 3: Create new profile
+    console.log(`[admin-sync-profile] Creating new profile...`)
+    const { error: insertError } = await supabaseClient
       .from('profiles')
       .insert({
         id: user.id,
@@ -171,39 +89,22 @@ export const handler: Handler = async (event) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-    
+
     if (insertError) {
       console.error(`[admin-sync-profile] Error creating profile:`, insertError)
-      return {
-        statusCode: 500,
-        headers,
-        body: `Failed to create profile: ${insertError.message}`
-      }
+      return errorResponse(500, 'Failed to create profile', insertError.message)
     }
 
-    console.log(`[admin-sync-profile] Successfully created profile for ${user.email}`)
+    console.log(`[admin-sync-profile] ✓ Profile created for ${user.email}`)
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        message: 'Profile created successfully',
-        profile: {
-          id: user.id,
-          email: user.email,
-          name: user.user_metadata?.name || user.user_metadata?.full_name
-        }
-      })
-    }
-    
+    return successResponse({ 
+      success: true, 
+      message: 'Profile created successfully',
+      user_id,
+      email: user.email
+    })
   } catch (err: any) {
-    console.error('[admin-sync-profile] Error:', err)
-    return {
-      statusCode: 500,
-      headers,
-      body: err?.message || 'Server error'
-    }
+    console.error('[admin-sync-profile] Exception:', err)
+    return errorResponse(500, 'Server error', err?.message)
   }
 }
-

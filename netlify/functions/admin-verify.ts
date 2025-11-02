@@ -1,83 +1,37 @@
-// Netlify function to verify admin status server-side
-type Handler = (event: {
-  httpMethod: string
-  headers: Record<string, string>
-  body?: string | null
-}, context: any) => Promise<{ statusCode: number; headers?: Record<string, string>; body?: string }>
-
-import { createClient } from '@supabase/supabase-js'
-
-function requireEnv(name: string): string {
-  const v = process.env[name]
-  if (!v) throw new Error(`Missing env ${name}`)
-  return v
-}
+import { Handler } from '@netlify/functions'
+import { verifyAuthAndAdmin, authAdminErrorResponse } from './utils/authAdmin'
+import { errorResponse, successResponse, handleOptions } from './utils/response'
 
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' }
+  // Handle OPTIONS/preflight
+  if (event.httpMethod === 'OPTIONS') return handleOptions()
   
+  if (event.httpMethod !== 'POST') {
+    return errorResponse(405, 'Method Not Allowed')
+  }
+
   try {
-    const authHeader = event.headers['authorization'] || event.headers['Authorization']
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
-    if (!token) return { statusCode: 401, body: 'Unauthorized' }
-
-    const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE')
-    const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY')
+    // Verify auth and admin status
+    const authAdminResult = await verifyAuthAndAdmin(event)
     
-    // Create two clients: one for auth verification (anon), one for data operations (service role)
-    const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
-
-    // Verify the JWT token using ANON key (service role can't verify user tokens)
-    const { data: userData, error: getUserErr } = await (sbAnon as any).auth.getUser(token)
-    if (getUserErr || !userData?.user?.id) {
-      console.error('[admin-verify] Token verification failed:', getUserErr)
-      return { statusCode: 401, body: 'Invalid token' }
-    }
-
-    const userId = userData.user.id
-    const userEmail = userData.user.email?.toLowerCase()
-
-    // Check if user is admin via multiple methods for backward compatibility
-    // Method 1: Check if email is in admin list (current method - keeping for now)
-    const adminEmails = (process.env.VITE_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map((s: string) => s.trim().toLowerCase())
-      .filter(Boolean)
-    
-    const isEmailAdmin = adminEmails.length > 0 ? 
-      adminEmails.includes(userEmail || '') : 
-      userEmail === 'justexisted@gmail.com' // Fallback
-
-    // Method 2: Check database for is_admin flag (future-proofing)
-    let isDatabaseAdmin = false
-    try {
-      const { data: profile } = await adminClient
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', userId)
-        .single()
-      
-      isDatabaseAdmin = Boolean(profile?.is_admin)
-    } catch {
-      // is_admin column doesn't exist yet, that's okay
-    }
-
-    const isAdmin = isEmailAdmin || isDatabaseAdmin
-
-    if (!isAdmin) {
-      return { 
-        statusCode: 403, 
-        body: JSON.stringify({ isAdmin: false, error: 'Admin access required' })
+    if (!authAdminResult.success || !authAdminResult.supabaseClient) {
+      // Return 403 if admin check failed (not just auth)
+      if (authAdminResult.statusCode === 403) {
+        return successResponse({ 
+          isAdmin: false, 
+          error: authAdminResult.error || 'Admin access required' 
+        })
       }
+      return authAdminErrorResponse(authAdminResult)
     }
+
+    const { userId, email, adminMethod, supabaseClient } = authAdminResult
 
     // Log admin access for audit trail
     try {
-      await adminClient.from('admin_audit_log').insert({
+      await supabaseClient.from('admin_audit_log').insert({
         admin_user_id: userId,
-        admin_email: userEmail,
+        admin_email: email,
         action: 'admin_verify',
         timestamp: new Date().toISOString(),
         ip_address: event.headers['x-forwarded-for'] || event.headers['x-real-ip'] || 'unknown'
@@ -86,16 +40,14 @@ export const handler: Handler = async (event) => {
       // audit log table doesn't exist yet, that's okay
     }
 
-    return { 
-      statusCode: 200, 
-      body: JSON.stringify({ 
-        isAdmin: true, 
-        userId,
-        email: userEmail,
-        method: isDatabaseAdmin ? 'database' : 'email'
-      })
-    }
+    return successResponse({ 
+      isAdmin: true, 
+      userId,
+      email,
+      method: adminMethod || 'email'
+    })
   } catch (err: any) {
-    return { statusCode: 500, body: err?.message || 'Server error' }
+    console.error('[admin-verify] Exception:', err)
+    return errorResponse(500, 'Server error', err?.message)
   }
 }

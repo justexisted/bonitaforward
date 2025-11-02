@@ -1,76 +1,42 @@
-// Netlify function to delete business listings using SERVICE_ROLE_KEY to bypass RLS
-// This is a workaround for RLS policy issues on the providers table
-
-type Handler = (event: {
-  httpMethod: string
-  headers: Record<string, string>
-  body?: string | null
-}, context: any) => Promise<{ statusCode: number; headers?: Record<string, string>; body?: string }>
-
+import { Handler } from '@netlify/functions'
+import { extractAndVerifyToken } from './utils/auth'
+import { getSupabaseConfig } from './utils/env'
 import { createClient } from '@supabase/supabase-js'
-
-function requireEnv(name: string): string {
-  const v = process.env[name]
-  if (!v) throw new Error(`Missing env ${name}`)
-  return v
-}
+import { errorResponse, successResponse, handleOptions } from './utils/response'
+import { checkIsAdmin } from './utils/admin'
 
 export const handler: Handler = async (event) => {
-  // CORS headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'X-Content-Type-Options': 'nosniff',
-  }
-  
-  // Handle preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' }
-  }
+  // Handle OPTIONS/preflight
+  if (event.httpMethod === 'OPTIONS') return handleOptions()
   
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers, body: 'Method Not Allowed' }
+    return errorResponse(405, 'Method Not Allowed')
   }
-  
+
   try {
-    // Verify authentication
-    const authHeader = event.headers['authorization'] || event.headers['Authorization']
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null
-    if (!token) return { statusCode: 401, headers, body: 'Unauthorized' }
-
-    const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_SERVICE_ROLE = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-    const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY')
+    // Verify token
+    const { url, serviceRole, anonKey } = getSupabaseConfig()
+    const authResult = await extractAndVerifyToken(event, url, anonKey)
     
-    // Create two clients: one for auth verification (anon), one for data operations (service role)
-    const sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
-
-    // Verify user token using ANON key (service role can't verify user tokens)
-    const { data: userData, error: getUserErr } = await (sbAnon as any).auth.getUser(token)
-    if (getUserErr || !userData?.user?.id) {
-      console.error('[delete-business-listing] Token verification failed:', getUserErr)
-      return { statusCode: 401, headers, body: 'Invalid token' }
+    if (!authResult.success || !authResult.user) {
+      return errorResponse(401, 'Authentication failed', authResult.error)
     }
 
-    const userId = userData.user.id
-    const userEmail = userData.user.email
-
-    console.log('[Delete Listing] User:', { userId, userEmail })
+    const { id: userId, email: userEmail } = authResult.user
+    const supabaseClient = createClient(url, serviceRole, { auth: { persistSession: false } })
 
     // Get listing ID from request body
     const body = JSON.parse(event.body || '{}') as { listing_id?: string }
     const listingId = body.listing_id
     
     if (!listingId) {
-      return { statusCode: 400, headers, body: 'Missing listing_id' }
+      return errorResponse(400, 'Missing listing_id')
     }
 
-    console.log('[Delete Listing] Attempting to delete:', listingId)
+    console.log('[Delete Listing] User:', { userId, userEmail }, 'Attempting to delete:', listingId)
 
     // Fetch the listing to verify ownership
-    const { data: listing, error: fetchError } = await sb
+    const { data: listing, error: fetchError } = await supabaseClient
       .from('providers')
       .select('*')
       .eq('id', listingId)
@@ -78,33 +44,19 @@ export const handler: Handler = async (event) => {
     
     if (fetchError || !listing) {
       console.error('[Delete Listing] Listing not found:', fetchError)
-      return { 
-        statusCode: 404, 
-        headers, 
-        body: JSON.stringify({ error: 'Listing not found' })
-      }
+      return errorResponse(404, 'Listing not found', fetchError?.message)
     }
 
     console.log('[Delete Listing] Found listing:', listing)
 
-    // Check if user is admin
-    const adminEmails = (process.env.VITE_ADMIN_EMAILS || '')
-      .split(',')
-      .map(s => s.trim().toLowerCase())
-      .filter(Boolean)
-    const adminList = adminEmails.length > 0 ? adminEmails : ['justexisted@gmail.com']
-    const isAdmin = userEmail && adminList.includes(userEmail.toLowerCase())
-
-    // Verify ownership or admin status
+    // Check if user is admin or owner
+    const adminCheck = await checkIsAdmin(userId, userEmail, supabaseClient)
+    const isAdmin = adminCheck.isAdmin
     const isOwner = listing.owner_user_id === userId || listing.email === userEmail
     
     if (!isOwner && !isAdmin) {
       console.error('[Delete Listing] User does not own listing and is not admin')
-      return { 
-        statusCode: 403, 
-        headers, 
-        body: JSON.stringify({ error: 'You do not have permission to delete this listing' })
-      }
+      return errorResponse(403, 'Permission denied', 'You do not have permission to delete this listing')
     }
 
     if (isAdmin) {
@@ -117,24 +69,24 @@ export const handler: Handler = async (event) => {
     console.log('[Delete Listing] Deleting related records...')
     
     // Delete provider change requests
-    await sb.from('provider_change_requests').delete().eq('provider_id', listingId)
+    await supabaseClient.from('provider_change_requests').delete().eq('provider_id', listingId)
     
     // Delete provider job posts
-    await sb.from('provider_job_posts').delete().eq('provider_id', listingId)
+    await supabaseClient.from('provider_job_posts').delete().eq('provider_id', listingId)
     
     // Delete from saved_providers
-    await sb.from('saved_providers').delete().eq('provider_id', listingId)
+    await supabaseClient.from('saved_providers').delete().eq('provider_id', listingId)
     
     // Delete from coupon_redemptions
-    await sb.from('coupon_redemptions').delete().eq('provider_id', listingId)
+    await supabaseClient.from('coupon_redemptions').delete().eq('provider_id', listingId)
     
     // Update bookings (set provider_id to null)
-    await sb.from('bookings').update({ provider_id: null }).eq('provider_id', listingId)
+    await supabaseClient.from('bookings').update({ provider_id: null }).eq('provider_id', listingId)
 
     console.log('[Delete Listing] Related records deleted, deleting main provider record...')
 
     // Delete the main provider record (service role bypasses RLS)
-    const { error: deleteError, count } = await sb
+    const { error: deleteError, count } = await supabaseClient
       .from('providers')
       .delete({ count: 'exact' })
       .eq('id', listingId)
@@ -143,47 +95,22 @@ export const handler: Handler = async (event) => {
 
     if (deleteError) {
       console.error('[Delete Listing] Delete failed:', deleteError)
-      return { 
-        statusCode: 500, 
-        headers, 
-        body: JSON.stringify({ 
-          error: 'Failed to delete listing',
-          details: deleteError.message 
-        })
-      }
+      return errorResponse(500, 'Failed to delete listing', deleteError.message)
     }
 
     if (count === 0) {
       console.error('[Delete Listing] No rows deleted')
-      return { 
-        statusCode: 500, 
-        headers, 
-        body: JSON.stringify({ 
-          error: 'Failed to delete listing - no rows affected'
-        })
-      }
+      return errorResponse(500, 'Failed to delete listing', 'No rows affected')
     }
 
     console.log('[Delete Listing] Successfully deleted listing')
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ 
-        success: true,
-        message: 'Business listing deleted successfully'
-      })
-    }
-    
+    return successResponse({ 
+      success: true,
+      message: 'Business listing deleted successfully'
+    })
   } catch (err: any) {
     console.error('[Delete Listing] Error:', err)
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: err?.message || 'Server error'
-      })
-    }
+    return errorResponse(500, 'Server error', err?.message)
   }
 }
-
