@@ -1,4 +1,52 @@
 /**
+ * DEPENDENCY TRACKING
+ *
+ * WHAT THIS DEPENDS ON:
+ * - AuthContext (auth.email, auth.loading, auth.isAuthed, auth.userId):
+ *   → CRITICAL: Must check auth.loading FIRST before checking auth.email
+ *   → CRITICAL: During navigation, auth.email may temporarily be undefined
+ *   → CRITICAL: Must preserve verified admin status during temporary email loss
+ * - Supabase auth session: Provides access token for server verification
+ *   → CRITICAL: No token means fallback to client-side check
+ * - Netlify function (admin-verify): Server-side verification endpoint
+ *   → CRITICAL: Returns { isAdmin: boolean, verified: true }
+ * - Environment variable (VITE_ADMIN_EMAILS): Admin email whitelist
+ *   → CRITICAL: Used for client-side fallback when server verification fails
+ *
+ * WHAT DEPENDS ON THIS:
+ * - Admin.tsx: Uses isAdmin to show/hide admin sections
+ *   → CRITICAL: If isAdmin flips to false during navigation, user gets logged out
+ * - Any page using admin verification: Depends on stable isAdmin state
+ *   → CRITICAL: Admin status must NOT change during normal navigation
+ *
+ * BREAKING CHANGES:
+ * - If you change check order (loading vs email) → User gets logged out during navigation
+ * - If you remove verified status preservation → User gets logged out on page transitions
+ * - If you change auth context structure → This hook breaks
+ * - If you change admin-verify response format → Server verification fails
+ *
+ * HOW TO SAFELY UPDATE:
+ * 1. ALWAYS check auth.loading FIRST before checking auth.email
+ * 2. ALWAYS preserve verified admin status if email temporarily missing (navigation)
+ * 3. Test navigation between admin page and other pages
+ * 4. Test during auth state transitions (login, logout, refresh)
+ * 5. Verify admin status doesn't flip during normal navigation
+ *
+ * RELATED FILES:
+ * - src/contexts/AuthContext.tsx: Provides auth state
+ * - src/pages/Admin.tsx: Consumes isAdmin from this hook
+ * - netlify/functions/admin-verify.ts: Server-side verification
+ *
+ * RECENT BREAKS:
+ * - Navigation logout bug (2025-01-XX): Fixed check order (loading → verified → email)
+ *   → Issue: Checking !auth.email before auth.loading caused logout during navigation
+ *   → Fix: Check loading first, preserve verified status during temporary email loss
+ *
+ * See: docs/prevention/CASCADING_FAILURES.md
+ * See: docs/prevention/ASYNC_FLOW_PREVENTION.md
+ */
+
+/**
  * Admin Verification Hook
  * 
  * This hook provides secure admin verification with server-side validation
@@ -87,21 +135,32 @@ export function useAdminVerification(auth: AuthContext) {
       console.log('[Admin] Current adminStatus:', adminStatus)
       console.log('[Admin] isClientAdmin:', isClientAdmin)
 
-      if (!auth.email) {
-        console.log('[Admin] ❌ No email, setting admin status to false')
-        setAdminStatus({ isAdmin: false, loading: false, verified: false })
+      // CRITICAL: Check loading FIRST to prevent race conditions during navigation
+      // During page navigation, auth state may temporarily change, but we should preserve
+      // the current admin status if auth is still loading
+      if (auth.loading) {
+        console.log('[Admin] ⏳ Auth still loading, preserving current admin status')
         return
       }
 
       // CRITICAL: Don't re-verify if already verified for this email
+      // This check happens AFTER loading check to prevent unnecessary state changes
       if (adminStatus.verified && adminStatus.isAdmin && auth.email) {
         console.log('[Admin] ✓ Already verified as admin, skipping re-verification')
         return
       }
 
-      // CRITICAL: Don't verify during auth loading to prevent race conditions
-      if (auth.loading) {
-        console.log('[Admin] ⏳ Auth still loading, skipping verification')
+      // CRITICAL: Only set admin to false if no email AND we're not already verified
+      // If we were previously verified, preserve the admin status during temporary email loss
+      // (e.g., during navigation between pages)
+      if (!auth.email) {
+        if (adminStatus.verified && adminStatus.isAdmin) {
+          // Preserve verified admin status if email temporarily missing (e.g., during navigation)
+          console.log('[Admin] ⚠️ No email but previously verified as admin, preserving admin status')
+          return
+        }
+        console.log('[Admin] ❌ No email and not verified, setting admin status to false')
+        setAdminStatus({ isAdmin: false, loading: false, verified: false })
         return
       }
 

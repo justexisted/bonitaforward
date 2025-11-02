@@ -4,6 +4,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { generateSlug } from '../../utils/helpers'
+import { updateUserProfile } from '../../utils/profileUtils'
 import type { Booking, SavedBusiness, SavedCoupon, PendingApplication, MyBusiness } from './types'
 import type { CalendarEvent } from '../Calendar'
 
@@ -438,12 +439,21 @@ export async function updateEvent(eventId: string, event: Partial<CalendarEvent>
   }
 }
 
+/**
+ * REFACTORED: Uses updateUserProfile() from profileUtils to ensure ALL fields are saved
+ * 
+ * This function now uses the centralized profile update utility which:
+ * - Ensures ALL fields are included (name, email, role, resident verification)
+ * - Validates data before saving
+ * - Handles INSERT vs UPDATE automatically
+ * - Prevents missing fields during profile updates
+ * 
+ * Session validation and verification logic is preserved for security.
+ * 
+ * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
+ */
 export async function updateProfile(userId: string, name: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // CRITICAL FIX: Don't use .select() on UPDATE - it causes 406 error when RLS blocks update
-    // Instead: Do UPDATE without select, then verify separately
-    // This approach matches how admin-sync-profile.ts handles profile updates
-    
     const trimmedName = name.trim()
     
     // CRITICAL: Verify session is valid and matches userId
@@ -466,9 +476,10 @@ export async function updateProfile(userId: string, name: string): Promise<{ suc
     }
     
     // First verify profile exists and user has permission to read it
+    // We also need to get the current email and role to preserve them during update
     const { data: existingProfile, error: checkError } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, email, role')
       .eq('id', userId)
       .maybeSingle()
     
@@ -488,21 +499,27 @@ export async function updateProfile(userId: string, name: string): Promise<{ suc
       return { success: true }
     }
     
-    // Update without .select() to avoid 406 errors when RLS blocks
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ name: trimmedName })
-      .eq('id', userId)
+    // CRITICAL: Use updateUserProfile() to ensure ALL fields are preserved
+    // We must include email and role from existing profile to prevent them from being cleared
+    // updateUserProfile will merge with existing data and ensure completeness
+    const result = await updateUserProfile(
+      userId,
+      {
+        email: existingProfile.email || session.user?.email || '',
+        name: trimmedName,
+        role: (existingProfile.role as 'business' | 'community' | null) || null
+      },
+      'account-settings'
+    )
     
-    if (updateError) {
-      console.error('[Account] Profile update error:', updateError)
-      return { success: false, error: updateError.message }
+    if (!result.success) {
+      console.error('[Account] Profile update error:', result.error)
+      return { success: false, error: result.error || 'Failed to update profile' }
     }
     
     // CRITICAL: Verify the update succeeded with retries
     // RLS might silently block UPDATE (0 rows affected) without throwing an error
     // We need to verify that the value actually changed
-    
     const maxRetries = 3
     let verifyData: { name: string | null } | null = null
     

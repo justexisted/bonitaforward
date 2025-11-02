@@ -1,4 +1,71 @@
 /**
+ * DEPENDENCY TRACKING
+ *
+ * WHAT THIS DEPENDS ON:
+ * - Supabase client (../lib/supabase): Provides database access for profiles table
+ *   → CRITICAL: Must have valid Supabase connection and RLS policies allow updates
+ *   → CRITICAL: Profiles table schema must match CompleteProfileData interface
+ * - localStorage ('bf-pending-profile'): Stores signup data temporarily during signup
+ *   → CRITICAL: Key must be 'bf-pending-profile' (used by SignIn.tsx, Onboarding.tsx)
+ *   → CRITICAL: Format must match: { name?: string, email?: string, role?: string, ... }
+ * - Profiles table schema: Must include all fields from CompleteProfileData
+ *   → CRITICAL: email, name, role, is_bonita_resident, resident_verification_method, resident_zip_code, resident_verified_at
+ *   → CRITICAL: If table schema changes, update CompleteProfileData interface
+ * - Auth user metadata: OAuth providers may store name in user_metadata
+ *   → CRITICAL: getNameFromMultipleSources() checks user_metadata.name and user_metadata.full_name
+ *   → CRITICAL: Auth user structure must match expected format
+ *
+ * WHAT DEPENDS ON THIS:
+ * - Onboarding.tsx: Uses updateUserProfile() and getNameFromMultipleSources() during business signup
+ *   → CRITICAL: Business account signup depends on this utility to save complete profiles
+ *   → CRITICAL: If updateUserProfile() breaks, business signups fail or save incomplete data
+ * - AuthContext.tsx (future): Should use updateUserProfile() instead of ensureProfile()
+ *   → CRITICAL: When migrated, all profile updates go through this utility
+ *   → CRITICAL: Changing this utility will affect all signup flows
+ * - AccountSettings.tsx (future): Should use updateUserProfile() for profile updates
+ *   → CRITICAL: When migrated, account settings updates will depend on this utility
+ * - All signup flows: Depend on CompleteProfileData interface and field completeness
+ *   → CRITICAL: If field structure changes, all signup flows break
+ *
+ * BREAKING CHANGES:
+ * - If you change CompleteProfileData interface → ALL signup flows break
+ * - If you change localStorage key ('bf-pending-profile') → SignIn.tsx and Onboarding.tsx break
+ * - If you change validation logic → Profile updates may fail unexpectedly
+ * - If you change createProfilePayload() → Field defaults may not match expected format
+ * - If you change profiles table schema → updateUserProfile() will fail
+ * - If you remove field completeness checks → Missing fields won't be caught in development
+ *
+ * HOW TO SAFELY UPDATE:
+ * 1. Check ALL consumers: grep -r "updateUserProfile\|getNameFromMultipleSources\|createProfilePayload" src/
+ * 2. Verify CompleteProfileData matches profiles table schema
+ * 3. Test signup flow end-to-end (SignIn → Onboarding → Admin panel)
+ * 4. Test business account signup (name must be saved)
+ * 5. Test community account signup (name must be saved)
+ * 6. Test resident verification (all fields must be saved)
+ * 7. Check admin panel shows complete profile data (name, role, resident verification)
+ * 8. Verify validation warnings appear in development console for missing fields
+ *
+ * RELATED FILES:
+ * - src/pages/SignIn.tsx: Saves data to localStorage ('bf-pending-profile')
+ * - src/pages/Onboarding.tsx: Uses updateUserProfile() and getNameFromMultipleSources()
+ * - src/contexts/AuthContext.tsx: Should be migrated to use updateUserProfile() (future)
+ * - src/pages/account/components/AccountSettings.tsx: Should be migrated to use updateUserProfile() (future)
+ * - src/types/admin.ts: ProfileRow type should match CompleteProfileData
+ * - docs/prevention/DATA_INTEGRITY_PREVENTION.md: Prevention guide for missing fields
+ *
+ * RECENT BREAKS:
+ * - Missing name during business signup (2025-01-XX): Onboarding.tsx wasn't using updateUserProfile()
+ *   → Fix: Created this utility and updated Onboarding.tsx to use it
+ *   → Lesson: Centralize profile updates to prevent missing fields
+ * - Missing fields in profile updates: Multiple files had direct Supabase calls omitting fields
+ *   → Fix: Created this utility to ensure ALL fields are included
+ *   → Lesson: Single source of truth for profile updates prevents missing fields
+ *
+ * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
+
+/**
  * Profile Update Utilities
  * 
  * CRITICAL: This file provides shared utilities for ALL profile updates.

@@ -65,6 +65,56 @@ Added comprehensive dependency tracking comments to all files that broke recentl
    - Consumers: admin-delete-user, user-delete
    - Breaking Changes: Deletion order, table schema
 
+### ✅ New Critical Files (COMPLETED)
+
+9. ✅ **src/utils/profileUtils.ts** ⭐ HIGH PRIORITY
+   - Issue: New shared utility for profile updates (prevention system)
+   - Dependencies: Supabase client, profiles table schema, localStorage (bf-pending-profile), auth user metadata
+   - Consumers: Onboarding.tsx (current), AuthContext.tsx (future), AccountSettings.tsx (future)
+   - Breaking Changes: Field completeness, validation logic, localStorage key format, CompleteProfileData interface
+   - **Status:** ✅ Completed - dependency tracking added
+
+10. ✅ **src/pages/Onboarding.tsx** ⭐ MEDIUM PRIORITY
+   - Issue: Part of signup flow, uses profileUtils
+   - Dependencies: profileUtils, localStorage (bf-pending-profile, bf-return-url), resident verification utils, Supabase auth
+   - Consumers: SignIn.tsx → Onboarding.tsx signup flow, App.tsx routing, AuthContext, Admin panel
+   - Breaking Changes: profileUtils API, localStorage keys, resident verification flow, password validation, redirect logic
+   - **Status:** ✅ Completed - dependency tracking added
+
+### ✅ Navigation State Management (COMPLETED)
+
+11. ✅ **src/hooks/useAdminVerification.ts** ⭐ HIGH PRIORITY
+   - Issue: Navigation logout bug (wrong check order)
+   - Dependencies: AuthContext (email, loading, isAuthed, userId), Supabase session, admin-verify function
+   - Consumers: Admin.tsx, any page using admin verification
+   - Breaking Changes: Check order (loading → verified → email), state preservation during navigation
+   - **Status:** ✅ Fixed and documented
+   - **Fix Applied:** Reordered checks to preserve verified admin status during navigation
+
+### ✅ Additional Critical Files (COMPLETED)
+
+12. ✅ **src/pages/SignIn.tsx** ⭐ HIGH PRIORITY
+   - Issue: Critical signup flow file, saves to localStorage
+   - Dependencies: AuthContext, localStorage ('bf-pending-profile', 'bf-return-url'), residentVerification utils
+   - Consumers: Onboarding.tsx, AuthContext.tsx, profileUtils.ts
+   - Breaking Changes: localStorage key changes, localStorage format changes, auth.signUpWithEmail() API
+   - **Status:** ✅ Completed - dependency tracking added
+
+13. ✅ **src/pages/account/components/AccountSettings.tsx** ⭐ MEDIUM PRIORITY
+   - Issue: Updates profiles directly (should migrate to profileUtils)
+   - Dependencies: dataLoader (updateProfile, loadEmailPreferences), profiles table, email_preferences table
+   - Consumers: Account.tsx, all users updating profiles
+   - Breaking Changes: updateProfile() API, email preferences API, RLS policies
+   - **Status:** ✅ Completed - dependency tracking added
+   - **Future Work:** Migrate to use updateUserProfile() from profileUtils.ts
+
+14. ✅ **netlify/functions/admin-verify.ts** ⭐ HIGH PRIORITY
+   - Issue: Used by useAdminVerification hook for server-side verification
+   - Dependencies: utils/authAdmin, utils/response, admin_audit_log table
+   - Consumers: useAdminVerification.ts, Admin.tsx
+   - Breaking Changes: verifyAuthAndAdmin() API, response format changes
+   - **Status:** ✅ Completed - dependency tracking added
+
 ---
 
 ## Dependency Tracking Format
@@ -165,12 +215,43 @@ Each dependency tracking comment includes:
 
 ---
 
+## Pending Work
+
+### ⏳ New Critical Files (Need Dependency Tracking)
+
+9. **src/utils/profileUtils.ts** ⭐ HIGH PRIORITY
+   - **Status:** ⏳ Pending - needs dependency tracking
+   - **Issue:** New shared utility for profile updates (prevention system)
+   - **Why Critical:** This is the single source of truth for ALL profile updates. Any change here affects ALL signup flows.
+   - **Dependencies:** Supabase client, profiles table schema, localStorage (bf-pending-profile)
+   - **Consumers:** Onboarding.tsx (current), AuthContext.tsx (future), AccountSettings.tsx (future)
+   - **Breaking Changes:** Field completeness, validation logic, localStorage key
+   - **See:** `docs/prevention/DATA_INTEGRITY_PREVENTION.md`
+
+10. **src/pages/Onboarding.tsx** ⭐ MEDIUM PRIORITY
+   - **Status:** ⏳ Pending - needs dependency tracking
+   - **Issue:** Part of signup flow, now uses profileUtils
+   - **Why Important:** This is where business account signups complete their profile. Missing fields here cause incomplete profiles.
+   - **Dependencies:** profileUtils, localStorage (bf-pending-profile), resident verification utils
+   - **Consumers:** SignIn.tsx → Onboarding.tsx flow
+   - **Breaking Changes:** profileUtils API, localStorage key, resident verification flow
+   - **See:** `docs/prevention/DATA_INTEGRITY_PREVENTION.md`
+
+---
+
 ## Next Steps
 
-1. ✅ All recently broken files have dependency tracking comments
-2. ⏳ Add dependency tracking to other critical files (future)
-3. ⏳ Create automated checks for breaking changes (future)
-4. ⏳ Set up integration tests that verify dependencies (future)
+1. ✅ All recently broken files (8 files) have dependency tracking comments
+2. ✅ Added dependency tracking to `useAdminVerification.ts` (navigation logout fix)
+3. ✅ Added dependency tracking to `profileUtils.ts` (critical - high priority)
+4. ✅ Added dependency tracking to `Onboarding.tsx` (important - medium priority)
+5. ✅ Added dependency tracking to `SignIn.tsx` (critical - high priority)
+6. ✅ Added dependency tracking to `AccountSettings.tsx` (important - medium priority)
+7. ✅ Added dependency tracking to `admin-verify.ts` (critical - high priority)
+8. ✅ Set up automated checks for breaking changes (completed)
+9. ✅ Refactored `AuthContext.tsx` to use `updateUserProfile()` from profileUtils (completed)
+10. ✅ Refactored `AccountSettings.tsx` (via dataLoader.ts) to use `updateUserProfile()` from profileUtils (completed)
+11. ⏳ Set up integration tests that verify dependencies (future)
 
 ---
 

@@ -1,3 +1,71 @@
+/**
+ * DEPENDENCY TRACKING
+ *
+ * WHAT THIS DEPENDS ON:
+ * - AuthContext (useAuth): Provides signUpWithEmail, signInWithEmail methods
+ *   → CRITICAL: Must use auth.signUpWithEmail() to ensure proper signup flow
+ *   → CRITICAL: AuthContext handles session management after signup
+ * - localStorage ('bf-pending-profile'): Stores signup data temporarily
+ *   → CRITICAL: Must save name, email, role, resident verification to this key
+ *   → CRITICAL: Key must be 'bf-pending-profile' (read by AuthContext and Onboarding.tsx)
+ *   → CRITICAL: Format must match: { name, email, role, is_bonita_resident, resident_verification_method, ... }
+ * - localStorage ('bf-return-url'): Stores redirect URL after signup/login
+ *   → CRITICAL: Used to redirect users after authentication
+ *   → CRITICAL: Must be removed after use to prevent stale redirects
+ * - residentVerification utils (verifyByZipCode, verifyBySelfDeclaration): Resident verification logic
+ *   → CRITICAL: Must return valid verification data matching VerificationMethod type
+ *   → CRITICAL: ZIP codes must match expected Bonita ZIP codes (91902, 91908, 91909)
+ * - Supabase auth: Provides password reset functionality
+ *   → CRITICAL: resetPasswordForEmail() must work for password reset flow
+ * - React Router (useNavigate, useLocation): Navigation after signup/login
+ *   → CRITICAL: Redirects to onboarding, account page, or saved return URL
+ *
+ * WHAT DEPENDS ON THIS:
+ * - Onboarding.tsx: Reads 'bf-pending-profile' from localStorage to get signup data
+ *   → CRITICAL: If localStorage format changes, Onboarding.tsx breaks
+ *   → CRITICAL: If localStorage key changes, Onboarding.tsx can't find signup data
+ * - AuthContext.tsx: Reads 'bf-pending-profile' during SIGNED_IN event
+ *   → CRITICAL: If localStorage format changes, auth context can't retrieve name/role
+ *   → CRITICAL: If localStorage key changes, signup data is lost
+ * - profileUtils.ts: getNameFromMultipleSources() reads from 'bf-pending-profile'
+ *   → CRITICAL: If localStorage key changes, name retrieval fails
+ * - All signup flows: Depend on correct localStorage format and key
+ *   → CRITICAL: Wrong format causes incomplete profiles in database
+ *
+ * BREAKING CHANGES:
+ * - If you change localStorage key ('bf-pending-profile') → Onboarding.tsx, AuthContext, profileUtils break
+ * - If you change localStorage format → Onboarding.tsx, AuthContext can't parse signup data
+ * - If you change auth.signUpWithEmail() API → Signup flow breaks
+ * - If you change resident verification format → Incomplete resident verification data saved
+ * - If you change redirect logic → Users land on wrong page after signup
+ *
+ * HOW TO SAFELY UPDATE:
+ * 1. Check ALL consumers of 'bf-pending-profile': grep -r "bf-pending-profile" src/
+ * 2. Verify localStorage format matches what Onboarding.tsx and AuthContext expect
+ * 3. Test complete signup flow: SignIn.tsx → Onboarding.tsx → Admin panel
+ * 4. Test business account signup (name, role, resident verification must be saved)
+ * 5. Test community account signup (name, role, resident verification must be saved)
+ * 6. Test OAuth signup flow (redirects correctly)
+ * 7. Test password reset flow (email sent correctly)
+ * 8. Verify admin panel shows complete profile data after signup
+ * 9. Check that 'bf-pending-profile' is removed after use (don't leave stale data)
+ *
+ * RELATED FILES:
+ * - src/contexts/AuthContext.tsx: Reads 'bf-pending-profile' during SIGNED_IN event
+ * - src/pages/Onboarding.tsx: Reads 'bf-pending-profile' to complete signup
+ * - src/utils/profileUtils.ts: getNameFromMultipleSources() reads from 'bf-pending-profile'
+ * - src/utils/residentVerification.ts: Provides verifyByZipCode() and verifyBySelfDeclaration()
+ * - docs/prevention/DATA_INTEGRITY_PREVENTION.md: Prevention guide for missing fields
+ *
+ * RECENT BREAKS:
+ * - Missing name during signup (2025-01-XX): localStorage format didn't include name
+ *   → Fix: Ensured name is always saved to 'bf-pending-profile'
+ *   → Lesson: Always include ALL fields (name, email, role, resident verification) in localStorage
+ *
+ * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
+
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useLocation, useNavigate } from 'react-router-dom'

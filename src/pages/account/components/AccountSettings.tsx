@@ -1,3 +1,66 @@
+/**
+ * DEPENDENCY TRACKING
+ *
+ * WHAT THIS DEPENDS ON:
+ * - dataLoader (updateProfile, loadEmailPreferences, updateEmailPreferences): Profile and email preference utilities
+ *   → CRITICAL: updateProfile() now uses updateUserProfile() from profileUtils to ensure ALL fields are saved
+ *   → CRITICAL: updateProfile() must save name to database correctly while preserving email and role
+ *   → CRITICAL: Email preferences utilities must handle email_notifications_enabled and marketing_emails_enabled
+ *   → CRITICAL: If updateProfile() breaks, profile updates fail
+ * - profileUtils (updateUserProfile): Centralized profile update utility
+ *   → CRITICAL: updateProfile() delegates to updateUserProfile() for actual database updates
+ *   → CRITICAL: Ensures ALL fields (name, email, role, resident verification) are preserved
+ * - AuthContext (indirect via Account.tsx): Provides userId, initialEmail, initialName
+ *   → CRITICAL: userId must be valid for profile updates
+ *   → CRITICAL: initialName is displayed and used for change detection
+ * - profiles table: Stores user profile data
+ *   → CRITICAL: updateProfile() updates profiles table with new name
+ *   → CRITICAL: Must have write access (RLS policies)
+ * - email_preferences table: Stores user email preferences
+ *   → CRITICAL: loadEmailPreferences() and updateEmailPreferences() manage preferences
+ *   → CRITICAL: Must have read/write access (RLS policies)
+ *
+ * WHAT DEPENDS ON THIS:
+ * - Account.tsx: Renders AccountSettings component
+ *   → CRITICAL: If AccountSettings breaks, account page doesn't work
+ * - All users updating profiles: Depend on updateProfile() working correctly
+ *   → CRITICAL: If profile updates fail, users can't change their name
+ *   → CRITICAL: If email preferences fail, users can't manage email settings
+ *
+ * BREAKING CHANGES:
+ * - If you change profileUtils.updateUserProfile() API → Profile updates fail
+ * - If you change updateProfile() API → Profile updates fail
+ * - If you change email preferences API → Email preference updates fail
+ * - If you change dataLoader structure → All profile updates break
+ * - If you remove name change detection → Users can't see when changes are saved
+ * - If you change RLS policies → Profile updates fail silently
+ *
+ * HOW TO SAFELY UPDATE:
+ * 1. Check dataLoader functions: grep -r "updateProfile\|loadEmailPreferences\|updateEmailPreferences" src/
+ * 2. Verify profile update works: Test name change in account settings
+ * 3. Verify email preferences work: Test toggling email notifications
+ * 4. Test RLS policies allow profile updates
+ * 5. Test that auth context refreshes after profile update (window.location.reload())
+ * 6. Verify admin panel shows updated name after change
+ * 7. Check console for errors during profile updates
+ *
+ * RELATED FILES:
+ * - src/pages/account/dataLoader.ts: Provides updateProfile(), loadEmailPreferences(), updateEmailPreferences()
+ *   → updateProfile() now uses updateUserProfile() from profileUtils.ts
+ * - src/pages/Account.tsx: Renders AccountSettings component
+ * - src/contexts/AuthContext.tsx: Provides userId and initial name for AccountSettings
+ * - src/utils/profileUtils.ts: Provides updateUserProfile() (used by updateProfile())
+ *
+ * RECENT BREAKS:
+ * - Profile updates missing fields: updateProfile() only updated name, not all fields
+ *   → Fix: Refactored updateProfile() to use updateUserProfile() from profileUtils.ts
+ *   → Result: ALL fields (name, email, role, resident verification) are now preserved during updates
+ *   → Lesson: Use centralized profile update utilities to prevent missing fields
+ *
+ * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
+
 import { useState, useEffect } from 'react'
 import { updateProfile, loadEmailPreferences, updateEmailPreferences } from '../dataLoader'
 

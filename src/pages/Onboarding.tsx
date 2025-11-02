@@ -1,3 +1,80 @@
+/**
+ * DEPENDENCY TRACKING
+ *
+ * WHAT THIS DEPENDS ON:
+ * - Supabase auth (../lib/supabase): Provides session management and password updates
+ *   → CRITICAL: Must have valid session before allowing onboarding
+ *   → CRITICAL: Must have session.user.email and session.user.id for profile updates
+ *   → CRITICAL: Password update via supabase.auth.updateUser() must succeed
+ * - profileUtils (updateUserProfile, getNameFromMultipleSources): Centralized profile update utility
+ *   → CRITICAL: updateUserProfile() ensures ALL fields (name, email, role, resident verification) are saved
+ *   → CRITICAL: getNameFromMultipleSources() retrieves name from localStorage or auth metadata
+ *   → CRITICAL: If profileUtils breaks, profile updates fail and incomplete profiles are saved
+ * - localStorage ('bf-pending-profile'): Stores signup data temporarily during signup flow
+ *   → CRITICAL: Must contain name, email, role if user came from SignIn.tsx
+ *   → CRITICAL: Key must match 'bf-pending-profile' (used by SignIn.tsx and profileUtils)
+ * - localStorage ('bf-return-url'): Stores redirect URL after onboarding
+ *   → CRITICAL: If present, redirects to saved URL after completion
+ *   → CRITICAL: Must be removed after use to prevent stale redirects
+ * - residentVerification utils (verifyByZipCode, verifyBySelfDeclaration): Resident verification logic
+ *   → CRITICAL: Must return valid verification results matching VerificationMethod type
+ *   → CRITICAL: ZIP codes must match expected Bonita ZIP codes (91902, 91908, 91909)
+ * - React Router (useNavigate): Navigation after onboarding completion
+ *   → CRITICAL: Redirects to '/signin' if no session, or to saved URL/role-based URL after completion
+ *
+ * WHAT DEPENDS ON THIS:
+ * - SignIn.tsx → Onboarding.tsx flow: Business account signup depends on this page
+ *   → CRITICAL: If onboarding fails, business users can't complete signup
+ *   → CRITICAL: If profile isn't saved correctly, admin panel shows incomplete data
+ * - App.tsx routing: '/onboarding' route renders this page
+ *   → CRITICAL: If this page breaks, onboarding flow is blocked
+ * - AuthContext.tsx (indirect): Depends on profile data saved here
+ *   → CRITICAL: Profile saved here is displayed in auth.name, auth.role
+ *   → CRITICAL: If profile is incomplete, auth context shows missing data
+ * - Admin panel (indirect): Displays profiles saved during onboarding
+ *   → CRITICAL: If name/role/resident verification isn't saved, admin sees incomplete profiles
+ *
+ * BREAKING CHANGES:
+ * - If you change profileUtils.updateUserProfile() API → Profile updates fail
+ * - If you change localStorage key ('bf-pending-profile') → Name can't be retrieved
+ * - If you change residentVerification API → Verification data format breaks
+ * - If you change password requirements → Validation fails
+ * - If you change redirect logic → Users land on wrong page after onboarding
+ * - If you remove name retrieval → Profiles saved without name (admin shows "No name provided")
+ *
+ * HOW TO SAFELY UPDATE:
+ * 1. Check ALL dependencies: grep -r "updateUserProfile\|getNameFromMultipleSources\|verifyByZipCode\|verifyBySelfDeclaration" src/
+ * 2. Verify localStorage keys match: 'bf-pending-profile' and 'bf-return-url'
+ * 3. Test complete signup flow: SignIn.tsx → Onboarding.tsx → Admin panel
+ * 4. Test business account signup (name, role, password must be saved)
+ * 5. Test community account signup (name, role, password must be saved)
+ * 6. Test resident verification (all verification fields must be saved)
+ * 7. Test OAuth signup flow (auth metadata must provide name)
+ * 8. Test redirect logic (saved URL, role-based URL, default URL)
+ * 9. Verify admin panel shows complete profile data after onboarding
+ * 10. Check console for validation warnings during profile updates
+ *
+ * RELATED FILES:
+ * - src/pages/SignIn.tsx: Saves data to localStorage ('bf-pending-profile') before redirecting here
+ * - src/utils/profileUtils.ts: Provides updateUserProfile() and getNameFromMultipleSources()
+ * - src/utils/residentVerification.ts: Provides verifyByZipCode() and verifyBySelfDeclaration()
+ * - src/contexts/AuthContext.tsx: Displays profile data saved during onboarding
+ * - src/pages/Admin.tsx: Shows profiles saved during onboarding in admin panel
+ * - src/App.tsx: Routes '/onboarding' to this page
+ * - docs/prevention/DATA_INTEGRITY_PREVENTION.md: Prevention guide for missing fields
+ *
+ * RECENT BREAKS:
+ * - Missing name during business signup (2025-01-XX): Wasn't using updateUserProfile()
+ *   → Fix: Updated to use updateUserProfile() and getNameFromMultipleSources()
+ *   → Lesson: Always use profileUtils for profile updates to ensure field completeness
+ * - Incomplete profiles in admin panel: Missing name, role, or resident verification
+ *   → Fix: Use updateUserProfile() to ensure ALL fields are included
+ *   → Lesson: Centralized profile updates prevent missing fields
+ *
+ * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
+
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'

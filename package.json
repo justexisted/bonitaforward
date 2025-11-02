@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "check:breaking": "tsx scripts/check-breaking-changes.ts",
+    "precommit": "npm run check:breaking && npm run lint",
     "seed:providers": "tsx scripts/seed-providers.ts",
     "seed:realty": "tsx scripts/seed-realty-report.ts",
     "seed:calendar": "tsx scripts/seed-calendar-events.ts",

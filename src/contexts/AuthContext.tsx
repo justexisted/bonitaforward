@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { updateUserProfile, getNameFromMultipleSources } from '../utils/profileUtils'
 
 // ============================================================================
 // AUTH CONTEXT TYPES
@@ -113,7 +114,8 @@ function clearLocalAuthData(): void {
  *   → CRITICAL: Session state changes trigger profile updates
  * - profiles table: Stores user profile data (name, role, resident verification)
  *   → CRITICAL: Must save name BEFORE reading it during signup (async order matters)
- * - ensureProfile(): Saves profile data to database
+ * - profileUtils (updateUserProfile, getNameFromMultipleSources): Centralized profile update utility
+ *   → CRITICAL: ensureProfile() now uses updateUserProfile() to ensure ALL fields are saved
  *   → CRITICAL: Must be called FIRST during signup, THEN fetch profile
  * 
  * WHAT DEPENDS ON THIS:
@@ -124,6 +126,7 @@ function clearLocalAuthData(): void {
  * - All pages: Use auth.isAuthed, auth.email, auth.userId
  * 
  * BREAKING CHANGES:
+ * - If you change profileUtils.updateUserProfile() API → Profile updates fail
  * - If you change ensureProfile() order → name won't display after signup
  * - If you change localStorage key → signup data won't be found
  * - If you change auth state structure → ALL consumers break
@@ -138,6 +141,7 @@ function clearLocalAuthData(): void {
  * 
  * RELATED FILES:
  * - src/pages/SignIn.tsx: Saves data to localStorage during signup
+ * - src/utils/profileUtils.ts: Provides updateUserProfile() and getNameFromMultipleSources()
  * - src/hooks/useAdminDataLoader.ts: Depends on auth.email for loading admin data
  * - src/pages/Admin.tsx: Displays auth.name in greeting
  * - src/components/admin/sections/ResidentVerificationSection.tsx: Depends on profiles from admin data
@@ -145,6 +149,9 @@ function clearLocalAuthData(): void {
  * RECENT BREAKS:
  * - Name display after signup (2025-01-XX): Fixed async order (save before read)
  * - Resident verification empty: Was affected by auth flow changes
+ * - Missing fields in profile updates (2025-01-XX): Refactored to use updateUserProfile() from profileUtils
+ *   → Fix: ensureProfile() now uses updateUserProfile() to ensure ALL fields are included
+ *   → Lesson: Use centralized profile update utilities to prevent missing fields
  * 
  * See: docs/prevention/ASYNC_FLOW_PREVENTION.md
  * See: docs/prevention/CASCADING_FAILURES.md
@@ -162,6 +169,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Helper: ensure a profile row exists with role/name
     // CRITICAL FIX: Use separate INSERT/UPDATE instead of upsert to avoid RLS 403 errors
+    /**
+     * REFACTORED: Uses updateUserProfile() from profileUtils to ensure ALL fields are saved
+     * 
+     * This function now uses the centralized profile update utility which:
+     * - Ensures ALL fields are included (name, email, role, resident verification)
+     * - Validates data before saving
+     * - Handles INSERT vs UPDATE automatically
+     * - Prevents missing fields during profile updates
+     * 
+     * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
+     */
     async function ensureProfile(userId?: string | null, email?: string | null, name?: string | null, metadataRole?: any) {
       if (!userId || !email) return
       try {
@@ -209,18 +227,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role = metadataRole
         }
         
-        // Check if profile already exists to avoid RLS issues with upsert
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', userId)
-          .maybeSingle()
+        // CRITICAL: Get name from multiple sources if not provided
+        // This ensures we have a name during signup even if not in localStorage
+        if (!name && email) {
+          // Try to get name from localStorage or auth metadata
+          // We don't have authUser here, so we'll use getNameFromMultipleSources with just email
+          try {
+            const nameFromStorage = await getNameFromMultipleSources(email)
+            if (nameFromStorage) {
+              name = nameFromStorage
+            }
+          } catch {
+            // Name retrieval failed, continue with null name
+          }
+        }
         
-        const updatePayload: any = {
-          email,
-          name: name || null,
-          role: role || metadataRole || null,
-          ...residentVerification
+        // Use centralized updateUserProfile utility to ensure ALL fields are saved
+        // This prevents missing fields like name or resident verification from being omitted
+        const result = await updateUserProfile(
+          userId,
+          {
+            email,
+            name: name || null,
+            role: role || metadataRole || null,
+            ...residentVerification
+          },
+          'auth-context'
+        )
+        
+        if (!result.success) {
+          console.error('[Auth] Error updating profile:', result.error)
+          console.error('[Auth] Profile data was:', { email, name, role, residentVerification })
+          return
         }
         
         // Log resident verification data for debugging
@@ -233,85 +271,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[Auth] Saving name to profile:', name)
         }
         
-        if (existingProfile) {
-          // Profile exists - use UPDATE
-          // Don't use .select() immediately after update - it can fail due to RLS
-          // Instead, verify with a separate query if needed
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update(updatePayload)
-            .eq('id', userId)
-          
-          if (updateError) {
-            console.error('[Auth] Error updating profile:', updateError)
-            console.error('[Auth] Update payload was:', updatePayload)
-            return
+        // CRITICAL FIX: Refresh profile state after update so name is immediately available
+        const profileData = await fetchUserProfile(userId)
+        if (profileData.name) {
+          if (mounted) {
+            setProfile(prev => ({ ...prev, name: profileData.name }))
+            profileRef.current = { ...profileRef.current, name: profileData.name } as any
           }
-          
-          // CRITICAL FIX: Refresh profile state after update so name is immediately available
-          const profileData = await fetchUserProfile(userId)
-          if (profileData.name) {
-            if (mounted) {
-              setProfile(prev => ({ ...prev, name: profileData.name }))
-              profileRef.current = { ...profileRef.current, name: profileData.name } as any
-            }
-          }
-          
-          // Verify update with a separate query (small delay for eventual consistency)
-          setTimeout(async () => {
-            const { data: verifyData } = await supabase
-              .from('profiles')
-              .select('is_bonita_resident, resident_verification_method, resident_zip_code')
-              .eq('id', userId)
-              .maybeSingle()
-            
-            if (verifyData) {
-              console.log('[Auth] Profile update verified:', verifyData)
-            } else {
-              console.warn('[Auth] Profile update verification returned no data')
-            }
-          }, 500)
-        } else {
-          // Profile doesn't exist - use INSERT
-          const insertPayload: any = {
-            id: userId,
-            ...updatePayload
-          }
-          
-          // Don't use .select() immediately after insert - it can fail due to RLS
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert(insertPayload)
-          
-          if (insertError) {
-            console.error('[Auth] Error creating profile:', insertError)
-            console.error('[Auth] Insert payload was:', insertPayload)
-            return
-          }
-          
-          // CRITICAL FIX: Refresh profile state after insert so name is immediately available
-          const profileData = await fetchUserProfile(userId)
-          if (profileData.name) {
-            if (mounted) {
-              setProfile(prev => ({ ...prev, name: profileData.name }))
-              profileRef.current = { ...profileRef.current, name: profileData.name } as any
-            }
-          }
-          
-          // Verify insert with a separate query (small delay for eventual consistency)
-          setTimeout(async () => {
-            const { data: verifyData } = await supabase
-              .from('profiles')
-              .select('is_bonita_resident, resident_verification_method, resident_zip_code')
-              .eq('id', userId)
-              .maybeSingle()
-            
-            if (verifyData) {
-              console.log('[Auth] Profile creation verified:', verifyData)
-            } else {
-              console.warn('[Auth] Profile creation verification returned no data')
-            }
-          }, 500)
         }
         
         // Clear pending profile data after successful save

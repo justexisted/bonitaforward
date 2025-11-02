@@ -186,6 +186,67 @@ const smokeTests = [
 
 ---
 
+### 7. **State Reset During Navigation** ⭐ RACE CONDITION BUG
+
+**What:** Checking state values in wrong order causes logout during navigation.
+
+**Example Failure:**
+```typescript
+// WRONG: Checking !auth.email BEFORE auth.loading
+if (!auth.email) {
+  setAdminStatus({ isAdmin: false }) // ❌ Logs out during navigation!
+  return
+}
+if (auth.loading) {
+  return // Too late - already set to false!
+}
+```
+
+**What Happened:**
+1. User navigates from admin page → provider page
+2. During React navigation, `auth.email` temporarily becomes `undefined`
+3. Hook checks `!auth.email` FIRST → immediately sets admin to `false`
+4. This happens BEFORE checking if auth is still loading
+5. Result: User gets logged out even though they're still authenticated
+
+**The Fix:**
+```typescript
+// CORRECT: Check loading FIRST, preserve verified status
+if (auth.loading) {
+  return // ✅ Preserve current state during loading
+}
+if (adminStatus.verified && adminStatus.isAdmin && auth.email) {
+  return // ✅ Already verified, skip re-verification
+}
+if (!auth.email) {
+  if (adminStatus.verified && adminStatus.isAdmin) {
+    return // ✅ Preserve verified status during temporary email loss
+  }
+  setAdminStatus({ isAdmin: false }) // Only set false if not verified
+  return
+}
+```
+
+**Prevention Checklist:**
+- ✅ ALWAYS check loading state FIRST before checking values
+- ✅ ALWAYS preserve verified/authenticated state during temporary value loss
+- ✅ Test navigation between pages (admin → provider, provider → admin)
+- ✅ Test during auth state transitions (login, logout, refresh)
+- ✅ Never reset state without checking if it's already verified/authenticated
+
+**Rule of Thumb:**
+> **When checking state values, check in this order:**
+> 1. Loading state (preserve current state)
+> 2. Verified/authenticated state (preserve if verified)
+> 3. Actual values (only set to false if not verified)
+
+**Files to Watch:**
+- `src/hooks/useAdminVerification.ts` - Admin verification
+- `src/contexts/AuthContext.tsx` - Auth state management
+- Any hook checking auth state during navigation
+
+---
+
 ## How to Prevent This (Action Plan)
 
 ### Immediate (5 minutes after EVERY change):
@@ -205,6 +266,8 @@ const smokeTests = [
    - [ ] Can admin view resident verification?
    - [ ] Does name display correctly?
    - [ ] Do other admin sections work?
+   - [ ] **Can admin navigate between pages without getting logged out?** ⭐ NEW
+   - [ ] **Does admin status persist during navigation?** ⭐ NEW
 
 3. **Manual Testing**
    - Actually USE the app after every change
