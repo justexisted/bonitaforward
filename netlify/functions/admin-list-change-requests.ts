@@ -23,22 +23,10 @@ export const handler: Handler = async (event) => {
     console.log('[admin-list-change-requests] Admin user:', email)
 
     // Fetch change requests using service role (bypasses RLS)
+    // Table: provider_change_requests (columns: id, provider_id, owner_user_id, type, changes, status, reason, created_at, decided_at)
     const { data: changeRequests, error: changeRequestsError } = await supabaseClient
-      .from('owner_change_requests')
-      .select(`
-        id,
-        provider_id,
-        requested_by_email,
-        requested_by_name,
-        current_owner_email,
-        current_owner_name,
-        new_owner_email,
-        new_owner_name,
-        status,
-        reason,
-        created_at,
-        updated_at
-      `)
+      .from('provider_change_requests')
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (changeRequestsError) {
@@ -46,13 +34,11 @@ export const handler: Handler = async (event) => {
       return errorResponse(500, 'Failed to fetch change requests', changeRequestsError.message)
     }
 
-    // Enrich change requests with provider and profile data
+    // Enrich change requests with provider and owner profile data
     const enrichedRequests = await Promise.all(
-      (changeRequests || []).map(async (request) => {
+      (changeRequests || []).map(async (request: any) => {
         let providerInfo = null
-        let requestedByProfile = null
-        let currentOwnerProfile = null
-        let newOwnerProfile = null
+        let ownerProfile = null
 
         // Fetch provider information
         if (request.provider_id) {
@@ -65,45 +51,21 @@ export const handler: Handler = async (event) => {
           if (provider) providerInfo = provider
         }
 
-        // Fetch requested by profile
-        if (request.requested_by_email) {
+        // Fetch owner profile (the user who made the request)
+        if (request.owner_user_id) {
           const { data: profile } = await supabaseClient
             .from('profiles')
             .select('id, email, name, role')
-            .eq('email', request.requested_by_email)
+            .eq('id', request.owner_user_id)
             .maybeSingle()
           
-          if (profile) requestedByProfile = profile
-        }
-
-        // Fetch current owner profile
-        if (request.current_owner_email) {
-          const { data: profile } = await supabaseClient
-            .from('profiles')
-            .select('id, email, name, role')
-            .eq('email', request.current_owner_email)
-            .maybeSingle()
-          
-          if (profile) currentOwnerProfile = profile
-        }
-
-        // Fetch new owner profile
-        if (request.new_owner_email) {
-          const { data: profile } = await supabaseClient
-            .from('profiles')
-            .select('id, email, name, role')
-            .eq('email', request.new_owner_email)
-            .maybeSingle()
-          
-          if (profile) newOwnerProfile = profile
+          if (profile) ownerProfile = profile
         }
 
         return {
           ...request,
           provider: providerInfo,
-          requested_by: requestedByProfile,
-          current_owner: currentOwnerProfile,
-          new_owner: newOwnerProfile
+          owner: ownerProfile
         }
       })
     )
