@@ -23,7 +23,7 @@ export const CustomerUsersSection: React.FC<CustomerUsersSectionProps> = ({
   businessEmails,
   deletingCustomerEmail,
   onSetDeletingCustomerEmail,
-  onDeleteCustomerUser,
+  onDeleteCustomerUser: _onDeleteCustomerUser, // Prefixed: Intentionally unused (deleteCustomerUserByEmail is used instead)
   deleteCustomerUserByEmail
 }) => {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())

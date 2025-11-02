@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 // iCalendar parsing moved to server-side Netlify function for reliability
 // import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '../lib/icalParser'
@@ -587,10 +587,27 @@ export default function AdminPage() {
                   const profile = profiles.find(p => AdminHelpers.normalizeEmail(p.email) === AdminHelpers.normalizeEmail(email))
                   if (profile?.id) {
                     // User has a profile - delete everything including auth user
-                    await UserUtils.deleteUser(profile.id, profiles, setMessage, setError, setDeletingUserId, setProfiles, setFunnels, setBookings)
+                    await UserUtils.deleteUser(
+                      profile.id, 
+                      profiles, 
+                      setMessage, 
+                      setError, 
+                      setDeletingUserId, 
+                      setProfiles as React.Dispatch<React.SetStateAction<any[]>>, 
+                      setFunnels as React.Dispatch<React.SetStateAction<any[]>>, 
+                      setBookings as React.Dispatch<React.SetStateAction<any[]>>
+                    )
                   } else {
                     // User only exists in funnels/bookings/booking_events - delete email-keyed data only
-                    await UserUtils.deleteUserByEmailOnly(email, setMessage, setError, setDeletingCustomerEmail, setFunnels, setBookings, setBookingEvents)
+                    await UserUtils.deleteUserByEmailOnly(
+                      email, 
+                      setMessage, 
+                      setError, 
+                      setDeletingCustomerEmail, 
+                      setFunnels as React.Dispatch<React.SetStateAction<any[]>>, 
+                      setBookings as React.Dispatch<React.SetStateAction<any[]>>, 
+                      setBookingEvents as React.Dispatch<React.SetStateAction<any[]>>
+                    )
                   }
                 }}
               />
