@@ -1,4 +1,5 @@
 import type { AdminSection } from '../../types/admin'
+import type { CustomerUser } from '../../utils/adminHelpers'
 
 // ============================================================================
 // ADMIN HEADER COMPONENT
@@ -24,7 +25,7 @@ import type { AdminSection } from '../../types/admin'
  * @param adminStatus - Admin verification status details
  * @param selectedUser - Currently selected user filter (null = all users)
  * @param section - Currently active admin section
- * @param customerUsers - List of customer user emails for filtering
+ * @param customerUsers - List of customer user objects for filtering
  * @param onUserChange - Callback when user filter changes
  * @param onSectionChange - Callback when section changes
  */
@@ -37,7 +38,7 @@ export interface AdminHeaderProps {
   }
   selectedUser: string | null
   section: AdminSection
-  customerUsers: string[]
+  customerUsers: CustomerUser[]
   onUserChange: (user: string | null) => void
   onSectionChange: (section: AdminSection) => void
 }
@@ -78,9 +79,9 @@ export function AdminHeader({
               aria-label="Filter by user"
             >
               <option value="">All users</option>
-              {customerUsers.map((email) => (
-                <option key={email} value={email}>
-                  {email}
+              {customerUsers.map((user) => (
+                <option key={user.email} value={user.email}>
+                  {user.name ? `${user.name} (${user.email})` : user.email}
                 </option>
               ))}
             </select>

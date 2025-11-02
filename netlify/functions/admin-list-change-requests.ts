@@ -1,3 +1,42 @@
+/**
+ * DEPENDENCY TRACKING
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - verifyAuthAndAdmin(): Verifies user is authenticated and admin
+ *   → CRITICAL: Must return supabaseClient with service role key
+ * - provider_change_requests table: NOT owner_change_requests!
+ *   → CRITICAL: Table name is provider_change_requests (not owner_change_requests)
+ * - utils/response: Standardized response format
+ *   → CRITICAL: Returns { success: true, ok: true, requests: [...] }
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - Admin.tsx: Loads change requests via DataLoadingUtils.loadChangeRequests()
+ * - ChangeRequestsSection: Displays change requests from Admin.tsx
+ * 
+ * BREAKING CHANGES:
+ * - If you use wrong table name → 500 error "table not found"
+ * - If you change response format → DataLoadingUtils won't find requests
+ * - If table schema changes → Query fails or returns wrong data
+ * 
+ * HOW TO SAFELY UPDATE:
+ * 1. Verify table name is provider_change_requests (NOT owner_change_requests)
+ * 2. Check table schema matches query fields
+ * 3. Verify response format matches DataLoadingUtils expectations
+ * 4. Test Admin.tsx still loads change requests
+ * 5. Test ChangeRequestsSection still displays data
+ * 
+ * RELATED FILES:
+ * - src/utils/adminDataLoadingUtils.ts: loadChangeRequests() calls this
+ * - src/pages/Admin.tsx: Uses loadChangeRequests() from DataLoadingUtils
+ * - src/components/admin/sections/ChangeRequestsSection-2025-10-19.tsx: Displays data
+ * 
+ * RECENT BREAKS:
+ * - Wrong table name (2025-01-XX): Used owner_change_requests instead of provider_change_requests
+ *   → Fix: Changed to provider_change_requests (correct table name)
+ * 
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
+
 import { Handler } from '@netlify/functions'
 import { verifyAuthAndAdmin, authAdminErrorResponse } from './utils/authAdmin'
 import { errorResponse, successResponse, handleOptions } from './utils/response'

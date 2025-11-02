@@ -42,6 +42,44 @@ type ProfileRow = {
 }
 
 /**
+ * DEPENDENCY TRACKING
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - admin-delete-user Netlify function: Handles actual deletion
+ *   → CRITICAL: Response format must be { success: true, ok: true, ... }
+ * - AuthContext: Provides session token for API call
+ *   → CRITICAL: Must have valid session.access_token
+ * - successResponse() utility: Standardized response format
+ *   → CRITICAL: MUST include both success and ok fields
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - Admin.tsx: Calls deleteUser() when admin deletes user
+ * - UsersSection: Calls deleteUser() from Admin.tsx
+ * 
+ * BREAKING CHANGES:
+ * - If admin-delete-user response format changes → This function won't recognize success
+ * - If session token format changes → API call fails
+ * - If you change function name → This breaks
+ * 
+ * HOW TO SAFELY UPDATE:
+ * 1. Check admin-delete-user response format first
+ * 2. Verify successResponse() includes both success and ok
+ * 3. Test response parsing handles both formats
+ * 4. Test Admin UI still works
+ * 
+ * RELATED FILES:
+ * - netlify/functions/admin-delete-user.ts: Backend endpoint
+ * - netlify/functions/utils/response.ts: Response format utility
+ * - src/pages/Admin.tsx: Uses this function
+ * 
+ * RECENT BREAKS:
+ * - API response format (2025-01-XX): Changed from { ok: true } to { success: true }
+ *   → Fix: Check both result.success === true || result.ok === true
+ * 
+ * See: docs/prevention/API_CONTRACT_PREVENTION.md
+ */
+
+/**
  * DELETE USER
  * 
  * Deletes a user and all their associated data using Netlify function.

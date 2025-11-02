@@ -320,6 +320,7 @@ export default function AdminPage() {
 
   // REFACTORED: Moved to adminHelpers.ts
   // Customer users: emails present in funnels/bookings/booking_events/profiles, excluding business owner emails
+  // Returns full user objects with name, role, account type, and data sources
   const customerUsers = useMemo(() => 
     AdminHelpers.getCustomerUsers(funnels, bookings, bookingEvents, profiles, businessEmails), 
     [funnels, bookings, bookingEvents, profiles, businessEmails]
@@ -592,7 +593,16 @@ export default function AdminPage() {
                 businessEmails={businessEmails}
                 deletingCustomerEmail={deletingCustomerEmail}
                 onSetDeletingCustomerEmail={setDeletingCustomerEmail}
-                onDeleteCustomerUser={deleteCustomerUser}
+                onDeleteCustomerUser={deleteUser}
+                deleteCustomerUserByEmail={async (email: string) => {
+                  // Find user ID from profiles
+                  const profile = profiles.find(p => AdminHelpers.normalizeEmail(p.email) === AdminHelpers.normalizeEmail(email))
+                  if (profile?.id) {
+                    await deleteUser(profile.id)
+                  } else {
+                    setError(`User not found for email: ${email}. User may only exist in funnels/bookings without a profile.`)
+                  }
+                }}
               />
             </AdminErrorBoundary>
           )}

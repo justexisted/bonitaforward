@@ -1,4 +1,42 @@
 /**
+ * DEPENDENCY TRACKING
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - SupabaseClient: Must have service role key for admin operations
+ *   → CRITICAL: Uses service role to bypass RLS
+ * - profiles table: Structure must match deletion logic
+ *   → CRITICAL: Deletes profile by user_id
+ * - Other tables: funnel_responses, bookings, provider_change_requests, etc.
+ *   → CRITICAL: Deletion order matters - related data FIRST, auth user LAST
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - admin-delete-user.ts: Uses this utility for admin user deletion
+ * - user-delete.ts: Uses this utility for self-deletion
+ *   → CRITICAL: Both must use same deletion order
+ * 
+ * BREAKING CHANGES:
+ * - If you change deletion order → Foreign key constraint errors
+ * - If table schema changes → Deletion queries fail
+ * - If you remove this utility → Both admin-delete-user and user-delete break
+ * 
+ * HOW TO SAFELY UPDATE:
+ * 1. Test deletion order is correct (related data → auth user)
+ * 2. Test both admin-delete-user and user-delete
+ * 3. Verify all related tables are handled
+ * 4. Check for foreign key constraints that might block deletion
+ * 
+ * RELATED FILES:
+ * - netlify/functions/admin-delete-user.ts: Admin deletion endpoint
+ * - netlify/functions/user-delete.ts: Self-deletion endpoint
+ * 
+ * RECENT BREAKS:
+ * - User deletion failing (2025-01-XX): Wrong deletion order
+ *   → Fix: Created this shared utility to ensure correct order
+ * 
+ * See: docs/prevention/ASYNC_FLOW_PREVENTION.md
+ */
+
+/**
  * Shared utility for user deletion logic
  * 
  * CRITICAL: Always delete related data BEFORE deleting the auth user

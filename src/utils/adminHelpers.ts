@@ -210,7 +210,7 @@ export function getBusinessEmails(profiles: ProfileRow[]): Set<string> {
 /**
  * GET CUSTOMER USERS
  * 
- * Returns a sorted array of customer user emails.
+ * Returns a sorted array of customer user objects with profile information.
  * Collects emails from:
  * - Funnel responses
  * - Bookings
@@ -218,44 +218,115 @@ export function getBusinessEmails(profiles: ProfileRow[]): Set<string> {
  * - Profiles (non-business users)
  * 
  * Excludes business owner emails.
+ * 
+ * Returns array of user objects with:
+ * - email: User email
+ * - name: User name from profile
+ * - role: User role from profile ('business', 'community', null)
+ * - accountType: 'customer' | 'business' | 'unknown'
+ * - dataSources: Array of where this email was found ('funnels', 'bookings', 'booking_events', 'profiles')
+ * - profileId: User's profile ID if found in profiles
  */
+export interface CustomerUser {
+  email: string
+  name: string | null
+  role: string | null
+  accountType: 'customer' | 'business' | 'unknown'
+  dataSources: string[]
+  profileId: string | null
+}
+
 export function getCustomerUsers(
   funnels: FunnelRow[],
   bookings: BookingRow[],
   bookingEvents: BookingEvent[],
   profiles: ProfileRow[],
   businessEmails: Set<string>
-): string[] {
-  const set = new Set<string>()
+): CustomerUser[] {
+  const userMap = new Map<string, CustomerUser>()
+  
+  // Helper to get or create user object
+  const getOrCreateUser = (email: string): CustomerUser => {
+    const normalized = normalizeEmail(email)
+    if (!userMap.has(normalized)) {
+      userMap.set(normalized, {
+        email: normalized,
+        name: null,
+        role: null,
+        accountType: 'unknown',
+        dataSources: [],
+        profileId: null
+      })
+    }
+    return userMap.get(normalized)!
+  }
   
   // Add users from funnel responses
   funnels.forEach((f) => { 
     const e = normalizeEmail(f.user_email)
-    if (e) set.add(e)
+    if (e && !businessEmails.has(e)) {
+      const user = getOrCreateUser(e)
+      if (!user.dataSources.includes('funnels')) {
+        user.dataSources.push('funnels')
+      }
+    }
   })
   
   // Add users from bookings
   bookings.forEach((b) => { 
     const e = normalizeEmail(b.user_email)
-    if (e) set.add(e)
+    if (e && !businessEmails.has(e)) {
+      const user = getOrCreateUser(e)
+      if (!user.dataSources.includes('bookings')) {
+        user.dataSources.push('bookings')
+      }
+    }
   })
   
   // Add users from booking events
   bookingEvents.forEach((be) => { 
     const e = normalizeEmail(be.customer_email)
-    if (e) set.add(e)
+    if (e && !businessEmails.has(e)) {
+      const user = getOrCreateUser(e)
+      if (!user.dataSources.includes('booking_events')) {
+        user.dataSources.push('booking_events')
+      }
+    }
   })
   
-  // Add users from profiles (non-business users)
+  // Add users from profiles and enrich with profile data
   profiles.forEach((p) => { 
     const e = normalizeEmail(p.email)
-    if (e && p.role !== 'business') set.add(e)
+    if (e && !businessEmails.has(e)) {
+      const user = getOrCreateUser(e)
+      if (!user.dataSources.includes('profiles')) {
+        user.dataSources.push('profiles')
+      }
+      // Enrich with profile data
+      user.name = p.name || null
+      user.role = p.role || null
+      user.profileId = p.id || null
+      
+      // Determine account type
+      if (p.role === 'business') {
+        user.accountType = 'business'
+      } else if (p.role === 'community') {
+        user.accountType = 'customer'
+      } else {
+        user.accountType = 'unknown'
+      }
+    }
   })
   
-  // Filter out business emails and sort
-  return Array.from(set)
-    .filter((e) => !businessEmails.has(normalizeEmail(e)))
-    .sort()
+  // Filter out business emails (safety check)
+  // NOTE: Users with role='business' may still appear if they're found in funnels/bookings
+  // but not in businessEmails set. They will be marked as 'business' account type and
+  // shown with a warning in the UI so admins can investigate why they're in customer list.
+  const filtered = Array.from(userMap.values())
+    .filter((u) => !businessEmails.has(normalizeEmail(u.email)))
+  
+  // Sort by email
+  return filtered.sort((a, b) => a.email.localeCompare(b.email))
 }
 
 /**

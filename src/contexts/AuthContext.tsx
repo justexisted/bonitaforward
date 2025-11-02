@@ -103,6 +103,52 @@ function clearLocalAuthData(): void {
 // AUTH PROVIDER COMPONENT
 // ============================================================================
 
+/**
+ * DEPENDENCY TRACKING
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - localStorage ('bf-pending-profile'): Stores signup data (name, role, resident verification)
+ *   → CRITICAL: Must read from localStorage during signup before saving to database
+ * - Supabase auth: Provides user sessions and auth events
+ *   → CRITICAL: Session state changes trigger profile updates
+ * - profiles table: Stores user profile data (name, role, resident verification)
+ *   → CRITICAL: Must save name BEFORE reading it during signup (async order matters)
+ * - ensureProfile(): Saves profile data to database
+ *   → CRITICAL: Must be called FIRST during signup, THEN fetch profile
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - Admin.tsx: Uses auth.name for display ("Hi, {name}")
+ * - Account.tsx: Uses auth.name for account settings
+ * - useAdminDataLoader: Uses auth.email to load admin data
+ * - ResidentVerificationSection: Uses profiles from admin data (depends on auth flow)
+ * - All pages: Use auth.isAuthed, auth.email, auth.userId
+ * 
+ * BREAKING CHANGES:
+ * - If you change ensureProfile() order → name won't display after signup
+ * - If you change localStorage key → signup data won't be found
+ * - If you change auth state structure → ALL consumers break
+ * - If you change async order → name/profile won't be available immediately
+ * 
+ * HOW TO SAFELY UPDATE:
+ * 1. Check all files that use auth.name, auth.email, auth.userId
+ * 2. Verify async operation order (save → read)
+ * 3. Test signup flow end-to-end
+ * 4. Test admin page still loads profiles
+ * 5. Test resident verification still works
+ * 
+ * RELATED FILES:
+ * - src/pages/SignIn.tsx: Saves data to localStorage during signup
+ * - src/hooks/useAdminDataLoader.ts: Depends on auth.email for loading admin data
+ * - src/pages/Admin.tsx: Displays auth.name in greeting
+ * - src/components/admin/sections/ResidentVerificationSection.tsx: Depends on profiles from admin data
+ * 
+ * RECENT BREAKS:
+ * - Name display after signup (2025-01-XX): Fixed async order (save before read)
+ * - Resident verification empty: Was affected by auth flow changes
+ * 
+ * See: docs/prevention/ASYNC_FLOW_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null>(null)
   const [loading, setLoading] = useState(true)

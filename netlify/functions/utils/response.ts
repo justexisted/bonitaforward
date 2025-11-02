@@ -1,4 +1,40 @@
 /**
+ * DEPENDENCY TRACKING
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - CORS_HEADERS: Standard CORS configuration
+ *   → CRITICAL: Required for all HTTP responses
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - ALL Netlify functions: Use successResponse() and errorResponse()
+ *   → CRITICAL: Response format must be consistent across ALL functions
+ * - ALL frontend code: Parses responses expecting { success: true, ok: true, ... }
+ *   → CRITICAL: Frontend checks both success and ok for backward compatibility
+ * 
+ * BREAKING CHANGES:
+ * - If you change successResponse() format → ALL Netlify functions break
+ * - If you remove success/ok fields → ALL frontend code breaks
+ * - If you change errorResponse() format → ALL error handling breaks
+ * 
+ * HOW TO SAFELY UPDATE:
+ * 1. NEVER change response format without updating ALL consumers
+ * 2. Use backward compatibility during migration (include both old and new fields)
+ * 3. Search for all usages: grep -r "successResponse\|errorResponse" src/
+ * 4. Test ALL admin functions after changing format
+ * 5. Update ALL frontend code that parses responses
+ * 
+ * RELATED FILES:
+ * - ALL netlify/functions/*.ts files: Use these utilities
+ * - ALL src/*.ts files that call Netlify functions: Parse responses
+ * 
+ * RECENT BREAKS:
+ * - API contract mismatch (2025-01-XX): Changed response format broke frontend
+ *   → Fix: successResponse() now ALWAYS includes success: true and ok: true
+ * 
+ * See: docs/prevention/API_CONTRACT_PREVENTION.md
+ */
+
+/**
  * Shared response utilities for Netlify functions
  * Standardizes error and success response formats
  * 

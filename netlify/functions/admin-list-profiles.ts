@@ -1,3 +1,49 @@
+/**
+ * DEPENDENCY TRACKING
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - verifyAuthAndAdmin(): Verifies user is authenticated and admin
+ *   → CRITICAL: Must return supabaseClient with service role key
+ * - successResponse(): Returns standardized response format
+ *   → CRITICAL: ALWAYS includes success: true and ok: true automatically
+ * - profiles table: Must have columns (is_bonita_resident, resident_verification_method, etc.)
+ *   → CRITICAL: Falls back to basic fields if resident columns don't exist
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - useAdminDataLoader: Calls this function to load profiles
+ *   → CRITICAL: Expects response format { success: true, ok: true, profiles: ProfileRow[] }
+ * - Admin.tsx: Uses profiles from useAdminDataLoader
+ * - ResidentVerificationSection: Filters profiles by is_bonita_resident
+ * - UsersSection: Displays profiles with resident verification data
+ * 
+ * BREAKING CHANGES:
+ * - If you change response format → useAdminDataLoader won't find profiles
+ * - If you remove resident verification fields → ResidentVerificationSection breaks
+ * - If you change ProfileRow type → Type mismatch between backend and frontend
+ * - If successResponse() format changes → ALL consumers break
+ * 
+ * HOW TO SAFELY UPDATE:
+ * 1. Check ProfileRow type in src/types/admin.ts matches query fields
+ * 2. Verify successResponse() format is correct
+ * 3. Update types/admin.ts if adding new fields
+ * 4. Test useAdminDataLoader receives correct data
+ * 5. Test all admin sections that use profiles
+ * 
+ * RELATED FILES:
+ * - src/types/admin.ts: ProfileRow type (MUST match query fields)
+ * - src/hooks/useAdminDataLoader.ts: Calls this function
+ * - netlify/functions/utils/response.ts: successResponse() utility
+ * - src/components/admin/sections/ResidentVerificationSection.tsx: Consumes profiles
+ * 
+ * RECENT BREAKS:
+ * - API response format (2025-01-XX): Changed from { ok: true } to { success: true }
+ *   → Fix: successResponse() now includes both for backward compatibility
+ * - Resident verification empty: useAdminDataLoader had wrong ProfileRow type
+ * 
+ * See: docs/prevention/API_CONTRACT_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
+
 import { Handler } from '@netlify/functions'
 import { verifyAuthAndAdmin, authAdminErrorResponse } from './utils/authAdmin'
 import { errorResponse, successResponse, handleOptions } from './utils/response'

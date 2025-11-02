@@ -25,6 +25,9 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+// CRITICAL: Import ProfileRow from shared types to ensure consistency
+// This ensures resident verification fields are always included
+import type { ProfileRow } from '../types/admin'
 
 // Type definitions
 type FunnelRow = {
@@ -118,12 +121,8 @@ type FlaggedEvent = {
   reporter_email?: string
 }
 
-type ProfileRow = {
-  id: string
-  email: string | null
-  name: string | null
-  role?: string | null
-}
+// ProfileRow imported at top - includes resident verification fields
+// DO NOT define ProfileRow here - use shared type from types/admin.ts
 
 interface UseAdminDataLoaderOptions {
   userEmail: string | null
@@ -155,6 +154,51 @@ interface UseAdminDataLoaderReturn {
   setError: (error: string | null) => void
 }
 
+/**
+ * DEPENDENCY TRACKING
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - AuthContext: Provides auth.email and auth.isAuthed
+ *   → CRITICAL: Must have valid email to load data
+ * - ProfileRow type (types/admin.ts): Defines profile structure
+ *   → CRITICAL: Must include resident verification fields (is_bonita_resident, etc.)
+ *   → DO NOT duplicate this type - always import from types/admin.ts
+ * - admin-list-profiles Netlify function: Returns ProfileRow[] with resident verification
+ *   → CRITICAL: Response format must match ProfileRow type
+ * - successResponse() utility: Returns { success: true, ok: true, profiles: [...] }
+ *   → CRITICAL: Must check both success and ok for backward compatibility
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - Admin.tsx: Uses profiles to display admin sections
+ * - ResidentVerificationSection: Filters profiles by is_bonita_resident
+ * - UsersSection: Displays profiles with resident verification status
+ * - All admin sections: Use profiles for user-related operations
+ * 
+ * BREAKING CHANGES:
+ * - If ProfileRow type changes → TypeScript error (good - catches it)
+ * - If admin-list-profiles response format changes → profiles array empty or wrong structure
+ * - If auth.email is null → No data loads
+ * - If you duplicate ProfileRow type → Resident verification fields lost
+ * 
+ * HOW TO SAFELY UPDATE:
+ * 1. NEVER create local ProfileRow type - always import from types/admin.ts
+ * 2. Verify admin-list-profiles returns correct fields
+ * 3. Check response format matches ProfileRow type
+ * 4. Test all admin sections still work
+ * 5. Test resident verification displays correctly
+ * 
+ * RELATED FILES:
+ * - src/types/admin.ts: Defines ProfileRow type (SINGLE SOURCE OF TRUTH)
+ * - netlify/functions/admin-list-profiles.ts: Returns profiles data
+ * - src/components/admin/sections/ResidentVerificationSection.tsx: Consumes profiles
+ * - src/pages/Admin.tsx: Uses profiles from this hook
+ * 
+ * RECENT BREAKS:
+ * - Resident verification empty (2025-01-XX): Had duplicate ProfileRow type without resident fields
+ *   → Fix: Import ProfileRow from types/admin.ts instead of local definition
+ * 
+ * See: docs/prevention/CASCADING_FAILURES.md
+ */
 /**
  * USE ADMIN DATA LOADER
  * 

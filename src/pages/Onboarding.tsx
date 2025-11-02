@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { verifyByZipCode, verifyBySelfDeclaration, type VerificationMethod } from '../utils/residentVerification'
+import { updateUserProfile, getNameFromMultipleSources } from '../utils/profileUtils'
 
 export default function OnboardingPage() {
   const navigate = useNavigate()
@@ -121,38 +122,32 @@ export default function OnboardingPage() {
       }
 
       // Set role and resident verification in profile
-      // CRITICAL FIX: Use separate INSERT/UPDATE instead of upsert to avoid RLS 403 errors
+      // CRITICAL: Use shared updateUserProfile utility to ensure ALL fields are saved
+      // This prevents missing fields like name from being omitted
+      // See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
       const { data: sess } = await supabase.auth.getSession()
       const userId = sess.session?.user?.id
       const email = sess.session?.user?.email
       if (userId && email) {
-        // Check if profile already exists to avoid RLS issues with upsert
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', userId)
-          .maybeSingle()
+        // Get name from multiple sources (localStorage, auth metadata)
+        const name = await getNameFromMultipleSources(email, sess.session?.user)
         
-        const updatePayload: any = {
-          email,
-          role,
-          ...verificationResult
-        }
+        // Use shared utility to update profile
+        // This ensures ALL fields (name, email, role, resident verification) are included
+        const result = await updateUserProfile(
+          userId,
+          {
+            email,
+            name,
+            role,
+            ...verificationResult
+          },
+          'onboarding'
+        )
         
-        if (existingProfile) {
-          // Profile exists - use UPDATE
-          await supabase
-            .from('profiles')
-            .update(updatePayload)
-            .eq('id', userId)
-        } else {
-          // Profile doesn't exist - use INSERT
-          await supabase
-            .from('profiles')
-            .insert({
-              id: userId,
-              ...updatePayload
-            })
+        if (!result.success) {
+          console.error('[Onboarding] Failed to update profile:', result.error)
+          // Don't fail the flow, but log error for debugging
         }
       }
       
