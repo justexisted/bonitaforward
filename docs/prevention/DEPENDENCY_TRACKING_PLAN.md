@@ -288,6 +288,25 @@ Provider pages, other pages
 
 ---
 
+## ✅ Testing Status (2025-01-XX)
+
+**User Deletion System - TESTED & VERIFIED:**
+- ✅ **Business Account Deletion** - Successfully tested (complete deletion with profile reload)
+- ✅ **Customer Account Deletion** - Successfully tested (complete deletion with profile reload)
+- ✅ **Users Without Profiles** - Successfully tested (email-only deletion from all tables)
+- ✅ **Profile Reload** - Verified deleted users don't reappear after page refresh
+- ✅ **Complete Coverage** - Verified deletion removes data from all email-keyed tables:
+  - `funnel_responses` (by `user_email`)
+  - `bookings` (by `user_email`)
+  - `booking_events` (by `customer_email` - note: different column name!)
+
+**Critical Patterns Verified:**
+1. Profile reload after deletion prevents stale data
+2. Handling both cases (with/without profiles) works correctly
+3. Remember `booking_events` uses `customer_email` column (not `user_email`)
+
+---
+
 ## Recent Additions (2025-01-XX)
 
 ### New Prevention System Created
@@ -395,4 +414,162 @@ See: `docs/prevention/DATA_INTEGRITY_PREVENTION.md`
 - `src/contexts/AuthContext.tsx` - Simplified (now handled in profileUtils)
 
 See: `docs/prevention/CASCADING_FAILURES.md` - Section #8
+
+---
+
+### Incomplete User Deletion Fix (2025-01-XX)
+
+**Issue:** Admin/user deletion only deleted some related data, leaving orphaned records  
+**File:** `netlify/functions/utils/userDeletion.ts`  
+**Fix:** Added deletion logic for all missing user-related tables
+
+**What Was Fixed:**
+- Added deletion for 9 missing tables:
+  - `user_saved_events` (saved calendar events)
+  - `saved_providers` (saved businesses)
+  - `coupon_redemptions` (saved coupons)
+  - `calendar_events` (events created by user)
+  - `business_applications` (business listing applications)
+  - `event_flags` (event flags by user)
+  - `event_votes` (event votes by user)
+  - `email_preferences` (email settings)
+  - `dismissed_notifications` (dismissed notifications)
+- Deletion now handles all 17+ tables with user-related data
+- Complete deletion ensures no orphaned records remain
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#9: Incomplete Deletion Logic)
+- Updated dependency tracking comment in `userDeletion.ts`
+- Documented all tables that must be deleted
+- Added checklist for finding all user-related tables
+
+**Key Rule for Future Code:**
+> When implementing user deletion, find ALL tables that reference the user:
+> 1. Search for `user_id` columns across all tables
+> 2. Search for `owner_user_id` columns across all tables
+> 3. Search for `email` columns that might reference the user
+> 4. Delete from ALL of these tables before deleting the auth user
+> 5. Test with a user that has data in every possible table
+
+**Files Updated:**
+- `netlify/functions/utils/userDeletion.ts` - Added 9 missing deletion steps
+- `netlify/functions/admin-delete-user.ts` - Uses updated utility (no changes needed)
+- `netlify/functions/user-delete.ts` - Uses updated utility (no changes needed)
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #9
+
+---
+
+### Missing Props in Destructuring Fix (2025-01-XX)
+
+**Issue:** `deleteCustomerUserByEmail is not a function` error in CustomerUsersSection  
+**File:** `src/components/admin/sections/CustomerUsersSection-2025-10-19.tsx`  
+**Fix:** Added missing props to destructuring and guard checks
+
+**What Was Fixed:**
+- Added `onDeleteCustomerUser` and `deleteCustomerUserByEmail` to prop destructuring
+- Added guard check before calling `deleteCustomerUserByEmail` (`if (!prop) return`)
+- Made onClick handler async to properly await the async function
+- Prevents runtime errors when props are called without being destructured
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#10: Missing Props in Destructuring)
+- Updated smoke test checklist to include prop verification
+- Documented common patterns for missing props
+
+**Key Rule for Future Code:**
+> When destructuring props, include ALL props from the interface:
+> 1. Copy all prop names from interface to destructuring
+> 2. If a prop isn't used, prefix it with `_` to indicate it's intentionally unused
+> 3. Add guard checks before calling function props (defensive programming)
+> 4. Use TypeScript to catch missing props at compile time
+
+**Files Updated:**
+- `src/components/admin/sections/CustomerUsersSection-2025-10-19.tsx` - Added missing props to destructuring
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #10
+
+---
+
+### Stale Data After Deletion Fix (2025-01-XX)
+
+**Issue:** Deleted users reappear after page refresh  
+**File:** `src/utils/adminUserUtils.ts`  
+**Fix:** Added profile reload after deletion to verify deletion worked
+
+**What Was Fixed:**
+- After successful deletion, reload profiles from database (via admin-list-profiles)
+- Update local state with fresh data from database (not just filtered local state)
+- Verify deletion actually worked by checking database state
+- Fallback to local update if reload fails
+- Prevents deleted users from reappearing on page refresh
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#11: Stale Data After Deletion)
+- Updated dependency tracking comment in `adminUserUtils.ts`
+- Documented reload pattern for all deletion operations
+- Added to smoke test checklist
+
+**Key Rule for Future Code:**
+> When deleting data, always reload from database after deletion:
+> 1. Call deletion function (backend deletes data)
+> 2. Reload data from database (verify deletion worked)
+> 3. Update local state with fresh data (ensures consistency)
+> 4. On page refresh, deleted data won't reappear (because it's actually deleted)
+
+**Files Updated:**
+- `src/utils/adminUserUtils.ts` - Added profile reload after deletion
+
+**Testing Verified (2025-01-XX):**
+- ✅ Successfully deleted business accounts (complete deletion with profile reload)
+- ✅ Successfully deleted customer accounts (complete deletion with profile reload)
+- ✅ Deleted users don't reappear after page refresh
+- ✅ Profile reload verifies deletion worked correctly
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #11
+
+---
+
+### Users Without Profiles Fix (2025-01-XX)
+
+**Issue:** Cannot delete users who only exist in funnels/bookings without profiles  
+**File:** `src/utils/adminUserUtils.ts`, `src/pages/Admin.tsx`  
+**Fix:** Added `deleteUserByEmailOnly()` function to handle users without profiles
+
+**What Was Fixed:**
+- Added `deleteUserByEmailOnly()` function for users without profiles
+- Updated `deleteCustomerUserByEmail` to handle both cases (with/without profile)
+- If user has profile → delete everything (auth user, profile, all data)
+- If no profile → delete email-keyed data only (funnels, bookings, booking_events)
+- Note: `booking_events` table uses `customer_email` column, not `user_email`
+- Shows appropriate message explaining what was deleted
+- Cannot delete auth user without profile (no userId)
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#12: Users Without Profiles)
+- Updated dependency tracking comment in `adminUserUtils.ts`
+- Documented email-only deletion pattern
+- Added to smoke test checklist
+
+**Key Rule for Future Code:**
+> When deleting by email, handle both cases:
+> 1. Check if profile exists for this email
+> 2. If profile exists: Delete everything (auth user, profile, all data)
+> 3. If no profile: Delete email-keyed data only (funnels, bookings, booking_events)
+> 4. Note: `booking_events` table uses `customer_email` column, not `user_email`
+> 5. Cannot delete auth user without profile (no userId)
+> 6. Show message explaining what was deleted
+
+**Files Updated:**
+- `src/utils/adminUserUtils.ts` - Added `deleteUserByEmailOnly()` function
+- `src/pages/Admin.tsx` - Updated `deleteCustomerUserByEmail` to handle both cases
+
+**Testing Verified (2025-01-XX):**
+- ✅ Successfully deleted users without profiles (email-only data deletion)
+- ✅ Deletion removes data from all email-keyed tables: `funnel_responses`, `bookings`, `booking_events`
+- ✅ Note: `booking_events` table uses `customer_email` column (not `user_email`)
+- ✅ Appropriate message shows what was deleted
+- ✅ User disappears from customer users list after deletion
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #12
 

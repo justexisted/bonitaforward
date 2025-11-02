@@ -31,7 +31,9 @@ export default function AccountPage() {
     return 'dashboard'
   })
   const [message, setMessage] = useState<string | null>(null)
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info')
   const [loading, setLoading] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
   const [data, setData] = useState<AccountData>({
     bookings: [],
     savedBusinesses: [],
@@ -145,6 +147,81 @@ export default function AccountPage() {
       myEvents: prev.myEvents.filter(ev => ev.id !== eventId)
     }))
   }
+
+  // Delete user account
+  async function deleteAccount() {
+    // Double confirmation
+    if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      return
+    }
+    if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) {
+      return
+    }
+
+    setDeletingAccount(true)
+    setMessage(null)
+    setMessageType('info')
+
+    try {
+      // Get current session to pass auth token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated. Please log in and try again.')
+      }
+
+      // Call Netlify function to delete user
+      const response = await fetch('/.netlify/functions/user-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        // Try to parse error response
+        let errorMessage = `Failed to delete account (${response.status})`
+        try {
+          const errorData = await response.json()
+          if (errorData.error) {
+            errorMessage = errorData.error
+            if (errorData.details) {
+              errorMessage += `: ${errorData.details}`
+            }
+          }
+        } catch {
+          // If JSON parse fails, use default message
+        }
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+
+      // Check for success (should have success: true or ok: true)
+      if (result.success === true || result.ok === true) {
+        // Success - sign out and redirect
+        setMessage('Account deleted successfully. Signing out...')
+        setMessageType('success')
+        
+        // Wait a moment for the message to show, then sign out
+        setTimeout(async () => {
+          await auth.signOut()
+          // Redirect to home page
+          navigate('/')
+        }, 1000)
+      } else {
+        throw new Error(result.error || result.message || 'Failed to delete account')
+      }
+    } catch (err: any) {
+      console.error('[Account] Delete account error:', err)
+      setMessage(err?.message || 'Failed to delete account. Please try again or contact support.')
+      setMessageType('error')
+    } finally {
+      setDeletingAccount(false)
+    }
+  }
+
   // Helper: update event locally
   function handleEventUpdated(updated: any) {
     setData(prev => ({
@@ -207,9 +284,33 @@ export default function AccountPage() {
 
           {/* Message Banner */}
           {message && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between">
-              <p className="text-sm text-blue-800">{message}</p>
-              <button onClick={() => setMessage(null)} className="text-blue-600 hover:text-blue-700">
+            <div className={`mb-6 p-4 rounded-lg flex items-start justify-between ${
+              messageType === 'error' 
+                ? 'bg-red-50 border border-red-200' 
+                : messageType === 'success'
+                ? 'bg-green-50 border border-green-200'
+                : 'bg-blue-50 border border-blue-200'
+            }`}>
+              <p className={`text-sm ${
+                messageType === 'error' 
+                  ? 'text-red-800' 
+                  : messageType === 'success'
+                  ? 'text-green-800'
+                  : 'text-blue-800'
+              }`}>{message}</p>
+              <button 
+                onClick={() => {
+                  setMessage(null)
+                  setMessageType('info')
+                }} 
+                className={`${
+                  messageType === 'error' 
+                    ? 'text-red-600 hover:text-red-700' 
+                    : messageType === 'success'
+                    ? 'text-green-600 hover:text-green-700'
+                    : 'text-blue-600 hover:text-blue-700'
+                }`}
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -756,14 +857,13 @@ export default function AccountPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => {
-                      if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) return
-                      if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return
-                      alert('Account deletion requires contacting support. Please email hello@bonitaforward.com')
-                    }}
-                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    onClick={deleteAccount}
+                    disabled={deletingAccount}
+                    className={`px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors ${
+                      deletingAccount ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
-                    Delete My Account
+                    {deletingAccount ? 'Deleting Account...' : 'Delete My Account'}
                   </button>
                 </div>
               </div>
@@ -820,9 +920,33 @@ export default function AccountPage() {
         <main className="flex-1 ml-64 p-8 pt-20 pb-6">
           {/* Message Banner */}
           {message && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between">
-              <p className="text-sm text-blue-800">{message}</p>
-              <button onClick={() => setMessage(null)} className="text-blue-600 hover:text-blue-700">
+            <div className={`mb-6 p-4 rounded-lg flex items-start justify-between ${
+              messageType === 'error' 
+                ? 'bg-red-50 border border-red-200' 
+                : messageType === 'success'
+                ? 'bg-green-50 border border-green-200'
+                : 'bg-blue-50 border border-blue-200'
+            }`}>
+              <p className={`text-sm ${
+                messageType === 'error' 
+                  ? 'text-red-800' 
+                  : messageType === 'success'
+                  ? 'text-green-800'
+                  : 'text-blue-800'
+              }`}>{message}</p>
+              <button 
+                onClick={() => {
+                  setMessage(null)
+                  setMessageType('info')
+                }} 
+                className={`${
+                  messageType === 'error' 
+                    ? 'text-red-600 hover:text-red-700' 
+                    : messageType === 'success'
+                    ? 'text-green-600 hover:text-green-700'
+                    : 'text-blue-600 hover:text-blue-700'
+                }`}
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1338,14 +1462,13 @@ export default function AccountPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => {
-                      if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) return
-                      if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return
-                      alert('Account deletion requires contacting support. Please email hello@bonitaforward.com')
-                    }}
-                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    onClick={deleteAccount}
+                    disabled={deletingAccount}
+                    className={`px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors ${
+                      deletingAccount ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
-                    Delete My Account
+                    {deletingAccount ? 'Deleting Account...' : 'Delete My Account'}
                   </button>
                 </div>
               </div>

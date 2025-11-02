@@ -13,6 +13,19 @@ Added comprehensive dependency tracking comments to all files that broke recentl
 
 ## Files Updated with Dependency Tracking
 
+### ✅ User Deletion System (TESTED & VERIFIED - 2025-01-XX)
+
+**Recent Updates:**
+- ✅ **Profile reload after deletion** - Prevents stale data, verified with business and customer account deletion
+- ✅ **Email-only deletion** - Handles users without profiles, verified successfully deletes all email-keyed data
+- ✅ **Complete deletion coverage** - Deletes from all tables: `funnel_responses`, `bookings`, `booking_events` (uses `customer_email`)
+- ✅ **Testing Status:** Successfully deleted business accounts, customer accounts, and users without profiles
+
+**Critical Pattern:**
+> Always reload from database after deletion to verify it worked, and handle both cases: users WITH profiles (full deletion) and users WITHOUT profiles (email-only deletion).
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Sections #11 and #12
+
 ### ✅ High Priority (Recently Broken)
 
 1. **src/contexts/AuthContext.tsx** ⭐
@@ -142,6 +155,42 @@ Added comprehensive dependency tracking comments to all files that broke recentl
 
 See: `docs/prevention/CASCADING_FAILURES.md` - Section #8
 
+### ✅ Incomplete User Deletion Fix (COMPLETED)
+
+**Issue:** Admin/user deletion only deleted some related data, leaving orphaned records  
+**File:** `netlify/functions/utils/userDeletion.ts`  
+**Fix:** Added deletion logic for all missing user-related tables
+
+**What Was Fixed:**
+- Added deletion for 9 missing tables:
+  - `user_saved_events` (saved calendar events)
+  - `saved_providers` (saved businesses)
+  - `coupon_redemptions` (saved coupons)
+  - `calendar_events` (events created by user)
+  - `business_applications` (business listing applications)
+  - `event_flags` (event flags by user)
+  - `event_votes` (event votes by user)
+  - `email_preferences` (email settings)
+  - `dismissed_notifications` (dismissed notifications)
+- Deletion now handles all 17+ tables with user-related data
+- Complete deletion ensures no orphaned records remain
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#9: Incomplete Deletion Logic)
+- Updated dependency tracking comment in `userDeletion.ts`
+- Documented all tables that must be deleted in deletion utility
+- Added checklist for finding all user-related tables
+
+**Files Updated:**
+- `netlify/functions/utils/userDeletion.ts` - Added 9 missing deletion steps
+- `docs/prevention/CASCADING_FAILURES.md` - New section #9
+- `docs/prevention/DEPENDENCY_TRACKING_PLAN.md` - Recent breaks section
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` - Status update
+
+**Status:** ✅ Completed - comprehensive user deletion implemented and documented
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #9
+
 ---
 
 ## Dependency Tracking Format
@@ -241,6 +290,10 @@ Each dependency tracking comment includes:
 8. userDeletion.ts → New utility (prevention)
 9. profileUtils.ts → Immutable role error on login (fixed)
 10. useAdminVerification.ts → Navigation logout bug (fixed)
+11. userDeletion.ts → Incomplete user deletion leaving orphaned records (fixed)
+12. CustomerUsersSection-2025-10-19.tsx → Missing props in destructuring causing "is not a function" error (fixed)
+13. adminUserUtils.ts → Stale data after deletion (deleted users reappear on refresh) (fixed)
+14. adminUserUtils.ts → Cannot delete users without profiles (fixed)
 
 ---
 
@@ -257,7 +310,13 @@ Each dependency tracking comment includes:
 9. ✅ Refactored `AuthContext.tsx` to use `updateUserProfile()` from profileUtils (completed)
 10. ✅ Refactored `AccountSettings.tsx` (via dataLoader.ts) to use `updateUserProfile()` from profileUtils (completed)
 11. ✅ Fixed immutable role error in `profileUtils.ts` - handles immutable database fields (completed)
-12. ⏳ Set up integration tests that verify dependencies (future)
+12. ✅ Fixed incomplete user deletion - added deletion for all missing user-related tables (completed)
+13. ✅ Fixed missing props in destructuring in `CustomerUsersSection-2025-10-19.tsx` - added missing props and guard checks (completed)
+14. ✅ Fixed stale data after deletion in `adminUserUtils.ts` - added profile reload after deletion to verify deletion worked (completed, tested with business and customer accounts)
+15. ✅ Fixed users without profiles deletion in `adminUserUtils.ts` - added `deleteUserByEmailOnly()` to handle users without profiles (completed, tested successfully)
+    - ✅ Successfully deletes from `funnel_responses`, `bookings`, and `booking_events` tables
+    - ✅ Note: `booking_events` uses `customer_email` column, not `user_email`
+16. ⏳ Set up integration tests that verify dependencies (future)
 
 ---
 

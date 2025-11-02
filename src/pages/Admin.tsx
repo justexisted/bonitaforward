@@ -586,9 +586,11 @@ export default function AdminPage() {
                   // Find user ID from profiles
                   const profile = profiles.find(p => AdminHelpers.normalizeEmail(p.email) === AdminHelpers.normalizeEmail(email))
                   if (profile?.id) {
-                    await deleteUser(profile.id)
+                    // User has a profile - delete everything including auth user
+                    await UserUtils.deleteUser(profile.id, profiles, setMessage, setError, setDeletingUserId, setProfiles, setFunnels, setBookings)
                   } else {
-                    setError(`User not found for email: ${email}. User may only exist in funnels/bookings without a profile.`)
+                    // User only exists in funnels/bookings/booking_events - delete email-keyed data only
+                    await UserUtils.deleteUserByEmailOnly(email, setMessage, setError, setDeletingCustomerEmail, setFunnels, setBookings, setBookingEvents)
                   }
                 }}
               />

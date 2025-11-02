@@ -23,6 +23,7 @@ export const CustomerUsersSection: React.FC<CustomerUsersSectionProps> = ({
   businessEmails,
   deletingCustomerEmail,
   onSetDeletingCustomerEmail,
+  onDeleteCustomerUser,
   deleteCustomerUserByEmail
 }) => {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
@@ -179,7 +180,13 @@ export const CustomerUsersSection: React.FC<CustomerUsersSectionProps> = ({
                   {deletingCustomerEmail === userObj.email ? (
                     <div className="flex flex-col items-end gap-2">
                       <button 
-                        onClick={() => deleteCustomerUserByEmail(userObj.email)} 
+                        onClick={async () => {
+                          if (!deleteCustomerUserByEmail) {
+                            console.error('[CustomerUsersSection] deleteCustomerUserByEmail is not a function')
+                            return
+                          }
+                          await deleteCustomerUserByEmail(userObj.email)
+                        }} 
                         className="rounded-full bg-red-50 text-red-700 px-3 py-1.5 border border-red-200 text-xs"
                       >
                         Confirm Delete

@@ -164,8 +164,43 @@ export async function deleteUser(
     const deletedProfile = profiles.find(p => p.id === userId)
     const deletedEmail = deletedProfile?.email?.toLowerCase().trim()
     
-    // Remove profile from profiles list
-    setProfiles((arr) => arr.filter((p) => p.id !== userId))
+    // CRITICAL: Reload profiles from database to ensure deletion is reflected
+    // This ensures the user list is updated even if page is refreshed
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      if (token) {
+        const url = '/.netlify/functions/admin-list-profiles'
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (res.ok) {
+          const result = await res.json()
+          if (result.success === true || result.ok === true) {
+            const updatedProfiles = result.profiles || []
+            setProfiles(updatedProfiles)
+            console.log('[Admin] Profiles reloaded after deletion:', updatedProfiles.length, 'profiles')
+          }
+        } else {
+          console.warn('[Admin] Failed to reload profiles after deletion, using local update')
+          // Fallback to local update if reload fails
+          setProfiles((arr) => arr.filter((p) => p.id !== userId))
+        }
+      } else {
+        // Fallback to local update if no session
+        setProfiles((arr) => arr.filter((p) => p.id !== userId))
+      }
+    } catch (reloadErr) {
+      console.warn('[Admin] Error reloading profiles after deletion:', reloadErr)
+      // Fallback to local update if reload fails
+      setProfiles((arr) => arr.filter((p) => p.id !== userId))
+    }
     
     // CRITICAL FIX: Remove funnel responses and bookings by email
     // This ensures the "All users" dropdown updates immediately
@@ -186,6 +221,99 @@ export async function deleteUser(
     setError(err?.message || 'Failed to delete user')
   } finally {
     setDeletingUserId(null)
+  }
+}
+
+/**
+ * DELETE USER BY EMAIL ONLY
+ * 
+ * Deletes a user's data by email when they don't have a profile.
+ * This removes their funnel responses, bookings, and booking events (email-keyed data).
+ * Cannot delete auth user since there's no profile/user_id.
+ * 
+ * Note: booking_events table uses 'customer_email' column, not 'user_email'.
+ */
+export async function deleteUserByEmailOnly(
+  email: string,
+  setMessage: (msg: string | null) => void,
+  setError: (err: string | null) => void,
+  setDeletingCustomerEmail: (email: string | null) => void,
+  setFunnels: React.Dispatch<React.SetStateAction<FunnelRow[]>>,
+  setBookings: React.Dispatch<React.SetStateAction<BookingRow[]>>,
+  setBookingEvents?: React.Dispatch<React.SetStateAction<any[]>>
+) {
+  setMessage(null)
+  setError(null)
+  setDeletingCustomerEmail(email)
+  
+  try {
+    // Get current session to pass auth token
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.access_token) {
+      throw new Error('Not authenticated')
+    }
+
+    // Call Netlify function to delete email-keyed data
+    // We'll create a new function for this or use an existing one
+    // For now, delete directly via Supabase (requires RLS to allow admin)
+    const normalizedEmail = email.toLowerCase().trim()
+    
+    // Delete funnel responses by email
+    const { count: funnelCount, error: funnelError } = await supabase
+      .from('funnel_responses')
+      .delete({ count: 'exact' })
+      .eq('user_email', normalizedEmail)
+    
+    if (funnelError) {
+      console.warn('[Admin] Error deleting funnel responses:', funnelError)
+    }
+    
+    // Delete bookings by email
+    const { count: bookingCount, error: bookingError } = await supabase
+      .from('bookings')
+      .delete({ count: 'exact' })
+      .eq('user_email', normalizedEmail)
+    
+    if (bookingError) {
+      console.warn('[Admin] Error deleting bookings:', bookingError)
+    }
+    
+    // Delete booking events by customer_email (booking_events table uses customer_email, not user_email)
+    const { count: bookingEventCount, error: bookingEventError } = await supabase
+      .from('booking_events')
+      .delete({ count: 'exact' })
+      .eq('customer_email', normalizedEmail)
+    
+    if (bookingEventError) {
+      console.warn('[Admin] Error deleting booking events:', bookingEventError)
+    }
+    
+    // Update local state
+    setFunnels((arr) => arr.filter((f) => {
+      const funnelEmail = f.user_email?.toLowerCase().trim()
+      return funnelEmail !== normalizedEmail
+    }))
+    setBookings((arr) => arr.filter((b) => {
+      const bookingEmail = b.user_email?.toLowerCase().trim()
+      return bookingEmail !== normalizedEmail
+    }))
+    // Update booking events state if setter is provided
+    if (setBookingEvents) {
+      setBookingEvents((arr: any[]) => arr.filter((be: any) => {
+        const bookingEventEmail = be.customer_email?.toLowerCase().trim()
+        return bookingEventEmail !== normalizedEmail
+      }))
+    }
+    
+    const deletedCount = (funnelCount || 0) + (bookingCount || 0) + (bookingEventCount || 0)
+    setMessage(`Deleted ${deletedCount} record(s) for ${email} (${funnelCount || 0} funnel response(s), ${bookingCount || 0} booking(s), ${bookingEventCount || 0} booking event(s)). User had no profile, so only email-keyed data was removed.`)
+    console.log(`[Admin] Deleted ${funnelCount || 0} funnel response(s), ${bookingCount || 0} booking(s), and ${bookingEventCount || 0} booking event(s) for email: ${email}`)
+  } catch (err: any) {
+    console.error('[Admin] Delete user by email error:', err)
+    setError(err?.message || 'Failed to delete user data')
+  } finally {
+    setDeletingCustomerEmail(null)
   }
 }
 

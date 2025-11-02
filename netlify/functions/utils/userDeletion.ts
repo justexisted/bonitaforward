@@ -6,7 +6,9 @@
  *   → CRITICAL: Uses service role to bypass RLS
  * - profiles table: Structure must match deletion logic
  *   → CRITICAL: Deletes profile by user_id
- * - Other tables: funnel_responses, bookings, provider_change_requests, etc.
+ * - Other tables: funnel_responses, bookings, provider_change_requests, user_saved_events,
+ *   saved_providers, coupon_redemptions, calendar_events, business_applications, event_flags,
+ *   event_votes, email_preferences, dismissed_notifications, etc.
  *   → CRITICAL: Deletion order matters - related data FIRST, auth user LAST
  * 
  * WHAT DEPENDS ON THIS:
@@ -48,6 +50,15 @@
  * - Provider change requests (by owner_user_id)
  * - Job posts (by owner_user_id)
  * - Notifications (by user_id)
+ * - Dismissed notifications (by user_id)
+ * - Saved events (user_saved_events by user_id)
+ * - Saved businesses (saved_providers by user_id)
+ * - Coupon redemptions (coupon_redemptions by user_id)
+ * - Calendar events created by user (calendar_events by created_by_user_id)
+ * - Business applications (business_applications by email)
+ * - Event flags (event_flags by user_id)
+ * - Event votes (event_votes by user_id)
+ * - Email preferences (email_preferences by user_id)
  * - Providers (soft delete - archive with 'deleted' badge)
  * - Profile (by user_id)
  * - Auth user (final step)
@@ -71,6 +82,15 @@ export interface UserDeletionResult {
     changeRequests?: number
     jobPosts?: number
     notifications?: number
+    dismissedNotifications?: number
+    savedEvents?: number
+    savedBusinesses?: number
+    couponRedemptions?: number
+    calendarEvents?: number
+    businessApplications?: number
+    eventFlags?: number
+    eventVotes?: number
+    emailPreferences?: boolean
     providers?: number
     profile?: boolean
   }
@@ -154,6 +174,200 @@ export async function deleteUserAndRelatedData(
       console.warn(`${logPrefix} Warning deleting notifications:`, err)
     }
     
+    // Step 5b: Delete dismissed notifications
+    try {
+      const { count } = await supabaseClient
+        .from('dismissed_notifications')
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+      deletedCounts.dismissedNotifications = count || 0
+      console.log(`${logPrefix} ✓ Deleted ${count || 0} dismissed notification(s)`)
+    } catch (err) {
+      console.warn(`${logPrefix} Warning deleting dismissed notifications:`, err)
+    }
+    
+    // Step 5c: Delete saved events (user_saved_events)
+    try {
+      // First verify if data exists
+      const { count: existingCount, error: checkError } = await supabaseClient
+        .from('user_saved_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+      
+      if (checkError) {
+        console.warn(`${logPrefix} Error checking saved events:`, checkError)
+      } else if (existingCount && existingCount > 0) {
+        console.log(`${logPrefix} Found ${existingCount} saved event(s) to delete`)
+      }
+      
+      const { count, error } = await supabaseClient
+        .from('user_saved_events')
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+      
+      if (error) {
+        console.warn(`${logPrefix} Error deleting saved events:`, error)
+      } else {
+        deletedCounts.savedEvents = count || 0
+        if (count && count > 0) {
+          console.log(`${logPrefix} ✓ Deleted ${count} saved event(s)`)
+        } else if (existingCount && existingCount > 0 && (!count || count === 0)) {
+          console.warn(`${logPrefix} ⚠️ Found ${existingCount} saved event(s) but deleted 0 - possible RLS issue`)
+        }
+      }
+    } catch (err) {
+      console.warn(`${logPrefix} Exception deleting saved events:`, err)
+    }
+    
+    // Step 5d: Delete saved businesses (saved_providers)
+    try {
+      // First verify if data exists
+      const { count: existingCount, error: checkError } = await supabaseClient
+        .from('saved_providers')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+      
+      if (checkError) {
+        console.warn(`${logPrefix} Error checking saved businesses:`, checkError)
+      } else if (existingCount && existingCount > 0) {
+        console.log(`${logPrefix} Found ${existingCount} saved business(es) to delete`)
+      }
+      
+      const { count, error } = await supabaseClient
+        .from('saved_providers')
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+      
+      if (error) {
+        console.warn(`${logPrefix} Error deleting saved businesses:`, error)
+      } else {
+        deletedCounts.savedBusinesses = count || 0
+        if (count && count > 0) {
+          console.log(`${logPrefix} ✓ Deleted ${count} saved business(es)`)
+        } else if (existingCount && existingCount > 0 && (!count || count === 0)) {
+          console.warn(`${logPrefix} ⚠️ Found ${existingCount} saved business(es) but deleted 0 - possible RLS issue`)
+        }
+      }
+    } catch (err) {
+      console.warn(`${logPrefix} Exception deleting saved businesses:`, err)
+    }
+    
+    // Step 5e: Delete coupon redemptions
+    try {
+      // First verify if data exists
+      const { count: existingCount, error: checkError } = await supabaseClient
+        .from('coupon_redemptions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+      
+      if (checkError) {
+        console.warn(`${logPrefix} Error checking coupon redemptions:`, checkError)
+      } else if (existingCount && existingCount > 0) {
+        console.log(`${logPrefix} Found ${existingCount} coupon redemption(s) to delete`)
+      }
+      
+      const { count, error } = await supabaseClient
+        .from('coupon_redemptions')
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+      
+      if (error) {
+        console.warn(`${logPrefix} Error deleting coupon redemptions:`, error)
+      } else {
+        deletedCounts.couponRedemptions = count || 0
+        if (count && count > 0) {
+          console.log(`${logPrefix} ✓ Deleted ${count} coupon redemption(s)`)
+        } else if (existingCount && existingCount > 0 && (!count || count === 0)) {
+          console.warn(`${logPrefix} ⚠️ Found ${existingCount} coupon redemption(s) but deleted 0 - possible RLS issue`)
+        }
+      }
+    } catch (err) {
+      console.warn(`${logPrefix} Exception deleting coupon redemptions:`, err)
+    }
+    
+    // Step 5f: Delete calendar events created by user
+    try {
+      // First verify if data exists
+      const { count: existingCount, error: checkError } = await supabaseClient
+        .from('calendar_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('created_by_user_id', userId)
+      
+      if (checkError) {
+        console.warn(`${logPrefix} Error checking calendar events:`, checkError)
+      } else if (existingCount && existingCount > 0) {
+        console.log(`${logPrefix} Found ${existingCount} calendar event(s) to delete`)
+      }
+      
+      const { count, error } = await supabaseClient
+        .from('calendar_events')
+        .delete({ count: 'exact' })
+        .eq('created_by_user_id', userId)
+      
+      if (error) {
+        console.warn(`${logPrefix} Error deleting calendar events:`, error)
+      } else {
+        deletedCounts.calendarEvents = count || 0
+        if (count && count > 0) {
+          console.log(`${logPrefix} ✓ Deleted ${count} calendar event(s)`)
+        } else if (existingCount && existingCount > 0 && (!count || count === 0)) {
+          console.warn(`${logPrefix} ⚠️ Found ${existingCount} calendar event(s) but deleted 0 - possible RLS issue`)
+        }
+      }
+    } catch (err) {
+      console.warn(`${logPrefix} Exception deleting calendar events:`, err)
+    }
+    
+    // Step 5g: Delete business applications (by email)
+    if (userEmail) {
+      try {
+        const { count } = await supabaseClient
+          .from('business_applications')
+          .delete({ count: 'exact' })
+          .eq('email', userEmail)
+        deletedCounts.businessApplications = count || 0
+        console.log(`${logPrefix} ✓ Deleted ${count || 0} business application(s)`)
+      } catch (err) {
+        console.warn(`${logPrefix} Warning deleting business applications:`, err)
+      }
+    }
+    
+    // Step 5h: Delete event flags (user who flagged events)
+    try {
+      const { count } = await supabaseClient
+        .from('event_flags')
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+      deletedCounts.eventFlags = count || 0
+      console.log(`${logPrefix} ✓ Deleted ${count || 0} event flag(s)`)
+    } catch (err) {
+      console.warn(`${logPrefix} Warning deleting event flags:`, err)
+    }
+    
+    // Step 5i: Delete event votes (user who voted on events)
+    try {
+      const { count } = await supabaseClient
+        .from('event_votes')
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+      deletedCounts.eventVotes = count || 0
+      console.log(`${logPrefix} ✓ Deleted ${count || 0} event vote(s)`)
+    } catch (err) {
+      console.warn(`${logPrefix} Warning deleting event votes:`, err)
+    }
+    
+    // Step 5j: Delete email preferences
+    try {
+      await supabaseClient
+        .from('email_preferences')
+        .delete()
+        .eq('user_id', userId)
+      deletedCounts.emailPreferences = true
+      console.log(`${logPrefix} ✓ Deleted email preferences`)
+    } catch (err) {
+      console.warn(`${logPrefix} Warning deleting email preferences:`, err)
+    }
+    
     // Step 6: Archive providers owned by user (soft delete)
     // This prevents breaking references in the public directory
     try {
@@ -183,7 +397,7 @@ export async function deleteUserAndRelatedData(
       console.warn(`${logPrefix} Warning archiving providers:`, err)
     }
     
-    // Step 7: Delete profile
+    // Step 7: Delete profile (must be after all related data)
     try {
       await supabaseClient
         .from('profiles')
@@ -195,7 +409,7 @@ export async function deleteUserAndRelatedData(
       console.warn(`${logPrefix} Warning deleting profile:`, err)
     }
 
-    // Step 8: Finally, delete from auth.users (must be last)
+    // Step 8: Finally, delete from auth.users (must be last - after all related data)
     console.log(`${logPrefix} Attempting to delete user ${userId} from auth.users`)
     const { error: authError } = await (supabaseClient as any).auth.admin.deleteUser(userId)
     
