@@ -244,6 +244,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Use centralized updateUserProfile utility to ensure ALL fields are saved
         // This prevents missing fields like name or resident verification from being omitted
+        // CRITICAL: updateUserProfile() automatically handles immutable fields like role
+        // (it checks if role is already set and excludes it from update if immutable)
         const result = await updateUserProfile(
           userId,
           {

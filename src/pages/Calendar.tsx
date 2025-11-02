@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ChevronUp, ChevronDown, MapPin, Calendar, Clock, X, ExternalLink, Bookmark, BookmarkCheck } from 'lucide-react'
@@ -322,8 +322,17 @@ export default function CalendarPage() {
     }
   }
 
+  // Guard against duplicate loads from React Strict Mode (dev double-render)
+  const hasLoadedEventsRef = useRef(false)
+
   // Load events from database
   useEffect(() => {
+    // Prevent duplicate loads in React Strict Mode (development)
+    if (hasLoadedEventsRef.current) {
+      return
+    }
+    hasLoadedEventsRef.current = true
+
     const loadEvents = async () => {
       setLoading(true)
       setError(null)

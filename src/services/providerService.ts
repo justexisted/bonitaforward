@@ -58,18 +58,13 @@ function coerceIsMember(r: any): boolean {
 export async function loadProvidersFromSupabase(
   setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void
 ): Promise<boolean> {
-  console.log('[Supabase] Starting to load providers from Supabase...')
-  
   try {
     const rows = await fetchProvidersFromSupabase()
-    console.log('[Supabase] fetchProvidersFromSupabase returned:', rows?.length || 0, 'providers')
     
     if (!rows || rows.length === 0) {
       console.warn('[Supabase] No providers found or failed to load')
       return false
     }
-    
-    console.log(`[Supabase] Loaded ${rows.length} providers from database`)
     
     // Initialize grouped providers by category
     const grouped: Record<CategoryKey, Provider[]> = {
@@ -224,15 +219,11 @@ export async function loadProvidersFromSheet(
 export async function loadProviders(
   setProvidersByCategory: (providers: Record<CategoryKey, Provider[]>) => void
 ): Promise<boolean> {
-  console.log('[ProviderService] Starting provider data loading...')
-  
   const supabaseSuccess = await loadProvidersFromSupabase(setProvidersByCategory)
-  console.log('[ProviderService] Supabase loading result:', supabaseSuccess)
   
   if (!supabaseSuccess) {
-    console.log('[ProviderService] Supabase failed, trying Google Sheets fallback...')
+    console.warn('[ProviderService] Supabase failed, trying Google Sheets fallback...')
     await loadProvidersFromSheet(setProvidersByCategory)
-    console.log('[ProviderService] Google Sheets fallback completed')
     return false
   }
   

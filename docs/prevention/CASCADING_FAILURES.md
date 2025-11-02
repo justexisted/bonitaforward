@@ -247,6 +247,66 @@ if (!auth.email) {
 
 ---
 
+### 8. **Immutable Database Fields** ⭐ DATABASE CONSTRAINT ERROR
+
+**What:** Trying to update database fields that are marked as immutable once set.
+
+**Example Failure:**
+```typescript
+// WRONG: Trying to update role when already set
+await updateUserProfile(userId, {
+  name: 'John',
+  role: 'business' // ❌ Error: "profiles.role is immutable once set"
+})
+```
+
+**What Happened:**
+1. User logs in after already having a role set during signup
+2. `AuthContext.ensureProfile()` calls `updateUserProfile()` with role included
+3. Database constraint prevents updating `role` once it's been set
+4. Result: 400 error on every login for existing users
+
+**The Fix:**
+```typescript
+// CORRECT: Check if immutable field is already set before updating
+const { data: existingProfile } = await supabase
+  .from('profiles')
+  .select('role')
+  .eq('id', userId)
+  .maybeSingle()
+
+const updatePayload: any = { ...payload }
+if (existingProfile?.role) {
+  // Role already set - exclude from update (immutable field)
+  delete updatePayload.role
+}
+await supabase.from('profiles').update(updatePayload).eq('id', userId)
+```
+
+**Prevention Checklist:**
+- ✅ ALWAYS check if immutable fields are already set before UPDATE
+- ✅ Exclude immutable fields from update payload if already set
+- ✅ Only set immutable fields during INSERT (when profile doesn't exist)
+- ✅ Handle immutable field errors gracefully in centralized utilities
+- ✅ Document which fields are immutable in dependency tracking comments
+
+**Rule of Thumb:**
+> **When updating database records, check immutable fields first:**
+> 1. Query existing record to check immutable fields
+> 2. If immutable field is already set, exclude it from update payload
+> 3. Only include immutable fields if they're not set yet (null/undefined)
+
+**Files to Watch:**
+- `src/utils/profileUtils.ts` - Centralized profile updates (handles immutable role)
+- `src/contexts/AuthContext.tsx` - Uses updateUserProfile() (affected by immutable fields)
+- Any function that updates database records with immutable fields
+
+**Common Immutable Fields:**
+- `profiles.role` - Cannot be changed after initial set
+- Other fields may be marked immutable by database constraints or RLS policies
+
+---
+
 ## How to Prevent This (Action Plan)
 
 ### Immediate (5 minutes after EVERY change):
@@ -268,6 +328,7 @@ if (!auth.email) {
    - [ ] Do other admin sections work?
    - [ ] **Can admin navigate between pages without getting logged out?** ⭐ NEW
    - [ ] **Does admin status persist during navigation?** ⭐ NEW
+   - [ ] **Can users log in without immutable field errors?** ⭐ NEW
 
 3. **Manual Testing**
    - Actually USE the app after every change

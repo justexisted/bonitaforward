@@ -300,10 +300,24 @@ export async function getEventHeaderImage(event: CalendarEvent): Promise<{
 /**
  * Save fetched image to database permanently
  * This ensures we only fetch from Unsplash ONCE per event
+ * Only logs when the image actually changes (not on redundant updates)
  */
 async function saveImageToDatabase(eventId: string, imageUrl: string, imageType: 'image' | 'gradient'): Promise<void> {
   try {
     const { supabase } = await import('../lib/supabase')
+    
+    // Check if image already exists to avoid redundant updates and logging
+    const { data: existingEvent } = await supabase
+      .from('calendar_events')
+      .select('image_url, image_type')
+      .eq('id', eventId)
+      .maybeSingle()
+    
+    // Skip update if image already exists and is the same
+    if (existingEvent?.image_url === imageUrl && existingEvent?.image_type === imageType) {
+      // Image already exists, no need to update or log
+      return
+    }
     
     const { error } = await supabase
       .from('calendar_events')
@@ -316,7 +330,11 @@ async function saveImageToDatabase(eventId: string, imageUrl: string, imageType:
     if (error) {
       console.warn(`[ImageUtils] Failed to save image to database for event ${eventId}:`, error)
     } else {
-      console.log(`[ImageUtils] Saved image to database for event ${eventId}`)
+      // Only log when image was actually updated (changed from null or different value)
+      const wasUpdated = !existingEvent?.image_url || existingEvent.image_url !== imageUrl
+      if (wasUpdated) {
+        console.log(`[ImageUtils] Saved image to database for event ${eventId}`)
+      }
     }
   } catch (err) {
     console.warn('[ImageUtils] Error saving image to database:', err)

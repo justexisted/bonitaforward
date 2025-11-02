@@ -15,7 +15,7 @@
  * ```
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { CategoryKey, Provider } from '../types'
 import { loadProviders } from '../services/providerService'
 
@@ -47,19 +47,27 @@ interface AppInitProps {
  * @returns null (this is a headless component)
  */
 export default function AppInit({ setProvidersByCategory }: AppInitProps) {
+  // Guard against duplicate loads from React Strict Mode (dev double-render)
+  const hasLoadedRef = useRef(false)
+  
   useEffect(() => {
     // ========================================================================
     // INITIAL DATA LOAD
     // ========================================================================
+    
+    // Prevent duplicate loads in React Strict Mode (development)
+    if (hasLoadedRef.current) {
+      return
+    }
+    hasLoadedRef.current = true
     
     /**
      * Load provider data immediately on mount
      * Uses the service layer which handles Supabase + Sheets fallback
      */
     const initialLoad = async () => {
-      console.log('[AppInit] Starting provider data loading...')
-      const supabaseSuccess = await loadProviders(setProvidersByCategory)
-      console.log('[AppInit] Initial load completed, Supabase success:', supabaseSuccess)
+      await loadProviders(setProvidersByCategory)
+      // Load completion is logged by supabaseData.ts
     }
     
     // Execute initial load
@@ -81,9 +89,8 @@ export default function AppInit({ setProvidersByCategory }: AppInitProps) {
      * ```
      */
     const handleRefresh = async () => {
-      console.log('[AppInit] Refreshing provider data...')
-      const supabaseSuccess = await loadProviders(setProvidersByCategory)
-      console.log('[AppInit] Refresh completed, Supabase success:', supabaseSuccess)
+      await loadProviders(setProvidersByCategory)
+      // Refresh completion is logged by supabaseData.ts
     }
     
     // Register event listener for refresh events
@@ -99,7 +106,6 @@ export default function AppInit({ setProvidersByCategory }: AppInitProps) {
      */
     return () => {
       window.removeEventListener('bf-refresh-providers', handleRefresh as EventListener)
-      console.log('[AppInit] Event listeners cleaned up')
     }
   }, [setProvidersByCategory])
   

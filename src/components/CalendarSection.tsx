@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar as CalendarIcon, X, Flag } from 'lucide-react'
 import { EventCard } from './EventCard'
@@ -71,7 +71,16 @@ export default function CalendarSection() {
   // Hide Dock when any modal is open
   useHideDock(Boolean(selectedEvent || showFlagModal))
 
+  // Guard against duplicate loads from React Strict Mode (dev double-render)
+  const hasLoadedRef = useRef(false)
+
   useEffect(() => {
+    // Prevent duplicate loads in React Strict Mode (development)
+    if (hasLoadedRef.current) {
+      return
+    }
+    hasLoadedRef.current = true
+
     const loadEvents = async () => {
       try {
         const calendarEvents = await fetchCalendarEvents()

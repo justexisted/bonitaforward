@@ -364,3 +364,35 @@ See: `docs/prevention/CASCADING_FAILURES.md` - Section #7
 
 See: `docs/prevention/DATA_INTEGRITY_PREVENTION.md`
 
+---
+
+### Immutable Database Fields Fix (2025-01-XX)
+
+**Issue:** `profiles.role is immutable once set` error on login  
+**File:** `src/utils/profileUtils.ts`  
+**Fix:** Added check to exclude immutable fields from update payload if already set
+
+**What Was Fixed:**
+- `updateUserProfile()` now checks if `role` is already set before UPDATE
+- If `role` is already set, it's excluded from update payload (immutable field)
+- Only sets `role` during INSERT (when profile doesn't exist)
+- Prevents 400 errors on login for existing users with roles
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#8: Immutable Database Fields)
+- Updated dependency tracking comment in `profileUtils.ts`
+- Documented immutable field handling in safe update procedures
+- Added to smoke test checklist
+
+**Key Rule for Future Code:**
+> When updating database records, check immutable fields first:
+> 1. Query existing record to check immutable fields
+> 2. If immutable field is already set, exclude it from update payload
+> 3. Only include immutable fields if they're not set yet (null/undefined)
+
+**Files Updated:**
+- `src/utils/profileUtils.ts` - Added immutable field check
+- `src/contexts/AuthContext.tsx` - Simplified (now handled in profileUtils)
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #8
+

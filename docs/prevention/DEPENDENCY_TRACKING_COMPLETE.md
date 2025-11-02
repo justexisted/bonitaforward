@@ -115,6 +115,33 @@ Added comprehensive dependency tracking comments to all files that broke recentl
    - Breaking Changes: verifyAuthAndAdmin() API, response format changes
    - **Status:** ✅ Completed - dependency tracking added
 
+### ✅ Immutable Database Fields Fix (COMPLETED)
+
+**Issue:** `profiles.role is immutable once set` error on login  
+**File:** `src/utils/profileUtils.ts`  
+**Fix:** Added check to exclude immutable fields from update payload if already set
+
+**What Was Fixed:**
+- `updateUserProfile()` now checks if `role` is already set before UPDATE
+- If `role` is already set, it's excluded from update payload (immutable field)
+- Only sets `role` during INSERT (when profile doesn't exist)
+- Prevents 400 errors on login for existing users with roles
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#8: Immutable Database Fields)
+- Updated dependency tracking comment in `profileUtils.ts` (recent breaks section)
+- Added to smoke test checklist in CASCADING_FAILURES.md
+
+**Files Updated:**
+- `src/utils/profileUtils.ts` - Added immutable field check
+- `src/contexts/AuthContext.tsx` - Simplified (now handled in profileUtils)
+- `docs/prevention/CASCADING_FAILURES.md` - New section #8
+- `docs/prevention/DEPENDENCY_TRACKING_PLAN.md` - Recent breaks section
+
+**Status:** ✅ Completed - immutable field handling implemented and documented
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #8
+
 ---
 
 ## Dependency Tracking Format
@@ -212,30 +239,8 @@ Each dependency tracking comment includes:
 6. admin-list-change-requests.ts → Wrong table name
 7. adminUserUtils.ts → API response parsing
 8. userDeletion.ts → New utility (prevention)
-
----
-
-## Pending Work
-
-### ⏳ New Critical Files (Need Dependency Tracking)
-
-9. **src/utils/profileUtils.ts** ⭐ HIGH PRIORITY
-   - **Status:** ⏳ Pending - needs dependency tracking
-   - **Issue:** New shared utility for profile updates (prevention system)
-   - **Why Critical:** This is the single source of truth for ALL profile updates. Any change here affects ALL signup flows.
-   - **Dependencies:** Supabase client, profiles table schema, localStorage (bf-pending-profile)
-   - **Consumers:** Onboarding.tsx (current), AuthContext.tsx (future), AccountSettings.tsx (future)
-   - **Breaking Changes:** Field completeness, validation logic, localStorage key
-   - **See:** `docs/prevention/DATA_INTEGRITY_PREVENTION.md`
-
-10. **src/pages/Onboarding.tsx** ⭐ MEDIUM PRIORITY
-   - **Status:** ⏳ Pending - needs dependency tracking
-   - **Issue:** Part of signup flow, now uses profileUtils
-   - **Why Important:** This is where business account signups complete their profile. Missing fields here cause incomplete profiles.
-   - **Dependencies:** profileUtils, localStorage (bf-pending-profile), resident verification utils
-   - **Consumers:** SignIn.tsx → Onboarding.tsx flow
-   - **Breaking Changes:** profileUtils API, localStorage key, resident verification flow
-   - **See:** `docs/prevention/DATA_INTEGRITY_PREVENTION.md`
+9. profileUtils.ts → Immutable role error on login (fixed)
+10. useAdminVerification.ts → Navigation logout bug (fixed)
 
 ---
 
@@ -251,7 +256,8 @@ Each dependency tracking comment includes:
 8. ✅ Set up automated checks for breaking changes (completed)
 9. ✅ Refactored `AuthContext.tsx` to use `updateUserProfile()` from profileUtils (completed)
 10. ✅ Refactored `AccountSettings.tsx` (via dataLoader.ts) to use `updateUserProfile()` from profileUtils (completed)
-11. ⏳ Set up integration tests that verify dependencies (future)
+11. ✅ Fixed immutable role error in `profileUtils.ts` - handles immutable database fields (completed)
+12. ⏳ Set up integration tests that verify dependencies (future)
 
 ---
 

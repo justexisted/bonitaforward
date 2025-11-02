@@ -60,6 +60,9 @@
  * - Missing fields in profile updates: Multiple files had direct Supabase calls omitting fields
  *   → Fix: Created this utility to ensure ALL fields are included
  *   → Lesson: Single source of truth for profile updates prevents missing fields
+ * - Role immutable error (2025-01-XX): Trying to update role when already set caused "profiles.role is immutable once set"
+ *   → Fix: Added check to exclude role from update payload if it's already set in database
+ *   → Lesson: Handle immutable database fields in centralized utility to prevent errors for all callers
  *
  * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
  * See: docs/prevention/CASCADING_FAILURES.md
@@ -232,14 +235,33 @@ export async function updateUserProfile(
     
     if (existing) {
       // Profile exists - use UPDATE
+      // CRITICAL: profiles.role is IMMUTABLE once set - we cannot update it
+      // Check existing profile to see if role is already set, and exclude it from update if so
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle()
+      
+      // Create update payload, excluding role if it's already set (immutable field)
+      const updatePayload: any = { ...payload }
+      if (existingProfile?.role) {
+        // Role already set - exclude from update to prevent "immutable" error
+        // profiles.role is IMMUTABLE once set - we cannot update it, even to null
+        delete updatePayload.role
+        if (payload.role && payload.role !== existingProfile.role) {
+          console.log(`[Profile Update from ${source}] Role already set (${existingProfile.role}), excluding from update (immutable field). Attempted to set: ${payload.role}`)
+        }
+      }
+      
       const { error } = await supabase
         .from('profiles')
-        .update(payload)
+        .update(updatePayload)
         .eq('id', userId)
       
       if (error) {
         console.error(`[Profile Update from ${source}] Error:`, error)
-        console.error(`[Profile Update from ${source}] Payload:`, payload)
+        console.error(`[Profile Update from ${source}] Payload:`, updatePayload)
         return { success: false, error: error.message }
       }
     } else {

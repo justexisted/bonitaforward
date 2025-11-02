@@ -92,7 +92,6 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
     }
 
     const allRows = (allData || []) as DbProvider[]
-    console.log(`[Supabase] Fetched ${allRows.length} providers from database (limit: 1000)`)
     
     // Warn if we hit the limit
     if (allRows.length === 1000) {
@@ -111,14 +110,15 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
       return isPublished
     })
 
-    console.log(`[Supabase] Published providers: ${publishedRows.length}`)
-
     // Exclude soft-deleted providers and providers without valid category_key
     const filtered = publishedRows.filter((r) => {
       // Must have valid category_key
       const hasValidCategory = r.category_key && typeof r.category_key === 'string' && r.category_key.trim().length > 0
       if (!hasValidCategory) {
-        console.log(`[Supabase] Excluding provider without category_key: ${r.name} (category_key: "${r.category_key}")`)
+        // Only log exclusion in development mode
+        if (import.meta.env.DEV) {
+          console.log(`[Supabase] Excluding provider without category_key: ${r.name} (category_key: "${r.category_key}")`)
+        }
         return false
       }
       
@@ -127,75 +127,41 @@ export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
       return isNotDeleted
     })
     
-    console.log(`[Supabase] Final filtered providers: ${filtered.length}`)
-    
-    // Log category breakdown
+    // Calculate category breakdown for summary log
     const categoryBreakdown: Record<string, number> = {}
     filtered.forEach(r => {
       const cat = r.category_key || 'unknown'
       categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1
     })
-    console.log('[Supabase] Category breakdown:', categoryBreakdown)
     
-    // Debug: Show all unique category_key values to identify any issues
-    const uniqueCategories = [...new Set(filtered.map(r => r.category_key).filter(Boolean))]
-    console.log('[Supabase] Unique category_key values:', uniqueCategories)
+    // Single summary log instead of multiple logs
+    console.log(`[Supabase] Loaded ${filtered.length} providers (${allRows.length} total, ${publishedRows.length} published)`, categoryBreakdown)
     
-    // Debug: Show health-wellness specifically
-    const healthWellnessCount = filtered.filter(r => r.category_key === 'health-wellness').length
-    console.log(`[Supabase] Health-wellness providers found: ${healthWellnessCount}`)
-    
-    // Debug: Show any providers with "health" in category_key
-    const healthRelated = filtered.filter(r => 
-      r.category_key && r.category_key.toLowerCase().includes('health')
-    )
-    console.log(`[Supabase] Providers with "health" in category_key: ${healthRelated.length}`)
-    if (healthRelated.length > 0) {
-      console.log('[Supabase] Health-related category_keys:', [...new Set(healthRelated.map(r => r.category_key))])
-    }
-    
-    // Debug: Analyze health-wellness provider tags to understand what types exist
-    const healthWellnessProviders = filtered.filter(r => r.category_key === 'health-wellness')
-    if (healthWellnessProviders.length > 0) {
-      console.log(`[Supabase] Analyzing ${healthWellnessProviders.length} health-wellness providers...`)
+    // Detailed debug logs only in development mode
+    if (import.meta.env.DEV) {
+      // Debug: Show health-wellness specifically
+      const healthWellnessCount = filtered.filter(r => r.category_key === 'health-wellness').length
       
-      // Collect all unique tags from health-wellness providers
-      const allTags = new Set<string>()
-      const providerTagMap = new Map<string, string[]>()
-      
-      healthWellnessProviders.forEach(provider => {
-        const tags = provider.tags || []
-        tags.forEach(tag => allTags.add(tag.toLowerCase()))
-        providerTagMap.set(provider.name, tags.map(t => t.toLowerCase()))
-      })
-      
-      console.log('[Supabase] All health-wellness tags:', Array.from(allTags).sort())
-      
-      // Show sample providers and their tags
-      console.log('[Supabase] Sample health-wellness providers:')
-      healthWellnessProviders.slice(0, 10).forEach(p => {
-        console.log(`  ${p.name}: [${(p.tags || []).join(', ')}]`)
-      })
-      
-      // Identify common provider types based on tags
-      const providerTypes = new Map<string, number>()
-      allTags.forEach(tag => {
-        let type = 'other'
-        if (tag.includes('dental') || tag.includes('dentist')) type = 'dental'
-        else if (tag.includes('chiropractor') || tag.includes('chiro')) type = 'chiropractor'
-        else if (tag.includes('gym') || tag.includes('fitness') || tag.includes('24 hour')) type = 'gym'
-        else if (tag.includes('salon') || tag.includes('hair') || tag.includes('beauty')) type = 'salon'
-        else if (tag.includes('spa') || tag.includes('medspa') || tag.includes('massage')) type = 'spa'
-        else if (tag.includes('medical') || tag.includes('doctor') || tag.includes('physician')) type = 'medical'
-        else if (tag.includes('therapy') || tag.includes('therapist') || tag.includes('physical therapy')) type = 'therapy'
-        else if (tag.includes('naturopath') || tag.includes('naturopathic')) type = 'naturopathic'
-        else if (tag.includes('mental') || tag.includes('psychology') || tag.includes('counseling')) type = 'mental health'
-        else if (tag.includes('optometry') || tag.includes('vision') || tag.includes('eye')) type = 'vision'
+      // Debug: Analyze health-wellness provider tags to understand what types exist
+      const healthWellnessProviders = filtered.filter(r => r.category_key === 'health-wellness')
+      if (healthWellnessProviders.length > 0) {
+        // Collect all unique tags from health-wellness providers
+        const allTags = new Set<string>()
         
-        providerTypes.set(type, (providerTypes.get(type) || 0) + 1)
-      })
-      
-      console.log('[Supabase] Provider types found:', Object.fromEntries(providerTypes))
+        healthWellnessProviders.forEach(provider => {
+          const tags = provider.tags || []
+          tags.forEach(tag => allTags.add(tag.toLowerCase()))
+        })
+        
+        console.log(`[Supabase] Health-wellness: ${healthWellnessCount} providers, ${allTags.size} unique tags`)
+        
+        // Show sample providers and their tags (only first 3 in dev)
+        if (healthWellnessProviders.length > 0 && allTags.size > 0) {
+          console.log('[Supabase] Sample health-wellness providers:', 
+            healthWellnessProviders.slice(0, 3).map(p => `${p.name}: [${(p.tags || []).slice(0, 3).join(', ')}]`)
+          )
+        }
+      }
     }
     
     // Fix image URLs for all providers
