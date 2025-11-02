@@ -218,7 +218,10 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
   // Check cache first (localStorage + memory)
   const cachedUrl = getCachedImage(searchQuery)
   if (cachedUrl) {
-    console.log(`[Unsplash] Using cached image for "${searchQuery}"`)
+    // Only log in development mode to reduce console spam
+    if (import.meta.env.DEV) {
+      console.log(`[Unsplash] Using cached image for "${searchQuery}"`)
+    }
     return cachedUrl
   }
   
@@ -230,7 +233,10 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
   }
   
   try {
-    console.log(`[Unsplash] Fetching new image for "${searchQuery}"`)
+    // Only log in development mode to reduce console spam
+    if (import.meta.env.DEV) {
+      console.log(`[Unsplash] Fetching new image for "${searchQuery}"`)
+    }
     
     const response = await fetch(
       `${UNSPLASH_API_URL}/search/photos?` +
@@ -258,7 +264,10 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
       // Save to cache (localStorage + memory)
       cacheImage(searchQuery, imageUrl)
       
-      console.log(`[Unsplash] Cached new image for "${searchQuery}"`)
+      // Only log in development mode to reduce console spam
+      if (import.meta.env.DEV) {
+        console.log(`[Unsplash] Cached new image for "${searchQuery}"`)
+      }
       return imageUrl
     }
     
@@ -330,9 +339,10 @@ async function saveImageToDatabase(eventId: string, imageUrl: string, imageType:
     if (error) {
       console.warn(`[ImageUtils] Failed to save image to database for event ${eventId}:`, error)
     } else {
-      // Only log when image was actually updated (changed from null or different value)
+      // Only log in development mode when image was actually updated (changed from null or different value)
       const wasUpdated = !existingEvent?.image_url || existingEvent.image_url !== imageUrl
-      if (wasUpdated) {
+      if (wasUpdated && import.meta.env.DEV) {
+        // Only log in development mode to reduce console spam in production
         console.log(`[ImageUtils] Saved image to database for event ${eventId}`)
       }
     }
