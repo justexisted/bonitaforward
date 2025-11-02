@@ -1,6 +1,14 @@
+/**
+ * Admin user deletion endpoint
+ * 
+ * CRITICAL: Uses shared deletion utility to ensure correct deletion order
+ * (related data first, auth user last) to prevent foreign key constraint errors.
+ */
+
 import { Handler } from '@netlify/functions'
 import { verifyAuthAndAdmin, authAdminErrorResponse } from './utils/authAdmin'
 import { errorResponse, successResponse, handleOptions } from './utils/response'
+import { deleteUserAndRelatedData, getUserEmailFromProfile } from './utils/userDeletion'
 
 export const handler: Handler = async (event) => {
   // Handle OPTIONS/preflight
@@ -34,30 +42,28 @@ export const handler: Handler = async (event) => {
       return errorResponse(400, 'Cannot delete your own account', 'Admins cannot delete themselves')
     }
 
-    // Step 1: Delete from auth.users using Admin API
-    const { error: authError } = await (supabaseClient as any).auth.admin.deleteUser(user_id)
-    
-    if (authError) {
-      console.error(`[admin-delete-user] Error deleting from auth.users:`, authError)
-      return errorResponse(500, 'Failed to delete user from auth system', authError.message)
+    // Get user email from profile (needed for deleting email-keyed data)
+    const userEmail = await getUserEmailFromProfile(user_id, supabaseClient)
+
+    // Use shared deletion utility to ensure correct deletion order
+    const deletionResult = await deleteUserAndRelatedData({
+      userId: user_id,
+      userEmail,
+      supabaseClient,
+      logPrefix: '[admin-delete-user]'
+    })
+
+    if (!deletionResult.success) {
+      console.error(`[admin-delete-user] Deletion failed:`, deletionResult.error)
+      return errorResponse(500, 'Failed to delete user from auth system', deletionResult.error)
     }
 
-    console.log(`[admin-delete-user] ✓ Deleted user from auth.users`)
+    console.log(`[admin-delete-user] ✓ User deletion completed successfully`, deletionResult.deletedCounts)
 
-    // Step 2: Delete from profiles table (cascade should handle most, but ensure it's done)
-    const { error: profileError } = await supabaseClient
-      .from('profiles')
-      .delete()
-      .eq('id', user_id)
-
-    if (profileError) {
-      console.warn(`[admin-delete-user] Warning deleting profile:`, profileError)
-      // Don't fail the whole operation if profile deletion fails (might already be deleted)
-    }
-
+    // successResponse() automatically includes success: true and ok: true
     return successResponse({ 
-      success: true, 
-      message: `User ${user_id} deleted successfully`
+      message: `User ${user_id} deleted successfully`,
+      deletedCounts: deletionResult.deletedCounts
     })
   } catch (err: any) {
     console.error('[admin-delete-user] Exception:', err)

@@ -109,8 +109,17 @@ export async function deleteUser(
     
     const result = await response.json()
     
-    if (!result.ok) {
-      throw new Error('Delete failed')
+    // Log response for debugging
+    console.log('[Admin] Delete user response:', result)
+    
+    // Check for success field (new format) or ok field (legacy format)
+    // The new refactored function returns { success: true, message: ..., deletedCounts: ... }
+    if (result.success === true || result.ok === true) {
+      // Success - continue with deletion cleanup
+    } else {
+      // No success indicator found - this is an error
+      console.error('[Admin] Delete response missing success indicator:', result)
+      throw new Error(result.error || result.message || 'Delete failed - no success indicator in response')
     }
     
     // Remove from local lists - get the user's email first
