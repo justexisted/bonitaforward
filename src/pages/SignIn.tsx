@@ -512,7 +512,7 @@ export default function SignInPage() {
             }
             else if (emsg.includes('password') && !emsg.includes('reset')) {
               console.log('[SignIn] ✓ Detected: Password validation error')
-              setMessage(error) // Show specific password error (e.g., "password must be at least 6 characters")
+              setMessage(error || 'Password validation failed') // Show specific password error (e.g., "password must be at least 6 characters")
             }
             else if (emsg.includes('email') && emsg.includes('invalid')) {
               console.log('[SignIn] ✓ Detected: Invalid email format')

@@ -27,7 +27,8 @@ export default function VerifyEmailPage() {
     async function verifyEmail() {
       try {
       // Call verify-email function with token as query parameter
-      const verifyUrl = `/.netlify/functions/verify-email?token=${encodeURIComponent(token)}`
+      // token is guaranteed to be non-null here because we return early if it's null
+      const verifyUrl = `/.netlify/functions/verify-email?token=${encodeURIComponent(token!)}`
       const response = await fetch(verifyUrl, {
         method: 'GET',
         headers: {
