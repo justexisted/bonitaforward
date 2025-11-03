@@ -692,3 +692,46 @@ See: `docs/prevention/CASCADING_FAILURES.md` - Section #12
 See: `docs/prevention/CASCADING_FAILURES.md` - Section #14
 See: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
 
+---
+
+### Email Verification Token Parsing Fix (2025-01-XX)
+
+**Issue:** `/verify-email` was returning "Missing verification token" due to incorrect query param parsing in Netlify function.  
+**Files:** `netlify/functions/verify-email.ts`  
+**Fix:** Read token from `event.queryStringParameters.token` with `rawQuery` fallback.  
+**Impact:** Prevents false verification failures; maintains API contract with `/verify-email?token=...` links.
+
+**Breaking-Change Awareness:**
+- If deployment environment changes request shape, ensure `queryStringParameters` and `rawQuery` are supported.
+- Frontend path `/verify-email?token=...` must remain stable.
+
+**Prevention:** Documented in `CASCADING_FAILURES.md` (#16). Add function-header comments describing expected inputs.
+
+---
+
+### Self‑Delete: Business Delete/Unlink + Auto‑Reconnect (2025-01-XX)
+
+**Issue:** After self-deletion, businesses remained orphaned and reappeared as "found by email but not linked" after re‑signup.  
+**Files:**
+- `netlify/functions/user-delete.ts` (accepts `deleteBusinesses`)
+- `netlify/functions/utils/userDeletion.ts` (hard vs soft delete providers)
+- `src/pages/Account.tsx` (UI prompt, passes intent)
+- `src/pages/account/dataLoader.ts` (`loadMyBusinesses()` auto-reconnect)
+
+**Fixes:**
+- Prompt user to delete or keep businesses when deleting account.
+- Backend hard-delete (permanent) or soft-delete (unlink + add `deleted` badge).
+- On next login, auto-reconnect providers by email and remove `deleted` badge.
+
+**Dependencies:**
+- Providers table must include `owner_user_id`, `badges`, `email`.
+- Auth flow must provide `userId` and `email` for reconnection.
+
+**Breaking-Change Awareness:**
+- Changing provider schema (e.g., removing `owner_user_id`/`badges`) breaks deletion/reconnection.
+- If email changes, reconnection by email may not find providers; consider a manual link flow.
+
+**Prevention:** Documented in `CASCADING_FAILURES.md` (#17). Add smoke tests covering delete -> re‑signup reconnection.
+
+---
+

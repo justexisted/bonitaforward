@@ -26,19 +26,17 @@ You're experiencing **cascading failures** - fixing one issue creates another:
 - ✅ Debug logging added to track name flow
 - **Status:** ✅ Fixed - See Section #14 for detailed pattern and prevention
 
-**User Deletion System - TESTED & WORKING:**
-- ✅ **Business Account Deletion** - Successfully tested complete deletion with profile reload
-- ✅ **Customer Account Deletion** - Successfully tested complete deletion with profile reload  
-- ✅ **Users Without Profiles** - Successfully tested email-only deletion (funnels, bookings, booking_events)
-- ✅ **Profile Reload** - Verified deleted users don't reappear after page refresh
-- ✅ **Complete Coverage** - Verified deletion removes data from all email-keyed tables
+**Email Verification Token Parsing - FIXED (2025-01-XX):**
+- ✅ Netlify function now correctly reads token from `event.queryStringParameters.token`
+- ✅ Added fallback for `rawQuery` to harden against environment differences
+- ✅ Prevents false "Missing verification token" errors
+- **Status:** ✅ Fixed - See Section #16
 
-**Key Lessons:**
-1. Always reload from database after deletion to verify it worked
-2. Handle both cases: users WITH profiles (full deletion) and WITHOUT profiles (email-only deletion)
-3. Don't forget `booking_events` table uses `customer_email` column (not `user_email`)
-
-See sections #11 and #12 below for detailed patterns and prevention strategies.
+**User Deletion + Business Handling - FIXED (2025-01-XX):**
+- ✅ Prompt users to delete or keep businesses on self-delete
+- ✅ Soft delete/unlink (keep) or hard delete (remove) via backend flag
+- ✅ Auto-reconnect unlinked businesses on next signup by email
+- **Status:** ✅ Fixed - See Section #17
 
 ---
 
@@ -925,76 +923,63 @@ if (event === 'SIGNED_IN') {
 - ✅ Resend verification email works from account page
 
 ---
-}
+
+### 16. Netlify Function Query Param Parsing Mismatch (2025-01-XX)
+
+**What:** Serverless function read query params incorrectly, causing verification to fail.
+
+**Failure Mode:**
+```ts
+// WRONG: Using URLSearchParams on queryStringParameters object
+const params = new URLSearchParams(event.queryStringParameters as any) // ❌
+const token = params.get('token') // null
 ```
 
-**What Happened:**
-1. User fills out funnel form or creates booking (no account created)
-2. Their email is stored in `funnel_responses` or `bookings` table
-3. No profile is created (they never signed up)
-4. Admin tries to delete user from customer list
-5. Code looks for profile to get userId
-6. Profile doesn't exist → deletion fails with "User not found"
-7. User remains in system even though admin tried to delete them
-
-**The Fix:**
-```typescript
-// CORRECT: Handle both cases - with and without profile
-async function deleteUserByEmail(email: string) {
-  const profile = profiles.find(p => p.email === email)
-  if (profile?.id) {
-    // User has profile - delete everything (auth user, profile, all data)
-    await deleteUser(profile.id)
-  } else {
-    // User only in funnels/bookings - delete email-keyed data only
-    await deleteUserByEmailOnly(email)
-  }
-}
-
-async function deleteUserByEmailOnly(email: string) {
-  // Delete email-keyed data (no profile means no userId)
-  await supabase.from('funnel_responses').delete().eq('user_email', email)
-  await supabase.from('bookings').delete().eq('user_email', email)
-  // booking_events uses 'customer_email' column, not 'user_email'
-  await supabase.from('booking_events').delete().eq('customer_email', email)
-  // Cannot delete auth user since there's no profile/userId
+**Fix:**
+```ts
+// CORRECT: Read token directly from queryStringParameters
+const qp = event.queryStringParameters || {}
+let token = typeof qp.token === 'string' ? qp.token : null
+// Fallback: rawQuery if available
+if (!token && (event as any).rawQuery) {
+  const usp = new URLSearchParams((event as any).rawQuery)
+  token = usp.get('token')
 }
 ```
 
 **Prevention Checklist:**
-- ✅ ALWAYS check if profile exists before requiring userId
-- ✅ Handle email-only deletion for users without profiles
-- ✅ Delete email-keyed data even if no profile exists
-- ✅ Show appropriate message explaining what was deleted
-- ✅ Don't try to delete auth user if there's no profile
-
-**Rule of Thumb:**
-> **When deleting by email, handle both cases:**
-> 1. Check if profile exists for this email
-> 2. If profile exists: Delete everything (auth user, profile, all data)
-> 3. If no profile: Delete email-keyed data only (funnels, bookings, booking_events)
-> 4. Note: `booking_events` table uses `customer_email` column, not `user_email`
-> 5. Cannot delete auth user without profile (no userId)
-> 6. Show message explaining what was deleted
+- ✅ Always check your platform’s request shape (Netlify: `queryStringParameters` is an object)
+- ✅ Add a defensive fallback (`rawQuery`) for environments/dev servers
+- ✅ Log clear errors that point to setup/migration issues vs bad tokens
+- ✅ Document parameter contracts in the function header
 
 **Files to Watch:**
-- `src/utils/adminUserUtils.ts` - `deleteUserByEmailOnly()` function
-- `src/pages/Admin.tsx` - `deleteCustomerUserByEmail` handler
-- Any deletion function that requires userId
+- `netlify/functions/verify-email.ts`
+- Any serverless function that reads query params
 
-**Common Patterns:**
-- Assumes all users have profiles
-- Fails when trying to delete users without profiles
-- Doesn't handle email-only data deletion
-- Shows error instead of partial deletion
-- Forgets to delete from `booking_events` table (uses `customer_email`, not `user_email`)
+---
 
-**Testing Verified (2025-01-XX):**
-- ✅ Successfully deleted business accounts (with profiles)
-- ✅ Successfully deleted customer accounts (with profiles)
-- ✅ Successfully deleted users without profiles (email-only data)
-- ✅ Deletion removes data from all tables: `funnel_responses`, `bookings`, `booking_events`
-- ✅ Deleted users don't reappear after page refresh
+### 17. Business Ownership on Self‑Deletion (2025-01-XX)
+
+**What:** When a user deletes their account, businesses might remain orphaned and later show as "found by email but not linked" after re‑signup.
+
+**Fix:**
+- Frontend: On delete, if user has businesses, prompt to delete or keep
+- Backend: `user-delete` accepts `deleteBusinesses` flag
+  - true → hard delete providers (permanent)
+  - false → soft delete: add `deleted` badge and set `owner_user_id = null`
+- Reconnection: On next login, `loadMyBusinesses()` finds providers by email with `owner_user_id IS NULL` and automatically links them back to the new `userId`, removing the `deleted` badge.
+
+**Prevention Checklist:**
+- ✅ Treat business ownership explicitly during account deletion
+- ✅ Avoid orphaned providers by unlinking instead of silent leave-behind
+- ✅ Provide a reconnection path (email match) on future signups
+- ✅ Keep public directory integrity (soft delete keeps references from breaking)
+
+**Files to Watch:**
+- `netlify/functions/user-delete.ts` (accepts `deleteBusinesses`)
+- `netlify/functions/utils/userDeletion.ts` (hard/soft delete logic)
+- `src/pages/account/dataLoader.ts` (`loadMyBusinesses()` reconnection)
 
 ---
 

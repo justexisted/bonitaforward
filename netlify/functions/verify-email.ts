@@ -44,8 +44,15 @@ export const handler: Handler = async (event) => {
     let token: string | null = null
     
     if (event.httpMethod === 'GET') {
-      const params = new URLSearchParams(event.queryStringParameters || {})
-      token = params.get('token')
+      // Netlify provides queryStringParameters as a plain object
+      // Using URLSearchParams on an object may return null; read directly and fallback
+      const qp = (event as any).queryStringParameters || {}
+      token = (typeof qp.token === 'string' && qp.token) ? qp.token : null
+      // Fallback: try parsing rawQuery if present
+      if (!token && (event as any).rawQuery) {
+        const usp = new URLSearchParams((event as any).rawQuery as string)
+        token = usp.get('token')
+      }
     } else {
       const body = JSON.parse(event.body || '{}')
       token = body.token
