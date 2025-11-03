@@ -314,7 +314,7 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
     if (userEmail) {
       const { data: emailData, error: emailError } = await supabase
         .from('providers')
-        .select('id, name, category_key, address, phone, email, website, published, created_at')
+        .select('id, name, category_key, address, phone, email, website, published, created_at, owner_user_id, badges')
         .ilike('email', userEmail.trim())
         .is('owner_user_id', null) // Only get businesses not already linked
         .order('created_at', { ascending: false })

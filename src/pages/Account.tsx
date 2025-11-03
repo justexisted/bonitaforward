@@ -150,7 +150,7 @@ export default function AccountPage() {
   }
 
   // Delete user account
-  async function deleteAccount(deleteBusinesses: boolean = false) {
+  async function deleteAccount() {
     // Double confirmation
     if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       return
