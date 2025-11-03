@@ -69,6 +69,13 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
    * - Change requests
    */
   const loadBusinessData = async () => {
+    console.log('[MyBusiness] loadBusinessData called with:', {
+      userId: auth.userId,
+      email: auth.email,
+      hasUserId: !!auth.userId,
+      hasEmail: !!auth.email
+    })
+    
     if (!auth.userId || !auth.email) {
       console.log('[MyBusiness] No userId or email, cannot load data')
       return
@@ -77,6 +84,19 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
     setLoading(true)
     try {
       console.log('[MyBusiness] Loading comprehensive business data for userId:', auth.userId, 'email:', auth.email)
+      
+      // First, test if we can query at all - check for Thai Restaurant by email
+      const { data: testData, error: testError } = await supabase
+        .from('providers')
+        .select('id, name, email, owner_user_id')
+        .ilike('email', auth.email)
+        .limit(5)
+      
+      console.log('[MyBusiness] Test query for email match:', {
+        error: testError,
+        count: testData?.length || 0,
+        businesses: testData?.map(b => ({ id: b.id, name: b.name, email: b.email, owner_user_id: b.owner_user_id })) || []
+      })
       
       // Load business listings owned by user from providers table
       const { data: listingsData, error: listingsError } = await supabase
@@ -226,6 +246,15 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
           !listingsData?.some(owned => owned.id === item.id)
         )
       ]
+
+      console.log('[MyBusiness] Combined listings result:', {
+        ownedCount: listingsData?.length || 0,
+        emailCount: emailListingsData?.length || 0,
+        totalCombined: allListings.length,
+        ownedIds: listingsData?.map(l => l.id) || [],
+        emailIds: emailListingsData?.map(l => l.id) || [],
+        finalIds: allListings.map(l => l.id)
+      })
 
       setListings((allListings as BusinessListing[]) || [])
       setApplications((appsData as BusinessApplication[]) || [])

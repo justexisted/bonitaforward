@@ -353,35 +353,23 @@ async function saveImageToDatabase(eventId: string, imageUrl: string, imageType:
 
 /**
  * Preload images for multiple events (batch processing)
- * Useful for calendar page to load all images at once
- * Automatically saves fetched images to database for permanent storage
+ * FRONTEND-ONLY: gradients fallback only. NO external API calls here.
+ * Images must be pre-populated in DB via scripts/populate-event-images.*
  */
 export async function preloadEventImages(events: CalendarEvent[]): Promise<Map<string, {
   type: 'image' | 'gradient'
   value: string
 }>> {
   const imageMap = new Map<string, { type: 'image' | 'gradient', value: string }>()
-  
-  // Process in parallel but limit concurrent requests
-  const batchSize = 5
-  for (let i = 0; i < events.length; i += batchSize) {
-    const batch = events.slice(i, i + batchSize)
-    const results = await Promise.all(
-      batch.map(async (event) => {
-        const result = await getEventHeaderImage(event)
-        
-        // Save to database permanently (fetch once, store forever)
-        await saveImageToDatabase(event.id, result.value, result.type)
-        
-        return result
-      })
-    )
-    
-    batch.forEach((event, index) => {
-      imageMap.set(event.id, results[index])
+
+  // Synchronous, no network calls: gradients only for events lacking DB images
+  events.forEach((event) => {
+    imageMap.set(event.id, {
+      type: 'gradient',
+      value: getEventGradient(event)
     })
-  }
-  
+  })
+
   return imageMap
 }
 

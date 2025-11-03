@@ -92,7 +92,7 @@ export default function CalendarSection() {
         
         console.log(`[CalendarSection] 📊 Events: ${calendarEvents.length} total`)
         console.log(`[CalendarSection] ✅ ${eventsWithDbImages} have database images`)
-        console.log(`[CalendarSection] 🔍 ${eventsNeedingImages.length} need dynamic images`)
+        console.log(`[CalendarSection] 🎨 ${eventsNeedingImages.length} will use gradient fallbacks (no external fetch)`)        
         
         if (eventsNeedingImages.length > 0) {
           const images = await preloadEventImages(eventsNeedingImages)

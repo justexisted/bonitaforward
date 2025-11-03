@@ -65,7 +65,7 @@
  * FOR SELECT USING (bucket_id = 'business-images');
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { type PlanChoice } from '../utils/planChoiceDb'
@@ -94,6 +94,15 @@ import { useBusinessOperations } from './MyBusiness/hooks/useBusinessOperations'
 export default function MyBusinessPage() {
   const auth = useAuth()
   const location = useLocation()
+  
+  console.log('[MyBusiness] Component rendered:', {
+    pathname: location.pathname,
+    isAuthed: auth.isAuthed,
+    userId: auth.userId,
+    email: auth.email,
+    role: auth.role
+  })
+  
   const [listings, setListings] = useState<BusinessListing[]>([])
   const [applications, setApplications] = useState<BusinessApplication[]>([])
   const [jobPosts, setJobPosts] = useState<JobPost[]>([])
@@ -215,20 +224,43 @@ export default function MyBusinessPage() {
    * 
    * Debug logging helps troubleshoot role assignment issues.
    */
+  const hasLoadedRef = useRef<string | null>(null)
+  
   useEffect(() => {
+    console.log('[MyBusiness] useEffect triggered:', {
+      isAuthed: auth.isAuthed,
+      userId: auth.userId,
+      email: auth.email,
+      role: auth.role,
+      hasLoadedRef: hasLoadedRef.current
+    })
+    
+    // Guard against duplicate loads from React Strict Mode (dev double-render)
+    // Reset guard when userId changes
+    if (hasLoadedRef.current === auth.userId && auth.userId) {
+      console.log('[MyBusiness] Skipping duplicate load (React StrictMode guard) for userId:', auth.userId)
+      return
+    }
+    
     if (!auth.isAuthed) {
+      console.log('[MyBusiness] Not authenticated, blocking load')
       setMessage('Please sign in to access this page.')
       setLoading(false)
       return
     }
 
     if (auth.role !== 'business') {
+      console.log('[MyBusiness] Wrong role, blocking load. Role:', auth.role)
       setMessage(`This page is only available for business accounts. Your current role: ${auth.role || 'none'}`)
       setLoading(false)
       return
     }
-    loadBusinessData()
-    checkUserPlanChoice()
+    
+    console.log('[MyBusiness] Starting data load for user:', auth.userId, 'email:', auth.email, 'role:', auth.role)
+    hasLoadedRef.current = auth.userId || null
+    void loadBusinessData()
+    void checkUserPlanChoice()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.userId, auth.role, auth.isAuthed])
 
   /**

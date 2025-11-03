@@ -272,7 +272,8 @@ export default function AccountPage() {
         })
       }
       
-      return hasBusinesses || hasApplications
+      // Ensure business users can always access Business sections
+      return hasBusinesses || hasApplications || auth.role === 'business'
     }
     return true
   })

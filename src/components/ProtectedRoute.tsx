@@ -45,6 +45,15 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const auth = useAuth()
   const navigate = useNavigate()
+  
+  console.log('[ProtectedRoute] Rendering:', {
+    loading: auth.loading,
+    isAuthed: auth.isAuthed,
+    role: auth.role,
+    emailVerified: auth.emailVerified,
+    allowedRoles,
+    requireEmailVerification
+  })
 
   useEffect(() => {
     // Don't redirect while still loading

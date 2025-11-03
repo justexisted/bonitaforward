@@ -18,6 +18,12 @@ export default function EmailVerificationGuard({
   children
 }: EmailVerificationGuardProps) {
   const auth = useAuth()
+  
+  console.log('[EmailVerificationGuard] Rendering:', {
+    loading: auth.loading,
+    isAuthed: auth.isAuthed,
+    emailVerified: auth.emailVerified
+  })
 
   // Show loading state while auth is loading
   if (auth.loading) {

@@ -299,83 +299,111 @@ export async function requestApplicationUpdate(applicationId: string, message: s
 
 export async function loadMyBusinesses(userId: string, userEmail?: string): Promise<MyBusiness[]> {
   try {
+    console.log('[Account] loadMyBusinesses called:', { userId, userEmail })
+    
     // First try to load by owner_user_id
     const { data: ownerData, error: ownerError } = await supabase
       .from('providers')
-      .select('id, name, category_key, address, phone, email, website, published, created_at')
+      .select('id, name, category_key, address, phone, email, website, published, created_at, owner_user_id, badges')
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false })
+    
+    console.log('[Account] Query by owner_user_id result:', {
+      error: ownerError,
+      count: ownerData?.length || 0,
+      ids: ownerData?.map(b => b.id) || []
+    })
     
     if (ownerError) {
       console.log('[Account] Error loading businesses by owner_user_id:', ownerError)
     }
     
-    // If user has an email, also try to find businesses by email (fallback for older businesses)
+    // If user has an email, also try to find businesses by email (fallback for older businesses or unlinked)
+    // This is important: we want to find businesses even if owner_user_id is null or different
+    let emailData: any[] = []
     if (userEmail) {
-      const { data: emailData, error: emailError } = await supabase
+      const { data: emailQueryData, error: emailError } = await supabase
         .from('providers')
         .select('id, name, category_key, address, phone, email, website, published, created_at, owner_user_id, badges')
         .ilike('email', userEmail.trim())
-        .is('owner_user_id', null) // Only get businesses not already linked
         .order('created_at', { ascending: false })
+      
+      console.log('[Account] Query by email result:', {
+        error: emailError,
+        count: emailQueryData?.length || 0,
+        businesses: emailQueryData?.map(b => ({ id: b.id, name: b.name, owner_user_id: b.owner_user_id })) || []
+      })
       
       if (emailError) {
         console.log('[Account] Error loading businesses by email:', emailError)
+      } else {
+        emailData = emailQueryData || []
       }
-      
-      // Combine results and deduplicate by id
-      const allBusinesses = [...(ownerData || []), ...(emailData || [])]
-      const uniqueBusinesses = Array.from(
-        new Map(allBusinesses.map(b => [b.id, b])).values()
-      )
-      
-      // If we found businesses by email but not linked, automatically reconnect them
-      // This handles the case where user deleted account and signed up again
-      if (emailData && emailData.length > 0) {
-        console.log('[Account] Found businesses by email but not linked to user. Automatically reconnecting...', {
-          userId,
-          userEmail,
-          unlinkedCount: emailData.length,
-          businessNames: emailData.map(b => b.name)
-        })
-        
-        // Automatically reconnect businesses by updating owner_user_id
-        // This allows users to recover their businesses after account deletion
-        for (const business of emailData) {
-          try {
-            // Remove 'deleted' badge if present (business is being reconnected)
-            const currentBadges = Array.isArray((business as any)?.badges) 
-              ? ((business as any)?.badges as string[]) 
-              : []
-            const updatedBadges = currentBadges.filter((b: string) => b !== 'deleted')
-            
-            const { error: updateError } = await supabase
-              .from('providers')
-              .update({ 
-                owner_user_id: userId,
-                badges: updatedBadges.length > 0 ? updatedBadges : null
-              })
-              .eq('id', business.id)
-            
-            if (updateError) {
-              console.warn('[Account] Failed to reconnect business:', business.name, updateError)
-            } else {
-              console.log('[Account] ✓ Reconnected business:', business.name)
-              // Update the business object so it appears as linked
-              business.owner_user_id = userId
-            }
-          } catch (err) {
-            console.warn('[Account] Error reconnecting business:', business.name, err)
-          }
-        }
-      }
-      
-      return uniqueBusinesses.map((b: any) => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]
     }
     
-    return ((ownerData || []) as any[]).map(b => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]
+    // Combine results and deduplicate by id
+    const allBusinesses = [...(ownerData || []), ...emailData]
+    const uniqueBusinesses = Array.from(
+      new Map(allBusinesses.map(b => [b.id, b])).values()
+    )
+    
+    console.log('[Account] Combined businesses:', {
+      ownerCount: ownerData?.length || 0,
+      emailCount: emailData.length,
+      totalUnique: uniqueBusinesses.length,
+      allIds: uniqueBusinesses.map(b => b.id)
+    })
+    
+    // If we found businesses by email but not linked (owner_user_id is null or different), automatically reconnect them
+    // This handles the case where user deleted account and signed up again
+    const unlinkedBusinesses = emailData.filter(b => !b.owner_user_id || b.owner_user_id !== userId)
+    if (unlinkedBusinesses.length > 0) {
+      console.log('[Account] Found businesses by email but not linked to user. Automatically reconnecting...', {
+        userId,
+        userEmail,
+        unlinkedCount: unlinkedBusinesses.length,
+        businessNames: unlinkedBusinesses.map(b => b.name)
+      })
+      
+      // Automatically reconnect businesses by updating owner_user_id
+      // This allows users to recover their businesses after account deletion
+      for (const business of unlinkedBusinesses) {
+        try {
+          // Remove 'deleted' badge if present (business is being reconnected)
+          const currentBadges = Array.isArray((business as any)?.badges) 
+            ? ((business as any)?.badges as string[]) 
+            : []
+          const updatedBadges = currentBadges.filter((b: string) => b !== 'deleted')
+          
+          const { error: updateError } = await supabase
+            .from('providers')
+            .update({ 
+              owner_user_id: userId,
+              badges: updatedBadges.length > 0 ? updatedBadges : null
+            })
+            .eq('id', business.id)
+          
+          if (updateError) {
+            console.warn('[Account] Failed to reconnect business:', business.name, updateError)
+          } else {
+            console.log('[Account] ✓ Reconnected business:', business.name)
+            // Update the business object so it appears as linked
+            business.owner_user_id = userId
+          }
+        } catch (err) {
+          console.warn('[Account] Error reconnecting business:', business.name, err)
+        }
+      }
+    }
+    
+    const result = uniqueBusinesses.map((b: any) => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]
+    console.log('[Account] Final loadMyBusinesses result:', {
+      count: result.length,
+      names: result.map(b => b.name)
+    })
+    return result
   } catch (err) {
-    console.log('[Account] Error loading user businesses:', err)
+    console.error('[Account] Error loading user businesses:', err)
     return []
   }
 }
