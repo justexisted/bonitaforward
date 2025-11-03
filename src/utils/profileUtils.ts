@@ -102,6 +102,9 @@ export interface CompleteProfileData {
  * Prevents missing fields like name or role from being omitted.
  */
 export function createProfilePayload(data: Partial<CompleteProfileData>): CompleteProfileData {
+  // CRITICAL: Only set preferences to null if they're explicitly undefined
+  // If they're explicitly false or true, preserve them
+  // This ensures preferences set during signup (true) are saved correctly
   return {
     email: data.email || '',
     name: data.name || null,
@@ -110,8 +113,9 @@ export function createProfilePayload(data: Partial<CompleteProfileData>): Comple
     resident_verification_method: data.resident_verification_method || null,
     resident_zip_code: data.resident_zip_code || null,
     resident_verified_at: data.resident_verified_at || null,
-    email_notifications_enabled: data.email_notifications_enabled ?? null,
-    marketing_emails_enabled: data.marketing_emails_enabled ?? null
+    // Preserve explicit boolean values (true/false), only use null if undefined
+    email_notifications_enabled: data.email_notifications_enabled !== undefined ? data.email_notifications_enabled : null,
+    marketing_emails_enabled: data.marketing_emails_enabled !== undefined ? data.marketing_emails_enabled : null
   }
 }
 

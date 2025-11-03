@@ -17,7 +17,7 @@ type AuthContextValue = {
   profileState: { name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
-  signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string; session: any }>
+  signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string; session: any; user?: any }>
   resetPassword: (email: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   resendVerificationEmail: () => Promise<{ error?: string }>
@@ -63,23 +63,67 @@ function saveReturnUrl(): void {
 /**
  * Fetch user profile (name and role) from database
  */
-async function fetchUserProfile(userId: string): Promise<{ name?: string; role?: 'business' | 'community' }> {
+async function fetchUserProfile(userId: string): Promise<{ name?: string; role?: 'business' | 'community'; emailConfirmed?: boolean }> {
   try {
-    const { data: prof } = await supabase
+    // Try to select email_confirmed_at, but handle gracefully if column doesn't exist yet
+    // This allows the app to work before SQL migrations are run
+    const { data: prof, error } = await supabase
       .from('profiles')
-      .select('name, role')
+      .select('name, role, email_confirmed_at')
       .eq('id', userId)
       .maybeSingle()
+    
+    if (error) {
+      // If error is about missing column (400 Bad Request with column name in message, or PGRST116)
+      // Try again without email_confirmed_at column
+      if (error.code === 'PGRST116' || error.message?.includes('email_confirmed_at') || error.message?.includes('column') || error.message?.includes('does not exist')) {
+        if (import.meta.env.DEV) {
+          console.warn('[Auth] email_confirmed_at column not found, using basic query. Run SQL migration: ops/sql/add-email-confirmed-at-to-profiles.sql')
+        }
+        
+        const { data: profBasic, error: basicError } = await supabase
+          .from('profiles')
+          .select('name, role')
+          .eq('id', userId)
+          .maybeSingle()
+        
+        if (basicError) {
+          if (import.meta.env.DEV) {
+            console.warn('[Auth] Error fetching profile:', basicError.message)
+          }
+          return {}
+        }
+        
+        if (profBasic) {
+          const dbRole = String((profBasic as any)?.role || '').toLowerCase()
+          return {
+            name: (profBasic as any)?.name || undefined,
+            role: (dbRole === 'business' || dbRole === 'community') ? dbRole as 'business' | 'community' : undefined,
+            emailConfirmed: false // Column doesn't exist yet, default to false
+          }
+        }
+      } else {
+        // For other errors, log and continue
+        if (import.meta.env.DEV) {
+          console.warn('[Auth] Error fetching profile:', error.message)
+        }
+      }
+      return {}
+    }
     
     if (prof) {
       const dbRole = String((prof as any)?.role || '').toLowerCase()
       return {
         name: (prof as any)?.name || undefined,
-        role: (dbRole === 'business' || dbRole === 'community') ? dbRole as 'business' | 'community' : undefined
+        role: (dbRole === 'business' || dbRole === 'community') ? dbRole as 'business' | 'community' : undefined,
+        emailConfirmed: Boolean((prof as any)?.email_confirmed_at) // Will be undefined/false if column doesn't exist
       }
     }
-  } catch (error) {
-    console.error('Error fetching user profile:', error)
+  } catch (error: any) {
+    // Handle any unexpected errors gracefully
+    if (import.meta.env.DEV) {
+      console.warn('[Auth] Error fetching user profile:', error?.message || error)
+    }
   }
   return {}
 }
@@ -434,17 +478,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const email = session.user.email
           const userId = session.user.id
           
-          // Check email verification status from session
-          const verified = Boolean(session.user.email_confirmed_at)
-          if (mounted) {
-            setEmailVerified(verified)
-          }
-          
           // Fetch fresh profile data from database (not stale session metadata)
           let name: string | undefined
           let role: 'business' | 'community' | undefined
+          let emailConfirmed = false
 
-          // console.log('[Auth] Processing existing session for:', email, 'userId:', userId, 'verified:', verified)
+          // console.log('[Auth] Processing existing session for:', email, 'userId:', userId)
           
           // CRITICAL FIX: Don't override profile if user is already signed in
           // This prevents initialization from clearing a successful sign-in
@@ -456,18 +495,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           /**
-           * CRITICAL FIX: Fetch name and role from database, not session metadata
+           * CRITICAL FIX: Fetch name, role, and email verification status from database
            * 
            * Issue: session.user.user_metadata contains stale data from sign-up
            * and doesn't update when profiles table is updated.
            * 
-           * Fix: Always fetch current name and role from profiles table.
+           * Fix: Always fetch current name, role, and email_confirmed_at from profiles table.
+           * Use custom email_confirmed_at from profiles table instead of Supabase's built-in system.
            */
           if (userId) {
             const profileData = await fetchUserProfile(userId)
             name = profileData.name
             role = profileData.role
-            // console.log('[Auth] Profile fetched from database:', { name, role })
+            emailConfirmed = profileData.emailConfirmed ?? false
+            // console.log('[Auth] Profile fetched from database:', { name, role, emailConfirmed })
+          }
+          
+          // Check custom email verification status from profiles table
+          if (mounted) {
+            setEmailVerified(emailConfirmed)
           }
 
           // console.log('[Auth] About to set profile state:', { name, email, userId, role })
@@ -540,15 +586,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const email = session.user.email
         const userId = session.user.id
         
-        // Check email verification status from session
-        const verified = Boolean(session.user.email_confirmed_at)
-        if (mounted) {
-          setEmailVerified(verified)
-        }
-        
         // Fetch fresh profile data from database (not stale session metadata)
         let name: string | undefined
         let role: 'business' | 'community' | undefined
+        let emailConfirmed = false
 
         // CRITICAL FIX: Don't process SIGNED_IN if user is already signed in with same email
         // This prevents the auth state reset when switching tabs
@@ -557,7 +598,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // console.log('User signed in:', { email, userId, verified })
+        /**
+         * CRITICAL: Fetch email verification status from profiles table (custom system)
+         * Use our custom email_confirmed_at from profiles instead of Supabase's built-in system.
+         */
+        if (userId) {
+          const profileData = await fetchUserProfile(userId)
+          name = profileData.name
+          role = profileData.role
+          emailConfirmed = profileData.emailConfirmed ?? false
+        }
+        
+        // Check custom email verification status from profiles table
+        if (mounted) {
+          setEmailVerified(emailConfirmed)
+        }
+
+        // console.log('User signed in:', { email, userId, emailConfirmed })
 
         /**
          * CRITICAL: Async Operation Order Matters!
@@ -630,10 +687,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session: currentSession } } = await supabase.auth.getSession()
         
         if (currentSession?.user?.email) {
-          // Update verification status if session still exists
-          const verified = Boolean(currentSession.user.email_confirmed_at)
-          if (mounted) {
-            setEmailVerified(verified)
+          // Fetch custom email verification status from profiles table
+          if (currentSession.user.id) {
+            const profileData = await fetchUserProfile(currentSession.user.id)
+            const emailConfirmed = profileData.emailConfirmed ?? false
+            if (mounted) {
+              setEmailVerified(emailConfirmed)
+            }
           }
           // console.log('[Auth] False SIGNED_OUT detected - session still exists, maintaining profile')
           // Don't clear profile if session actually exists
@@ -653,10 +713,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
         // Only update if we have a valid session
         if (session?.user?.email) {
-          // Check email verification status from refreshed session
-          const verified = Boolean(session.user.email_confirmed_at)
-          if (mounted) {
-            setEmailVerified(verified)
+          // Fetch custom email verification status from profiles table
+          if (session.user.id) {
+            const profileData = await fetchUserProfile(session.user.id)
+            const emailConfirmed = profileData.emailConfirmed ?? false
+            if (mounted) {
+              setEmailVerified(emailConfirmed)
+            }
           }
           // console.log('[Auth] Token refreshed with valid session, maintaining profile, verified:', verified)
           const newProfile = profile ? { ...profile } : null
@@ -787,7 +850,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // console.log('[Auth]   Email confirmed:', data?.user?.email_confirmed_at ? 'YES' : 'NO')
     // console.log('[Auth] ========================================')
     
-    return { error: error?.message, session: data?.session ?? null }
+    // Return both session and user (user is available even without session)
+    return { 
+      error: error?.message, 
+      session: data?.session ?? null,
+      user: data?.user ?? null // Include user object for verification email
+    }
   }
 
   const resetPassword = async (email: string) => {
@@ -798,21 +866,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Resend verification email to the current user
-   * Only works if user is authenticated but email is not verified
+   * Uses our custom Resend email system instead of Supabase's built-in confirmation
    */
   const resendVerificationEmail = async () => {
-    if (!profile?.email) {
-      return { error: 'No email address found. Please sign in first.' }
+    if (!profile?.email || !profile?.userId) {
+      return { error: 'No email address or user ID found. Please sign in first.' }
     }
     
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: profile.email
+      const response = await fetch('/.netlify/functions/send-verification-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: profile.userId,
+          email: profile.email,
+          name: profile.name,
+        }),
       })
-      
-      if (error) {
-        return { error: error.message }
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        return { error: result.error || 'Failed to send verification email' }
       }
       
       return { error: undefined }

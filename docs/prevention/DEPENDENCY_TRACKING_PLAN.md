@@ -573,3 +573,73 @@ See: `docs/prevention/CASCADING_FAILURES.md` - Section #11
 
 See: `docs/prevention/CASCADING_FAILURES.md` - Section #12
 
+---
+
+### Custom Email Verification System (2025-01-XX)
+
+**Issue:** Replaced Supabase's built-in email confirmation with custom Resend-based verification system  
+**Files Created:** `send-verification-email.ts`, `verify-email.ts`, `VerifyEmail.tsx`, `EmailVerification.tsx`  
+**Files Updated:** `AuthContext.tsx`, `SignIn.tsx`, `send-email.ts`, `App.tsx`  
+**Fix:** Implemented custom verification system using Resend and React Email templates
+
+**What Was Implemented:**
+1. **Database Tables:**
+   - `email_verification_tokens` - Stores verification tokens with expiration (24 hours)
+   - `profiles.email_confirmed_at` - Stores verification timestamp (custom field)
+
+2. **Netlify Functions:**
+   - `send-verification-email.ts` - Generates secure tokens and sends verification emails via Resend
+   - `verify-email.ts` - Verifies tokens and updates `profiles.email_confirmed_at`
+
+3. **Frontend Components:**
+   - `VerifyEmail.tsx` - Verification page at `/verify-email` route
+   - `EmailVerification.tsx` - React Email template for verification emails
+   - Updated `AuthContext.tsx` - Checks `profiles.email_confirmed_at` instead of Supabase's system
+   - Updated `SignIn.tsx` - Sends verification email after signup
+
+4. **Email System:**
+   - Updated `send-email.ts` - Added `email_verification` type support
+   - Custom React Email template matching Bonita Forward branding
+
+**Key Dependencies:**
+- `send-verification-email.ts` → `email_verification_tokens` table (stores tokens)
+- `send-verification-email.ts` → `send-email.ts` (sends emails via Resend)
+- `verify-email.ts` → `email_verification_tokens` table (verifies tokens)
+- `verify-email.ts` → `profiles` table (updates `email_confirmed_at`)
+- `AuthContext.tsx` → `profiles.email_confirmed_at` (checks custom verification status)
+- `SignIn.tsx` → `send-verification-email.ts` (sends email after signup)
+- `VerifyEmail.tsx` → `verify-email.ts` (verifies token from email link)
+
+**Breaking Changes to Watch:**
+- If you change `profiles.email_confirmed_at` column → AuthContext breaks
+- If you change `email_verification_tokens` table structure → Functions break
+- If you change verification URL format → VerifyEmail page breaks
+- If you change `resendVerificationEmail()` API → AccountSettings/EmailVerificationPrompt break
+- If you disable Resend API key → Verification emails won't send
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#14: Custom Email Verification System)
+- Setup guide: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
+- SQL migrations: `ops/sql/create-email-verification-tokens.sql`, `ops/sql/add-email-confirmed-at-to-profiles.sql`
+
+**Key Rules for Future Code:**
+> **When checking email verification status:**
+> 1. Always check `profiles.email_confirmed_at` from database (custom system)
+> 2. Do NOT use Supabase's `session.user.email_confirmed_at` (their system is disabled)
+> 3. Verification tokens expire after 24 hours (check expiration before verification)
+> 4. Tokens are single-use (mark as used after verification)
+> 5. Email verification is sent via Resend (custom email template)
+
+**Files to Add Dependency Tracking:**
+- ⚠️ `netlify/functions/send-verification-email.ts` - Needs dependency tracking
+- ⚠️ `netlify/functions/verify-email.ts` - Needs dependency tracking
+- ⚠️ `src/pages/VerifyEmail.tsx` - Needs dependency tracking
+
+**Migration Requirements:**
+- Must run SQL migrations before using system
+- Must disable Supabase email confirmation in dashboard
+- Existing users may need to verify via new system
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #14
+See: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
+

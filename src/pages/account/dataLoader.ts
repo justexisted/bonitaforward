@@ -601,9 +601,16 @@ export async function loadEmailPreferences(userId: string): Promise<{
       return null
     }
 
+    // CRITICAL: Default to true for both preferences (matching signup defaults)
+    // This ensures preferences set during signup are preserved
+    // Only default to false if explicitly set to false in database
     return {
-      email_notifications_enabled: data.email_notifications_enabled ?? true,
-      marketing_emails_enabled: data.marketing_emails_enabled ?? false,
+      email_notifications_enabled: data.email_notifications_enabled !== null && data.email_notifications_enabled !== undefined 
+        ? data.email_notifications_enabled 
+        : true, // Default to true (matches signup default)
+      marketing_emails_enabled: data.marketing_emails_enabled !== null && data.marketing_emails_enabled !== undefined
+        ? data.marketing_emails_enabled
+        : true, // Default to true (matches signup default)
       email_consent_date: data.email_consent_date,
       email_unsubscribe_date: data.email_unsubscribe_date
     }

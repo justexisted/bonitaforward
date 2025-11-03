@@ -10,4 +10,5 @@ export { ChangeRequestApproved } from './templates/ChangeRequestApproved'
 export { ChangeRequestRejected } from './templates/ChangeRequestRejected'
 export { BookingConfirmation } from './templates/BookingConfirmation'
 export { ApplicationApproved } from './templates/ApplicationApproved'
+export { EmailVerification } from './templates/EmailVerification'
 

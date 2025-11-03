@@ -17,6 +17,7 @@ import {
   ChangeRequestRejected,
   BookingConfirmation,
   ApplicationApproved,
+  EmailVerification,
 } from '../../src/emails'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -27,7 +28,7 @@ const FROM_EMAIL = 'Bonita Forward <notifications@bonitaforward.com>'
 const FROM_EMAIL_FALLBACK = 'Bonita Forward <onboarding@resend.dev>'
 
 interface SendEmailRequest {
-  type: 'change_request_approved' | 'change_request_rejected' | 'booking_confirmation' | 'application_approved'
+  type: 'change_request_approved' | 'change_request_rejected' | 'booking_confirmation' | 'application_approved' | 'email_verification'
   to: string
   data: any
 }
@@ -120,6 +121,16 @@ export const handler = async (event: any) => {
           const approvedAppHtml = await render(approvedAppElement, { pretty: false })
           html = String(approvedAppHtml)
           subject = `${data.businessName} is Now Live on Bonita Forward`
+          break
+
+        case 'email_verification':
+          const verificationElement = React.createElement(EmailVerification, {
+            name: data.name,
+            verificationUrl: data.verificationUrl,
+          })
+          const verificationHtml = await render(verificationElement, { pretty: false })
+          html = String(verificationHtml)
+          subject = 'Verify your email address - Bonita Forward'
           break
 
         default:

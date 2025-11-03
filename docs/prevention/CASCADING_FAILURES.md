@@ -751,6 +751,75 @@ if (existing) {
 - Section #11: Stale Data After Deletion (data preservation patterns)
 
 ---
+
+### 14. **Custom Email Verification System** ⭐ NEW FEATURE IMPLEMENTATION (2025-01-XX)
+
+**What:** Replaced Supabase's built-in email confirmation with custom Resend-based verification system.
+
+**Implementation:**
+- Custom verification tokens stored in `email_verification_tokens` table
+- Verification emails sent via Resend using React Email templates
+- Verification status stored in `profiles.email_confirmed_at` (custom field)
+- AuthContext checks custom verification status instead of Supabase's system
+
+**Key Files:**
+- `netlify/functions/send-verification-email.ts` - Generates tokens and sends emails
+- `netlify/functions/verify-email.ts` - Verifies tokens and updates profiles
+- `src/pages/VerifyEmail.tsx` - Verification page at `/verify-email`
+- `src/contexts/AuthContext.tsx` - Checks `profiles.email_confirmed_at` (not `session.user.email_confirmed_at`)
+- `src/emails/templates/EmailVerification.tsx` - React Email template
+- `ops/sql/create-email-verification-tokens.sql` - Database table for tokens
+- `ops/sql/add-email-confirmed-at-to-profiles.sql` - Adds verification column
+
+**Breaking Changes to Watch:**
+- If you change `profiles.email_confirmed_at` column → AuthContext breaks
+- If you change `email_verification_tokens` table structure → Functions break
+- If you change verification URL format → VerifyEmail page breaks
+- If you change `resendVerificationEmail()` API → AccountSettings/EmailVerificationPrompt break
+
+**Prevention Checklist:**
+- ✅ Always check `profiles.email_confirmed_at` (NOT Supabase's `email_confirmed_at`)
+- ✅ Verification tokens expire after 24 hours (must respect expiration)
+- ✅ Tokens are single-use (must mark as used after verification)
+- ✅ Custom verification status must sync with Supabase auth state
+- ✅ Disable Supabase email confirmation in dashboard (we use our system)
+
+**Rule of Thumb:**
+> **When checking email verification status:**
+> 1. Always check `profiles.email_confirmed_at` from database (custom system)
+> 2. Do NOT use Supabase's `session.user.email_confirmed_at` (their system is disabled)
+> 3. Verification tokens expire after 24 hours (check expiration before verification)
+> 4. Tokens are single-use (mark as used after verification)
+> 5. Email verification is sent via Resend (custom email template)
+
+**Files to Watch:**
+- `src/contexts/AuthContext.tsx` - Checks custom verification status (`fetchUserProfile()`)
+- `src/components/EmailVerificationGuard.tsx` - Blocks unverified users
+- `src/components/EmailVerificationPrompt.tsx` - Shows verification prompt
+- `netlify/functions/send-verification-email.ts` - Token generation and email sending
+- `netlify/functions/verify-email.ts` - Token verification and profile update
+- `src/pages/VerifyEmail.tsx` - Verification page handler
+- `src/pages/SignIn.tsx` - Sends verification email after signup
+
+**Database Tables:**
+- `email_verification_tokens` - Stores verification tokens with expiration
+- `profiles.email_confirmed_at` - Stores verification timestamp (custom field)
+
+**Migration Notes:**
+- Must run SQL migrations before using system:
+  - `ops/sql/create-email-verification-tokens.sql`
+  - `ops/sql/add-email-confirmed-at-to-profiles.sql`
+- Must disable Supabase email confirmation in dashboard
+- Existing users may need to verify via new system if not already verified
+
+**Testing Verified (2025-01-XX):**
+- ✅ Verification email sent after signup
+- ✅ Token verification updates profile
+- ✅ AuthContext checks custom verification status
+- ✅ EmailVerificationGuard blocks unverified users
+- ✅ Resend verification email works from account page
+
+---
 }
 ```
 
@@ -852,6 +921,10 @@ async function deleteUserByEmailOnly(email: string) {
   - [ ] **Do deleted users stay deleted after page refresh?** ⭐ NEW ✅ TESTED
   - [ ] **Can admin delete users who only exist in funnels/bookings without profiles?** ⭐ NEW ✅ TESTED
   - [ ] **Can admin delete both business and customer accounts successfully?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users verify their email via custom verification system?** ⭐ NEW
+  - [ ] **Does email verification status update correctly after verification?** ⭐ NEW
+  - [ ] **Are unverified users blocked from protected features?** ⭐ NEW
+  - [ ] **Can users resend verification emails from account page?** ⭐ NEW
 
 3. **Manual Testing**
    - Actually USE the app after every change

@@ -4,6 +4,7 @@ import ResetPasswordPage from './pages/ResetPassword'
 import './index.css'
 import SignInPage from './pages/SignIn'
 import OnboardingPage from './pages/Onboarding'
+import VerifyEmailPage from './pages/VerifyEmail'
 import AccountPage from './pages/Account'
 import { CommunityIndex, CommunityPost } from './pages/Community'
 import AdminPage from './pages/Admin'
@@ -88,6 +89,7 @@ export default function App() {
             <Route path="signin" element={<SignInPage />} />
             <Route path="onboarding" element={<OnboardingPage />} />
             <Route path="reset-password" element={<ResetPasswordPage />} />
+            <Route path="verify-email" element={<VerifyEmailPage />} />
             <Route path="community" element={<CommunityIndex />} />
             <Route path="community/:category" element={<CommunityPost />} />
             <Route path="jobs" element={<JobsPage />} />

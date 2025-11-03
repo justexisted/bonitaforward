@@ -273,15 +273,20 @@ export default function SignInPage() {
           console.log('[SignIn] Account type selected:', accountType)
           console.log('[SignIn] Password length:', password.length)
 
-          const { error, session } = await auth.signUpWithEmail(email, password, name, accountType || undefined)
+          const signupResult = await auth.signUpWithEmail(email, password, name, accountType || undefined)
+          const { error, session, user } = signupResult
+          
+          // Get user ID from signup result (Supabase returns user even without session when email confirmation is enabled)
+          const userId = user?.id || session?.user?.id
           
           console.log('[SignIn] Sign-up result:', {
             error: error,
             hasSession: !!session,
+            userId: userId || 'none',
             sessionUser: session ? 'present' : 'none'
           })
 
-          if (!error) {
+          if (!error && userId) {
             /**
              * SUCCESS CASE: Sign-up worked
              * 
@@ -350,17 +355,74 @@ export default function SignInPage() {
                */
               console.log('[SignIn] No session returned - email confirmation might be required')
               
-              // Try sign-in to see if account is usable
-              const { error: signInErr } = await auth.signInWithEmail(email, password)
-              if (signInErr) {
-                console.log('[SignIn] Sign-in failed after successful sign-up:', signInErr)
-                setMessage('Account created successfully! Please check your email and click the verification link to confirm your account. Once verified, you can sign in.')
-                return
+              // Send verification email via our custom system
+              // User ID should be available from signup result
+              if (userId) {
+                try {
+                  console.log('[SignIn] Sending custom verification email...')
+                  const emailResponse = await fetch('/.netlify/functions/send-verification-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      userId,
+                      email: email,
+                      name,
+                    }),
+                  })
+                  
+                  if (emailResponse.ok) {
+                    console.log('[SignIn] Verification email sent successfully')
+                    setMessage('Account created successfully! Please check your email to verify your account. Once verified, you can sign in.')
+                  } else {
+                    const errorData = await emailResponse.json().catch(() => ({}))
+                    console.warn('[SignIn] Failed to send verification email:', errorData)
+                    setMessage('Account created successfully! You can resend the verification email from your account page.')
+                  }
+                } catch (emailError) {
+                  console.warn('[SignIn] Error sending verification email:', emailError)
+                  setMessage('Account created successfully! You can resend the verification email from your account page.')
+                }
               } else {
-                console.log('[SignIn] Sign-in successful after sign-up')
+                setMessage('Account created successfully! Please check your email to verify your account.')
               }
+              return
             } else {
               console.log('[SignIn] Session returned with sign-up, user is immediately authenticated')
+            }
+
+            // Send verification email via our custom system
+            // We do this after signup, even if Supabase returned a session
+            // because we're using our custom verification system, not Supabase's
+            // User ID should be available from signup result or session
+            const finalUserId = userId || session?.user?.id
+            if (finalUserId) {
+              try {
+                console.log('[SignIn] Sending custom verification email...')
+                const emailResponse = await fetch('/.netlify/functions/send-verification-email', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId: finalUserId,
+                    email: email,
+                    name,
+                  }),
+                })
+                
+                if (emailResponse.ok) {
+                  const result = await emailResponse.json()
+                  console.log('[SignIn] Verification email sent successfully:', result)
+                } else {
+                  const errorData = await emailResponse.json().catch(() => ({ error: 'Unknown error' }))
+                  console.warn('[SignIn] Failed to send verification email:', errorData)
+                  // Show user-friendly message if table doesn't exist
+                  if (errorData.error?.includes('table not found') || errorData.error?.includes('migration')) {
+                    console.warn('[SignIn] Email verification system not set up. Please run SQL migrations.')
+                  }
+                }
+              } catch (emailError: any) {
+                console.warn('[SignIn] Error sending verification email:', emailError)
+                // Don't block signup if email fails - user can resend later
+              }
             }
 
             // Redirect based on account type
