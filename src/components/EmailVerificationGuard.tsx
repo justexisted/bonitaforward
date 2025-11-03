@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import EmailVerificationPrompt from './EmailVerificationPrompt'
 
@@ -12,12 +12,10 @@ import EmailVerificationPrompt from './EmailVerificationPrompt'
  */
 interface EmailVerificationGuardProps {
   children: ReactNode
-  showPrompt?: boolean // Whether to show the verification prompt (default: true)
 }
 
 export default function EmailVerificationGuard({ 
-  children, 
-  showPrompt = true 
+  children
 }: EmailVerificationGuardProps) {
   const auth = useAuth()
 

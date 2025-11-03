@@ -35,7 +35,12 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
   useEffect(() => {
     if (!auth.isAuthed || !auth.userId) return
 
+    // Guard against duplicate subscriptions (React StrictMode protection)
+    let isMounted = true
+    const channels: Array<{ unsubscribe: () => void }> = []
+
     async function loadNotifications() {
+      if (!isMounted) return
       try {
         const allNotifications: Notification[] = []
 
@@ -136,23 +141,29 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
     loadNotifications()
 
     // Set up real-time subscriptions for immediate updates
+    // Use unique channel names with userId to prevent conflicts
+    const userId = auth.userId
+    const userEmail = auth.email
+    
     const userNotifsChannel = supabase
-      .channel('user_notifications_changes')
+      .channel(`user_notifications_${userId}_${Date.now()}`) // Unique channel name
       .on('postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'user_notifications',
-          filter: `user_id=eq.${auth.userId}`
+          filter: `user_id=eq.${userId}`
         },
         () => {
-          loadNotifications()
+          if (isMounted) loadNotifications()
         }
       )
       .subscribe()
 
+    channels.push(userNotifsChannel)
+
     const changeRequestsChannel = supabase
-      .channel('provider_change_requests_changes')
+      .channel(`provider_change_requests_${userId}_${Date.now()}`) // Unique channel name
       .on('postgres_changes',
         {
           event: '*',
@@ -160,33 +171,45 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
           table: 'provider_change_requests'
         },
         () => {
-          loadNotifications()
+          if (isMounted) loadNotifications()
         }
       )
       .subscribe()
 
+    channels.push(changeRequestsChannel)
+
     const applicationsChannel = supabase
-      .channel('business_applications_changes')
+      .channel(`business_applications_${userId}_${Date.now()}`) // Unique channel name
       .on('postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'business_applications',
-          filter: auth.email ? `email=eq.${auth.email}` : undefined
+          filter: userEmail ? `email=eq.${userEmail}` : undefined
         },
         () => {
-          loadNotifications()
+          if (isMounted) loadNotifications()
         }
       )
       .subscribe()
 
+    channels.push(applicationsChannel)
+
     // Also poll for updates every 30 seconds as backup
-    const interval = setInterval(loadNotifications, 30000)
+    const interval = setInterval(() => {
+      if (isMounted) loadNotifications()
+    }, 30000)
 
     return () => {
-      userNotifsChannel.unsubscribe()
-      changeRequestsChannel.unsubscribe()
-      applicationsChannel.unsubscribe()
+      isMounted = false
+      // Unsubscribe from all channels
+      channels.forEach(channel => {
+        try {
+          channel.unsubscribe()
+        } catch (err) {
+          console.warn('[NotificationBell] Error unsubscribing channel:', err)
+        }
+      })
       clearInterval(interval)
     }
   }, [auth.isAuthed, auth.userId, auth.email])

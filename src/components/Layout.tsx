@@ -53,7 +53,11 @@ export default function Layout() {
       return
     }
 
+    // Guard against duplicate subscriptions (React StrictMode protection)
+    let isMounted = true
+
     const loadNotifications = async () => {
+      if (!isMounted) return
       try {
         // Check if user owns any businesses
         const { data: providers } = await supabase
@@ -89,24 +93,31 @@ export default function Layout() {
     loadNotifications()
 
     // Set up real-time subscription for notifications
+    // Use unique channel name with userId to prevent conflicts
+    const userId = auth.userId
     const subscription = supabase
-      .channel('booking_notifications')
+      .channel(`booking_notifications_${userId}_${Date.now()}`) // Unique channel name
       .on('postgres_changes', 
         { 
           event: '*', 
           schema: 'public', 
           table: 'user_notifications',
-          filter: `user_id=eq.${auth.userId}`
+          filter: `user_id=eq.${userId}`
         }, 
         () => {
           // Reload notifications when they change
-          loadNotifications()
+          if (isMounted) loadNotifications()
         }
       )
       .subscribe()
 
     return () => {
-      subscription.unsubscribe()
+      isMounted = false
+      try {
+        subscription.unsubscribe()
+      } catch (err) {
+        console.warn('[Layout] Error unsubscribing notification channel:', err)
+      }
     }
   }, [auth.isAuthed, auth.userId])
 
