@@ -71,6 +71,7 @@ export interface UserDeletionOptions {
   userEmail: string | null
   supabaseClient: SupabaseClient
   logPrefix?: string
+  deleteBusinesses?: boolean // If true, hard delete businesses; if false, just unlink them
 }
 
 export interface UserDeletionResult {
@@ -105,7 +106,7 @@ export interface UserDeletionResult {
 export async function deleteUserAndRelatedData(
   options: UserDeletionOptions
 ): Promise<UserDeletionResult> {
-  const { userId, userEmail, supabaseClient, logPrefix = '[user-deletion]' } = options
+  const { userId, userEmail, supabaseClient, logPrefix = '[user-deletion]', deleteBusinesses = false } = options
   
   const deletedCounts: UserDeletionResult['deletedCounts'] = {}
   
@@ -368,33 +369,47 @@ export async function deleteUserAndRelatedData(
       console.warn(`${logPrefix} Warning deleting email preferences:`, err)
     }
     
-    // Step 6: Archive providers owned by user (soft delete)
-    // This prevents breaking references in the public directory
+    // Step 6: Handle providers owned by user
+    // If deleteBusinesses is true: Hard delete businesses
+    // If deleteBusinesses is false: Soft delete (archive with 'deleted' badge and unlink)
     try {
       const { data: providers } = await supabaseClient
         .from('providers')
-        .select('id, badges')
+        .select('id, badges, name')
         .eq('owner_user_id', userId)
       
       if (Array.isArray(providers) && providers.length > 0) {
-        for (const provider of providers) {
-          const badges = Array.isArray((provider as any)?.badges) 
-            ? ((provider as any)?.badges as string[]) 
-            : []
-          const nextBadges = Array.from(new Set([...badges, 'deleted']))
-          await supabaseClient
-            .from('providers')
-            .update({ 
-              badges: nextBadges as any, 
-              owner_user_id: null as any 
-            })
-            .eq('id', (provider as any).id)
+        if (deleteBusinesses) {
+          // Hard delete: Permanently delete all businesses owned by user
+          for (const provider of providers) {
+            await supabaseClient
+              .from('providers')
+              .delete()
+              .eq('id', (provider as any).id)
+          }
+          deletedCounts.providers = providers.length
+          console.log(`${logPrefix} ✓ Deleted ${providers.length} provider(s) permanently`)
+        } else {
+          // Soft delete: Archive and unlink (allows reconnection later)
+          for (const provider of providers) {
+            const badges = Array.isArray((provider as any)?.badges) 
+              ? ((provider as any)?.badges as string[]) 
+              : []
+            const nextBadges = Array.from(new Set([...badges, 'deleted']))
+            await supabaseClient
+              .from('providers')
+              .update({ 
+                badges: nextBadges as any, 
+                owner_user_id: null as any 
+              })
+              .eq('id', (provider as any).id)
+          }
+          deletedCounts.providers = providers.length
+          console.log(`${logPrefix} ✓ Archived ${providers.length} provider(s) (unlinked, can be reconnected later)`)
         }
-        deletedCounts.providers = providers.length
-        console.log(`${logPrefix} ✓ Archived ${providers.length} provider(s)`)
       }
     } catch (err) {
-      console.warn(`${logPrefix} Warning archiving providers:`, err)
+      console.warn(`${logPrefix} Warning handling providers:`, err)
     }
     
     // Step 7: Delete profile (must be after all related data)

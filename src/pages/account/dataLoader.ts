@@ -329,14 +329,45 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
         new Map(allBusinesses.map(b => [b.id, b])).values()
       )
       
-      // If we found businesses by email, log a warning that they need to be linked
+      // If we found businesses by email but not linked, automatically reconnect them
+      // This handles the case where user deleted account and signed up again
       if (emailData && emailData.length > 0) {
-        console.warn('[Account] Found businesses by email but not linked to user:', {
+        console.log('[Account] Found businesses by email but not linked to user. Automatically reconnecting...', {
           userId,
           userEmail,
           unlinkedCount: emailData.length,
           businessNames: emailData.map(b => b.name)
         })
+        
+        // Automatically reconnect businesses by updating owner_user_id
+        // This allows users to recover their businesses after account deletion
+        for (const business of emailData) {
+          try {
+            // Remove 'deleted' badge if present (business is being reconnected)
+            const currentBadges = Array.isArray((business as any)?.badges) 
+              ? ((business as any)?.badges as string[]) 
+              : []
+            const updatedBadges = currentBadges.filter((b: string) => b !== 'deleted')
+            
+            const { error: updateError } = await supabase
+              .from('providers')
+              .update({ 
+                owner_user_id: userId,
+                badges: updatedBadges.length > 0 ? updatedBadges : null
+              })
+              .eq('id', business.id)
+            
+            if (updateError) {
+              console.warn('[Account] Failed to reconnect business:', business.name, updateError)
+            } else {
+              console.log('[Account] ✓ Reconnected business:', business.name)
+              // Update the business object so it appears as linked
+              business.owner_user_id = userId
+            }
+          } catch (err) {
+            console.warn('[Account] Error reconnecting business:', business.name, err)
+          }
+        }
       }
       
       return uniqueBusinesses.map((b: any) => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]

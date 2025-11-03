@@ -33,13 +33,18 @@ export const handler: Handler = async (event) => {
     const userEmail = authResult.user.email || null
     const supabaseClient = createClient(url, serviceRole, { auth: { persistSession: false } })
 
+    // Parse request body for deleteBusinesses option
+    const body = JSON.parse(event.body || '{}') as { deleteBusinesses?: boolean }
+    const deleteBusinesses = body.deleteBusinesses === true
+
     // Use shared deletion utility to ensure correct deletion order
     // This handles all related data deletion before auth user deletion
     const deletionResult = await deleteUserAndRelatedData({
       userId,
       userEmail,
       supabaseClient,
-      logPrefix: '[user-delete]'
+      logPrefix: '[user-delete]',
+      deleteBusinesses
     })
 
     if (!deletionResult.success) {

@@ -150,11 +150,27 @@ export default function AccountPage() {
   }
 
   // Delete user account
-  async function deleteAccount() {
+  async function deleteAccount(deleteBusinesses: boolean = false) {
     // Double confirmation
     if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       return
     }
+    
+    // Check if user has businesses
+    const hasBusinesses = data.myBusinesses && data.myBusinesses.length > 0
+    
+    // If user has businesses, ask if they want to delete them too
+    let shouldDeleteBusinesses = false
+    if (hasBusinesses) {
+      const deleteBusinessesConfirmed = confirm(
+        `You have ${data.myBusinesses.length} business(es) linked to your account.\n\n` +
+        `Would you like to DELETE your businesses as well?\n\n` +
+        `• Click "OK" to DELETE your businesses permanently\n` +
+        `• Click "Cancel" to keep your businesses (they will be unlinked from your account and you can reconnect them if you sign up again)`
+      )
+      shouldDeleteBusinesses = deleteBusinessesConfirmed
+    }
+    
     if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) {
       return
     }
@@ -177,7 +193,10 @@ export default function AccountPage() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
-        }
+        },
+        body: JSON.stringify({
+          deleteBusinesses: shouldDeleteBusinesses
+        })
       })
 
       if (!response.ok) {
@@ -859,11 +878,16 @@ export default function AccountPage() {
                         <li>Your saved businesses will be lost</li>
                         <li>Your events will be deleted</li>
                         <li>Your applications will be removed</li>
+                        {data.myBusinesses && data.myBusinesses.length > 0 && (
+                          <li className="text-orange-600 font-medium mt-2">
+                            You have {data.myBusinesses.length} business(es) - You'll be asked if you want to delete them permanently or keep them (they can be reconnected if you sign up again)
+                          </li>
+                        )}
                       </ul>
                     </div>
                   </div>
                   <button
-                    onClick={deleteAccount}
+                    onClick={() => deleteAccount()}
                     disabled={deletingAccount}
                     className={`px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors ${
                       deletingAccount ? 'opacity-50 cursor-not-allowed' : ''
@@ -1469,11 +1493,16 @@ export default function AccountPage() {
                         <li>Your saved businesses will be lost</li>
                         <li>Your events will be deleted</li>
                         <li>Your applications will be removed</li>
+                        {data.myBusinesses && data.myBusinesses.length > 0 && (
+                          <li className="text-orange-600 font-medium mt-2">
+                            You have {data.myBusinesses.length} business(es) - You'll be asked if you want to delete them permanently or keep them (they can be reconnected if you sign up again)
+                          </li>
+                        )}
                       </ul>
                     </div>
                   </div>
                   <button
-                    onClick={deleteAccount}
+                    onClick={() => deleteAccount()}
                     disabled={deletingAccount}
                     className={`px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors ${
                       deletingAccount ? 'opacity-50 cursor-not-allowed' : ''
