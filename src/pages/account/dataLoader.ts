@@ -320,7 +320,19 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
     
     // If user has an email, also try to find businesses by email (fallback for older businesses or unlinked)
     // This is important: we want to find businesses even if owner_user_id is null or different
-    let emailData: any[] = []
+    let emailData: Array<{
+      id: string
+      name: string
+      category_key: string
+      address?: string | null
+      phone?: string | null
+      email?: string | null
+      website?: string | null
+      published?: boolean | null
+      created_at?: string | null
+      owner_user_id?: string | null
+      badges?: string[] | null
+    }> = []
     if (userEmail) {
       const { data: emailQueryData, error: emailError } = await supabase
         .from('providers')
@@ -336,8 +348,8 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
       
       if (emailError) {
         console.log('[Account] Error loading businesses by email:', emailError)
-      } else {
-        emailData = emailQueryData || []
+      } else if (emailQueryData) {
+        emailData = emailQueryData
       }
     }
     
