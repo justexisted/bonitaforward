@@ -17,6 +17,7 @@ import NotFoundPage from './pages/NotFound'
 import UnsubscribePage from './pages/Unsubscribe'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import EmailVerificationGuard from './components/EmailVerificationGuard'
 import Layout from './components/Layout'
 import AppInit from './components/AppInit'
 import ProviderPage from './pages/ProviderPage'
@@ -96,12 +97,16 @@ export default function App() {
             <Route path="owner" element={<Navigate to="/my-business" replace />} />
             <Route path="my-business" element={
               <ProtectedRoute allowedRoles={['business']}>
-                <MyBusinessPage />
+                <EmailVerificationGuard>
+                  <MyBusinessPage />
+                </EmailVerificationGuard>
               </ProtectedRoute>
             } />
             <Route path="pricing" element={
               <ProtectedRoute allowedRoles={['business']}>
-                <PricingPage />
+                <EmailVerificationGuard>
+                  <PricingPage />
+                </EmailVerificationGuard>
               </ProtectedRoute>
             } />
             <Route path="account" element={<AccountPage />} />

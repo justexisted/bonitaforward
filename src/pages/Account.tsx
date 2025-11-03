@@ -18,6 +18,7 @@ import {
   deleteEvent
 } from './account/dataLoader'
 import { AccountSettings, MyBookings, SavedBusinesses, SavedCoupons } from './account/components'
+import EmailVerificationPrompt from '../components/EmailVerificationPrompt'
 
 export default function AccountPage() {
   const auth = useAuth()
@@ -315,6 +316,11 @@ export default function AccountPage() {
               </button>
             </div>
           )}
+
+          {/* Email Verification Prompt */}
+          <div className="mb-6">
+            <EmailVerificationPrompt />
+          </div>
 
           {/* 4x2 Icon Grid (Mobile Only) */}
           {activeSection === 'dashboard' && (
@@ -951,6 +957,11 @@ export default function AccountPage() {
               </button>
             </div>
           )}
+          
+          {/* Email Verification Prompt */}
+          <div className="mb-6">
+            <EmailVerificationPrompt />
+          </div>
           
           {/* Section Content (Desktop) */}
           <div className="max-w-4xl">

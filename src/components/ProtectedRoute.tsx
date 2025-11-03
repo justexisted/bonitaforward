@@ -28,15 +28,21 @@ function LoadingSpinner({ message = 'Loading...', className = '' }: { message?: 
  * Features:
  * - Redirects unauthenticated users to sign-in page
  * - Redirects users without proper role to home page
+ * - Blocks unverified users from accessing protected content
  * - Shows loading state while authentication is being determined
  * - Supports multiple allowed roles
  */
 interface ProtectedRouteProps {
   children: React.ReactNode
   allowedRoles: ('business' | 'community')[]
+  requireEmailVerification?: boolean // Whether email verification is required (default: true)
 }
 
-export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+export default function ProtectedRoute({ 
+  children, 
+  allowedRoles,
+  requireEmailVerification = true // Default to requiring email verification
+}: ProtectedRouteProps) {
   const auth = useAuth()
   const navigate = useNavigate()
 
@@ -49,11 +55,17 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
       return
     }
 
+    // Check email verification if required
+    if (requireEmailVerification && !auth.emailVerified) {
+      // Don't redirect - let EmailVerificationGuard handle it
+      return
+    }
+
     if (!allowedRoles.includes(auth.role || 'community')) {
       navigate('/')
       return
     }
-  }, [auth.isAuthed, auth.loading, auth.role, allowedRoles, navigate])
+  }, [auth.isAuthed, auth.loading, auth.role, auth.emailVerified, allowedRoles, requireEmailVerification, navigate])
 
   // Show loading state while authentication is being determined
   if (auth.loading) {
@@ -66,6 +78,11 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 
   if (!auth.isAuthed || !allowedRoles.includes(auth.role || 'community')) {
     return null
+  }
+
+  // Block unverified users if email verification is required
+  if (requireEmailVerification && !auth.emailVerified) {
+    return null // EmailVerificationGuard will show the verification prompt
   }
 
   return <>{children}</>

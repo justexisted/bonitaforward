@@ -113,8 +113,8 @@ export default function SignInPage() {
   const [zipCode, setZipCode] = useState('')
   const [isBonitaResident, setIsBonitaResident] = useState(false)
   // Email preferences fields
-  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true) // Default to true
-  const [marketingEmailsEnabled, setMarketingEmailsEnabled] = useState(false) // Default to false
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true) // Default to true - both preselected
+  const [marketingEmailsEnabled, setMarketingEmailsEnabled] = useState(true) // Default to true - both preselected
 
   const handleResetPassword = async () => {
     if (!email) { setMessage('Enter your email'); return }
@@ -354,7 +354,7 @@ export default function SignInPage() {
               const { error: signInErr } = await auth.signInWithEmail(email, password)
               if (signInErr) {
                 console.log('[SignIn] Sign-in failed after successful sign-up:', signInErr)
-                setMessage('Account created. Please check your email to confirm your account, then sign in.')
+                setMessage('Account created successfully! Please check your email and click the verification link to confirm your account. Once verified, you can sign in.')
                 return
               } else {
                 console.log('[SignIn] Sign-in successful after sign-up')

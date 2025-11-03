@@ -13,12 +13,14 @@ type AuthContextValue = {
   email?: string
   userId?: string
   role?: 'business' | 'community'
+  emailVerified: boolean // Whether user's email is verified
   profileState: { name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>
   signUpWithEmail: (email: string, password: string, name?: string, role?: 'business' | 'community') => Promise<{ error?: string; session: any }>
   resetPassword: (email: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
+  resendVerificationEmail: () => Promise<{ error?: string }>
 }
 
 // ============================================================================
@@ -32,12 +34,14 @@ const AuthContext = createContext<AuthContextValue>({
   email: undefined,
   userId: undefined,
   role: undefined,
+  emailVerified: false,
   profileState: null,
   signInWithGoogle: async () => {},
   signInWithEmail: async () => ({ error: undefined }),
   signUpWithEmail: async () => ({ error: undefined, session: null }),
   resetPassword: async () => ({ error: undefined }),
   signOut: async () => {},
+  resendVerificationEmail: async () => ({ error: undefined }),
 })
 
 // ============================================================================
@@ -159,6 +163,7 @@ function clearLocalAuthData(): void {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<{ name?: string; email?: string; userId?: string; role?: 'business' | 'community' } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [emailVerified, setEmailVerified] = useState(false) // Track email verification status
   
   // CRITICAL FIX: Use a ref to track profile state for immediate access
   // This prevents the race condition where profile state isn't immediately available in context
@@ -393,6 +398,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('[Auth] Error getting session:', error)
           if (mounted) {
             setLoading(false)
+            setEmailVerified(false)
             initializationComplete = true
           }
           return
@@ -410,6 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // console.log('[Auth] No session found during initialization')
           if (mounted) {
             setLoading(false)
+            setEmailVerified(false)
             initializationComplete = true
           }
           return
@@ -427,11 +434,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const email = session.user.email
           const userId = session.user.id
           
+          // Check email verification status from session
+          const verified = Boolean(session.user.email_confirmed_at)
+          if (mounted) {
+            setEmailVerified(verified)
+          }
+          
           // Fetch fresh profile data from database (not stale session metadata)
           let name: string | undefined
           let role: 'business' | 'community' | undefined
 
-          // console.log('[Auth] Processing existing session for:', email, 'userId:', userId)
+          // console.log('[Auth] Processing existing session for:', email, 'userId:', userId, 'verified:', verified)
           
           // CRITICAL FIX: Don't override profile if user is already signed in
           // This prevents initialization from clearing a successful sign-in
@@ -469,7 +482,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           //   name,
           //   email,
           //   userId,
-          //   role
+          //   role,
+          //   emailVerified: verified
           // })
 
           // Ensure profile exists in database with proper role
@@ -526,6 +540,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const email = session.user.email
         const userId = session.user.id
         
+        // Check email verification status from session
+        const verified = Boolean(session.user.email_confirmed_at)
+        if (mounted) {
+          setEmailVerified(verified)
+        }
+        
         // Fetch fresh profile data from database (not stale session metadata)
         let name: string | undefined
         let role: 'business' | 'community' | undefined
@@ -537,7 +557,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // console.log('User signed in:', { email, userId })
+        // console.log('User signed in:', { email, userId, verified })
 
         /**
          * CRITICAL: Async Operation Order Matters!
@@ -610,6 +630,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session: currentSession } } = await supabase.auth.getSession()
         
         if (currentSession?.user?.email) {
+          // Update verification status if session still exists
+          const verified = Boolean(currentSession.user.email_confirmed_at)
+          if (mounted) {
+            setEmailVerified(verified)
+          }
           // console.log('[Auth] False SIGNED_OUT detected - session still exists, maintaining profile')
           // Don't clear profile if session actually exists
           return
@@ -618,6 +643,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // console.log('[Auth] Confirmed SIGNED_OUT - clearing profile')
         setProfile(null)
         profileRef.current = null
+        if (mounted) {
+          setEmailVerified(false)
+        }
         // Clear any remaining auth data
         clearLocalAuthData()
         // console.log('[Auth] Cleared custom app data, Supabase will handle its own session cleanup')
@@ -625,7 +653,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
         // Only update if we have a valid session
         if (session?.user?.email) {
-          // console.log('[Auth] Token refreshed with valid session, maintaining profile')
+          // Check email verification status from refreshed session
+          const verified = Boolean(session.user.email_confirmed_at)
+          if (mounted) {
+            setEmailVerified(verified)
+          }
+          // console.log('[Auth] Token refreshed with valid session, maintaining profile, verified:', verified)
           const newProfile = profile ? { ...profile } : null
           setProfile(newProfile)
           profileRef.current = newProfile
@@ -633,6 +666,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // console.log('[Auth] Token refresh but no session - this should not happen, clearing profile')
           setProfile(null)
           profileRef.current = null
+          if (mounted) {
+            setEmailVerified(false)
+          }
         }
       } else {
         // console.log('[Auth] Unhandled auth event:', event, 'session exists:', !!session)
@@ -761,6 +797,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   /**
+   * Resend verification email to the current user
+   * Only works if user is authenticated but email is not verified
+   */
+  const resendVerificationEmail = async () => {
+    if (!profile?.email) {
+      return { error: 'No email address found. Please sign in first.' }
+    }
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: profile.email
+      })
+      
+      if (error) {
+        return { error: error.message }
+      }
+      
+      return { error: undefined }
+    } catch (err: any) {
+      return { error: err.message || 'Failed to send verification email' }
+    }
+  }
+
+  /**
    * CRITICAL DEBUG: Auth context value creation
    * 
    * This is where the auth state gets exposed to the rest of the app.
@@ -777,12 +838,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: currentProfile?.email,
     userId: currentProfile?.userId,
     role: currentProfile?.role,
+    emailVerified,
     profileState: currentProfile,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
     resetPassword,
     signOut,
+    resendVerificationEmail,
   }
 
   // Debug log the auth context value whenever it changes
