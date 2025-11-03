@@ -19,6 +19,13 @@ You're experiencing **cascading failures** - fixing one issue creates another:
 
 ## ✅ Verified Solutions (2025-01-XX)
 
+**Name Storage During Signup - FIXED (2025-01-XX):**
+- ✅ Fixed async operation order in SIGNED_IN handler
+- ✅ Name now appears immediately after signup
+- ✅ Name is read from localStorage FIRST, then saved to database
+- ✅ Debug logging added to track name flow
+- **Status:** ✅ Fixed - See Section #14 for detailed pattern and prevention
+
 **User Deletion System - TESTED & WORKING:**
 - ✅ **Business Account Deletion** - Successfully tested complete deletion with profile reload
 - ✅ **Customer Account Deletion** - Successfully tested complete deletion with profile reload  
@@ -752,7 +759,105 @@ if (existing) {
 
 ---
 
-### 14. **Custom Email Verification System** ⭐ NEW FEATURE IMPLEMENTATION (2025-01-XX)
+### 14. **Async Operation Order in SIGNED_IN Handler** ⭐ RECURRING ISSUE (2025-01-XX)
+
+**What:** Reading from database before saving data during signup causes "Hi, User" instead of actual name.
+
+**Example Failure:**
+```typescript
+// WRONG: Read from database FIRST (name is empty/null)
+if (event === 'SIGNED_IN') {
+  // ❌ Read from database FIRST - name doesn't exist yet!
+  const profileData = await fetchUserProfile(userId)
+  name = profileData.name // undefined/null
+  
+  // ❌ Save name AFTER reading - too late!
+  await ensureProfile(userId, email, name, role)
+  // Result: name is saved but already read as undefined
+}
+```
+
+**What Happened:**
+1. User signs up with name "John Doe"
+2. Name is saved to localStorage (`bf-pending-profile`)
+3. SIGNED_IN event fires
+4. Code reads from database FIRST (name doesn't exist yet - returns undefined)
+5. Code sets `name = undefined` from database
+6. Code saves name to database (too late - already set to undefined)
+7. Result: "Hi, User" instead of "Hi, John Doe"
+
+**The Fix:**
+```typescript
+// CORRECT: Read from localStorage FIRST, then save, then read from database
+if (event === 'SIGNED_IN') {
+  // Step 1: Read from localStorage FIRST (signup flow)
+  const raw = localStorage.getItem('bf-pending-profile')
+  if (raw) {
+    const pref = JSON.parse(raw)
+    if (pref?.name && pref.name.trim()) {
+      name = pref.name.trim() // ✅ Get name from localStorage
+    }
+  }
+  
+  // Step 2: Save to database FIRST (with name from localStorage)
+  await ensureProfile(userId, email, name, role) // ✅ Save name
+  
+  // Step 3: THEN read from database (now it has the name)
+  const profileData = await fetchUserProfile(userId)
+  name = profileData.name || name // ✅ Use database name if exists
+}
+```
+
+**Prevention Checklist:**
+- ✅ ALWAYS read from localStorage FIRST during signup (before database)
+- ✅ ALWAYS save to database BEFORE reading from it during signup
+- ✅ Follow the correct order: localStorage → save → database → state
+- ✅ Add debug logging to track name flow during signup
+- ✅ Test signup flow: name must appear immediately after signup
+- ✅ Verify name is in localStorage before ensureProfile is called
+- ✅ Verify name is included in update payload when present
+
+**Rule of Thumb:**
+> **During signup, the operation order is CRITICAL:**
+> 1. Read from localStorage (contains signup form data)
+> 2. Save to database (write data we just read)
+> 3. Read from database (verify data was saved)
+> 4. Update state (display the data)
+>
+> **WRONG order causes data loss:**
+> 1. Read from database (empty data) ❌
+> 2. Save to database (saves empty data) ❌
+
+**Files to Watch:**
+- `src/contexts/AuthContext.tsx` - SIGNED_IN event handler MUST follow correct order
+- `src/contexts/AuthContext.tsx` - ensureProfile() MUST include name in payload if present
+- Any auth state change handlers that save/read profile data
+
+**Common Patterns:**
+- Reading from database before writing during signup
+- Not reading from localStorage during SIGNED_IN event
+- Not including name in update payload if it's undefined at some point
+- Race conditions where localStorage is cleared before it's read
+
+**Related Issues:**
+- This is a recurring problem that has been fixed multiple times
+- The root cause is async operation order during signup flow
+- Name preservation logic (Section #13) also plays a role
+
+**Testing Verified (2025-01-XX):**
+- ✅ Name appears immediately after signup
+- ✅ Name is read from localStorage before database
+- ✅ Name is saved to database before reading
+- ✅ Debug logging tracks name flow correctly
+
+**Documentation:**
+- See: `docs/prevention/ASYNC_FLOW_PREVENTION.md` - Detailed async flow patterns
+- See: `docs/prevention/CASCADING_FAILURES.md` - Section #13 (Preserving Existing Data)
+- See: `docs/prevention/DEPENDENCY_TRACKING_PLAN.md` - Async Operation Order Fix
+
+---
+
+### 15. **Custom Email Verification System** ⭐ NEW FEATURE IMPLEMENTATION (2025-01-XX)
 
 **What:** Replaced Supabase's built-in email confirmation with custom Resend-based verification system.
 
@@ -1008,10 +1113,12 @@ Before committing ANY change:
   grep -r "changed-thing" src/
   ```
 - [ ] **Smoke Tests:** Does everything still work?
-  - [ ] Signup works
+  - [ ] Signup works - name must appear immediately after signup
   - [ ] Signin works
   - [ ] Admin pages load
   - [ ] All sections display correctly
+  - [ ] Name is stored in database after signup
+  - [ ] Name is read from localStorage before database during signup
 - [ ] **Related Files:** Are they all updated?
   - [ ] Types updated?
   - [ ] Functions updated?

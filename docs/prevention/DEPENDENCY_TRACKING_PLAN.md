@@ -417,6 +417,55 @@ See: `docs/prevention/CASCADING_FAILURES.md` - Section #8
 
 ---
 
+### Async Operation Order Fix in SIGNED_IN Handler (2025-01-XX)
+
+**Issue:** Name not stored/displayed during signup - "Hi, User" instead of actual name  
+**File:** `src/contexts/AuthContext.tsx` - SIGNED_IN event handler  
+**Fix:** Fixed async operation order - read localStorage FIRST, then save, then read from database
+
+**What Was Fixed:**
+- SIGNED_IN handler now reads from localStorage BEFORE fetching from database
+- Name from localStorage is included in ensureProfile() payload when present
+- Added debug logging to track name flow during signup
+- Fixed order: localStorage → save to database → read from database → update state
+
+**Root Cause:**
+- Code was reading from database BEFORE saving name during signup
+- Database query returned undefined/null (name wasn't saved yet)
+- Name was set to undefined before it could be saved
+- Result: Name saved to database but already lost in state
+
+**Documentation Added:**
+- New section in `CASCADING_FAILURES.md` (#14: Async Operation Order in SIGNED_IN Handler)
+- Updated dependency tracking comment in `AuthContext.tsx`
+- Added debug logging to track name flow
+- Documented correct operation order in code comments
+
+**Key Rule for Future Code:**
+> During signup, ALWAYS follow this order:
+> 1. Read from localStorage (contains signup form data)
+> 2. Save to database (write data we just read)
+> 3. Read from database (verify data was saved)
+> 4. Update state (display the data)
+>
+> NEVER read from database before saving during signup!
+
+**Files Updated:**
+- `src/contexts/AuthContext.tsx` - Fixed SIGNED_IN handler order
+- `src/contexts/AuthContext.tsx` - ensureProfile() now includes name in payload when present
+- Added debug logging to track name flow (dev mode only)
+
+**Prevention:**
+- Always read from localStorage FIRST during signup
+- Always save to database BEFORE reading from it during signup
+- Add debug logging to verify correct order
+- Test signup flow: name must appear immediately after signup
+
+See: `docs/prevention/CASCADING_FAILURES.md` - Section #14  
+See: `docs/prevention/ASYNC_FLOW_PREVENTION.md` - Async flow patterns
+
+---
+
 ### Incomplete User Deletion Fix (2025-01-XX)
 
 **Issue:** Admin/user deletion only deleted some related data, leaving orphaned records  

@@ -414,9 +414,18 @@ export default function SignInPage() {
                 } else {
                   const errorData = await emailResponse.json().catch(() => ({ error: 'Unknown error' }))
                   console.warn('[SignIn] Failed to send verification email:', errorData)
-                  // Show user-friendly message if table doesn't exist
-                  if (errorData.error?.includes('table not found') || errorData.error?.includes('migration')) {
-                    console.warn('[SignIn] Email verification system not set up. Please run SQL migrations.')
+                  
+                  // Check if this is a migration issue
+                  if (errorData.migrationRequired || 
+                      errorData.error?.includes('not set up') || 
+                      errorData.error?.includes('migration') ||
+                      errorData.error?.includes('table not found') ||
+                      errorData.error?.includes('Could not find the table')) {
+                    console.error('[SignIn] ⚠️ Email verification system requires SQL migration!')
+                    console.error('[SignIn] Run this SQL in Supabase Dashboard → SQL Editor:')
+                    console.error('[SignIn]   1. ops/sql/create-email-verification-tokens.sql')
+                    console.error('[SignIn]   2. ops/sql/add-email-confirmed-at-to-profiles.sql')
+                    // Don't show error to user - signup succeeded, they can verify later
                   }
                 }
               } catch (emailError: any) {

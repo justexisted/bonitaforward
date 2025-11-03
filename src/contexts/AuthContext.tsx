@@ -350,10 +350,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...emailPreferences
         }
         
-        // Only include name if we have one - this prevents clearing existing names
-        // If name is not provided, updateUserProfile will preserve the existing name from database
+        // CRITICAL: Always include name in payload during signup (when it comes from localStorage)
+        // Only skip name if it's explicitly null/undefined AND we're NOT in signup flow
+        // During signup, we MUST save the name even if it seems empty to ensure it's persisted
+        const isSignupFlow = !!localStorage.getItem('bf-pending-profile')
+        
         if (name) {
+          // We have a name - include it
           updatePayload.name = name
+          if (import.meta.env.DEV) {
+            console.log('[Auth] ensureProfile: Including name in payload:', name)
+          }
+        } else if (isSignupFlow && import.meta.env.DEV) {
+          // During signup but no name - this is a problem!
+          console.warn('[Auth] ensureProfile: Signup flow detected but NO NAME found! localStorage:', localStorage.getItem('bf-pending-profile'))
+        }
+        
+        if (import.meta.env.DEV) {
+          console.log('[Auth] ensureProfile: Calling updateUserProfile with payload:', {
+            email: updatePayload.email,
+            name: updatePayload.name || 'NOT INCLUDED',
+            role: updatePayload.role,
+            hasEmailPrefs: !!updatePayload.email_notifications_enabled || !!updatePayload.marketing_emails_enabled
+          })
         }
         
         const result = await updateUserProfile(
@@ -361,6 +380,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           updatePayload,
           'auth-context'
         )
+        
+        if (import.meta.env.DEV) {
+          console.log('[Auth] ensureProfile: updateUserProfile result:', result)
+        }
         
         // If email preferences were set during signup, also set email_consent_date
         // This tracks when user consented to receive emails
@@ -599,24 +622,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         /**
-         * CRITICAL: Fetch email verification status from profiles table (custom system)
-         * Use our custom email_confirmed_at from profiles instead of Supabase's built-in system.
-         */
-        if (userId) {
-          const profileData = await fetchUserProfile(userId)
-          name = profileData.name
-          role = profileData.role
-          emailConfirmed = profileData.emailConfirmed ?? false
-        }
-        
-        // Check custom email verification status from profiles table
-        if (mounted) {
-          setEmailVerified(emailConfirmed)
-        }
-
-        // console.log('User signed in:', { email, userId, emailConfirmed })
-
-        /**
          * CRITICAL: Async Operation Order Matters!
          * 
          * During signup, we must save the name BEFORE trying to read it.
@@ -636,7 +641,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          * See: docs/prevention/ASYNC_FLOW_PREVENTION.md
          */
         if (userId && email) {
-          // Step 1: Read from localStorage (signup flow)
+          // Step 1: Read from localStorage (signup flow) FIRST
           // This contains the name entered during signup
           try {
             const raw = localStorage.getItem('bf-pending-profile')
@@ -645,27 +650,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 name?: string
                 role?: 'business' | 'community'
               }
-              // Use name from localStorage if available (signup flow)
+              // CRITICAL: Use name from localStorage if available (signup flow)
+              // This MUST happen BEFORE ensureProfile so the name is saved
               if (pref?.name && pref.name.trim()) {
                 name = pref.name.trim()
+                if (import.meta.env.DEV) {
+                  console.log('[Auth] Found name in localStorage during SIGNED_IN:', name)
+                }
               }
               if (pref?.role === 'business' || pref?.role === 'community') {
                 role = pref.role
               }
             }
-          } catch {}
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              console.warn('[Auth] Error reading localStorage during SIGNED_IN:', err)
+            }
+          }
           
           // Step 2: Save to database FIRST (with name from localStorage)
           // This ensures the name is in the database before we try to read it
+          if (import.meta.env.DEV) {
+            console.log('[Auth] Calling ensureProfile with name:', name || 'NO NAME')
+          }
           await ensureProfile(userId, email, name, role)
           
           // Step 3: THEN read from database (now it has the name)
           // This reads the name we just saved
           const profileData = await fetchUserProfile(userId)
           // Use database name if it exists, otherwise keep localStorage name
-          name = profileData.name || name
+          name = profileData.name || name || undefined
           role = profileData.role || role
-          // console.log('Profile fetched from database on sign in:', { name, role })
+          emailConfirmed = profileData.emailConfirmed ?? false
+          
+          if (import.meta.env.DEV) {
+            console.log('[Auth] Profile fetched from database after ensureProfile:', { 
+              name: name || 'NO NAME', 
+              role, 
+              emailConfirmed,
+              fromDatabase: !!profileData.name,
+              fromLocalStorage: !profileData.name && !!name
+            })
+          }
+        } else if (userId) {
+          // No email - still fetch verification status
+          const profileData = await fetchUserProfile(userId)
+          emailConfirmed = profileData.emailConfirmed ?? false
+        }
+        
+        // Check custom email verification status from profiles table
+        if (mounted) {
+          setEmailVerified(emailConfirmed)
         }
 
         // console.log('[Auth] Setting profile state:', { name, email, userId, role })

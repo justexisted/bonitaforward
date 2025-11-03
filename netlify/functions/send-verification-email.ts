@@ -73,15 +73,24 @@ export const handler: Handler = async (event) => {
       console.error('[SendVerificationEmail] Error storing token:', tokenError)
       
       // Check if error is because table doesn't exist
-      if (tokenError.message?.includes('does not exist') || tokenError.code === '42P01') {
+      // Error messages may vary: "does not exist", "Could not find the table", "42P01" (PostgreSQL error code)
+      const isTableNotFound = tokenError.message?.includes('does not exist') || 
+                              tokenError.message?.includes('Could not find the table') ||
+                              tokenError.message?.includes('email_verification_tokens') ||
+                              tokenError.code === '42P01' ||
+                              tokenError.code === 'PGRST116'
+      
+      if (isTableNotFound) {
         return {
           statusCode: 500,
           headers: {
             'Access-Control-Allow-Origin': '*',
           },
           body: JSON.stringify({ 
-            error: 'Email verification table not found. Please run SQL migration: ops/sql/create-email-verification-tokens.sql',
-            details: tokenError.message
+            error: 'Email verification system not set up. Please run SQL migration: ops/sql/create-email-verification-tokens.sql',
+            details: tokenError.message,
+            migrationRequired: true,
+            migrationFile: 'ops/sql/create-email-verification-tokens.sql'
           }),
         }
       }
