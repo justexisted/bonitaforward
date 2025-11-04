@@ -545,7 +545,7 @@ export default function CalendarPage() {
       // (We'll handle this after insert)
 
       // Insert event with image
-      const { data: insertedEvent, error } = await supabase
+      const { error } = await supabase
         .from('calendar_events')
         .insert([{
           title: newEvent.title,
@@ -563,13 +563,8 @@ export default function CalendarPage() {
           image_url: headerImage.value,
           image_type: headerImage.type
         }])
-        .select()
-        .single()
 
       if (error) throw error
-
-      // If we used a temp ID for storage path, that's OK - the file is already uploaded
-      // The URL will be a Supabase Storage URL, not Unsplash URL
 
       alert('Event created successfully! It will appear on the calendar shortly.')
       
