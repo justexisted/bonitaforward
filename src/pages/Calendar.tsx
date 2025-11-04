@@ -136,13 +136,47 @@ const RSS_FEEDS: Array<{url: string, source: string, category: string}> = []
 export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
   try {
     // Load events from database
+    // CRITICAL: Use .select('*') to avoid errors from selecting non-existent columns
+    // Explicit column selection breaks when columns don't exist in the database
+    // Using '*' automatically selects only columns that exist
     const { data: dbEvents, error: dbError } = await supabase
       .from('calendar_events')
       .select('*')
       .order('date', { ascending: true })
     
     if (dbError) {
-      console.warn('Database events error:', dbError)
+      console.error('[fetchCalendarEvents] Database query error:', dbError)
+      console.error('[fetchCalendarEvents] Error details:', {
+        message: dbError.message,
+        details: dbError.details,
+        hint: dbError.hint,
+        code: dbError.code
+      })
+      // Return empty array on error to prevent breaking the app
+      return []
+    }
+    
+    if (!dbEvents) {
+      console.warn('[fetchCalendarEvents] No events returned (dbEvents is null/undefined)')
+      return []
+    }
+    
+    // DIAGNOSTIC: Check if image_url is being returned from database
+    if (dbEvents && dbEvents.length > 0) {
+      const eventsWithImages = dbEvents.filter(e => e.image_url).length
+      const eventsWithoutImages = dbEvents.filter(e => !e.image_url).length
+      console.log('[DEBUG] Database events image check:', {
+        total: dbEvents.length,
+        withImageUrl: eventsWithImages,
+        withoutImageUrl: eventsWithoutImages,
+        sample: dbEvents.slice(0, 3).map(e => ({
+          id: e.id,
+          title: e.title?.substring(0, 30),
+          hasImageUrl: !!e.image_url,
+          imageUrl: e.image_url ? e.image_url.substring(0, 50) + '...' : null,
+          imageType: e.image_type
+        }))
+      })
     }
     
     // Fetch events from RSS feeds (disabled - all proxies failing)
@@ -165,12 +199,41 @@ export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
     const icalEvents = await parseMultipleICalFeeds(ICAL_FEEDS)
     const calendarEvents = icalEvents.map(convertICalToCalendarEvent)
     
-    // Combine database events, RSS events, and iCalendar events
+    // Create a map of database events by ID to preserve image data during deduplication
+    const dbEventsMap = new Map<string, CalendarEvent>()
+    if (dbEvents) {
+      dbEvents.forEach(event => {
+        dbEventsMap.set(event.id, event)
+      })
+    }
+    
+    // Combine external events (RSS + iCalendar) - these won't have image_url
+    const externalEvents = [...rssEvents, ...calendarEvents]
+    
+    // Deduplication: If external event has same ID as database event, prefer database event (has image)
+    // Also, prevent external events from overriding database events
+    const uniqueExternalEvents = externalEvents.filter(externalEvent => {
+      // If a database event with this ID exists, skip the external event (database has priority)
+      return !dbEventsMap.has(externalEvent.id)
+    })
+    
+    // Combine: Database events first (preserve their image_url), then unique external events
     const allEvents = [
       ...(dbEvents || []),
-      ...rssEvents,
-      ...calendarEvents
+      ...uniqueExternalEvents
     ]
+    
+    // DIAGNOSTIC: Verify final merged events have image_url where expected
+    const finalEventsWithImages = allEvents.filter(e => e.image_url).length
+    const finalEventsWithoutImages = allEvents.filter(e => !e.image_url).length
+    console.log('[DEBUG] Final merged events image check:', {
+      total: allEvents.length,
+      withImageUrl: finalEventsWithImages,
+      withoutImageUrl: finalEventsWithoutImages,
+      dbEventsCount: dbEvents?.length || 0,
+      externalEventsCount: uniqueExternalEvents.length,
+      duplicatesRemoved: externalEvents.length - uniqueExternalEvents.length
+    })
     
     // Sort by date
     return allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())

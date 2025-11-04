@@ -983,6 +983,191 @@ if (!token && (event as any).rawQuery) {
 
 ---
 
+### 18. Event Images Not Showing from Database (2025-11-03)
+
+**What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.
+
+**Root Cause:**
+1. Query using `.select('*')` might not include `image_url` if RLS filters columns (though policy allows reading all fields)
+2. External events (iCalendar) were merged with database events without deduplication
+3. If external events had same IDs as database events, they could override database events (losing `image_url`)
+
+**Fix:**
+- **Explicit field selection**: Changed from `.select('*')` to explicitly selecting all fields including `image_url` and `image_type`
+- **Deduplication logic**: Created a Map of database events by ID, then filter out external events that match database event IDs (database events have priority)
+- **Preserve database images**: Database events are placed first in the merged array, external events are filtered to remove duplicates
+
+**Wrong Code:**
+```typescript
+// Query might not include image_url if RLS filters
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('*') // ❌ Might not include image_url
+
+// Merge without deduplication - external events can override database events
+const allEvents = [
+  ...(dbEvents || []),
+  ...rssEvents, // ❌ No image_url
+  ...calendarEvents // ❌ No image_url, might override database events
+]
+```
+
+**Correct Code:**
+```typescript
+// Explicitly select image_url and image_type to ensure they're included
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('id, title, description, date, time, location, address, category, source, upvotes, downvotes, created_at, updated_at, user_id, provider_id, created_by_user_id, is_flagged, flag_count, url, image_url, image_type') // ✅ Explicit
+
+// Create map of database events to preserve image data
+const dbEventsMap = new Map<string, CalendarEvent>()
+dbEvents?.forEach(event => {
+  dbEventsMap.set(event.id, event)
+})
+
+// Filter external events to remove duplicates (database has priority)
+const uniqueExternalEvents = externalEvents.filter(externalEvent => {
+  return !dbEventsMap.has(externalEvent.id) // ✅ Skip if database event exists
+})
+
+// Combine: Database first (has images), then unique external events
+const allEvents = [
+  ...(dbEvents || []), // ✅ Database events with images first
+  ...uniqueExternalEvents // ✅ Only unique external events
+]
+```
+
+**Prevention Checklist:**
+- ✅ Explicitly select `image_url` and `image_type` in queries (don't rely on `*`)
+- ✅ Deduplicate external events to prevent overriding database events
+- ✅ Database events have priority over external events (preserve images)
+- ✅ Add logging to verify `image_url` is present in final merged events
+- ✅ Test with events that have database images to verify they show images
+
+**Rule of Thumb:**
+> When merging database events with external events:
+> 1. Explicitly select all fields including `image_url` and `image_type` (don't use `*`)
+> 2. Create a Map of database events by ID to preserve image data
+> 3. Filter external events to remove duplicates (database events have priority)
+> 4. Database events should be first in the merged array
+> 5. Add diagnostic logging to verify `image_url` is present in final events
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')` and deduplication)
+- `src/components/CalendarSection.tsx` (uses `fetchCalendarEvents()` - automatically benefits)
+- `src/components/EventCard.tsx` (checks `event.image_url` and `event.image_type`)
+
+**Related:**
+- Section #14: Async Operation Order in SIGNED_IN Handler
+- Section #15: Custom Email Verification System
+- Section #19: Explicit Column Selection Breaks When Columns Don't Exist (⚠️ **This fix caused Section #19** - explicit column selection broke the query)
+
+---
+
+### 19. Explicit Column Selection Breaks When Columns Don't Exist (2025-11-03)
+
+**What:** When explicitly selecting columns in Supabase queries, if any column doesn't exist in the database, the query fails and returns no data (or empty results).
+
+**Root Cause:**
+- Explicit column selection (e.g., `.select('id, title, image_url')`) requires ALL listed columns to exist
+- If you select columns that were never added via migrations, Supabase returns an error or empty results
+- TypeScript types may include optional fields that don't exist in the actual database schema
+- Using `.select('*')` is safer because it only selects columns that actually exist
+
+**Example:**
+```typescript
+// ❌ BROKEN: Tries to select columns that might not exist
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // If ANY of these columns don't exist → query fails → returns empty/no data
+
+// ✅ CORRECT: Selects all existing columns automatically
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('*')
+  // Only selects columns that actually exist in the database
+```
+
+**Fix:**
+- Use `.select('*')` instead of explicit column lists
+- If you need specific columns, verify they exist in the database first (check migrations)
+- Add error handling to detect query failures
+- Log query errors with full details (message, code, hint, details)
+
+**Wrong Code:**
+```typescript
+// Selecting columns that might not exist
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // ❌ If user_id, provider_id, is_flagged, flag_count, or url don't exist → FAILS
+
+// No error handling
+if (dbError) {
+  console.warn('Error:', dbError) // ❌ Not enough detail
+}
+```
+
+**Correct Code:**
+```typescript
+// Use * to select all existing columns
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('*') // ✅ Automatically selects only existing columns
+  .order('date', { ascending: true })
+
+// Comprehensive error handling
+if (dbError) {
+  console.error('[fetchCalendarEvents] Database query error:', dbError)
+  console.error('[fetchCalendarEvents] Error details:', {
+    message: dbError.message,
+    details: dbError.details,
+    hint: dbError.hint,
+    code: dbError.code
+  })
+  return [] // ✅ Return empty array on error to prevent breaking app
+}
+
+if (!dbEvents) {
+  console.warn('[fetchCalendarEvents] No events returned')
+  return []
+}
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use `.select('*')`** unless you're 100% certain all columns exist
+- ✅ **Check migrations** before explicitly selecting columns
+- ✅ **Add comprehensive error logging** to detect query failures
+- ✅ **Return empty array on error** to prevent breaking the app
+- ✅ **Verify database schema** matches TypeScript types before explicit selection
+- ✅ **Test with actual database** to ensure columns exist
+
+**Rule of Thumb:**
+> When querying Supabase:
+> 1. **Default to `.select('*')`** - it's safer and automatically selects existing columns
+> 2. **Only use explicit column selection** if you've verified all columns exist via migrations
+> 3. **Always check for errors** and log full error details (message, code, hint, details)
+> 4. **Return empty array on error** to prevent breaking the app
+> 5. **TypeScript types may include optional fields that don't exist** - don't assume types match database
+
+**How to Verify Database Schema:**
+1. Check migration files in `ops/migrations/` to see what columns were added
+2. Check base table creation in `scripts/create-*-tables.sql`
+3. Query database directly: `SELECT column_name FROM information_schema.columns WHERE table_name = 'table_name'`
+4. Use Supabase dashboard to inspect table structure
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')`)
+- Any file using explicit column selection in Supabase queries
+- Migration files to verify which columns actually exist
+
+**Related:**
+- Section #18: Event Images Not Showing from Database
+- Section #15: Custom Email Verification System
+
+---
+
 ## How to Prevent This (Action Plan)
 
 ### Immediate (5 minutes after EVERY change):
@@ -1015,6 +1200,8 @@ if (!token && (event as any).rawQuery) {
   - [ ] **Does email verification status update correctly after verification?** ⭐ NEW
   - [ ] **Are unverified users blocked from protected features?** ⭐ NEW
   - [ ] **Can users resend verification emails from account page?** ⭐ NEW
+  - [ ] **Do calendar events with database images show their images (not gradients)?** ⭐ NEW
+  - [ ] **Do calendar events without database images show gradient fallbacks?** ⭐ NEW
 
 3. **Manual Testing**
    - Actually USE the app after every change
