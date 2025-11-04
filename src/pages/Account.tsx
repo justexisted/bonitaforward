@@ -162,9 +162,12 @@ export default function AccountPage() {
     // If user has businesses, ask if they want to delete them too
     let shouldDeleteBusinesses = false
     if (hasBusinesses) {
+      // Show business names so user knows exactly which businesses they're deciding about
+      const businessNames = data.myBusinesses.map(b => b.name || 'Unnamed Business').join(', ')
       const deleteBusinessesConfirmed = confirm(
-        `You have ${data.myBusinesses.length} business(es) linked to your account.\n\n` +
-        `Would you like to DELETE your businesses as well?\n\n` +
+        `You have ${data.myBusinesses.length} business(es) linked to your account:\n\n` +
+        `${businessNames}\n\n` +
+        `Would you like to DELETE these businesses permanently?\n\n` +
         `• Click "OK" to DELETE your businesses permanently\n` +
         `• Click "Cancel" to keep your businesses (they will be unlinked from your account and you can reconnect them if you sign up again)`
       )
