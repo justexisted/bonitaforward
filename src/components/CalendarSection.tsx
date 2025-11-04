@@ -87,8 +87,18 @@ export default function CalendarSection() {
         setEvents(calendarEvents)
         
         // ONLY load dynamic images for events that don't have database images
-        const eventsWithDbImages = calendarEvents.filter(e => e.image_url).length
-        const eventsNeedingImages = calendarEvents.filter(e => !e.image_url)
+        // CRITICAL: Check for both image_url AND image_type (or infer from image_url format)
+        // Events with image_url but null image_type are still considered to have database images
+        const eventsWithDbImages = calendarEvents.filter(e => {
+          // Has image_url: if image_type is set, use it; otherwise infer from URL format
+          if (e.image_url) {
+            if (e.image_type) return true
+            // Legacy: infer type - URLs are images, gradients are gradients
+            return e.image_url.startsWith('http')
+          }
+          return false
+        }).length
+        const eventsNeedingImages = calendarEvents.filter(e => !e.image_url || (e.image_url && !e.image_type && !e.image_url.startsWith('http')))
         
         console.log(`[CalendarSection] 📊 Events: ${calendarEvents.length} total`)
         console.log(`[CalendarSection] ✅ ${eventsWithDbImages} have database images`)

@@ -279,6 +279,37 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
 }
 
 /**
+ * Get event header image from database, handling legacy events
+ * CRITICAL: Handles legacy events where image_url exists but image_type is null
+ * If image_url exists but image_type is missing, infers type from image_url format:
+ * - URLs starting with 'http' are 'image' type
+ * - Strings starting with 'linear-gradient' are 'gradient' type
+ * This prevents cascading failure where events with database images fall back to gradients
+ * 
+ * @param event - Calendar event with optional image_url and image_type
+ * @returns Header image object with type and value
+ */
+export function getEventHeaderImageFromDb(event: CalendarEvent): {
+  type: 'image' | 'gradient'
+  value: string
+} {
+  // If image_url exists, use it (with type inference if needed)
+  if (event.image_url) {
+    // If image_type is set, use it
+    if (event.image_type) {
+      return { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+    }
+    // Legacy events: infer type from image_url format
+    // URLs (http/https) are image type, gradients are gradient type
+    const inferredType = event.image_url.startsWith('http') ? 'image' : 'gradient'
+    return { type: inferredType, value: event.image_url }
+  }
+  
+  // No image_url: use gradient fallback
+  return { type: 'gradient', value: getEventGradient(event) }
+}
+
+/**
  * Get event header image
  * Tries Unsplash first, falls back to gradient
  */

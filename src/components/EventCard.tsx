@@ -1,7 +1,7 @@
 import { Calendar, Clock, MapPin, ExternalLink, Bookmark, BookmarkCheck } from 'lucide-react'
 import { EventIcons } from '../utils/eventIcons'
 import { extractEventUrl, cleanDescriptionFromUrls, getButtonTextForUrl } from '../utils/eventUrlUtils'
-import { getEventGradient } from '../utils/eventImageUtils'
+import { getEventHeaderImageFromDb } from '../utils/eventImageUtils'
 import type { CalendarEvent } from '../types'
 
 interface EventCardProps {
@@ -32,9 +32,8 @@ export function EventCard({ event, onClick, savedEventIds, onToggleSave, isAuthe
   const buttonText = getButtonTextForUrl(eventUrl)
   
   // Get header image from database, or fallback to gradient
-  const headerImage = event.image_url && event.image_type
-    ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
-    : { type: 'gradient' as const, value: getEventGradient(event) }
+  // Uses helper function that handles legacy events with image_url but null image_type
+  const headerImage = getEventHeaderImageFromDb(event)
   
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {

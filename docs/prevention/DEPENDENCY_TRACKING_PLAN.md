@@ -788,3 +788,49 @@ See: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
 
 ---
 
+### Event Images Not Showing Due to Null image_type (2025-01-XX)
+
+**Issue:** Events with database `image_url` but null `image_type` were showing gradient fallbacks instead of their stored images, even though they had valid image URLs in the database.
+
+**Files:**
+- `src/components/EventCard.tsx` (uses `getEventHeaderImageFromDb()` helper)
+- `src/pages/Calendar.tsx` (uses `getEventHeaderImageFromDb()` helper - 3 locations)
+- `src/components/CalendarSection.tsx` (updated logging to check for both fields or infer type)
+- `src/utils/eventImageUtils.ts` (contains `getEventHeaderImageFromDb()` helper function)
+- `scripts/backfill-event-image-types.ts` (backfill script to set image_type for legacy events)
+
+**Fixes:**
+- Created `getEventHeaderImageFromDb()` helper that handles legacy events with null `image_type`
+- Infers `image_type` from `image_url` format if `image_type` is null:
+  - URLs starting with 'http' → 'image' type
+  - Strings starting with 'linear-gradient' → 'gradient' type
+- Updated all components to use the helper function (prevents code duplication)
+- Updated CalendarSection logging to check for both fields or infer type
+- Created database backfill script to set `image_type` for legacy events
+
+**Dependencies:**
+- Calendar events table must have `image_url` column (for storing image URLs or gradient strings)
+- Calendar events table must have `image_type` column (for storing 'image' or 'gradient' type)
+- `image_type` can be null (legacy data support)
+- `image_url` format must be consistent (URLs start with 'http', gradients start with 'linear-gradient')
+- Helper function `getEventHeaderImageFromDb()` must be used consistently across all components
+
+**Breaking-Change Awareness:**
+- If you remove `getEventHeaderImageFromDb()` helper → All components break (code duplication)
+- If you change `image_type` inference logic → Must update helper function and all usages
+- If you change `image_url` format → Type inference logic might break (e.g., if URLs no longer start with 'http')
+- If you change `image_type` column name → Helper function breaks
+- If you change `image_url` column name → Helper function breaks
+
+**Prevention:** Documented in `CASCADING_FAILURES.md` (#21). Handle legacy data where optional fields might be null. Infer missing field values from existing data when possible.
+
+**Testing Verified (2025-01-XX):**
+- ✅ Events with `image_url` and `image_type` show images correctly
+- ✅ Events with `image_url` but null `image_type` infer type and show images correctly
+- ✅ Events with `image_url` starting with 'http' are treated as 'image' type
+- ✅ Events with `image_url` starting with 'linear-gradient' are treated as 'gradient' type
+- ✅ Events without `image_url` show gradient fallback
+- ✅ Database backfill script sets `image_type` for legacy events
+
+---
+

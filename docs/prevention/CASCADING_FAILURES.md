@@ -1080,6 +1080,105 @@ async function deleteUser(userId: string, deleteBusinesses?: boolean) {
 
 ---
 
+### 21. Event Images Not Showing Due to Null image_type (2025-01-XX)
+
+**What:** Events with database `image_url` but null `image_type` were showing gradient fallbacks instead of their stored images, even though they had valid image URLs in the database.
+
+**Root Cause:**
+1. EventCard and Calendar.tsx require BOTH `image_url` AND `image_type` to display database images
+2. Legacy events were created/populated with `image_url` but `image_type` was null
+3. When `image_type` is null, the code falls back to gradient even though `image_url` exists
+4. This is a cascading failure from Section #18 fix - the fix required both fields, but didn't handle legacy data
+
+**What Happened:**
+1. Events were populated with `image_url` values (Unsplash URLs or gradient strings)
+2. Some events had `image_url` but `image_type` was null (legacy data or incomplete population)
+3. EventCard checks `event.image_url && event.image_type` - if either is null, it falls back to gradient
+4. Result: Events with valid database images show gradients instead of images
+
+**The Fix:**
+- **Legacy data handling**: Created `getEventHeaderImageFromDb()` helper that infers `image_type` from `image_url` format if `image_type` is null
+- **Type inference**: If `image_url` starts with 'http', assume it's 'image' type; if it starts with 'linear-gradient', assume it's 'gradient' type
+- **Updated all components**: EventCard, Calendar.tsx (3 locations), and CalendarSection now use the helper function
+- **Database backfill script**: Created `scripts/backfill-event-image-types.ts` to set `image_type` for legacy events
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Requires both fields, falls back to gradient if image_type is null
+const headerImage = event.image_url && event.image_type
+  ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+  : { type: 'gradient' as const, value: getEventGradient(event) }
+// If image_type is null → always falls back to gradient, even if image_url exists
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Handles legacy events with null image_type
+export function getEventHeaderImageFromDb(event: CalendarEvent): {
+  type: 'image' | 'gradient'
+  value: string
+} {
+  if (event.image_url) {
+    // If image_type is set, use it
+    if (event.image_type) {
+      return { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+    }
+    // Legacy events: infer type from image_url format
+    // URLs (http/https) are image type, gradients are gradient type
+    const inferredType = event.image_url.startsWith('http') ? 'image' : 'gradient'
+    return { type: inferredType, value: event.image_url }
+  }
+  
+  // No image_url: use gradient fallback
+  return { type: 'gradient', value: getEventGradient(event) }
+}
+
+// Usage:
+const headerImage = getEventHeaderImageFromDb(event)
+```
+
+**Prevention Checklist:**
+- ✅ Handle legacy data where optional fields might be null (don't require both fields if one can be inferred)
+- ✅ Infer missing field values from existing data when possible (image_type from image_url format)
+- ✅ Use helper functions for complex logic (prevents duplication and inconsistency)
+- ✅ Update all components that use the same logic (EventCard, Calendar.tsx, CalendarSection)
+- ✅ Create database backfill scripts to fix legacy data
+- ✅ Add logging to verify image_url is present in final events
+
+**Rule of Thumb:**
+> When checking for optional fields that depend on each other:
+> 1. If one field can be inferred from another, don't require both to be non-null
+> 2. Create helper functions for complex field validation/inference logic
+> 3. Update all components that use the same logic (don't duplicate code)
+> 4. Create database backfill scripts to fix legacy data with missing fields
+> 5. Test with legacy data where optional fields might be null
+
+**Files to Watch:**
+- `src/components/EventCard.tsx` - Uses `getEventHeaderImageFromDb()` helper
+- `src/pages/Calendar.tsx` - Uses `getEventHeaderImageFromDb()` helper (3 locations)
+- `src/components/CalendarSection.tsx` - Updated logging to check for both fields or infer type
+- `src/utils/eventImageUtils.ts` - Contains `getEventHeaderImageFromDb()` helper function
+- `scripts/backfill-event-image-types.ts` - Backfill script to set image_type for legacy events
+
+**Breaking Changes:**
+- If you remove `getEventHeaderImageFromDb()` helper → All components break (code duplication)
+- If you change image_type inference logic → Must update helper function and all usages
+- If you change image_url format → Type inference logic might break
+
+**Testing Verified (2025-01-XX):**
+- ✅ Events with image_url and image_type show images correctly
+- ✅ Events with image_url but null image_type infer type and show images correctly
+- ✅ Events with image_url starting with 'http' are treated as 'image' type
+- ✅ Events with image_url starting with 'linear-gradient' are treated as 'gradient' type
+- ✅ Events without image_url show gradient fallback
+- ✅ Database backfill script sets image_type for legacy events
+
+**Related:**
+- Section #18: Event Images Not Showing from Database (original fix that required both fields)
+- Section #19: Explicit Column Selection Breaks When Columns Don't Exist (why we use `.select('*')`)
+
+---
+
 ### 18. Event Images Not Showing from Database (2025-11-03)
 
 **What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.

@@ -6,7 +6,7 @@ import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '
 import type { CalendarEvent } from '../types'
 import { EventIcons } from '../utils/eventIcons'
 import { extractEventUrl, cleanDescriptionFromUrls, getButtonTextForUrl } from '../utils/eventUrlUtils'
-import { getEventGradient, preloadEventImages, getEventHeaderImage } from '../utils/eventImageUtils'
+import { getEventGradient, preloadEventImages, getEventHeaderImage, getEventHeaderImageFromDb } from '../utils/eventImageUtils'
 import { fetchSavedEvents, saveEvent, unsaveEvent, migrateLocalStorageToDatabase } from '../utils/savedEventsDb'
 import { useHideDock } from '../hooks/useHideDock'
 import { hasAcceptedEventTerms, acceptEventTerms, migrateEventTermsToDatabase } from '../utils/eventTermsDb'
@@ -922,12 +922,16 @@ export default function CalendarPage() {
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
                     // PRIORITIZE database images, then dynamic, then gradient fallback
+                    // Uses helper function that handles legacy events with image_url but null image_type
                     const dynamicImage = eventImages.get(event.id)
-                    const headerImage = event.image_url && event.image_type
-                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                    const dbImage = getEventHeaderImageFromDb(event)
+                    // If database has image_url (even if image_type is null), use it
+                    // Otherwise, fall back to dynamic image, then gradient
+                    const headerImage = event.image_url
+                      ? dbImage // Database image (handles legacy events with null image_type)
                       : dynamicImage
                         ? dynamicImage
-                        : { type: 'gradient' as const, value: getEventGradient(event) }
+                        : dbImage // Fallback to gradient from helper
                     
                     return (
                       <div
@@ -1087,12 +1091,16 @@ export default function CalendarPage() {
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
                     // PRIORITIZE database images, then dynamic, then gradient fallback
+                    // Uses helper function that handles legacy events with image_url but null image_type
                     const dynamicImage = eventImages.get(event.id)
-                    const headerImage = event.image_url && event.image_type
-                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                    const dbImage = getEventHeaderImageFromDb(event)
+                    // If database has image_url (even if image_type is null), use it
+                    // Otherwise, fall back to dynamic image, then gradient
+                    const headerImage = event.image_url
+                      ? dbImage // Database image (handles legacy events with null image_type)
                       : dynamicImage
                         ? dynamicImage
-                        : { type: 'gradient' as const, value: getEventGradient(event) }
+                        : dbImage // Fallback to gradient from helper
                     
                     return (
                       <div
@@ -1243,12 +1251,16 @@ export default function CalendarPage() {
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
                     // PRIORITIZE database images, then dynamic, then gradient fallback
+                    // Uses helper function that handles legacy events with image_url but null image_type
                     const dynamicImage = eventImages.get(event.id)
-                    const headerImage = event.image_url && event.image_type
-                      ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
+                    const dbImage = getEventHeaderImageFromDb(event)
+                    // If database has image_url (even if image_type is null), use it
+                    // Otherwise, fall back to dynamic image, then gradient
+                    const headerImage = event.image_url
+                      ? dbImage // Database image (handles legacy events with null image_type)
                       : dynamicImage
                         ? dynamicImage
-                        : { type: 'gradient' as const, value: getEventGradient(event) }
+                        : dbImage // Fallback to gradient from helper
                     
                     return (
                       <div
