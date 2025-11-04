@@ -262,7 +262,6 @@ export async function deleteUser(
     }
     
     // Build success message based on what was deleted
-    const deletedProfile = profiles.find(p => p.id === userId)
     const deletedCounts = result.deletedCounts || {}
     const providersCount = deletedCounts.providers || 0
     
