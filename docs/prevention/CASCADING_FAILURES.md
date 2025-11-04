@@ -1080,6 +1080,99 @@ async function deleteUser(userId: string, deleteBusinesses?: boolean) {
 
 ---
 
+### 22. Event Images Stored in Supabase Storage (2025-01-XX)
+
+**What:** New events automatically download images from Unsplash and store them in Supabase Storage. The database stores Supabase Storage URLs (your own storage), not Unsplash URLs.
+
+**Root Cause:**
+1. Previously, event creation saved Unsplash URLs directly to database
+2. Images were served from Unsplash servers (not your own storage)
+3. Browser inspector showed `background-image: url(https://images.unsplash.com/...)`
+4. User wanted images stored in their own database/storage, not referenced from Unsplash
+
+**The Fix:**
+- **Automatic image download and storage**: When creating new events, the system:
+  1. Fetches Unsplash image URL
+  2. Downloads the image file
+  3. Uploads to Supabase Storage (your own storage bucket `event-images`)
+  4. Saves Supabase Storage URL to database (not Unsplash URL)
+- **Existing events left alone**: Only NEW events trigger Unsplash → Supabase Storage flow
+- **Display uses database only**: All images come from database (no external API calls on page load)
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Saves Unsplash URL directly to database
+const unsplashImageUrl = await fetchUnsplashImage(keywords)
+if (unsplashImageUrl) {
+  headerImage = { type: 'image', value: unsplashImageUrl } // Unsplash URL saved
+  // Database stores: https://images.unsplash.com/...
+  // Images served from Unsplash servers
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Downloads image and stores in Supabase Storage
+const unsplashImageUrl = await fetchUnsplashImage(keywords)
+if (unsplashImageUrl) {
+  // Download image from Unsplash
+  const supabaseStorageUrl = await downloadAndStoreImage(unsplashImageUrl, tempEventId)
+  if (supabaseStorageUrl) {
+    headerImage = { type: 'image', value: supabaseStorageUrl } // Supabase Storage URL saved
+    // Database stores: https://your-project.supabase.co/storage/v1/object/public/event-images/...
+    // Images served from YOUR Supabase Storage
+  }
+}
+```
+
+**Prevention Checklist:**
+- ✅ Only NEW events trigger Unsplash API calls (automatic on event creation)
+- ✅ Existing events are NEVER touched (left as-is in database)
+- ✅ Images downloaded and stored in Supabase Storage (your own storage)
+- ✅ Database stores Supabase Storage URLs (not Unsplash URLs)
+- ✅ Display code uses database only (no external API calls on page load)
+- ✅ Supabase Storage bucket `event-images` must exist (public bucket)
+
+**Rule of Thumb:**
+> When storing images from external APIs:
+> 1. Download the image file (don't just save the URL)
+> 2. Upload to your own storage (Supabase Storage, S3, etc.)
+> 3. Save your storage URL to database (not external API URL)
+> 4. Only trigger for NEW records (never touch existing data automatically)
+> 5. Display always uses database (no external API calls)
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`handleCreateEvent` - downloads and stores images for new events only)
+- `src/utils/eventImageStorage.ts` (`downloadAndStoreImage` - downloads from Unsplash, uploads to Supabase Storage)
+- `src/utils/eventImageUtils.ts` (`fetchUnsplashImage` - fetches Unsplash URL, used only during event creation)
+- `src/components/EventCard.tsx` (uses `getEventHeaderImageFromDb` - reads from database only, no API calls)
+- `src/components/CalendarSection.tsx` (uses `getEventHeaderImageFromDb` - reads from database only, no API calls)
+
+**Breaking Changes:**
+- If you remove `downloadAndStoreImage` → New events won't store images in Supabase Storage
+- If Supabase Storage bucket `event-images` doesn't exist → Image storage fails (falls back to Unsplash URL)
+- If you change Supabase Storage bucket name → Image storage fails
+- If you remove Unsplash API key → New events use gradient fallback (existing events unaffected)
+
+**Dependencies:**
+- Supabase Storage bucket `event-images` must exist (create in Supabase Dashboard → Storage)
+- Bucket must be public (for public image URLs)
+- Unsplash API key required for new event creation (only)
+- Existing events in database are NOT modified (left as-is)
+
+**Testing Verified (2025-01-XX):**
+- ✅ New event creation downloads Unsplash image and stores in Supabase Storage
+- ✅ Database stores Supabase Storage URL (not Unsplash URL)
+- ✅ Display code reads from database only (no Unsplash API calls on page load)
+- ✅ Existing events left unchanged (not modified automatically)
+- ✅ Browser inspector shows Supabase Storage URLs (not Unsplash URLs)
+
+**Related:**
+- Section #21: Event Images Not Showing Due to Null image_type (display logic)
+- Section #18: Event Images Not Showing from Database (original fix)
+
+---
+
 ### 21. Event Images Not Showing Due to Null image_type (2025-01-XX)
 
 **What:** Events with database `image_url` but null `image_type` were showing gradient fallbacks instead of their stored images, even though they had valid image URLs in the database.

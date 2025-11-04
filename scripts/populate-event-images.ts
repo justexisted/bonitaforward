@@ -207,11 +207,14 @@ async function populateEventImages() {
   console.log('🚀 Starting event image population...\n')
 
   try {
-    // Fetch all events without images
+    // Fetch all events that need images:
+    // 1. Events with NULL image_url or image_type
+    // 2. Events with gradient strings saved (image_url LIKE 'linear-gradient%')
+    // 3. Events with image_type = 'gradient' (should have actual URLs)
     const { data: events, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .or('image_url.is.null,image_type.is.null')
+      .or('image_url.is.null,image_type.is.null,image_url.like.linear-gradient%,image_type.eq.gradient')
       .order('created_at', { ascending: false })
 
     if (error) {

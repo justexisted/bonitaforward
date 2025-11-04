@@ -5,7 +5,7 @@ import { EventCard } from './EventCard'
 import { fetchCalendarEvents, type CalendarEvent } from '../pages/Calendar'
 import { useAuth } from '../contexts/AuthContext'
 import { extractEventUrl, cleanDescriptionFromUrls } from '../utils/eventUrlUtils'
-import { preloadEventImages } from '../utils/eventImageUtils'
+// NO external API calls - all images come from database only
 import { 
   fetchSavedEvents, 
   saveEvent, 
@@ -59,7 +59,7 @@ export default function CalendarSection() {
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set())
-  const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
+  // NO eventImages state - all images come from database only
 
   // State for flag/report feature
   const [showFlagModal, setShowFlagModal] = useState(false)
@@ -98,16 +98,12 @@ export default function CalendarSection() {
           }
           return false
         }).length
-        const eventsNeedingImages = calendarEvents.filter(e => !e.image_url || (e.image_url && !e.image_type && !e.image_url.startsWith('http')))
-        
         console.log(`[CalendarSection] 📊 Events: ${calendarEvents.length} total`)
         console.log(`[CalendarSection] ✅ ${eventsWithDbImages} have database images`)
-        console.log(`[CalendarSection] 🎨 ${eventsNeedingImages.length} will use gradient fallbacks (no external fetch)`)        
+        console.log(`[CalendarSection] 🎨 ${calendarEvents.length - eventsWithDbImages} will use gradient fallbacks (images must be populated in database)`)        
         
-        if (eventsNeedingImages.length > 0) {
-          const images = await preloadEventImages(eventsNeedingImages)
-          setEventImages(images)
-        }
+        // CRITICAL: NO external API calls - all images come from database only
+        // If events don't have images in database, they'll use gradients from getEventHeaderImageFromDb
       } catch (error) {
         console.error('Error loading calendar events:', error)
       } finally {
@@ -320,18 +316,12 @@ export default function CalendarSection() {
           {upcomingEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-visible">
             {upcomingEvents.map((event) => {
-              // PRIORITIZE database images, only use dynamic if database is empty
-              const dynamicImage = eventImages.get(event.id)
-              const eventWithImage = event.image_url ? event : (dynamicImage ? {
-                ...event,
-                image_url: dynamicImage.value,
-                image_type: dynamicImage.type
-              } : event)
-                
-                return (
-                  <EventCard
-                    key={event.id}
-                    event={eventWithImage}
+              // CRITICAL: Only use images from database - EventCard handles this via getEventHeaderImageFromDb
+              // NO external API calls - all images come from database only
+              return (
+                <EventCard
+                  key={event.id}
+                  event={event}
                     onClick={setSelectedEvent}
                     savedEventIds={savedEventIds}
                     onToggleSave={toggleSaveEvent}

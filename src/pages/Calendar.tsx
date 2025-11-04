@@ -6,7 +6,8 @@ import { parseMultipleICalFeeds, convertICalToCalendarEvent, ICAL_FEEDS } from '
 import type { CalendarEvent } from '../types'
 import { EventIcons } from '../utils/eventIcons'
 import { extractEventUrl, cleanDescriptionFromUrls, getButtonTextForUrl } from '../utils/eventUrlUtils'
-import { getEventGradient, preloadEventImages, getEventHeaderImage, getEventHeaderImageFromDb } from '../utils/eventImageUtils'
+import { getEventGradient, getEventHeaderImageFromDb, extractSearchKeywords, fetchUnsplashImage, getUnsplashAccessKey } from '../utils/eventImageUtils'
+import { downloadAndStoreImage } from '../utils/eventImageStorage'
 import { fetchSavedEvents, saveEvent, unsaveEvent, migrateLocalStorageToDatabase } from '../utils/savedEventsDb'
 import { useHideDock } from '../hooks/useHideDock'
 import { hasAcceptedEventTerms, acceptEventTerms, migrateEventTermsToDatabase } from '../utils/eventTermsDb'
@@ -161,19 +162,24 @@ export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
       return []
     }
     
-    // DIAGNOSTIC: Check if image_url is being returned from database
+    // DIAGNOSTIC: Check if image_url is being returned from database and what type of values they are
     if (dbEvents && dbEvents.length > 0) {
       const eventsWithImages = dbEvents.filter(e => e.image_url).length
       const eventsWithoutImages = dbEvents.filter(e => !e.image_url).length
+      const eventsWithImageUrls = dbEvents.filter(e => e.image_url && e.image_url.startsWith('http')).length
+      const eventsWithGradientStrings = dbEvents.filter(e => e.image_url && !e.image_url.startsWith('http')).length
       console.log('[DEBUG] Database events image check:', {
         total: dbEvents.length,
         withImageUrl: eventsWithImages,
         withoutImageUrl: eventsWithoutImages,
-        sample: dbEvents.slice(0, 3).map(e => ({
+        withImageUrls: eventsWithImageUrls, // URLs starting with http
+        withGradientStrings: eventsWithGradientStrings, // Gradient strings
+        sample: dbEvents.slice(0, 5).map(e => ({
           id: e.id,
           title: e.title?.substring(0, 30),
           hasImageUrl: !!e.image_url,
-          imageUrl: e.image_url ? e.image_url.substring(0, 50) + '...' : null,
+          imageUrl: e.image_url ? e.image_url.substring(0, 80) + '...' : null,
+          imageUrlType: e.image_url ? (e.image_url.startsWith('http') ? 'URL' : 'GRADIENT_STRING') : 'NONE',
           imageType: e.image_type
         }))
       })
@@ -283,8 +289,7 @@ export default function CalendarPage() {
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(new Set())
   const [showSavedEvents, setShowSavedEvents] = useState(false) // Toggle for showing saved events section
 
-  // State for dynamically loaded event images (Unsplash + gradients)
-  const [eventImages, setEventImages] = useState<Map<string, { type: 'image' | 'gradient', value: string }>>(new Map())
+  // NO eventImages state - all images come from database only
 
   // Hide Dock when any modal is open
   const isAnyModalOpen = Boolean(selectedEvent || showCreateEvent || showTermsModal || showFlagModal || editingEvent)
@@ -404,18 +409,17 @@ export default function CalendarPage() {
         const allEvents = await fetchCalendarEvents()
         setEvents(allEvents)
         
-        // ONLY load dynamic images for events that don't have database images
+        // CRITICAL: Only use images from database - NO external API calls
+        // Events without database images will use gradient fallbacks
         const eventsWithDbImages = allEvents.filter(e => e.image_url).length
-        const eventsNeedingImages = allEvents.filter(e => !e.image_url)
+        const eventsWithoutImages = allEvents.filter(e => !e.image_url)
         
         console.log(`[Calendar] 📊 Events: ${allEvents.length} total`)
         console.log(`[Calendar] ✅ ${eventsWithDbImages} have database images`)
-        console.log(`[Calendar] 🔍 ${eventsNeedingImages.length} need dynamic images`)
+        console.log(`[Calendar] 🎨 ${eventsWithoutImages.length} will use gradient fallbacks (images must be populated in database)`)
         
-        if (eventsNeedingImages.length > 0) {
-          const images = await preloadEventImages(eventsNeedingImages)
-          setEventImages(images)
-        }
+        // NO external API calls - all images come from database
+        // If events don't have images, they'll use gradients from getEventHeaderImageFromDb
       } catch (err) {
         console.error('Error loading events:', err)
         setError('Failed to load events')
@@ -490,13 +494,58 @@ export default function CalendarPage() {
         category: newEvent.category
       }
 
-      // Fetch header image (Unsplash or gradient)
-      console.log('[CreateEvent] Fetching header image...')
-      const headerImage = await getEventHeaderImage(tempEvent as CalendarEvent)
-      console.log(`[CreateEvent] Got ${headerImage.type}: ${headerImage.value.substring(0, 50)}...`)
+      // CRITICAL: Fetch Unsplash image, download it, and store in Supabase Storage
+      // Save Supabase Storage URL to database, NOT Unsplash URL
+      console.log('[CreateEvent] Fetching Unsplash image for event...')
+      
+      // Extract keywords for image search
+      const keywords = extractSearchKeywords(tempEvent as CalendarEvent)
+      console.log('[CreateEvent] Search keywords:', keywords)
+      
+      // Try to fetch Unsplash image (with API key check)
+      const apiKey = getUnsplashAccessKey()
+      let headerImage: { type: 'image' | 'gradient', value: string }
+      
+      if (apiKey && apiKey !== 'demo_key') {
+        // Fetch Unsplash image URL
+        const unsplashImageUrl = await fetchUnsplashImage(keywords)
+        if (unsplashImageUrl) {
+          console.log('[CreateEvent] ✅ Got Unsplash image URL:', unsplashImageUrl.substring(0, 60) + '...')
+          
+          // Download and store in Supabase Storage
+          // Generate temporary event ID for storage path
+          const tempEventId = `temp-${Date.now()}`
+          const supabaseStorageUrl = await downloadAndStoreImage(unsplashImageUrl, tempEventId)
+          
+          if (supabaseStorageUrl) {
+            // Use Supabase Storage URL (your own database)
+            headerImage = { type: 'image', value: supabaseStorageUrl }
+            console.log('[CreateEvent] ✅ Image stored in Supabase Storage:', supabaseStorageUrl.substring(0, 60) + '...')
+          } else {
+            // Storage failed - check if bucket exists
+            console.error('[CreateEvent] ❌ FAILED to store in Supabase Storage')
+            console.error('[CreateEvent] ❌ Check browser console for storage bucket error')
+            console.error('[CreateEvent] ❌ Make sure "event-images" bucket exists in Supabase Dashboard → Storage')
+            console.error('[CreateEvent] ⚠️ Falling back to Unsplash URL (image will be served from Unsplash, not your storage)')
+            // Fall back to Unsplash URL (temporary - will be replaced once bucket is created)
+            headerImage = { type: 'image', value: unsplashImageUrl }
+          }
+        } else {
+          // Unsplash failed, use gradient
+          headerImage = { type: 'gradient', value: getEventGradient(tempEvent as CalendarEvent) }
+          console.log('[CreateEvent] ⚠️ Unsplash failed, using gradient fallback')
+        }
+      } else {
+        // No API key, use gradient
+        console.warn('[CreateEvent] ⚠️ No Unsplash API key - using gradient fallback')
+        headerImage = { type: 'gradient', value: getEventGradient(tempEvent as CalendarEvent) }
+      }
+      
+      // After inserting event, update with actual event ID if we used temp ID
+      // (We'll handle this after insert)
 
       // Insert event with image
-      const { error } = await supabase
+      const { data: insertedEvent, error } = await supabase
         .from('calendar_events')
         .insert([{
           title: newEvent.title,
@@ -514,8 +563,13 @@ export default function CalendarPage() {
           image_url: headerImage.value,
           image_type: headerImage.type
         }])
+        .select()
+        .single()
 
       if (error) throw error
+
+      // If we used a temp ID for storage path, that's OK - the file is already uploaded
+      // The URL will be a Supabase Storage URL, not Unsplash URL
 
       alert('Event created successfully! It will appear on the calendar shortly.')
       
@@ -921,17 +975,9 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // PRIORITIZE database images, then dynamic, then gradient fallback
-                    // Uses helper function that handles legacy events with image_url but null image_type
-                    const dynamicImage = eventImages.get(event.id)
-                    const dbImage = getEventHeaderImageFromDb(event)
-                    // If database has image_url (even if image_type is null), use it
-                    // Otherwise, fall back to dynamic image, then gradient
-                    const headerImage = event.image_url
-                      ? dbImage // Database image (handles legacy events with null image_type)
-                      : dynamicImage
-                        ? dynamicImage
-                        : dbImage // Fallback to gradient from helper
+                    // CRITICAL: Only use images from database - NO external API calls
+                    // All images come from database via getEventHeaderImageFromDb
+                    const headerImage = getEventHeaderImageFromDb(event)
                     
                     return (
                       <div
@@ -1090,17 +1136,9 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // PRIORITIZE database images, then dynamic, then gradient fallback
-                    // Uses helper function that handles legacy events with image_url but null image_type
-                    const dynamicImage = eventImages.get(event.id)
-                    const dbImage = getEventHeaderImageFromDb(event)
-                    // If database has image_url (even if image_type is null), use it
-                    // Otherwise, fall back to dynamic image, then gradient
-                    const headerImage = event.image_url
-                      ? dbImage // Database image (handles legacy events with null image_type)
-                      : dynamicImage
-                        ? dynamicImage
-                        : dbImage // Fallback to gradient from helper
+                    // CRITICAL: Only use images from database - NO external API calls
+                    // All images come from database via getEventHeaderImageFromDb
+                    const headerImage = getEventHeaderImageFromDb(event)
                     
                     return (
                       <div
@@ -1250,17 +1288,9 @@ export default function CalendarPage() {
                     const cleanDescription = cleanDescriptionFromUrls(event.description)
                     const buttonText = getButtonTextForUrl(eventUrl)
                     
-                    // PRIORITIZE database images, then dynamic, then gradient fallback
-                    // Uses helper function that handles legacy events with image_url but null image_type
-                    const dynamicImage = eventImages.get(event.id)
-                    const dbImage = getEventHeaderImageFromDb(event)
-                    // If database has image_url (even if image_type is null), use it
-                    // Otherwise, fall back to dynamic image, then gradient
-                    const headerImage = event.image_url
-                      ? dbImage // Database image (handles legacy events with null image_type)
-                      : dynamicImage
-                        ? dynamicImage
-                        : dbImage // Fallback to gradient from helper
+                    // CRITICAL: Only use images from database - NO external API calls
+                    // All images come from database via getEventHeaderImageFromDb
+                    const headerImage = getEventHeaderImageFromDb(event)
                     
                     return (
                       <div

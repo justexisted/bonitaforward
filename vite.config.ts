@@ -13,5 +13,23 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['lenis'],
+    esbuildOptions: {
+      // Explicitly support import.meta to prevent warnings during dependency optimization
+      // This tells esbuild that the target environment supports import.meta
+      supported: {
+        'import-meta': true
+      },
+      format: 'esm'
+    }
+  },
+  build: {
+    // Ensure ESM format for import.meta support
+    // This prevents esbuild warnings about import.meta not being available with CJS format
+    target: 'esnext',
+    rollupOptions: {
+      output: {
+        format: 'es'
+      }
+    }
   }
 })

@@ -9,8 +9,28 @@
 import type { CalendarEvent } from '../types'
 
 // Unsplash API configuration
-const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || 'demo_key'
 const UNSPLASH_API_URL = 'https://api.unsplash.com'
+
+// Get Unsplash API key - access at runtime to avoid esbuild warnings during dependency optimization
+// Vite will replace import.meta.env at build time, but accessing it at module top level causes warnings
+export const getUnsplashAccessKey = (): string => {
+  try {
+    // @ts-ignore - Vite replaces import.meta.env at build time
+    return import.meta.env?.VITE_UNSPLASH_ACCESS_KEY || 'demo_key'
+  } catch {
+    return 'demo_key'
+  }
+}
+
+// Check if in development mode - access at runtime to avoid esbuild warnings
+const isDev = (): boolean => {
+  try {
+    // @ts-ignore - Vite replaces import.meta.env at build time
+    return import.meta.env?.DEV === true
+  } catch {
+    return false
+  }
+}
 
 // localStorage key for image cache
 const STORAGE_KEY = 'bf-event-images-cache'
@@ -214,19 +234,22 @@ export function getEventGradient(event: CalendarEvent): string {
  * Returns image URL or null if failed
  * Checks cache first to avoid unnecessary API calls
  */
-async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
+export async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
   // Check cache first (localStorage + memory)
   const cachedUrl = getCachedImage(searchQuery)
   if (cachedUrl) {
     // Only log in development mode to reduce console spam
-    if (import.meta.env.DEV) {
+    if (isDev()) {
       console.log(`[Unsplash] Using cached image for "${searchQuery}"`)
     }
     return cachedUrl
   }
   
+  // Get API key at runtime
+  const apiKey = getUnsplashAccessKey()
+  
   // Skip if no API key (will use gradient fallback)
-  if (!UNSPLASH_ACCESS_KEY || UNSPLASH_ACCESS_KEY === 'demo_key') {
+  if (!apiKey || apiKey === 'demo_key') {
     console.warn('[Unsplash] ❌ NO API KEY - Add VITE_UNSPLASH_ACCESS_KEY to environment variables')
     console.warn('[Unsplash] Get free key at: https://unsplash.com/developers')
     return null
@@ -234,10 +257,11 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
   
   try {
     // Only log in development mode to reduce console spam
-    if (import.meta.env.DEV) {
+    if (isDev()) {
       console.log(`[Unsplash] Fetching new image for "${searchQuery}"`)
     }
     
+    const apiKey = getUnsplashAccessKey()
     const response = await fetch(
       `${UNSPLASH_API_URL}/search/photos?` +
       `query=${encodeURIComponent(searchQuery)}` +
@@ -246,7 +270,7 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
       `&content_filter=high`,
       {
         headers: {
-          'Authorization': `Client-ID ${UNSPLASH_ACCESS_KEY}`
+          'Authorization': `Client-ID ${apiKey}`
         }
       }
     )
@@ -265,7 +289,7 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
       cacheImage(searchQuery, imageUrl)
       
       // Only log in development mode to reduce console spam
-      if (import.meta.env.DEV) {
+      if (isDev()) {
         console.log(`[Unsplash] Cached new image for "${searchQuery}"`)
       }
       return imageUrl
@@ -297,15 +321,27 @@ export function getEventHeaderImageFromDb(event: CalendarEvent): {
   if (event.image_url) {
     // If image_type is set, use it
     if (event.image_type) {
+      // DIAGNOSTIC: Log when using database image_type
+      if (isDev()) {
+        const isImage = event.image_type === 'image'
+        console.log(`[getEventHeaderImageFromDb] Event "${event.title?.substring(0, 30)}" - using image_type: ${event.image_type}, isImage: ${isImage}, url: ${event.image_url.substring(0, 60)}...`)
+      }
       return { type: event.image_type as 'image' | 'gradient', value: event.image_url }
     }
     // Legacy events: infer type from image_url format
     // URLs (http/https) are image type, gradients are gradient type
     const inferredType = event.image_url.startsWith('http') ? 'image' : 'gradient'
+    // DIAGNOSTIC: Log when inferring type
+    if (isDev()) {
+      console.log(`[getEventHeaderImageFromDb] Event "${event.title?.substring(0, 30)}" - inferred type: ${inferredType}, url: ${event.image_url.substring(0, 60)}...`)
+    }
     return { type: inferredType, value: event.image_url }
   }
   
   // No image_url: use gradient fallback
+  if (isDev()) {
+    console.log(`[getEventHeaderImageFromDb] Event "${event.title?.substring(0, 30)}" - NO image_url, using gradient fallback`)
+  }
   return { type: 'gradient', value: getEventGradient(event) }
 }
 

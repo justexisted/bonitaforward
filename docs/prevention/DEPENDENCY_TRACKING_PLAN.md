@@ -788,6 +788,52 @@ See: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
 
 ---
 
+### Event Images Stored in Supabase Storage (2025-01-XX)
+
+**Issue:** New events automatically download images from Unsplash and store them in Supabase Storage. Images are stored in YOUR database/storage, not referenced from Unsplash.
+
+**Files:**
+- `src/pages/Calendar.tsx` (`handleCreateEvent` - downloads and stores images for new events only)
+- `src/utils/eventImageStorage.ts` (`downloadAndStoreImage` - downloads from Unsplash, uploads to Supabase Storage)
+- `src/utils/eventImageUtils.ts` (`fetchUnsplashImage` - fetches Unsplash URL, used only during event creation)
+- `src/components/EventCard.tsx` (uses `getEventHeaderImageFromDb` - reads from database only, no API calls)
+- `src/components/CalendarSection.tsx` (uses `getEventHeaderImageFromDb` - reads from database only, no API calls)
+
+**Fixes:**
+- New event creation automatically:
+  1. Fetches Unsplash image URL
+  2. Downloads the image file
+  3. Uploads to Supabase Storage (bucket: `event-images`)
+  4. Saves Supabase Storage URL to database (not Unsplash URL)
+- Existing events are NEVER touched (left as-is in database)
+- Display code uses database only (no external API calls on page load)
+
+**Dependencies:**
+- Supabase Storage bucket `event-images` must exist (create in Supabase Dashboard → Storage)
+- Bucket must be public (for public image URLs)
+- Unsplash API key required for new event creation only (not for display)
+- Calendar events table must have `image_url` column (stores Supabase Storage URLs)
+- Calendar events table must have `image_type` column (stores 'image' or 'gradient')
+- Existing events in database are NOT modified automatically
+
+**Breaking-Change Awareness:**
+- If you remove `downloadAndStoreImage` → New events won't store images in Supabase Storage
+- If Supabase Storage bucket `event-images` doesn't exist → Image storage fails (falls back to Unsplash URL)
+- If you change Supabase Storage bucket name → Image storage fails
+- If you remove Unsplash API key → New events use gradient fallback (existing events unaffected)
+- If you modify existing events automatically → BREAKS existing functionality (never do this)
+
+**Prevention:** Documented in `CASCADING_FAILURES.md` (#22). Only NEW events trigger Unsplash → Supabase Storage flow. Existing events are left alone.
+
+**Testing Verified (2025-01-XX):**
+- ✅ New event creation downloads Unsplash image and stores in Supabase Storage
+- ✅ Database stores Supabase Storage URL (not Unsplash URL)
+- ✅ Display code reads from database only (no Unsplash API calls on page load)
+- ✅ Existing events left unchanged (not modified automatically)
+- ✅ Browser inspector shows Supabase Storage URLs (not Unsplash URLs)
+
+---
+
 ### Event Images Not Showing Due to Null image_type (2025-01-XX)
 
 **Issue:** Events with database `image_url` but null `image_type` were showing gradient fallbacks instead of their stored images, even though they had valid image URLs in the database.
