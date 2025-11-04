@@ -25,7 +25,7 @@ interface BookingUpdatedProps {
 export function BookingUpdated({
   businessName,
   customerName,
-  customerEmail,
+  customerEmail, // Recipient email - not displayed in template but required for API compatibility
   customerPhone,
   bookingDate,
   bookingTime,
@@ -33,6 +33,9 @@ export function BookingUpdated({
   changes,
   message,
 }: BookingUpdatedProps) {
+  // customerEmail is the recipient address, not displayed in email template
+  void customerEmail
+  
   const formattedDate = new Date(bookingDate).toLocaleDateString('en-US', { 
     weekday: 'long', 
     year: 'numeric', 
@@ -63,7 +66,7 @@ export function BookingUpdated({
       <Heading style={h1}>Booking Details Updated</Heading>
       
       <Text style={text}>
-        Your booking at <strong>{businessName}</strong> has been updated.
+        {customerName ? `Hi ${customerName},` : 'Hi there,'} your booking at <strong>{businessName}</strong> has been updated.
       </Text>
 
       <Section style={changesBox}>
@@ -92,6 +95,12 @@ export function BookingUpdated({
               <tr>
                 <td style={labelCell}>Duration:</td>
                 <td style={valueCell}>{bookingDuration} minutes</td>
+              </tr>
+            )}
+            {customerPhone && (
+              <tr>
+                <td style={labelCell}>Your Phone:</td>
+                <td style={valueCell}>{customerPhone}</td>
               </tr>
             )}
             <tr>

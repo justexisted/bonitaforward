@@ -44,36 +44,54 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
       try {
         const allNotifications: Notification[] = []
 
-        // 1. Fetch admin notifications from user_notifications table
-        const { data: userNotifs } = await supabase
-          .from('user_notifications')
-          .select('id, title, message, created_at, is_read')
-          .eq('user_id', auth.userId)
-          .order('created_at', { ascending: false })
-          .limit(20)
+        // OPTIMIZED: Run all queries in parallel to reduce total request time
+        // This still makes 4 REST calls, but they happen simultaneously instead of sequentially
+        const [userNotifsResult, applicationsResult, providersResult] = await Promise.allSettled([
+          // 1. Fetch admin notifications from user_notifications table
+          supabase
+            .from('user_notifications')
+            .select('id, title, message, created_at, is_read')
+            .eq('user_id', auth.userId)
+            .order('created_at', { ascending: false })
+            .limit(20),
+          
+          // 2. Fetch pending business applications (if user has email)
+          auth.email
+            ? supabase
+                .from('business_applications')
+                .select('id, business_name, status, created_at')
+                .eq('email', auth.email)
+                .order('created_at', { ascending: false })
+            : Promise.resolve({ data: null, error: null }),
+          
+          // 3. Fetch providers owned by user (needed for change requests)
+          supabase
+            .from('providers')
+            .select('id, name')
+            .eq('owner_user_id', auth.userId)
+        ])
 
-        if (userNotifs && userNotifs.length > 0) {
-          const adminNotifs: Notification[] = userNotifs.map((notif) => ({
-            id: notif.id,
-            type: 'admin_notification' as const,
-            title: notif.title,
-            message: notif.message,
-            timestamp: notif.created_at,
-            read: notif.is_read,
-            link: '/my-business',
-            isAdminNotification: true
-          }))
-          allNotifications.push(...adminNotifs)
+        // Process user notifications
+        if (userNotifsResult.status === 'fulfilled') {
+          const { data: userNotifs } = userNotifsResult.value
+          if (userNotifs && userNotifs.length > 0) {
+            const adminNotifs: Notification[] = userNotifs.map((notif) => ({
+              id: notif.id,
+              type: 'admin_notification' as const,
+              title: notif.title,
+              message: notif.message,
+              timestamp: notif.created_at,
+              read: notif.is_read,
+              link: '/my-business',
+              isAdminNotification: true
+            }))
+            allNotifications.push(...adminNotifs)
+          }
         }
 
-        // 2. Fetch pending business applications (if user has email)
-        if (auth.email) {
-          const { data: applications } = await supabase
-            .from('business_applications')
-            .select('id, business_name, status, created_at')
-            .eq('email', auth.email)
-            .order('created_at', { ascending: false })
-
+        // Process business applications
+        if (applicationsResult.status === 'fulfilled' && applicationsResult.value.data) {
+          const applications = applicationsResult.value.data
           if (applications && applications.length > 0) {
             // Only show pending applications as unread notifications (exclude approved/rejected)
             const appNotifs: Notification[] = applications
@@ -93,37 +111,36 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
           }
         }
 
-        // 3. Fetch pending change requests for user's businesses
-        const { data: providers } = await supabase
-          .from('providers')
-          .select('id, name')
-          .eq('owner_user_id', auth.userId)
+        // Process change requests (requires providers query to complete first)
+        if (providersResult.status === 'fulfilled') {
+          const { data: providers } = providersResult.value
+          if (providers && providers.length > 0) {
+            const providerIds = providers.map(p => p.id)
+            
+            // Fetch change requests for user's providers
+            const { data: changeRequests } = await supabase
+              .from('provider_change_requests')
+              .select('id, provider_id, type, status, created_at')
+              .in('provider_id', providerIds)
+              .eq('status', 'pending')
+              .order('created_at', { ascending: false })
 
-        if (providers && providers.length > 0) {
-          const providerIds = providers.map(p => p.id)
-          
-          const { data: changeRequests } = await supabase
-            .from('provider_change_requests')
-            .select('id, provider_id, type, status, created_at')
-            .in('provider_id', providerIds)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false })
-
-          if (changeRequests && changeRequests.length > 0) {
-            const changeReqNotifs: Notification[] = changeRequests.map((req) => {
-              const provider = providers.find(p => p.id === req.provider_id)
-              return {
-                id: req.id,
-                type: 'pending_application' as const,
-                title: 'Business Update Pending',
-                message: `Your changes to "${provider?.name || 'your business'}" are awaiting approval.`,
-                timestamp: req.created_at,
-                read: false,
-                link: '/my-business',
-                isAdminNotification: false
-              }
-            })
-            allNotifications.push(...changeReqNotifs)
+            if (changeRequests && changeRequests.length > 0) {
+              const changeReqNotifs: Notification[] = changeRequests.map((req) => {
+                const provider = providers.find(p => p.id === req.provider_id)
+                return {
+                  id: req.id,
+                  type: 'pending_application' as const,
+                  title: 'Business Update Pending',
+                  message: `Your changes to "${provider?.name || 'your business'}" are awaiting approval.`,
+                  timestamp: req.created_at,
+                  read: false,
+                  link: '/my-business',
+                  isAdminNotification: false
+                }
+              })
+              allNotifications.push(...changeReqNotifs)
+            }
           }
         }
 
@@ -195,10 +212,11 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
 
     channels.push(applicationsChannel)
 
-    // Also poll for updates every 30 seconds as backup
+    // Also poll for updates every 5 minutes as backup (real-time subscriptions should handle most updates)
+    // Reduced from 30 seconds to 5 minutes to minimize REST API calls
     const interval = setInterval(() => {
       if (isMounted) loadNotifications()
-    }, 30000)
+    }, 5 * 60 * 1000) // 5 minutes = 300000ms
 
     return () => {
       isMounted = false
