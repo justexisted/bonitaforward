@@ -51,13 +51,50 @@ export default function EmailVerificationGuard({
   return (
     <div className="container-px mx-auto max-w-4xl py-8">
       <EmailVerificationPrompt />
-      <div className="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 p-8 text-center">
-        <h2 className="text-xl font-semibold text-neutral-900 mb-2">
-          Email Verification Required
+      <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-8 text-center">
+        <div className="inline-block rounded-full bg-blue-100 p-3 mb-4">
+          <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-blue-900 mb-3">
+          Verify Your Email Address
         </h2>
-        <p className="text-neutral-600">
-          Please verify your email address to access this feature.
+        <p className="text-lg text-blue-800 mb-4">
+          Hey, verify your email address so you can access your business and request to make changes.
         </p>
+        <p className="text-blue-700 mb-6">
+          Once you verify your email, you'll be able to view your business listings, manage your profile, and submit change requests.
+        </p>
+        <div className="bg-white rounded-lg border border-blue-200 p-6 text-left max-w-2xl mx-auto">
+          <h3 className="font-semibold text-blue-900 mb-3">What you can do after verifying:</h3>
+          <ul className="space-y-2 text-blue-800">
+            <li className="flex items-start">
+              <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              View and manage your business listings
+            </li>
+            <li className="flex items-start">
+              <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Request changes to your business information
+            </li>
+            <li className="flex items-start">
+              <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Post job openings and manage applications
+            </li>
+            <li className="flex items-start">
+              <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Access analytics and business insights
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   )
