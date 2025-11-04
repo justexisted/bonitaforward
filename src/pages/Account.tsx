@@ -35,6 +35,8 @@ export default function AccountPage() {
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info')
   const [loading, setLoading] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [showDeleteBusinessModal, setShowDeleteBusinessModal] = useState(false)
+  const [selectedBusinessesToDelete, setSelectedBusinessesToDelete] = useState<Set<string>>(new Set())
   const [data, setData] = useState<AccountData>({
     bookings: [],
     savedBusinesses: [],
@@ -151,7 +153,7 @@ export default function AccountPage() {
 
   // Delete user account
   async function deleteAccount() {
-    // Double confirmation
+    // First confirmation
     if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       return
     }
@@ -159,28 +161,53 @@ export default function AccountPage() {
     // Check if user has businesses
     const hasBusinesses = data.myBusinesses && data.myBusinesses.length > 0
     
-    // If user has businesses, ask if they want to delete them too
-    let shouldDeleteBusinesses = false
+    // If user has businesses, show modal to select which ones to delete
     if (hasBusinesses) {
-      // Show business names so user knows exactly which businesses they're deciding about
-      const businessNames = data.myBusinesses.map(b => b.name || 'Unnamed Business').join(', ')
-      const deleteBusinessesConfirmed = confirm(
-        `You have ${data.myBusinesses.length} business(es) linked to your account:\n\n` +
-        `${businessNames}\n\n` +
-        `Would you like to DELETE these businesses permanently?\n\n` +
-        `• Click "OK" to DELETE your businesses permanently\n` +
-        `• Click "Cancel" to keep your businesses (they will be unlinked from your account and you can reconnect them if you sign up again)`
-      )
-      shouldDeleteBusinesses = deleteBusinessesConfirmed
+      // Pre-select all businesses by default
+      setSelectedBusinessesToDelete(new Set(data.myBusinesses.map(b => b.id)))
+      setShowDeleteBusinessModal(true)
+      return // Wait for modal to handle the deletion
     }
     
+    // No businesses, proceed with final confirmation
     if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) {
       return
     }
+    
+    // Proceed with account deletion (no businesses to delete)
+    await performAccountDeletion(false)
+  }
+
+  // Handle business selection in modal
+  function handleBusinessToggle(businessId: string) {
+    setSelectedBusinessesToDelete(prev => {
+      const next = new Set(prev)
+      if (next.has(businessId)) {
+        next.delete(businessId)
+      } else {
+        next.add(businessId)
+      }
+      return next
+    })
+  }
+
+  // Handle "Delete All" button
+  function handleDeleteAllBusinesses() {
+    setSelectedBusinessesToDelete(new Set(data.myBusinesses.map(b => b.id)))
+  }
+
+  // Handle "Keep All" button
+  function handleKeepAllBusinesses() {
+    setSelectedBusinessesToDelete(new Set())
+  }
+
+  // Perform the actual account deletion
+  async function performAccountDeletion(shouldDeleteBusinesses: boolean) {
 
     setDeletingAccount(true)
     setMessage(null)
     setMessageType('info')
+    setShowDeleteBusinessModal(false)
 
     try {
       // Get current session to pass auth token
@@ -188,6 +215,11 @@ export default function AccountPage() {
       
       if (!session?.access_token) {
         throw new Error('Not authenticated. Please log in and try again.')
+      }
+
+      console.log('[Account] Deleting account with deleteBusinesses:', shouldDeleteBusinesses)
+      if (shouldDeleteBusinesses) {
+        console.log('[Account] Will DELETE businesses:', data.myBusinesses.filter(b => selectedBusinessesToDelete.has(b.id)).map(b => b.name))
       }
 
       // Call Netlify function to delete user
@@ -198,7 +230,8 @@ export default function AccountPage() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          deleteBusinesses: shouldDeleteBusinesses
+          deleteBusinesses: shouldDeleteBusinesses,
+          businessIdsToDelete: shouldDeleteBusinesses ? Array.from(selectedBusinessesToDelete) : []
         })
       })
 
@@ -223,6 +256,12 @@ export default function AccountPage() {
 
       // Check for success (should have success: true or ok: true)
       if (result.success === true || result.ok === true) {
+        // Log deletion counts for debugging
+        console.log('[Account] Account deletion successful. Deleted counts:', result.deletedCounts)
+        if (shouldDeleteBusinesses && result.deletedCounts?.providers !== undefined) {
+          console.log('[Account] Businesses deleted:', result.deletedCounts.providers)
+        }
+        
         // Success - sign out and redirect
         setMessage('Account deleted successfully. Signing out...')
         setMessageType('success')
@@ -243,6 +282,33 @@ export default function AccountPage() {
     } finally {
       setDeletingAccount(false)
     }
+  }
+
+  // Handle confirm from business selection modal
+  function handleConfirmBusinessDeletion() {
+    const hasSelectedBusinesses = selectedBusinessesToDelete.size > 0
+    
+    if (hasSelectedBusinesses) {
+      const businessNames = data.myBusinesses
+        .filter(b => selectedBusinessesToDelete.has(b.id))
+        .map(b => b.name || 'Unnamed Business')
+        .join(', ')
+      
+      if (!confirm(
+        `You are about to PERMANENTLY DELETE the following businesses:\n\n${businessNames}\n\n` +
+        `This cannot be undone. Are you absolutely sure?`
+      )) {
+        return
+      }
+    }
+    
+    // Final confirmation
+    if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) {
+      return
+    }
+    
+    // Proceed with deletion
+    performAccountDeletion(hasSelectedBusinesses)
   }
 
   // Helper: update event locally
@@ -1618,6 +1684,108 @@ export default function AccountPage() {
               >
                 {submittingEventEdit ? 'Saving...' : 'Save Changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Business Selection Modal */}
+      {showDeleteBusinessModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowDeleteBusinessModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-red-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-red-600">Delete Your Businesses</h2>
+                <button
+                  onClick={() => setShowDeleteBusinessModal(false)}
+                  className="text-neutral-500 hover:text-neutral-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <p className="text-neutral-700 mb-6">
+                You have {data.myBusinesses.length} business(es) linked to your account. 
+                Select which businesses you want to <strong className="text-red-600">PERMANENTLY DELETE</strong> when you delete your account.
+              </p>
+
+              <div className="space-y-3 mb-6">
+                {data.myBusinesses.map((business) => (
+                  <div 
+                    key={business.id}
+                    className={`p-4 rounded-lg border-2 transition-colors ${
+                      selectedBusinessesToDelete.has(business.id)
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-neutral-200 bg-neutral-50'
+                    }`}
+                  >
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedBusinessesToDelete.has(business.id)}
+                        onChange={() => handleBusinessToggle(business.id)}
+                        className="w-5 h-5 rounded border-neutral-300 text-red-600 focus:ring-red-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-semibold text-neutral-900">
+                          {business.name || 'Unnamed Business'}
+                        </div>
+                        {business.category_key && (
+                          <div className="text-sm text-neutral-600">
+                            {business.category_key}
+                          </div>
+                        )}
+                      </div>
+                      {selectedBusinessesToDelete.has(business.id) && (
+                        <span className="text-red-600 font-medium text-sm">Will be DELETED</span>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mb-6">
+                <button
+                  onClick={handleDeleteAllBusinesses}
+                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
+                >
+                  Delete All
+                </button>
+                <button
+                  onClick={handleKeepAllBusinesses}
+                  className="px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
+                >
+                  Keep All
+                </button>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-amber-800">
+                  <strong>Important:</strong> Businesses you select will be <strong>PERMANENTLY DELETED</strong> and cannot be recovered. 
+                  Businesses you don't select will be unlinked from your account but will remain in the system.
+                </p>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowDeleteBusinessModal(false)}
+                  className="px-6 py-3 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmBusinessDeletion}
+                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  Continue with Deletion
+                </button>
+              </div>
             </div>
           </div>
         </div>

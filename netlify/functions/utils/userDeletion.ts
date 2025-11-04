@@ -89,6 +89,7 @@ export interface UserDeletionOptions {
   supabaseClient: SupabaseClient
   logPrefix?: string
   deleteBusinesses?: boolean // If true, hard delete businesses; if false, just unlink them
+  businessIdsToDelete?: string[] // Specific business IDs to delete (if provided, only these will be deleted)
 }
 
 export interface UserDeletionResult {
@@ -123,7 +124,7 @@ export interface UserDeletionResult {
 export async function deleteUserAndRelatedData(
   options: UserDeletionOptions
 ): Promise<UserDeletionResult> {
-  const { userId, userEmail, supabaseClient, logPrefix = '[user-deletion]', deleteBusinesses = false } = options
+  const { userId, userEmail, supabaseClient, logPrefix = '[user-deletion]', deleteBusinesses = false, businessIdsToDelete = [] } = options
   
   const deletedCounts: UserDeletionResult['deletedCounts'] = {}
   
@@ -387,7 +388,7 @@ export async function deleteUserAndRelatedData(
     }
     
     // Step 6: Handle providers owned by user
-    // If deleteBusinesses is true: Hard delete businesses
+    // If deleteBusinesses is true: Hard delete businesses (or specific businessIdsToDelete if provided)
     // If deleteBusinesses is false: Soft delete (archive with 'deleted' badge and unlink)
     try {
       const { data: providers } = await supabaseClient
@@ -397,15 +398,54 @@ export async function deleteUserAndRelatedData(
       
       if (Array.isArray(providers) && providers.length > 0) {
         if (deleteBusinesses) {
-          // Hard delete: Permanently delete all businesses owned by user
-          for (const provider of providers) {
-            await supabaseClient
+          // Hard delete: Permanently delete businesses
+          // If businessIdsToDelete is provided, only delete those specific businesses
+          // Otherwise, delete all businesses owned by the user
+          const businessesToDelete = businessIdsToDelete.length > 0
+            ? providers.filter(p => businessIdsToDelete.includes((p as any).id))
+            : providers
+          
+          let deletedCount = 0
+          for (const provider of businessesToDelete) {
+            const { error: deleteError } = await supabaseClient
               .from('providers')
               .delete()
               .eq('id', (provider as any).id)
+            
+            if (deleteError) {
+              console.error(`${logPrefix} ❌ Failed to delete provider ${(provider as any).id} (${(provider as any).name}):`, deleteError)
+            } else {
+              deletedCount++
+              console.log(`${logPrefix} ✓ Deleted provider ${(provider as any).id} (${(provider as any).name})`)
+            }
           }
-          deletedCounts.providers = providers.length
-          console.log(`${logPrefix} ✓ Deleted ${providers.length} provider(s) permanently`)
+          
+          // Soft delete remaining businesses (if businessIdsToDelete was provided and there are businesses not in the list)
+          if (businessIdsToDelete.length > 0) {
+            const businessesToKeep = providers.filter(p => !businessIdsToDelete.includes((p as any).id))
+            for (const provider of businessesToKeep) {
+              const badges = Array.isArray((provider as any)?.badges) 
+                ? ((provider as any)?.badges as string[]) 
+                : []
+              const nextBadges = Array.from(new Set([...badges, 'deleted']))
+              const { error: updateError } = await supabaseClient
+                .from('providers')
+                .update({ 
+                  badges: nextBadges as any, 
+                  owner_user_id: null as any 
+                })
+                .eq('id', (provider as any).id)
+              
+              if (updateError) {
+                console.error(`${logPrefix} ❌ Failed to soft delete provider ${(provider as any).id}:`, updateError)
+              } else {
+                console.log(`${logPrefix} ✓ Soft deleted provider ${(provider as any).id} (${(provider as any).name})`)
+              }
+            }
+          }
+          
+          deletedCounts.providers = deletedCount
+          console.log(`${logPrefix} ✓ Deleted ${deletedCount} provider(s) permanently`)
         } else {
           // Soft delete: Archive and unlink (allows reconnection later)
           for (const provider of providers) {
@@ -413,20 +453,25 @@ export async function deleteUserAndRelatedData(
               ? ((provider as any)?.badges as string[]) 
               : []
             const nextBadges = Array.from(new Set([...badges, 'deleted']))
-            await supabaseClient
+            const { error: updateError } = await supabaseClient
               .from('providers')
               .update({ 
                 badges: nextBadges as any, 
                 owner_user_id: null as any 
               })
               .eq('id', (provider as any).id)
+            
+            if (updateError) {
+              console.error(`${logPrefix} ❌ Failed to soft delete provider ${(provider as any).id}:`, updateError)
+            }
           }
           deletedCounts.providers = providers.length
           console.log(`${logPrefix} ✓ Archived ${providers.length} provider(s) (unlinked, can be reconnected later)`)
         }
       }
     } catch (err) {
-      console.warn(`${logPrefix} Warning handling providers:`, err)
+      console.error(`${logPrefix} ❌ ERROR handling providers:`, err)
+      // Don't fail the entire deletion, but log the error clearly
     }
     
     // Step 7: Delete profile (must be after all related data)
