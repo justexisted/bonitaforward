@@ -108,16 +108,20 @@ export const handler: Handler = async (event) => {
     }
 
     // Build verification URL
-    // Use SITE_URL from environment if available, otherwise fall back to production URL
-    // For local development, Netlify CLI provides event.headers.host
-    const baseUrl = process.env.SITE_URL || process.env.URL || 
-      (event.headers.host ? `http://${event.headers.host}` : 'https://www.bonitaforward.com')
+    // CRITICAL: NEVER use localhost for verification emails - always use production URL
+    // This ensures users get valid links that work in production, not broken localhost links
+    // Priority: SITE_URL env var > production URL fallback
+    // NEVER use event.headers.host as it can be localhost in development
+    const baseUrl = process.env.SITE_URL || 'https://www.bonitaforward.com'
     const verificationUrl = `${baseUrl}/verify-email?token=${token}`
+    
+    // Log the URL being used (for debugging - remove token from logs for security)
+    console.log('[SendVerificationEmail] Using base URL:', baseUrl)
+    console.log('[SendVerificationEmail] Verification URL (token redacted):', `${baseUrl}/verify-email?token=...`)
 
     // Send verification email via send-email function
-    // Use the same base URL logic for consistency
-    const sendEmailUrl = process.env.SITE_URL || process.env.URL || 
-      (event.headers.host ? `http://${event.headers.host}` : 'https://www.bonitaforward.com')
+    // Use production URL for email sending function too
+    const sendEmailUrl = process.env.SITE_URL || 'https://www.bonitaforward.com'
     
     const emailResponse = await fetch(`${sendEmailUrl}/.netlify/functions/send-email`, {
       method: 'POST',

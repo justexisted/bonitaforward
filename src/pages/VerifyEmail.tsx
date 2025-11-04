@@ -53,7 +53,10 @@ export default function VerifyEmailPage() {
           }, 2000)
         } else {
           setStatus('error')
-          setMessage(result.error || 'Failed to verify email address')
+          // Show detailed error message if available, otherwise show generic error
+          const errorMessage = result.error || 'Failed to verify email address'
+          const details = result.details ? `\n\n${result.details}` : ''
+          setMessage(errorMessage + details)
         }
       } catch (error: any) {
         console.error('[VerifyEmail] Error:', error)
@@ -98,11 +101,31 @@ export default function VerifyEmailPage() {
             <h1 className="text-2xl font-bold text-red-700 mb-2">Verification Failed</h1>
             <p className="text-neutral-600 mb-4">{message}</p>
             <div className="space-y-2">
+              {auth.isAuthed && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const result = await auth.resendVerificationEmail()
+                      if (result.error) {
+                        setMessage(`Failed to send verification email: ${result.error}`)
+                      } else {
+                        setMessage('A new verification email has been sent. Please check your inbox.')
+                        setStatus('loading')
+                      }
+                    } catch (error: any) {
+                      setMessage(`Error: ${error.message || 'Failed to send verification email'}`)
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Request New Verification Email
+                </button>
+              )}
               <button
                 onClick={() => navigate('/signin')}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="w-full px-4 py-2 bg-neutral-200 text-neutral-700 rounded-lg font-medium hover:bg-neutral-300 transition-colors"
               >
-                Go to Sign In
+                {auth.isAuthed ? 'Go to Account' : 'Go to Sign In'}
               </button>
               <p className="text-sm text-neutral-500">
                 Need help? Contact us at{' '}

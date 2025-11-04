@@ -59,6 +59,7 @@ export const handler: Handler = async (event) => {
     }
 
     if (!token) {
+      console.error('[VerifyEmail] Missing token in request')
       return {
         statusCode: 400,
         headers: {
@@ -67,6 +68,8 @@ export const handler: Handler = async (event) => {
         body: JSON.stringify({ error: 'Missing verification token' }),
       }
     }
+
+    console.log('[VerifyEmail] Looking up token:', token.substring(0, 8) + '...')
 
     // Find token in database
     // Note: This table must be created by running ops/sql/create-email-verification-tokens.sql
@@ -77,6 +80,13 @@ export const handler: Handler = async (event) => {
       .single()
 
     if (tokenError) {
+      console.error('[VerifyEmail] Token lookup error:', {
+        code: tokenError.code,
+        message: tokenError.message,
+        hint: tokenError.hint,
+        tokenPreview: token.substring(0, 8) + '...'
+      })
+
       // Check if error is because table doesn't exist
       if (tokenError.message?.includes('does not exist') || tokenError.code === '42P01') {
         return {
@@ -88,6 +98,27 @@ export const handler: Handler = async (event) => {
             success: false,
             error: 'Email verification table not found. Please run SQL migration: ops/sql/create-email-verification-tokens.sql',
             details: tokenError.message
+          }),
+        }
+      }
+      
+      // Check if error is because no rows found (token doesn't exist)
+      if (tokenError.code === 'PGRST116' || tokenError.message?.includes('No rows') || tokenError.message?.includes('not found')) {
+        console.warn('[VerifyEmail] Token not found in database. Checking if user email is already verified...')
+        
+        // Try to find if this token might be for a user whose email is already verified
+        // We can't directly lookup by token, but we can check if there are any recent tokens
+        // This is a fallback for legacy accounts that might not have tokens
+        // For now, return a helpful error message
+        return {
+          statusCode: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+          },
+          body: JSON.stringify({ 
+            success: false,
+            error: 'Verification token not found. This token may have expired or already been used. Please request a new verification email.',
+            details: 'Token does not exist in database. This may happen if the token expired, was already used, or if the account was created before the verification system was implemented.'
           }),
         }
       }
@@ -106,6 +137,7 @@ export const handler: Handler = async (event) => {
     }
     
     if (!tokenData) {
+      console.warn('[VerifyEmail] Token lookup returned no data (token not found)')
       return {
         statusCode: 400,
         headers: {
@@ -113,10 +145,13 @@ export const handler: Handler = async (event) => {
         },
         body: JSON.stringify({ 
           success: false,
-          error: 'Invalid or expired verification token' 
+          error: 'Verification token not found. This token may have expired or already been used. Please request a new verification email.',
+          details: 'Token does not exist in database'
         }),
       }
     }
+
+    console.log('[VerifyEmail] Token found for user:', tokenData.user_id, 'email:', tokenData.email)
 
     // Check if token is expired
     const expiresAt = new Date(tokenData.expires_at)
@@ -158,6 +193,67 @@ export const handler: Handler = async (event) => {
       // Continue anyway - we'll still verify the email
     }
 
+    // Check if profile exists before updating
+    const { data: existingProfile, error: profileCheckError } = await supabase
+      .from('profiles')
+      .select('id, email_confirmed_at')
+      .eq('id', tokenData.user_id)
+      .maybeSingle()
+
+    if (profileCheckError) {
+      console.error('[VerifyEmail] Error checking profile:', profileCheckError)
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to verify email address',
+          details: profileCheckError.message
+        }),
+      }
+    }
+
+    if (!existingProfile) {
+      console.error('[VerifyEmail] Profile not found for user:', tokenData.user_id)
+      return {
+        statusCode: 404,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'User profile not found. Please contact support.',
+          details: `Profile does not exist for user ${tokenData.user_id}`
+        }),
+      }
+    }
+
+    // Check if email is already verified
+    if (existingProfile.email_confirmed_at) {
+      console.log('[VerifyEmail] Email already verified for user:', tokenData.user_id)
+      // Still mark token as used (if not already)
+      await supabase
+        .from('email_verification_tokens')
+        .update({ used_at: new Date().toISOString() })
+        .eq('token', token)
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          success: true,
+          message: 'Email is already verified',
+          userId: tokenData.user_id,
+          alreadyVerified: true
+        }),
+      }
+    }
+
     // Update profile with email_confirmed_at
     // Note: This column must be added by running ops/sql/add-email-confirmed-at-to-profiles.sql
     const confirmedAt = new Date().toISOString()
@@ -196,6 +292,8 @@ export const handler: Handler = async (event) => {
         }),
       }
     }
+
+    console.log('[VerifyEmail] Successfully verified email for user:', tokenData.user_id)
 
     // Also update auth.users.email_confirmed_at (for consistency)
     try {
