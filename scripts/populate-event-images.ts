@@ -188,16 +188,96 @@ async function fetchUnsplashImage(searchQuery: string): Promise<string | null> {
   }
 }
 
+// Download image from URL and upload to Supabase Storage
+async function downloadAndStoreImage(imageUrl: string, eventId: string): Promise<string | null> {
+  try {
+    console.log(`   📥 Downloading image from Unsplash...`)
+    
+    // Download image
+    const response = await fetch(imageUrl)
+    if (!response.ok) {
+      console.error(`   ❌ Failed to download image: ${response.status}`)
+      return null
+    }
+    
+    // Get image as blob
+    const blob = await response.blob()
+    
+    // Determine file extension from Content-Type or URL
+    let extension = 'jpg'
+    const contentType = response.headers.get('content-type')
+    if (contentType?.includes('png')) extension = 'png'
+    else if (contentType?.includes('webp')) extension = 'webp'
+    else if (contentType?.includes('gif')) extension = 'gif'
+    else if (imageUrl.includes('.png')) extension = 'png'
+    else if (imageUrl.includes('.webp')) extension = 'webp'
+    else if (imageUrl.includes('.gif')) extension = 'gif'
+    
+    // Generate unique filename
+    const timestamp = Date.now()
+    const filename = `event-${eventId}-${timestamp}.${extension}`
+    const path = `event-images/${filename}`
+    
+    console.log(`   📤 Uploading to Supabase Storage: ${path}`)
+    
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('event-images')
+      .upload(path, blob, {
+        contentType: `image/${extension}`,
+        cacheControl: '31536000', // 1 year cache
+        upsert: false
+      })
+    
+    if (uploadError) {
+      console.error(`   ❌ Upload failed:`, uploadError)
+      // Check if bucket doesn't exist
+      if (uploadError.message.includes('Bucket') || uploadError.message.includes('bucket') || uploadError.message.includes('not found')) {
+        console.error(`   ❌❌❌ CRITICAL: Storage bucket "event-images" does not exist!`)
+        console.error(`   ❌❌❌ Create it in Supabase Dashboard → Storage → Create bucket "event-images" (public)`)
+        console.error(`   ❌❌❌ Full error:`, JSON.stringify(uploadError, null, 2))
+      }
+      return null
+    }
+    
+    // Get public URL from Supabase Storage
+    const { data: urlData } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(path)
+    
+    if (!urlData?.publicUrl) {
+      console.error(`   ❌ Failed to get public URL`)
+      return null
+    }
+    
+    console.log(`   ✅ Image stored in Supabase Storage: ${urlData.publicUrl.substring(0, 60)}...`)
+    return urlData.publicUrl
+    
+  } catch (error: any) {
+    console.error(`   ❌ Error downloading/storing image:`, error)
+    return null
+  }
+}
+
 // Get event header image
 async function getEventHeaderImage(event: CalendarEvent): Promise<{
   type: 'image' | 'gradient'
   value: string
 }> {
   const keywords = extractSearchKeywords(event)
-  const imageUrl = await fetchUnsplashImage(keywords)
+  const unsplashUrl = await fetchUnsplashImage(keywords)
   
-  if (imageUrl) {
-    return { type: 'image', value: imageUrl }
+  if (unsplashUrl) {
+    // Download and store in Supabase Storage
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    
+    if (storageUrl) {
+      return { type: 'image', value: storageUrl }
+    } else {
+      console.warn(`   ⚠️  Failed to store in Supabase Storage, falling back to gradient`)
+      // Fall back to gradient if storage fails
+      return { type: 'gradient', value: getEventGradient(event) }
+    }
   }
   
   return { type: 'gradient', value: getEventGradient(event) }
@@ -211,10 +291,11 @@ async function populateEventImages() {
     // 1. Events with NULL image_url or image_type
     // 2. Events with gradient strings saved (image_url LIKE 'linear-gradient%')
     // 3. Events with image_type = 'gradient' (should have actual URLs)
+    // 4. Events with Unsplash URLs (need to be converted to Supabase Storage)
     const { data: events, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .or('image_url.is.null,image_type.is.null,image_url.like.linear-gradient%,image_type.eq.gradient')
+      .or('image_url.is.null,image_type.is.null,image_url.like.linear-gradient%,image_type.eq.gradient,image_url.like.https://images.unsplash.com%')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -239,6 +320,40 @@ async function populateEventImages() {
       try {
         console.log(`${progress} Processing: "${event.title}"`)
 
+        // Check if event already has Unsplash URL - convert it to Supabase Storage
+        if (event.image_url && event.image_url.includes('images.unsplash.com')) {
+          console.log(`   🔄 Converting Unsplash URL to Supabase Storage...`)
+          const storageUrl = await downloadAndStoreImage(event.image_url, event.id)
+          
+          if (storageUrl) {
+            // Update with Supabase Storage URL
+            const { data: updateData, error: updateError } = await supabase
+              .from('calendar_events')
+              .update({
+                image_url: storageUrl,
+                image_type: 'image'
+              })
+              .eq('id', event.id)
+              .select()
+
+            if (updateError) {
+              console.error(`   ❌ UPDATE ERROR:`, updateError)
+              throw updateError
+            }
+            
+            if (!updateData || updateData.length === 0) {
+              console.error(`   ❌ UPDATE FAILED: No rows affected. Likely RLS policy blocking update.`)
+              throw new Error('RLS policy blocking update')
+            }
+
+            console.log(`   ✅ Converted to Supabase Storage URL\n`)
+            successCount++
+            continue // Skip to next event
+          } else {
+            console.warn(`   ⚠️  Failed to convert, will fetch new image...`)
+          }
+        }
+
         // Get image (Unsplash or gradient)
         const image = await getEventHeaderImage(event)
 
@@ -262,7 +377,11 @@ async function populateEventImages() {
           throw new Error('RLS policy blocking update')
         }
 
-        console.log(`   ✅ ${image.type === 'image' ? '🖼️  Saved Unsplash image' : '🎨 Saved gradient'}\n`)
+        if (image.type === 'image') {
+          console.log(`   ✅ Image stored in Supabase Storage (not Unsplash URL)\n`)
+        } else {
+          console.log(`   ✅ Saved gradient fallback\n`)
+        }
         successCount++
 
         // Rate limiting: wait 1 second between Unsplash calls
@@ -295,10 +414,16 @@ async function populateEventImages() {
 populateEventImages()
   .then(() => {
     console.log('\n✨ Done!')
-    process.exit(0)
+    // Use setTimeout to avoid Node.js assertion error on Windows
+    // This is a known issue with tsx/Node.js async handle cleanup
+    setTimeout(() => {
+      process.exit(0)
+    }, 100)
   })
   .catch((error) => {
     console.error('\n❌ Script failed:', error)
-    process.exit(1)
+    setTimeout(() => {
+      process.exit(1)
+    }, 100)
   })
 
