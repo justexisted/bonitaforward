@@ -16,7 +16,13 @@ import {
   ChangeRequestApproved,
   ChangeRequestRejected,
   BookingConfirmation,
+  BookingCancelled,
+  BookingUpdated,
+  BookingReminder,
   ApplicationApproved,
+  FeaturedExpirationReminder,
+  Welcome,
+  AccountDeletionConfirmation,
   EmailVerification,
 } from '../../src/emails'
 
@@ -28,7 +34,7 @@ const FROM_EMAIL = 'Bonita Forward <notifications@bonitaforward.com>'
 const FROM_EMAIL_FALLBACK = 'Bonita Forward <onboarding@resend.dev>'
 
 interface SendEmailRequest {
-  type: 'change_request_approved' | 'change_request_rejected' | 'booking_confirmation' | 'application_approved' | 'email_verification'
+  type: 'change_request_approved' | 'change_request_rejected' | 'booking_confirmation' | 'booking_cancelled' | 'booking_updated' | 'booking_reminder' | 'application_approved' | 'featured_expiration_reminder' | 'welcome' | 'account_deletion_confirmation' | 'email_verification'
   to: string
   data: any
 }
@@ -112,6 +118,54 @@ export const handler = async (event: any) => {
           subject = `New Booking Request for ${data.businessName}`
           break
 
+        case 'booking_cancelled':
+          const cancelledElement = React.createElement(BookingCancelled, {
+            businessName: data.businessName,
+            customerName: data.customerName,
+            customerEmail: data.customerEmail,
+            bookingDate: data.bookingDate,
+            bookingTime: data.bookingTime,
+            cancelledBy: data.cancelledBy,
+            reason: data.reason,
+          })
+          const cancelledHtml = await render(cancelledElement, { pretty: false })
+          html = String(cancelledHtml)
+          subject = `Booking Cancelled at ${data.businessName}`
+          break
+
+        case 'booking_updated':
+          const updatedElement = React.createElement(BookingUpdated, {
+            businessName: data.businessName,
+            customerName: data.customerName,
+            customerEmail: data.customerEmail,
+            customerPhone: data.customerPhone,
+            bookingDate: data.bookingDate,
+            bookingTime: data.bookingTime,
+            bookingDuration: data.bookingDuration,
+            changes: data.changes,
+            message: data.message,
+          })
+          const updatedHtml = await render(updatedElement, { pretty: false })
+          html = String(updatedHtml)
+          subject = `Booking Updated at ${data.businessName}`
+          break
+
+        case 'booking_reminder':
+          const reminderElement = React.createElement(BookingReminder, {
+            businessName: data.businessName,
+            customerName: data.customerName,
+            customerEmail: data.customerEmail,
+            customerPhone: data.customerPhone,
+            bookingDate: data.bookingDate,
+            bookingTime: data.bookingTime,
+            bookingDuration: data.bookingDuration,
+            recipientType: data.recipientType,
+          })
+          const reminderHtml = await render(reminderElement, { pretty: false })
+          html = String(reminderHtml)
+          subject = `Reminder: Your booking at ${data.businessName} is tomorrow`
+          break
+
         case 'application_approved':
           const approvedAppElement = React.createElement(ApplicationApproved, {
             businessName: data.businessName,
@@ -121,6 +175,44 @@ export const handler = async (event: any) => {
           const approvedAppHtml = await render(approvedAppElement, { pretty: false })
           html = String(approvedAppHtml)
           subject = `${data.businessName} is Now Live on Bonita Forward`
+          break
+
+        case 'featured_expiration_reminder':
+          const expirationElement = React.createElement(FeaturedExpirationReminder, {
+            businessName: data.businessName,
+            expirationDate: data.expirationDate,
+            daysUntilExpiration: data.daysUntilExpiration,
+            renewalPrice: data.renewalPrice,
+          })
+          const expirationHtml = await render(expirationElement, { pretty: false })
+          html = String(expirationHtml)
+          subject = data.daysUntilExpiration === 1
+            ? '⚠️ Your Featured Listing Expires Tomorrow!'
+            : data.daysUntilExpiration <= 7
+            ? `⏰ Your Featured Listing Expires in ${data.daysUntilExpiration} Days`
+            : `📅 Featured Listing Expiration Reminder: ${data.businessName}`
+          break
+
+        case 'welcome':
+          const welcomeElement = React.createElement(Welcome, {
+            name: data.name,
+            role: data.role,
+          })
+          const welcomeHtml = await render(welcomeElement, { pretty: false })
+          html = String(welcomeHtml)
+          subject = `Welcome to Bonita Forward, ${data.name}!`
+          break
+
+        case 'account_deletion_confirmation':
+          const deletionElement = React.createElement(AccountDeletionConfirmation, {
+            name: data.name,
+            deletedBy: data.deletedBy,
+            businessesDeleted: data.businessesDeleted,
+            businessesKept: data.businessesKept,
+          })
+          const deletionHtml = await render(deletionElement, { pretty: false })
+          html = String(deletionHtml)
+          subject = 'Your Account Has Been Deleted'
           break
 
         case 'email_verification':

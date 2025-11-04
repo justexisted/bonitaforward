@@ -61,7 +61,7 @@
 import { Handler } from '@netlify/functions'
 import { verifyAuthAndAdmin, authAdminErrorResponse } from './utils/authAdmin'
 import { errorResponse, successResponse, handleOptions } from './utils/response'
-import { deleteUserAndRelatedData, getUserEmailFromProfile } from './utils/userDeletion'
+import { deleteUserAndRelatedData, getUserEmailFromProfile, getUserNameFromProfile } from './utils/userDeletion'
 
 export const handler: Handler = async (event) => {
   // Handle OPTIONS/preflight
@@ -97,8 +97,9 @@ export const handler: Handler = async (event) => {
       return errorResponse(400, 'Cannot delete your own account', 'Admins cannot delete themselves')
     }
 
-    // Get user email from profile (needed for deleting email-keyed data)
+    // Get user email and name from profile (needed for deleting email-keyed data and email notification)
     const userEmail = await getUserEmailFromProfile(user_id, supabaseClient)
+    const userName = await getUserNameFromProfile(user_id, supabaseClient)
 
     // Use shared deletion utility to ensure correct deletion order
     // Pass deleteBusinesses option to control whether businesses are hard deleted or soft deleted
@@ -116,6 +117,39 @@ export const handler: Handler = async (event) => {
     }
 
     console.log(`[admin-delete-user] ✓ User deletion completed successfully`, deletionResult.deletedCounts)
+
+    // Send deletion confirmation email (if email is available)
+    if (userEmail) {
+      try {
+        const baseUrl = process.env.SITE_URL || 'https://www.bonitaforward.com'
+        console.log(`[admin-delete-user] Sending deletion confirmation email to: ${userEmail}`)
+        const emailResponse = await fetch(`${baseUrl}/.netlify/functions/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'account_deletion_confirmation',
+            to: userEmail,
+            data: {
+              name: userName || 'there',
+              deletedBy: 'admin',
+              businessesDeleted: deletionResult.deletedCounts?.businessesDeleted,
+              businessesKept: deletionResult.deletedCounts?.businessesKept,
+            },
+          }),
+        })
+
+        if (!emailResponse.ok) {
+          const emailError = await emailResponse.text()
+          console.warn(`[admin-delete-user] Failed to send deletion confirmation email:`, emailError)
+          // Don't fail the deletion if email fails
+        } else {
+          console.log(`[admin-delete-user] ✅ Deletion confirmation email sent successfully`)
+        }
+      } catch (emailErr) {
+        console.warn(`[admin-delete-user] Exception sending deletion confirmation email:`, emailErr)
+        // Don't fail the deletion if email fails
+      }
+    }
 
     // successResponse() automatically includes success: true and ok: true
     return successResponse({ 

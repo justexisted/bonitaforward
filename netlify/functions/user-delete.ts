@@ -10,7 +10,7 @@ import { extractAndVerifyToken } from './utils/auth'
 import { getSupabaseConfig } from './utils/env'
 import { createClient } from '@supabase/supabase-js'
 import { errorResponse, successResponse, handleOptions } from './utils/response'
-import { deleteUserAndRelatedData } from './utils/userDeletion'
+import { deleteUserAndRelatedData, getUserNameFromProfile } from './utils/userDeletion'
 
 export const handler: Handler = async (event) => {
   // Handle OPTIONS/preflight
@@ -32,6 +32,9 @@ export const handler: Handler = async (event) => {
     const userId = authResult.user.id
     const userEmail = authResult.user.email || null
     const supabaseClient = createClient(url, serviceRole, { auth: { persistSession: false } })
+
+    // Get user name BEFORE deletion (needed for email notification)
+    const userName = await getUserNameFromProfile(userId, supabaseClient)
 
     // Parse request body for deleteBusinesses option
     const body = JSON.parse(event.body || '{}') as { deleteBusinesses?: boolean; businessIdsToDelete?: string[] }
@@ -55,6 +58,39 @@ export const handler: Handler = async (event) => {
     }
 
     console.log(`[user-delete] ✓ User deletion completed successfully`, deletionResult.deletedCounts)
+
+    // Send deletion confirmation email (if email is available)
+    if (userEmail) {
+      try {
+        const baseUrl = process.env.SITE_URL || 'https://www.bonitaforward.com'
+        console.log(`[user-delete] Sending deletion confirmation email to: ${userEmail}`)
+        const emailResponse = await fetch(`${baseUrl}/.netlify/functions/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'account_deletion_confirmation',
+            to: userEmail,
+            data: {
+              name: userName || 'there',
+              deletedBy: 'self',
+              businessesDeleted: deletionResult.deletedCounts?.businessesDeleted,
+              businessesKept: deletionResult.deletedCounts?.businessesKept,
+            },
+          }),
+        })
+
+        if (!emailResponse.ok) {
+          const emailError = await emailResponse.text()
+          console.warn(`[user-delete] Failed to send deletion confirmation email:`, emailError)
+          // Don't fail the deletion if email fails
+        } else {
+          console.log(`[user-delete] ✅ Deletion confirmation email sent successfully`)
+        }
+      } catch (emailErr) {
+        console.warn(`[user-delete] Exception sending deletion confirmation email:`, emailErr)
+        // Don't fail the deletion if email fails
+      }
+    }
 
     // successResponse() automatically includes success: true and ok: true
     return successResponse({ 

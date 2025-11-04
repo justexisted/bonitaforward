@@ -164,6 +164,54 @@ export async function notifyBookingReceived(
   return sendEmail('booking_confirmation', to, booking)
 }
 
+export async function notifyBookingCancelled(
+  to: string,
+  booking: {
+    businessName: string
+    customerName: string
+    customerEmail: string
+    bookingDate: string
+    bookingTime?: string
+    cancelledBy: 'customer' | 'business'
+    reason?: string
+  }
+) {
+  return sendEmail('booking_cancelled', to, booking)
+}
+
+export async function notifyBookingUpdated(
+  to: string,
+  booking: {
+    businessName: string
+    customerName: string
+    customerEmail: string
+    customerPhone?: string
+    bookingDate: string
+    bookingTime?: string
+    bookingDuration?: number
+    changes: string[] // e.g., ['date', 'time', 'notes']
+    message?: string
+  }
+) {
+  return sendEmail('booking_updated', to, booking)
+}
+
+export async function notifyBookingReminder(
+  to: string,
+  booking: {
+    businessName: string
+    customerName: string
+    customerEmail: string
+    customerPhone?: string
+    bookingDate: string
+    bookingTime?: string
+    bookingDuration?: number
+    recipientType: 'customer' | 'business'
+  }
+) {
+  return sendEmail('booking_reminder', to, booking)
+}
+
 /**
  * APPLICATION NOTIFICATIONS
  */
@@ -179,6 +227,59 @@ export async function notifyApplicationApproved(
     category,
     tier,
   })
+}
+
+/**
+ * FEATURED LISTING NOTIFICATIONS
+ */
+
+export async function notifyFeaturedExpiring(
+  to: string,
+  businessName: string,
+  expirationDate: string,
+  daysUntilExpiration: number,
+  renewalPrice: string
+) {
+  return sendEmail('featured_expiration_reminder', to, {
+    businessName,
+    expirationDate,
+    daysUntilExpiration,
+    renewalPrice,
+  })
+}
+
+/**
+ * USER ONBOARDING NOTIFICATIONS
+ */
+
+export async function notifyWelcome(
+  to: string,
+  name: string,
+  role: 'business' | 'community'
+) {
+  return sendEmail('welcome', to, {
+    name,
+    role,
+  })
+}
+
+/**
+ * ACCOUNT DELETION NOTIFICATIONS
+ */
+
+export async function notifyAccountDeletion(
+  to: string,
+  name: string,
+  deletedBy: 'self' | 'admin',
+  businessesDeleted?: number,
+  businessesKept?: number
+) {
+  return sendEmail('account_deletion_confirmation', to, {
+    name,
+    deletedBy,
+    businessesDeleted,
+    businessesKept,
+  }, true) // Critical email - send even if user unsubscribed
 }
 
 /**

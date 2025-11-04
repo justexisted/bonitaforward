@@ -77,3 +77,13 @@
 [[schedule]]
   expression = "0 17 * * *"
   function = "fetch-kpbs-events"
+
+# Scheduled function for booking reminders (daily at 6 AM UTC / 11 PM PST)
+[[schedule]]
+  expression = "0 6 * * *"
+  function = "send-booking-reminders"
+
+# Scheduled function for featured listing expiration reminders (daily at 7 AM UTC / midnight PST)
+[[schedule]]
+  expression = "0 7 * * *"
+  function = "check-featured-expiration"

@@ -98,6 +98,8 @@ export interface UserDeletionResult {
   deletedCounts?: {
     funnelResponses?: number
     bookings?: number
+    businessesDeleted?: number // Number of businesses hard deleted
+    businessesKept?: number // Number of businesses soft deleted (kept in system)
     changeRequests?: number
     jobPosts?: number
     notifications?: number
@@ -444,8 +446,16 @@ export async function deleteUserAndRelatedData(
             }
           }
           
-          deletedCounts.providers = deletedCount
+          // Track business counts for email notification
+          const businessesKept = businessIdsToDelete.length > 0 
+            ? providers.length - deletedCount 
+            : 0
+          deletedCounts.businessesDeleted = deletedCount
+          deletedCounts.businessesKept = businessesKept
           console.log(`${logPrefix} ✓ Deleted ${deletedCount} provider(s) permanently`)
+          if (businessesKept > 0) {
+            console.log(`${logPrefix} ✓ Kept ${businessesKept} provider(s) in system (soft deleted)`)
+          }
         } else {
           // Soft delete: Archive and unlink (allows reconnection later)
           for (const provider of providers) {
@@ -465,7 +475,8 @@ export async function deleteUserAndRelatedData(
               console.error(`${logPrefix} ❌ Failed to soft delete provider ${(provider as any).id}:`, updateError)
             }
           }
-          deletedCounts.providers = providers.length
+          deletedCounts.businessesDeleted = 0
+          deletedCounts.businessesKept = providers.length
           console.log(`${logPrefix} ✓ Archived ${providers.length} provider(s) (unlinked, can be reconnected later)`)
         }
       }
@@ -537,6 +548,26 @@ export async function getUserEmailFromProfile(
     return profile?.email || null
   } catch (err) {
     console.warn('[user-deletion] Could not fetch user email:', err)
+    return null
+  }
+}
+
+/**
+ * Get user name from profile (helper function)
+ */
+export async function getUserNameFromProfile(
+  userId: string,
+  supabaseClient: SupabaseClient
+): Promise<string | null> {
+  try {
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('name')
+      .eq('id', userId)
+      .maybeSingle()
+    return profile?.name || null
+  } catch (err) {
+    console.warn('[user-deletion] Could not fetch user name:', err)
     return null
   }
 }

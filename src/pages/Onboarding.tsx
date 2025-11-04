@@ -268,6 +268,37 @@ export default function OnboardingPage() {
               console.warn('[Onboarding] Exception setting email_consent_date:', err)
             }
           }
+
+          // Send welcome email after successful profile creation
+          if (email && name && role) {
+            try {
+              const baseUrl = import.meta.env.VITE_SITE_URL || window.location.origin
+              console.log('[Onboarding] Sending welcome email to:', email)
+              const emailResponse = await fetch(`${baseUrl}/.netlify/functions/send-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'welcome',
+                  to: email,
+                  data: {
+                    name: name || 'there',
+                    role: role,
+                  },
+                }),
+              })
+
+              if (!emailResponse.ok) {
+                const emailError = await emailResponse.text()
+                console.warn('[Onboarding] Failed to send welcome email:', emailError)
+                // Don't fail the flow if email fails
+              } else {
+                console.log('[Onboarding] ✅ Welcome email sent successfully')
+              }
+            } catch (emailErr) {
+              console.warn('[Onboarding] Exception sending welcome email:', emailErr)
+              // Don't fail the flow if email fails
+            }
+          }
         }
       }
       
