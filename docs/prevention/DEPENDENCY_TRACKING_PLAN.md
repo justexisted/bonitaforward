@@ -38,11 +38,21 @@ Add comprehensive dependency tracking comments to all files that broke recently 
 **Issue:** User deletion failing (wrong order)  
 **Break Chain:** admin-delete-user → adminUserUtils → Admin.tsx  
 **Status:** ✅ Fixed, dependency tracking added
+**Recent Update (2025-01-XX):** Added deleteBusinesses parameter support
+- ✅ Accepts deleteBusinesses parameter (true = hard delete, false = soft delete)
+- ✅ Passes parameter to userDeletion utility
+- ✅ Dependency tracking updated to document business deletion logic
 
 ### 6. ✅ **adminUserUtils.ts** ⭐ MEDIUM PRIORITY
 **Issue:** API response format mismatch  
 **Break Chain:** admin-delete-user → adminUserUtils → Admin.tsx  
 **Status:** ✅ Fixed, dependency tracking added
+**Recent Update (2025-01-XX):** Added business deletion prompt for admin
+- ✅ Checks for businesses before deletion (queries providers table)
+- ✅ Prompts admin about deleting businesses if user has businesses
+- ✅ Passes deleteBusinesses parameter to backend
+- ✅ Success message indicates what happened with businesses
+- ✅ Dependency tracking updated to document business check logic and RLS requirements
 
 ### 7. ✅ **admin-list-change-requests.ts** ⭐ MEDIUM PRIORITY
 **Issue:** Wrong table name (owner_change_requests vs provider_change_requests)  
@@ -53,6 +63,10 @@ Add comprehensive dependency tracking comments to all files that broke recently 
 **Issue:** New shared utility (prevention)  
 **Break Chain:** user-delete → admin-delete-user → userDeletion utility  
 **Status:** ✅ Fixed, dependency tracking added
+**Recent Update (2025-01-XX):** Added deleteBusinesses parameter support
+- ✅ Handles hard delete (deleteBusinesses=true) - permanently removes businesses
+- ✅ Handles soft delete (deleteBusinesses=false) - unlinks businesses (owner_user_id=null, badges=['deleted'])
+- ✅ Dependency tracking updated to document providers table requirements and deletion logic
 
 ---
 
@@ -732,6 +746,45 @@ See: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
 - If email changes, reconnection by email may not find providers; consider a manual link flow.
 
 **Prevention:** Documented in `CASCADING_FAILURES.md` (#17). Add smoke tests covering delete -> re‑signup reconnection.
+
+---
+
+### Admin Business Deletion Choice (2025-01-XX)
+
+**Issue:** Admin deleting user accounts had no control over whether businesses should be permanently deleted or kept (unlinked).
+
+**Files:**
+- `netlify/functions/admin-delete-user.ts` (accepts `deleteBusinesses` parameter)
+- `src/utils/adminUserUtils.ts` (checks for businesses, prompts admin)
+- `netlify/functions/utils/userDeletion.ts` (handles hard/soft delete logic)
+
+**Fixes:**
+- Admin deletion checks for businesses before deletion (queries providers table by owner_user_id)
+- Prompts admin about deleting businesses if user has businesses (shows business names)
+- Passes deleteBusinesses parameter to backend (true = hard delete, false = soft delete)
+- Backend handles both cases (hard delete removes businesses, soft delete unlinks them)
+- Success message indicates what happened with businesses
+
+**Dependencies:**
+- Providers table must have RLS policy allowing admin to read providers (for business check)
+- Providers table must support owner_user_id column (for querying businesses)
+- Providers table must support badges column (for soft delete - adds 'deleted' badge)
+- Providers table must support setting owner_user_id to null (for soft delete)
+
+**Breaking-Change Awareness:**
+- If you remove deleteBusinesses parameter → Businesses always soft-deleted (unlinked)
+- If providers table RLS changes → Can't check for businesses before deletion
+- If providers table structure changes → Business deletion logic fails
+- If you change deleteBusinesses parameter name → Frontend breaks
+
+**Prevention:** Documented in `CASCADING_FAILURES.md` (#20). Add smoke tests covering admin deletion with businesses.
+
+**Testing Verified (2025-01-XX):**
+- ✅ Admin is prompted about businesses when deleting user with businesses
+- ✅ Hard delete (deleteBusinesses=true) permanently removes businesses
+- ✅ Soft delete (deleteBusinesses=false) unlinks businesses (can be reconnected)
+- ✅ Success message shows what happened with businesses
+- ✅ Deletion continues even if business check fails (graceful error handling)
 
 ---
 

@@ -6,6 +6,10 @@
  *   → CRITICAL: Uses service role to bypass RLS
  * - profiles table: Structure must match deletion logic
  *   → CRITICAL: Deletes profile by user_id
+ * - providers table: Must support owner_user_id column
+ *   → CRITICAL: Queries by owner_user_id to find businesses
+ *   → CRITICAL: Must support badges column for soft delete (adds 'deleted' badge)
+ *   → CRITICAL: Must support setting owner_user_id to null for soft delete
  * - Other tables: funnel_responses, bookings, provider_change_requests, user_saved_events,
  *   saved_providers, coupon_redemptions, calendar_events, business_applications, event_flags,
  *   event_votes, email_preferences, dismissed_notifications, etc.
@@ -13,29 +17,42 @@
  * 
  * WHAT DEPENDS ON THIS:
  * - admin-delete-user.ts: Uses this utility for admin user deletion
+ *   → CRITICAL: Passes deleteBusinesses parameter (true = hard delete, false = soft delete)
  * - user-delete.ts: Uses this utility for self-deletion
+ *   → CRITICAL: Passes deleteBusinesses parameter (true = hard delete, false = soft delete)
  *   → CRITICAL: Both must use same deletion order
  * 
  * BREAKING CHANGES:
  * - If you change deletion order → Foreign key constraint errors
  * - If table schema changes → Deletion queries fail
  * - If you remove this utility → Both admin-delete-user and user-delete break
+ * - If you change deleteBusinesses parameter → Both callers break
+ * - If providers table structure changes → Business deletion logic fails
+ * - If you remove deleteBusinesses logic → Businesses always soft-deleted (unlinked)
  * 
  * HOW TO SAFELY UPDATE:
  * 1. Test deletion order is correct (related data → auth user)
- * 2. Test both admin-delete-user and user-delete
+ * 2. Test both admin-delete-user and user-delete with deleteBusinesses=true and false
  * 3. Verify all related tables are handled
  * 4. Check for foreign key constraints that might block deletion
+ * 5. Test hard delete (deleteBusinesses=true) - businesses permanently removed
+ * 6. Test soft delete (deleteBusinesses=false) - businesses unlinked with 'deleted' badge
+ * 7. Verify providers table supports owner_user_id=null and badges array
  * 
  * RELATED FILES:
- * - netlify/functions/admin-delete-user.ts: Admin deletion endpoint
- * - netlify/functions/user-delete.ts: Self-deletion endpoint
+ * - netlify/functions/admin-delete-user.ts: Admin deletion endpoint (passes deleteBusinesses)
+ * - netlify/functions/user-delete.ts: Self-deletion endpoint (passes deleteBusinesses)
+ * - src/utils/adminUserUtils.ts: Checks for businesses, prompts admin
+ * - src/pages/Account.tsx: Self-delete, prompts user about businesses
  * 
  * RECENT BREAKS:
  * - User deletion failing (2025-01-XX): Wrong deletion order
  *   → Fix: Created this shared utility to ensure correct order
+ * - Business deletion (2025-01-XX): Added deleteBusinesses parameter
+ *   → Fix: Hard delete removes businesses, soft delete unlinks them (owner_user_id=null, badges=['deleted'])
  * 
  * See: docs/prevention/ASYNC_FLOW_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
  */
 
 /**

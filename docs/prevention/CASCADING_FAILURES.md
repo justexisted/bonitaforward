@@ -983,6 +983,103 @@ if (!token && (event as any).rawQuery) {
 
 ---
 
+### 20. Admin Business Deletion Choice (2025-01-XX)
+
+**What:** When an admin deletes a user account, they need to choose whether to permanently delete or keep (unlink) the user's businesses.
+
+**Failure Mode:**
+```typescript
+// WRONG: Admin deletion doesn't handle businesses
+async function deleteUser(userId: string) {
+  // ❌ No prompt about businesses
+  // ❌ No option to delete or keep businesses
+  await deleteUserAndRelatedData(userId)
+  // Businesses are always soft-deleted (unlinked), admin has no choice
+}
+```
+
+**What Happened:**
+1. Admin deletes user account via admin panel
+2. User has businesses linked to their account
+3. Backend always soft-deletes businesses (unlinks them)
+4. Admin has no control over whether businesses should be permanently deleted
+5. Result: Businesses remain in database even if admin wants them deleted
+
+**The Fix:**
+```typescript
+// CORRECT: Check for businesses and prompt admin
+async function deleteUser(userId: string, deleteBusinesses?: boolean) {
+  // Check if user has businesses
+  let shouldDeleteBusinesses = deleteBusinesses
+  if (shouldDeleteBusinesses === undefined) {
+    const { data: businesses } = await supabase
+      .from('providers')
+      .select('id, name')
+      .eq('owner_user_id', userId)
+    
+    if (businesses && businesses.length > 0) {
+      // Prompt admin about businesses
+      const confirmMessage = 
+        `This user has ${businesses.length} business(es):\n\n` +
+        `${businessNames}\n\n` +
+        `Delete businesses permanently? (OK = delete, Cancel = keep)`
+      shouldDeleteBusinesses = confirm(confirmMessage)
+    }
+  }
+  
+  // Pass deleteBusinesses to backend
+  await fetch('/api/delete-user', {
+    body: JSON.stringify({ 
+      user_id: userId,
+      deleteBusinesses: shouldDeleteBusinesses === true
+    })
+  })
+}
+```
+
+**Prevention Checklist:**
+- ✅ Check for businesses before deletion (query providers table by owner_user_id)
+- ✅ Prompt admin if businesses exist (show business names)
+- ✅ Pass deleteBusinesses parameter to backend (true = hard delete, false = soft delete)
+- ✅ Backend handles both cases (hard delete removes businesses, soft delete unlinks them)
+- ✅ Success message indicates what happened with businesses
+- ✅ Handle RLS policy failures gracefully (continue deletion even if business check fails)
+
+**Rule of Thumb:**
+> When deleting user accounts (admin or self-delete):
+> 1. Check if user has businesses (query providers table by owner_user_id)
+> 2. If businesses exist, prompt admin/user about deletion choice
+> 3. Pass deleteBusinesses parameter to backend (true = hard delete, false = soft delete)
+> 4. Backend handles deletion based on parameter (hard delete vs soft delete)
+> 5. Success message should indicate what happened with businesses
+> 6. Handle errors gracefully (continue deletion even if business check fails)
+
+**Files to Watch:**
+- `src/utils/adminUserUtils.ts` - Checks for businesses, prompts admin (deleteUser function)
+- `netlify/functions/admin-delete-user.ts` - Accepts deleteBusinesses parameter
+- `netlify/functions/user-delete.ts` - Accepts deleteBusinesses parameter (self-delete)
+- `netlify/functions/utils/userDeletion.ts` - Handles hard/soft delete logic
+- `src/pages/Account.tsx` - Prompts user about businesses (self-delete)
+
+**Breaking Changes:**
+- If you remove deleteBusinesses parameter → Businesses always soft-deleted (unlinked)
+- If providers table RLS changes → Can't check for businesses before deletion
+- If providers table structure changes → Business deletion logic fails
+- If you change deleteBusinesses parameter name → Frontend breaks
+
+**Testing Verified (2025-01-XX):**
+- ✅ Admin is prompted about businesses when deleting user with businesses
+- ✅ Hard delete (deleteBusinesses=true) permanently removes businesses
+- ✅ Soft delete (deleteBusinesses=false) unlinks businesses (can be reconnected)
+- ✅ Success message shows what happened with businesses
+- ✅ Deletion continues even if business check fails (graceful error handling)
+
+**Related:**
+- Section #17: Business Ownership on Self‑Deletion (similar pattern for self-delete)
+- Section #9: Incomplete Deletion Logic (comprehensive deletion patterns)
+
+---
+
 ### 18. Event Images Not Showing from Database (2025-11-03)
 
 **What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.
@@ -1202,6 +1299,10 @@ if (!dbEvents) {
   - [ ] **Can users resend verification emails from account page?** ⭐ NEW
   - [ ] **Do calendar events with database images show their images (not gradients)?** ⭐ NEW
   - [ ] **Do calendar events without database images show gradient fallbacks?** ⭐ NEW
+  - [ ] **Can admin choose to delete or keep businesses when deleting user account?** ⭐ NEW ✅ TESTED
+  - [ ] **Does admin deletion prompt show business names when user has businesses?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses hard deleted when admin chooses to delete them?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses soft deleted (unlinked) when admin chooses to keep them?** ⭐ NEW ✅ TESTED
 
 3. **Manual Testing**
    - Actually USE the app after every change

@@ -47,36 +47,51 @@ type ProfileRow = {
  * WHAT THIS DEPENDS ON:
  * - admin-delete-user Netlify function: Handles actual deletion
  *   → CRITICAL: Response format must be { success: true, ok: true, ... }
+ *   → CRITICAL: Accepts deleteBusinesses parameter (true = hard delete, false = soft delete)
  * - AuthContext: Provides session token for API call
  *   → CRITICAL: Must have valid session.access_token
+ * - Supabase providers table: Queries businesses owned by user
+ *   → CRITICAL: Must have RLS policy allowing admin to read providers
+ *   → CRITICAL: Queries by owner_user_id to find businesses
  * - successResponse() utility: Standardized response format
  *   → CRITICAL: MUST include both success and ok fields
  * 
  * WHAT DEPENDS ON THIS:
  * - Admin.tsx: Calls deleteUser() when admin deletes user
+ *   → CRITICAL: Passes userId, expects deleteBusinesses to be prompted automatically
  * - UsersSection: Calls deleteUser() from Admin.tsx
  * 
  * BREAKING CHANGES:
  * - If admin-delete-user response format changes → This function won't recognize success
+ * - If admin-delete-user removes deleteBusinesses parameter → Businesses always soft-deleted
  * - If session token format changes → API call fails
- * - If you change function name → This breaks
+ * - If providers table RLS changes → Can't check for businesses before deletion
+ * - If you change function name → Admin.tsx breaks
+ * - If you remove business check logic → Admin won't be prompted about businesses
  * 
  * HOW TO SAFELY UPDATE:
  * 1. Check admin-delete-user response format first
  * 2. Verify successResponse() includes both success and ok
  * 3. Test response parsing handles both formats
  * 4. Test Admin UI still works
+ * 5. Test business deletion prompt appears when user has businesses
+ * 6. Test deleteBusinesses parameter is passed correctly to backend
+ * 7. Verify providers table query works (RLS allows admin read access)
  * 
  * RELATED FILES:
- * - netlify/functions/admin-delete-user.ts: Backend endpoint
+ * - netlify/functions/admin-delete-user.ts: Backend endpoint (accepts deleteBusinesses)
+ * - netlify/functions/utils/userDeletion.ts: Handles actual business deletion logic
  * - netlify/functions/utils/response.ts: Response format utility
  * - src/pages/Admin.tsx: Uses this function
  * 
  * RECENT BREAKS:
  * - API response format (2025-01-XX): Changed from { ok: true } to { success: true }
  *   → Fix: Check both result.success === true || result.ok === true
+ * - Business deletion (2025-01-XX): Added deleteBusinesses parameter
+ *   → Fix: Check for businesses before deletion, prompt admin, pass parameter to backend
  * 
  * See: docs/prevention/API_CONTRACT_PREVENTION.md
+ * See: docs/prevention/CASCADING_FAILURES.md
  */
 
 /**
@@ -93,7 +108,8 @@ export async function deleteUser(
   setDeletingUserId: (id: string | null) => void,
   setProfiles: React.Dispatch<React.SetStateAction<ProfileRow[]>>,
   setFunnels: React.Dispatch<React.SetStateAction<FunnelRow[]>>,
-  setBookings: React.Dispatch<React.SetStateAction<BookingRow[]>>
+  setBookings: React.Dispatch<React.SetStateAction<BookingRow[]>>,
+  deleteBusinesses?: boolean // Optional: if not provided, will prompt admin
 ) {
   setMessage(null)
   setDeletingUserId(userId)
@@ -105,6 +121,33 @@ export async function deleteUser(
       throw new Error('Not authenticated')
     }
     
+    // Check if user has businesses and prompt admin if deleteBusinesses not provided
+    let shouldDeleteBusinesses = deleteBusinesses
+    if (shouldDeleteBusinesses === undefined) {
+      try {
+        // Fetch businesses owned by this user
+        const { data: businesses, error: businessError } = await supabase
+          .from('providers')
+          .select('id, name')
+          .eq('owner_user_id', userId)
+        
+        if (!businessError && businesses && businesses.length > 0) {
+          const businessNames = businesses.map(b => b.name || 'Unnamed Business').join(', ')
+          const confirmMessage = 
+            `This user has ${businesses.length} business(es) linked to their account:\n\n` +
+            `${businessNames}\n\n` +
+            `Would you like to DELETE these businesses permanently?\n\n` +
+            `• Click "OK" to DELETE businesses permanently\n` +
+            `• Click "Cancel" to keep businesses (they will be unlinked from the account and can be reconnected later)`
+          
+          shouldDeleteBusinesses = confirm(confirmMessage)
+        }
+      } catch (err) {
+        console.warn('[Admin] Error checking for businesses:', err)
+        // Continue with deletion even if we can't check businesses
+      }
+    }
+    
     // Call Netlify function to delete user
     const url = '/.netlify/functions/admin-delete-user'
     
@@ -114,7 +157,10 @@ export async function deleteUser(
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`
       },
-      body: JSON.stringify({ user_id: userId })
+      body: JSON.stringify({ 
+        user_id: userId,
+        deleteBusinesses: shouldDeleteBusinesses === true
+      })
     })
     
     if (!response.ok) {
@@ -215,7 +261,22 @@ export async function deleteUser(
       }))
     }
     
-    setMessage('User deleted successfully - all associated data removed')
+    // Build success message based on what was deleted
+    const deletedProfile = profiles.find(p => p.id === userId)
+    const deletedCounts = result.deletedCounts || {}
+    const providersCount = deletedCounts.providers || 0
+    
+    let message = 'User deleted successfully'
+    if (providersCount > 0) {
+      if (shouldDeleteBusinesses === true) {
+        message += ` - ${providersCount} business(es) permanently deleted`
+      } else {
+        message += ` - ${providersCount} business(es) unlinked (can be reconnected later)`
+      }
+    } else {
+      message += ' - all associated data removed'
+    }
+    setMessage(message)
   } catch (err: any) {
     console.error('[Admin] Delete user error:', err)
     setError(err?.message || 'Failed to delete user')
