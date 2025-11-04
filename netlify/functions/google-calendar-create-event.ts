@@ -114,6 +114,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
       provider_id, 
       customer_email, 
       customer_name,
+      customer_phone,
       booking_date,
       duration_minutes = 60,
       notes 
@@ -256,6 +257,54 @@ export const handler: Handler = async (event: HandlerEvent) => {
           booking_id: booking?.id,
           is_read: false
         }])
+    }
+
+    // Send email notification to business owner
+    if (ownerData?.email) {
+      try {
+        // Format booking time from startTime
+        const bookingTime = startTime.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        })
+
+        // Get base URL for email function (same pattern as send-verification-email)
+        const baseUrl = process.env.SITE_URL || 'https://www.bonitaforward.com'
+        
+        console.log('[Booking] Sending booking confirmation email to:', ownerData.email)
+        
+        const emailResponse = await fetch(`${baseUrl}/.netlify/functions/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'booking_confirmation',
+            to: ownerData.email,
+            data: {
+              businessName: provider.name,
+              customerName: customer_name || customer_email || 'Customer',
+              customerEmail: customer_email || '',
+              customerPhone: customer_phone || undefined,
+              serviceRequested: undefined, // Not available in current implementation
+              bookingDate: startTime.toISOString(),
+              bookingTime: bookingTime,
+              message: notes || undefined,
+            },
+          }),
+        })
+
+        if (!emailResponse.ok) {
+          const emailError = await emailResponse.text()
+          console.error('[Booking] Failed to send booking confirmation email:', emailError)
+        } else {
+          console.log('[Booking] ✅ Booking confirmation email sent successfully')
+        }
+      } catch (emailErr) {
+        console.error('[Booking] Error sending booking confirmation email:', emailErr)
+        // Don't fail booking creation just because email failed
+      }
     }
 
     return {

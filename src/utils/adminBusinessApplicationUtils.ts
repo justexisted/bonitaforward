@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '../lib/supabase'
+import { notifyApplicationApproved, notifyChangeRequestRejected } from '../services/emailNotificationService'
 
 // Type definitions
 type BusinessApplicationRow = {
@@ -259,6 +260,23 @@ export async function approveApplication(
       // Don't fail the approval just because notification failed
     }
   }
+
+  // Send email notification to applicant (works even if they don't have an account yet)
+  if (app.email) {
+    try {
+      console.log('[Admin] Sending approval email to:', app.email)
+      await notifyApplicationApproved(
+        app.email,
+        businessName,
+        draft.category,
+        'free' // Current implementation always creates free tier providers
+      )
+      console.log('[Admin] ✅ Approval email sent successfully')
+    } catch (err) {
+      console.error('[Admin] Failed to send approval email:', err)
+      // Don't fail the approval just because email failed
+    }
+  }
   
   // Refresh providers list
   try {
@@ -354,6 +372,23 @@ export async function deleteApplication(
     } catch (err) {
       console.error('[Admin] Failed to send rejection notification:', err)
       // Don't fail the rejection just because notification failed
+    }
+  }
+
+  // Send email notification to applicant (works even if they don't have an account yet)
+  if (app.email) {
+    try {
+      console.log('[Admin] Sending rejection email to:', app.email)
+      await notifyChangeRequestRejected(
+        app.email,
+        app.business_name || 'your business',
+        'update', // Use 'update' as closest match for application rejection
+        reason || undefined
+      )
+      console.log('[Admin] ✅ Rejection email sent successfully')
+    } catch (err) {
+      console.error('[Admin] Failed to send rejection email:', err)
+      // Don't fail the rejection just because email failed
     }
   }
   
