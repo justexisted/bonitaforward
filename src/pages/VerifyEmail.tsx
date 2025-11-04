@@ -25,43 +25,69 @@ export default function VerifyEmailPage() {
     }
 
     async function verifyEmail() {
+      // Keep loading state while processing
+      setStatus('loading')
+      setMessage('Verifying your email address...')
+      
       try {
-      // Call verify-email function with token as query parameter
-      // token is guaranteed to be non-null here because we return early if it's null
-      const verifyUrl = `/.netlify/functions/verify-email?token=${encodeURIComponent(token!)}`
-      const response = await fetch(verifyUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+        // Call verify-email function with token as query parameter
+        // token is guaranteed to be non-null here because we return early if it's null
+        const verifyUrl = `/.netlify/functions/verify-email?token=${encodeURIComponent(token!)}`
+        console.log('[VerifyEmail] Starting verification request...')
+        
+        const response = await fetch(verifyUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
 
-        const result = await response.json()
+        console.log('[VerifyEmail] Response status:', response.status, response.statusText)
+        
+        // Parse response body
+        let result: any
+        try {
+          const responseText = await response.text()
+          console.log('[VerifyEmail] Response body:', responseText)
+          result = JSON.parse(responseText)
+        } catch (parseError) {
+          console.error('[VerifyEmail] Failed to parse response:', parseError)
+          setStatus('error')
+          setMessage(`Server error: Invalid response format. Status: ${response.status}`)
+          return
+        }
 
-        if (result.success) {
+        console.log('[VerifyEmail] Parsed result:', result)
+
+        // Check if verification was successful
+        if (result.success === true) {
           setStatus('success')
-          setMessage('Your email has been verified successfully! Redirecting...')
+          const successMessage = result.alreadyVerified 
+            ? 'Your email is already verified!' 
+            : 'Your email has been verified successfully!'
+          setMessage(successMessage)
           
+          // DISABLED: Automatic redirect - commented out to allow viewing console logs
           // Refresh auth state to pick up verification status
-          // Wait a moment then redirect
-          setTimeout(() => {
-            if (auth.isAuthed) {
-              navigate('/account', { replace: true })
-            } else {
-              navigate('/signin', { replace: true })
-            }
-          }, 2000)
+          // setTimeout(() => {
+          //   if (auth.isAuthed) {
+          //     navigate('/account', { replace: true })
+          //   } else {
+          //     navigate('/signin', { replace: true })
+          //   }
+          // }, 2000)
         } else {
           setStatus('error')
           // Show detailed error message if available, otherwise show generic error
           const errorMessage = result.error || 'Failed to verify email address'
           const details = result.details ? `\n\n${result.details}` : ''
           setMessage(errorMessage + details)
+          console.error('[VerifyEmail] Verification failed:', result)
         }
       } catch (error: any) {
-        console.error('[VerifyEmail] Error:', error)
+        console.error('[VerifyEmail] Network or parsing error:', error)
         setStatus('error')
-        setMessage(error.message || 'An error occurred while verifying your email')
+        setMessage(error.message || 'An error occurred while verifying your email. Please check your connection and try again.')
       }
     }
 
@@ -73,33 +99,59 @@ export default function VerifyEmailPage() {
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg border border-neutral-200 p-8 text-center">
         {status === 'loading' && (
           <>
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mb-6"></div>
             <h1 className="text-2xl font-bold text-neutral-900 mb-2">Verifying Email...</h1>
-            <p className="text-neutral-600">Please wait while we verify your email address.</p>
+            <p className="text-neutral-600 mb-4">{message || 'Please wait while we verify your email address.'}</p>
+            <div className="w-full bg-neutral-200 rounded-full h-2 mb-4">
+              <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
+            <p className="text-sm text-neutral-500">This may take a few seconds...</p>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <div className="inline-block rounded-full bg-green-100 p-3 mb-4">
-              <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <div className="inline-block rounded-full bg-green-100 p-4 mb-6 animate-pulse">
+              <svg className="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-green-700 mb-2">Email Verified!</h1>
-            <p className="text-neutral-600 mb-4">{message}</p>
+            <h1 className="text-3xl font-bold text-green-700 mb-3">Email Verified!</h1>
+            <p className="text-neutral-700 mb-6 text-lg">{message}</p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  if (auth.isAuthed) {
+                    navigate('/account', { replace: true })
+                  } else {
+                    navigate('/signin', { replace: true })
+                  }
+                }}
+                className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-lg"
+              >
+                {auth.isAuthed ? 'Go to Account' : 'Go to Sign In'}
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="w-full px-6 py-3 bg-neutral-200 text-neutral-700 rounded-lg font-medium hover:bg-neutral-300 transition-colors"
+              >
+                Go to Home
+              </button>
+            </div>
           </>
         )}
 
         {status === 'error' && (
           <>
-            <div className="inline-block rounded-full bg-red-100 p-3 mb-4">
-              <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <div className="inline-block rounded-full bg-red-100 p-4 mb-6">
+              <svg className="w-16 h-16 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-red-700 mb-2">Verification Failed</h1>
-            <p className="text-neutral-600 mb-4">{message}</p>
+            <h1 className="text-3xl font-bold text-red-700 mb-3">Verification Failed</h1>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-red-800 whitespace-pre-line text-left">{message}</p>
+            </div>
             <div className="space-y-2">
               {auth.isAuthed && (
                 <button

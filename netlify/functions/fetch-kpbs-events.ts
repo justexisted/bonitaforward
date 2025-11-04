@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import * as cheerio from 'cheerio'
 import ICAL from 'ical.js'
 import { filterEventsByZipCode } from './utils/zipCodeFilter'
+import { removeDuplicateEvents } from './utils/eventDuplicateDetection'
 
 // Supabase configuration
 const supabaseUrl = process.env.SUPABASE_URL!
@@ -526,35 +527,8 @@ export const handler: Handler = async (event, context) => {
     // Step 4: Convert to database format
     const dbEvents = allEvents.map(convertToDatabaseEvent)
     
-    // Step 5: Apply duplicate detection
-    const uniqueEvents = dbEvents.filter((event, index, self) => {
-      return index === self.findIndex(e => {
-        // Exact match on title and source
-        if (e.title === event.title && e.source === event.source && e.date === event.date) {
-          return true
-        }
-        
-        // Fuzzy match: similar title (case-insensitive, normalized) and date within 1 hour
-        const normalizeTitle = (title: string) => title.toLowerCase().trim().replace(/[^\w\s]/g, '')
-        const e1Title = normalizeTitle(e.title)
-        const e2Title = normalizeTitle(event.title)
-        
-        // Check if titles are very similar (>80% match or one contains the other)
-        const titleMatch = e1Title === e2Title || 
-                          e1Title.includes(e2Title) || 
-                          e2Title.includes(e1Title)
-        
-        // Check if dates are within 1 hour of each other
-        const date1 = new Date(e.date).getTime()
-        const date2 = new Date(event.date).getTime()
-        const oneHour = 60 * 60 * 1000
-        const dateMatch = Math.abs(date1 - date2) < oneHour
-        
-        return titleMatch && dateMatch
-      })
-    })
-    
-    console.log(`Found ${dbEvents.length} total events, ${uniqueEvents.length} unique events (removed ${dbEvents.length - uniqueEvents.length} duplicates)`)
+    // Step 5: Apply duplicate detection using shared utility
+    const uniqueEvents = removeDuplicateEvents(dbEvents, SOURCE_NAME)
     
     // Step 6: Filter by allowed zip codes (Chula Vista area ~20 min radius)
     const filteredEvents = filterEventsByZipCode(uniqueEvents, SOURCE_NAME)
