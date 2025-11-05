@@ -354,13 +354,14 @@ async function populateEventImages() {
             successCount++
             continue // Skip to next event
           } else {
-            // Storage failed - remove Unsplash URL and use gradient instead
-            console.warn(`   ⚠️  Failed to convert to Supabase Storage, removing Unsplash URL and using gradient...`)
+            // Storage failed - remove Unsplash URL and set image_url to null
+            // CRITICAL: Never save gradient strings to image_url - the frontend computes gradients when image_url is null
+            console.warn(`   ⚠️  Failed to convert to Supabase Storage, removing Unsplash URL and setting image_url to null...`)
             const { data: updateData, error: updateError } = await supabase
               .from('calendar_events')
               .update({
-                image_url: getEventGradient(event),
-                image_type: 'gradient'
+                image_url: null,
+                image_type: null
               })
               .eq('id', event.id)
               .select()
@@ -370,7 +371,7 @@ async function populateEventImages() {
               throw updateError
             }
             
-            console.log(`   ✅ Removed Unsplash URL, saved gradient fallback\n`)
+            console.log(`   ✅ Removed Unsplash URL, set image_url to null (frontend will compute gradient)\n`)
             successCount++
             continue
           }
@@ -379,12 +380,18 @@ async function populateEventImages() {
         // Get image (Unsplash or gradient)
         const image = await getEventHeaderImage(event)
 
+        // CRITICAL: Never save gradient strings to image_url
+        // If image.type is 'gradient', set image_url to null instead
+        // The frontend will compute gradients dynamically when image_url is null
+        const imageUrl = image.type === 'image' ? image.value : null
+        const imageType = image.type === 'image' ? 'image' : null
+
         // Update database
         const { data: updateData, error: updateError } = await supabase
           .from('calendar_events')
           .update({
-            image_url: image.value,
-            image_type: image.type
+            image_url: imageUrl,
+            image_type: imageType
           })
           .eq('id', event.id)
           .select()
