@@ -38,6 +38,13 @@ You're experiencing **cascading failures** - fixing one issue creates another:
 - ✅ Auto-reconnect unlinked businesses on next signup by email
 - **Status:** ✅ Fixed - See Section #17
 
+**Business Applications RLS Policy Blocking Inserts - FIXED (2025-01-XX):**
+- ✅ Fixed restrictive INSERT policy that blocked authenticated users from submitting applications
+- ✅ Removed duplicate policies (`applications_insert_all` and `applications_insert_public`)
+- ✅ Created single public INSERT policy matching master RLS policies
+- ✅ Security maintained: SELECT/DELETE policies still enforce email matching
+- **Status:** ✅ Fixed - See Section #24 for detailed pattern and prevention
+
 ---
 
 ## Why This Happens
@@ -1414,6 +1421,163 @@ await supabase
 
 ---
 
+### 24. RLS Policy Conflicts and Duplicate Policies ⭐ DATABASE SECURITY ISSUE (2025-01-XX)
+
+**What:** Row Level Security (RLS) policies can conflict or duplicate, causing inserts/updates/deletes to fail silently or with confusing errors.
+
+**Root Cause:**
+- Multiple RLS policy files can create duplicate policies with different names
+- Conflicting policies (e.g., restrictive vs. public) can cause evaluation failures
+- `auth.jwt() ->> 'email'` may not be available or match exactly, causing restrictive policies to fail
+- Policies from different migration files can conflict with master policies
+
+**Example:**
+```sql
+-- ❌ PROBLEM: Two INSERT policies with different names
+-- From migration file:
+CREATE POLICY "applications_insert_all" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- From master RLS file:
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ❌ PROBLEM: Restrictive policy that fails
+-- From fix file:
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ auth.jwt() ->> 'email' may not be available
+```
+
+**Symptoms:**
+- Users get "new row violates row-level security policy" errors
+- Inserts fail even when they should work
+- Multiple policies with similar names exist
+- Policies from different files conflict
+
+**Fix:**
+1. **Drop ALL existing policies** before creating new ones:
+   ```sql
+   -- Drop ALL existing INSERT policies
+   DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+   DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+   DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+   -- ... drop all variations
+   ```
+
+2. **Create single consistent policy** matching master RLS file:
+   ```sql
+   -- Create single public INSERT policy
+   CREATE POLICY "applications_insert_public" 
+   ON public.business_applications FOR INSERT
+   WITH CHECK (true);
+   ```
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT 
+     schemaname, 
+     tablename, 
+     policyname, 
+     cmd,
+     qual,
+     with_check
+   FROM pg_policies 
+   WHERE tablename = 'business_applications'
+     AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Creating policy without dropping existing ones
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ May fail if JWT email not available
+
+-- ❌ Multiple policies with different names
+CREATE POLICY "applications_insert_all" ...;  -- From migration
+CREATE POLICY "applications_insert_public" ...;  -- From master
+-- ❌ Both exist, but one might be restrictive and block inserts
+```
+
+**Correct Code:**
+```sql
+-- ✅ Drop ALL existing policies first
+DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications (auth)" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_anon_insert" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_auth_insert" ON public.business_applications;
+
+-- ✅ Create single consistent policy
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ✅ Verify only one policy exists
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' AND cmd = 'INSERT';
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS drop existing policies** before creating new ones
+- ✅ **Check for duplicate policies** before creating new ones
+- ✅ **Use consistent policy names** matching master RLS file
+- ✅ **Avoid restrictive policies** that depend on `auth.jwt() ->> 'email'` (may not be available)
+- ✅ **Use public INSERT policies** for public forms (similar to `contact_leads`)
+- ✅ **Rely on SELECT/DELETE policies** for security (email matching, admin checks)
+- ✅ **Verify policies after creation** to ensure only one exists per operation
+- ✅ **Document policy rationale** in SQL comments
+
+**Rule of Thumb:**
+> When fixing RLS policies:
+> 1. **Drop ALL existing policies** for the operation (INSERT/UPDATE/DELETE/SELECT)
+> 2. **Create single consistent policy** matching master RLS file
+> 3. **Use public INSERT policies** for public forms (security enforced by SELECT/DELETE)
+> 4. **Avoid `auth.jwt() ->> 'email'`** - use `auth.uid()` or `auth.users` table instead
+> 5. **Verify policies after creation** to ensure clean state
+> 6. **Check for duplicate policies** from different migration files
+
+**How to Check for Duplicate Policies:**
+```sql
+-- Check all INSERT policies
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' 
+  AND cmd = 'INSERT'
+ORDER BY policyname;
+
+-- Check all policies for a table
+SELECT policyname, cmd, qual, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications'
+ORDER BY cmd, policyname;
+```
+
+**Security Note:**
+- Public INSERT policies don't compromise security if SELECT/DELETE policies enforce email matching
+- Users can submit applications, but can only VIEW/DELETE their own (by email)
+- Admins can VIEW/UPDATE/DELETE all applications
+- Email matching is enforced by SELECT/DELETE policies, not INSERT
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (source of truth)
+- `ops/rls/fix-*.sql` - Individual fix files (should match master)
+- `ops/migrations/*.sql` - Migration files (may create duplicate policies)
+- Any file that modifies RLS policies
+
+**Related:**
+- Section #9: Incomplete Deletion Logic (user deletion patterns)
+- Section #17: Business Ownership on Self-Deletion (business deletion patterns)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
 ### 18. Event Images Not Showing from Database (2025-11-03)
 
 **What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.
@@ -1637,6 +1801,8 @@ if (!dbEvents) {
   - [ ] **Does admin deletion prompt show business names when user has businesses?** ⭐ NEW ✅ TESTED
   - [ ] **Are businesses hard deleted when admin chooses to delete them?** ⭐ NEW ✅ TESTED
   - [ ] **Are businesses soft deleted (unlinked) when admin chooses to keep them?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW ✅ TESTED
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
 
 3. **Manual Testing**
    - Actually USE the app after every change
@@ -1726,11 +1892,21 @@ Before committing ANY change:
   - [ ] All sections display correctly
   - [ ] Name is stored in database after signup
   - [ ] Name is read from localStorage before database during signup
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+- [ ] **RLS Policy Checks** (if modifying database policies):
+  - [ ] Checked for duplicate policies before creating new ones
+  - [ ] Dropped ALL existing policies for the operation before creating new ones
+  - [ ] Verified only one policy exists per operation after creation
+  - [ ] Policy names match master RLS file
+  - [ ] Tested that inserts/updates/deletes work correctly
+  - [ ] Verified security (SELECT/DELETE policies still enforce email matching)
 - [ ] **Related Files:** Are they all updated?
   - [ ] Types updated?
   - [ ] Functions updated?
   - [ ] Components updated?
   - [ ] Tests updated?
+  - [ ] **RLS policies updated?** ⭐ NEW
 - [ ] **Integration Test:** Does the whole flow work?
 - [ ] **Manual Testing:** Actually USE the app
 
