@@ -376,6 +376,22 @@ export class QueryBuilder<T = any> {
   }
 
   /**
+   * Case-insensitive like filter (maintains Supabase API)
+   */
+  ilike(column: string, value: string): this {
+    this.builder = this.builder.ilike(column, value)
+    return this
+  }
+
+  /**
+   * OR filter (maintains Supabase API)
+   */
+  or(filter: string): this {
+    this.builder = this.builder.or(filter)
+    return this
+  }
+
+  /**
    * Order by column (maintains Supabase API)
    */
   order(column: string, options?: { ascending?: boolean }): this {
@@ -434,8 +450,16 @@ export class QueryBuilder<T = any> {
   /**
    * Upsert data (maintains Supabase API)
    */
-  upsert(data: any[] | any, options?: { onConflict?: string }): this {
+  upsert(data: any[] | any, options?: { onConflict?: string; ignoreDuplicates?: boolean }): this {
     this.builder = this.builder.upsert(data, options)
+    return this
+  }
+  
+  /**
+   * Filter by not equal (maintains Supabase API)
+   */
+  not(column: string, operator: string, value: any): this {
+    this.builder = (this.builder as any).not(column, operator, value)
     return this
   }
 

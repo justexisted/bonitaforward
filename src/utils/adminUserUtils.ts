@@ -12,6 +12,7 @@
  * - collapseBusinessDetails: Collapse expanded business details
  */
 
+import { query, deleteRows } from '../lib/supabaseQuery'
 import { supabase } from '../lib/supabase'
 
 // Type definitions
@@ -126,13 +127,16 @@ export async function deleteUser(
     if (shouldDeleteBusinesses === undefined) {
       try {
         // Fetch businesses owned by this user
-        const { data: businesses, error: businessError } = await supabase
-          .from('providers')
+        const businessResult = await query('providers', { logPrefix: '[AdminUserUtils]' })
           .select('id, name')
           .eq('owner_user_id', userId)
+          .execute()
         
-        if (!businessError && businesses && businesses.length > 0) {
-          const businessNames = businesses.map(b => b.name || 'Unnamed Business').join(', ')
+        const businesses = businessResult.data
+        const businessError = businessResult.error
+        
+        if (!businessError && businesses && Array.isArray(businesses) && businesses.length > 0) {
+          const businessNames = businesses.map((b: any) => b.name || 'Unnamed Business').join(', ')
           const confirmMessage = 
             `This user has ${businesses.length} business(es) linked to their account:\n\n` +
             `${businessNames}\n\n` +
@@ -320,33 +324,36 @@ export async function deleteUserByEmailOnly(
     const normalizedEmail = email.toLowerCase().trim()
     
     // Delete funnel responses by email
-    const { count: funnelCount, error: funnelError } = await supabase
-      .from('funnel_responses')
-      .delete({ count: 'exact' })
-      .eq('user_email', normalizedEmail)
+    const funnelResult = await deleteRows(
+      'funnel_responses',
+      { user_email: normalizedEmail },
+      { logPrefix: '[AdminUserUtils]' }
+    )
     
-    if (funnelError) {
-      console.warn('[Admin] Error deleting funnel responses:', funnelError)
+    if (funnelResult.error) {
+      console.warn('[Admin] Error deleting funnel responses:', funnelResult.error.message)
     }
     
     // Delete bookings by email
-    const { count: bookingCount, error: bookingError } = await supabase
-      .from('bookings')
-      .delete({ count: 'exact' })
-      .eq('user_email', normalizedEmail)
+    const bookingResult = await deleteRows(
+      'bookings',
+      { user_email: normalizedEmail },
+      { logPrefix: '[AdminUserUtils]' }
+    )
     
-    if (bookingError) {
-      console.warn('[Admin] Error deleting bookings:', bookingError)
+    if (bookingResult.error) {
+      console.warn('[Admin] Error deleting bookings:', bookingResult.error.message)
     }
     
     // Delete booking events by customer_email (booking_events table uses customer_email, not user_email)
-    const { count: bookingEventCount, error: bookingEventError } = await supabase
-      .from('booking_events')
-      .delete({ count: 'exact' })
-      .eq('customer_email', normalizedEmail)
+    const bookingEventResult = await deleteRows(
+      'booking_events',
+      { customer_email: normalizedEmail },
+      { logPrefix: '[AdminUserUtils]' }
+    )
     
-    if (bookingEventError) {
-      console.warn('[Admin] Error deleting booking events:', bookingEventError)
+    if (bookingEventResult.error) {
+      console.warn('[Admin] Error deleting booking events:', bookingEventResult.error.message)
     }
     
     // Update local state
@@ -366,9 +373,9 @@ export async function deleteUserByEmailOnly(
       }))
     }
     
-    const deletedCount = (funnelCount || 0) + (bookingCount || 0) + (bookingEventCount || 0)
-    setMessage(`Deleted ${deletedCount} record(s) for ${email} (${funnelCount || 0} funnel response(s), ${bookingCount || 0} booking(s), ${bookingEventCount || 0} booking event(s)). User had no profile, so only email-keyed data was removed.`)
-    console.log(`[Admin] Deleted ${funnelCount || 0} funnel response(s), ${bookingCount || 0} booking(s), and ${bookingEventCount || 0} booking event(s) for email: ${email}`)
+    // Note: deleteRows doesn't return count, but deletion was attempted
+    setMessage(`Deleted email-keyed data for ${email}. User had no profile, so only email-keyed data was removed.`)
+    console.log(`[Admin] Deleted email-keyed data for email: ${email}`)
   } catch (err: any) {
     console.error('[Admin] Delete user by email error:', err)
     setError(err?.message || 'Failed to delete user data')
@@ -403,14 +410,24 @@ export async function deleteCustomerUser(
     }
     
     // Remove funnel responses and bookings for this email
-    try { await supabase.from('funnel_responses').delete().eq('user_email', email) } catch {}
-    try { await supabase.from('bookings').delete().eq('user_email', email) } catch {}
+    try {
+      await deleteRows('funnel_responses', { user_email: email }, { logPrefix: '[AdminUserUtils]' })
+    } catch {}
+    try {
+      await deleteRows('bookings', { user_email: email }, { logPrefix: '[AdminUserUtils]' })
+    } catch {}
     
     // If an auth profile exists (and is not a business owner), delete the auth user as well
     try {
-      const { data: prof } = await supabase.from('profiles').select('id,role').eq('email', email).limit(1).maybeSingle()
-      const pid = (prof as any)?.id as string | undefined
-      const role = (prof as any)?.role as string | undefined
+      const profResult = await query('profiles', { logPrefix: '[AdminUserUtils]' })
+        .select('id,role')
+        .eq('email', email)
+        .limit(1)
+        .maybeSingle()
+        .execute()
+      
+      const pid = (profResult.data as any)?.id as string | undefined
+      const role = (profResult.data as any)?.role as string | undefined
       if (pid && role !== 'business') {
         // Call Netlify function to delete user
         const url = '/.netlify/functions/admin-delete-user'

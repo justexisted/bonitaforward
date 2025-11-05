@@ -1,8 +1,11 @@
 /**
  * Account Data Loading Utilities
+ * 
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
  */
 
 import { supabase } from '../../lib/supabase'
+import { query, update, deleteRows } from '../../lib/supabaseQuery'
 import { generateSlug } from '../../utils/helpers'
 import { updateUserProfile } from '../../utils/profileUtils'
 import type { Booking, SavedBusiness, SavedCoupon, PendingApplication, MyBusiness } from './types'
@@ -11,8 +14,7 @@ import type { CalendarEvent } from '../Calendar'
 export async function loadBookings(email: string): Promise<Booking[]> {
   // Try booking_events table first (has customer data)
   try {
-    const { data: eventsData, error: eventsError } = await supabase
-      .from('booking_events')
+    const result = await query('booking_events', { logPrefix: '[Account]' })
       .select(`
         id,
         status,
@@ -33,9 +35,10 @@ export async function loadBookings(email: string): Promise<Booking[]> {
       `)
       .eq('customer_email', email)
       .order('booking_date', { ascending: false })
+      .execute()
     
-    if (!eventsError && eventsData && eventsData.length > 0) {
-      return eventsData.map((b: any) => ({
+    if (!result.error && result.data && result.data.length > 0) {
+      return result.data.map((b: any) => ({
         id: b.id,
         provider_id: b.provider_id || b.providers?.id,
         provider_name: b.providers?.name,
@@ -58,18 +61,18 @@ export async function loadBookings(email: string): Promise<Booking[]> {
 
   // Fallback to bookings table (simpler structure - no category_key)
   try {
-    const { data, error } = await supabase
-      .from('bookings')
+    const result = await query('bookings', { logPrefix: '[Account]' })
       .select('id, status, created_at, user_email, name, notes')
       .eq('user_email', email)
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.log('[Account] Error loading bookings:', error)
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
     
-    return (data || []).map((b: any) => ({
+    return (result.data || []).map((b: any) => ({
       id: b.id,
       provider_id: null,
       provider_name: b.name || 'Booking Request',
@@ -92,8 +95,7 @@ export async function loadBookings(email: string): Promise<Booking[]> {
 
 export async function loadSavedBusinesses(userId: string): Promise<SavedBusiness[]> {
   try {
-    const { data, error } = await supabase
-      .from('saved_providers')
+    const result = await query('saved_providers', { logPrefix: '[Account]' })
       .select(`
         id,
         provider_id,
@@ -108,13 +110,14 @@ export async function loadSavedBusinesses(userId: string): Promise<SavedBusiness
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.log('[Account] Error loading saved businesses:', error)
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
     
-    return (data || []).map((s: any) => ({
+    return (result.data || []).map((s: any) => ({
       id: s.id,
       provider_id: s.provider_id,
       created_at: s.created_at,
@@ -133,11 +136,11 @@ export async function loadSavedBusinesses(userId: string): Promise<SavedBusiness
 /**
  * Load saved coupons for the user
  * Shows in "Saved" section on account page
+ * Uses centralized query utility with automatic retry logic
  */
 export async function loadSavedCoupons(userId: string): Promise<SavedCoupon[]> {
   try {
-    const { data, error } = await supabase
-      .from('coupon_redemptions')
+    const result = await query('coupon_redemptions', { logPrefix: '[Account]' })
       .select(`
         id,
         provider_id,
@@ -152,13 +155,14 @@ export async function loadSavedCoupons(userId: string): Promise<SavedCoupon[]> {
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.log('[Account] Error loading saved coupons:', error)
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
     
-    return (data || []).map((c: any) => ({
+    return (result.data || []).map((c: any) => ({
       id: c.id,
       provider_id: c.provider_id,
       code: c.code,
@@ -177,21 +181,22 @@ export async function loadSavedCoupons(userId: string): Promise<SavedCoupon[]> {
 /**
  * Load events CREATED by the user
  * Shows in "My Events" section on account page
+ * Uses centralized query utility with automatic retry logic
  */
 export async function loadMyEvents(userId: string): Promise<CalendarEvent[]> {
   try {
-    const { data, error } = await supabase
-      .from('calendar_events')
+    const result = await query('calendar_events', { logPrefix: '[Account]' })
       .select('*')
       .eq('created_by_user_id', userId)
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.log('[Account] Error loading created events:', error)
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
     
-    return (data || []) as CalendarEvent[]
+    return (result.data || []) as CalendarEvent[]
   } catch (err) {
     console.log('[Account] Error loading created events:', err)
     return []
@@ -201,39 +206,40 @@ export async function loadMyEvents(userId: string): Promise<CalendarEvent[]> {
 /**
  * Load events SAVED/BOOKMARKED by the user (from user_saved_events table)
  * Shows in "Saved Events" section on account page
+ * Uses centralized query utility with automatic retry logic
  */
 export async function loadSavedEvents(userId: string): Promise<CalendarEvent[]> {
   try {
     // Get event IDs that user has saved
-    const { data: savedData, error: savedError } = await supabase
-      .from('user_saved_events')
+    const savedResult = await query('user_saved_events', { logPrefix: '[Account]' })
       .select('event_id')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (savedError) {
-      console.log('[Account] Error loading saved event IDs:', savedError)
+    if (savedResult.error) {
+      // Error already logged by query utility
       return []
     }
     
-    if (!savedData || savedData.length === 0) {
+    if (!savedResult.data || savedResult.data.length === 0) {
       return []
     }
     
     // Get the full event details for those IDs
-    const eventIds = savedData.map(s => s.event_id)
-    const { data: eventsData, error: eventsError } = await supabase
-      .from('calendar_events')
+    const eventIds = savedResult.data.map((s: any) => s.event_id)
+    const eventsResult = await query('calendar_events', { logPrefix: '[Account]' })
       .select('*')
       .in('id', eventIds)
       .order('date', { ascending: true })
+      .execute()
     
-    if (eventsError) {
-      console.log('[Account] Error loading saved events:', eventsError)
+    if (eventsResult.error) {
+      // Error already logged by query utility
       return []
     }
     
-    return (eventsData || []) as CalendarEvent[]
+    return (eventsResult.data || []) as CalendarEvent[]
   } catch (err) {
     console.log('[Account] Error loading saved events:', err)
     return []
@@ -242,19 +248,19 @@ export async function loadSavedEvents(userId: string): Promise<CalendarEvent[]> 
 
 export async function loadPendingApplications(email: string): Promise<PendingApplication[]> {
   try {
-    const { data, error } = await supabase
-      .from('business_applications')
+    const result = await query('business_applications', { logPrefix: '[Account]' })
       .select('*')
       .eq('email', email)
       .order('created_at', { ascending: false })
       .limit(10)
+      .execute()
     
-    if (error) {
-      console.log('[Account] Error loading applications:', error)
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
     
-    return (data || []).map((r: any) => ({
+    return (result.data || []).map((r: any) => ({
       id: r.id,
       business_name: r.business_name,
       full_name: r.full_name,
@@ -277,17 +283,19 @@ export async function requestApplicationUpdate(applicationId: string, message: s
   try {
     // Create a change request or notification for the admin
     // For now, we'll update the application with a note
-    const { error } = await supabase
-      .from('business_applications')
-      .update({
+    const result = await update(
+      'business_applications',
+      {
         challenge: message,
         updated_at: new Date().toISOString()
-      })
-      .eq('id', applicationId)
+      },
+      { id: applicationId },
+      { logPrefix: '[Account]' }
+    )
     
-    if (error) {
-      console.error('[Account] Error requesting update:', error)
-      return { success: false, error: error.message }
+    if (result.error) {
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
     
     return { success: true }
@@ -302,20 +310,22 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
     console.log('[Account] loadMyBusinesses called:', { userId, userEmail })
     
     // First try to load by owner_user_id
-    const { data: ownerData, error: ownerError } = await supabase
-      .from('providers')
+    const ownerResult = await query('providers', { logPrefix: '[Account]' })
       .select('id, name, category_key, address, phone, email, website, published, created_at, owner_user_id, badges')
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false })
+      .execute()
     
+    const ownerData = ownerResult.data
     console.log('[Account] Query by owner_user_id result:', {
-      error: ownerError,
+      error: ownerResult.error,
       count: ownerData?.length || 0,
-      ids: ownerData?.map(b => b.id) || []
+      ids: ownerData?.map((b: any) => b.id) || []
     })
     
-    if (ownerError) {
-      console.log('[Account] Error loading businesses by owner_user_id:', ownerError)
+    if (ownerResult.error) {
+      // Error already logged by query utility
+      console.log('[Account] Error loading businesses by owner_user_id')
     }
     
     // If user has an email, also try to find businesses by email (fallback for older businesses or unlinked)
@@ -334,22 +344,23 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
       badges?: string[] | null
     }> = []
     if (userEmail) {
-      const { data: emailQueryData, error: emailError } = await supabase
-        .from('providers')
+      const emailResult = await query('providers', { logPrefix: '[Account]' })
         .select('id, name, category_key, address, phone, email, website, published, created_at, owner_user_id, badges')
         .ilike('email', userEmail.trim())
         .order('created_at', { ascending: false })
+        .execute()
       
       console.log('[Account] Query by email result:', {
-        error: emailError,
-        count: emailQueryData?.length || 0,
-        businesses: emailQueryData?.map(b => ({ id: b.id, name: b.name, owner_user_id: b.owner_user_id })) || []
+        error: emailResult.error,
+        count: emailResult.data?.length || 0,
+        businesses: emailResult.data?.map((b: any) => ({ id: b.id, name: b.name, owner_user_id: b.owner_user_id })) || []
       })
       
-      if (emailError) {
-        console.log('[Account] Error loading businesses by email:', emailError)
-      } else if (emailQueryData) {
-        emailData = emailQueryData
+      if (emailResult.error) {
+        // Error already logged by query utility
+        console.log('[Account] Error loading businesses by email')
+      } else if (emailResult.data) {
+        emailData = emailResult.data as any[]
       }
     }
     
@@ -387,16 +398,19 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
             : []
           const updatedBadges = currentBadges.filter((b: string) => b !== 'deleted')
           
-          const { error: updateError } = await supabase
-            .from('providers')
-            .update({ 
+          const reconnectResult = await update(
+            'providers',
+            { 
               owner_user_id: userId,
               badges: updatedBadges.length > 0 ? updatedBadges : null
-            })
-            .eq('id', business.id)
+            },
+            { id: business.id },
+            { logPrefix: '[Account]' }
+          )
           
-          if (updateError) {
-            console.warn('[Account] Failed to reconnect business:', business.name, updateError)
+          if (reconnectResult.error) {
+            // Error already logged by query utility
+            console.warn('[Account] Failed to reconnect business:', business.name)
           } else {
             console.log('[Account] ✓ Reconnected business:', business.name)
             // Update the business object so it appears as linked
@@ -453,13 +467,15 @@ export async function cancelBooking(bookingId: string): Promise<{ success: boole
 
 export async function unsaveBusiness(savedId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('saved_providers')
-      .delete()
-      .eq('id', savedId)
+    const result = await deleteRows(
+      'saved_providers',
+      { id: savedId },
+      { logPrefix: '[Account]' }
+    )
     
-    if (error) {
-      return { success: false, error: error.message }
+    if (result.error) {
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
     
     return { success: true }
@@ -470,13 +486,15 @@ export async function unsaveBusiness(savedId: string): Promise<{ success: boolea
 
 export async function deleteEvent(eventId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('calendar_events')
-      .delete()
-      .eq('id', eventId)
+    const result = await deleteRows(
+      'calendar_events',
+      { id: eventId },
+      { logPrefix: '[Account]' }
+    )
     
-    if (error) {
-      return { success: false, error: error.message }
+    if (result.error) {
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
     
     return { success: true }
@@ -487,9 +505,9 @@ export async function deleteEvent(eventId: string): Promise<{ success: boolean; 
 
 export async function updateEvent(eventId: string, event: Partial<CalendarEvent>): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('calendar_events')
-      .update({
+    const result = await update(
+      'calendar_events',
+      {
         title: event.title,
         description: event.description,
         date: event.date,
@@ -497,11 +515,14 @@ export async function updateEvent(eventId: string, event: Partial<CalendarEvent>
         location: event.location,
         address: event.address,
         category: event.category,
-      })
-      .eq('id', eventId)
+      },
+      { id: eventId },
+      { logPrefix: '[Account]' }
+    )
     
-    if (error) {
-      return { success: false, error: error.message }
+    if (result.error) {
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
     
     return { success: true }
@@ -598,24 +619,25 @@ export async function updateProfile(userId: string, name: string): Promise<{ suc
       // Wait longer on each retry for eventual consistency
       await new Promise(resolve => setTimeout(resolve, 100 * attempt))
       
-      const { data: verify, error: verifyError } = await supabase
-        .from('profiles')
+      const verifyResult = await query('profiles', { logPrefix: '[Account]' })
         .select('name')
         .eq('id', userId)
         .maybeSingle()
+        .execute()
       
-      if (verifyError) {
-        console.error(`[Account] Verification query error (attempt ${attempt}):`, verifyError)
+      if (verifyResult.error) {
+        // Error already logged by query utility
+        console.error(`[Account] Verification query error (attempt ${attempt}):`, verifyResult.error.message)
         continue
       }
       
-      if (!verify) {
+      if (!verifyResult.data) {
         console.warn(`[Account] Verification returned no data (attempt ${attempt})`)
         continue
       }
       
-      verifyData = verify
-      const verifiedName = (verify.name || '').trim()
+      verifyData = verifyResult.data
+      const verifiedName = (verifyData?.name || '').trim()
       
       if (verifiedName === trimmedName) {
         // Update succeeded!
@@ -661,14 +683,19 @@ export async function loadEmailPreferences(userId: string): Promise<{
   email_unsubscribe_date: string | null
 } | null> {
   try {
-    const { data, error } = await supabase
-      .from('profiles')
+    const result = await query('profiles', { logPrefix: '[Account]' })
       .select('email_notifications_enabled, marketing_emails_enabled, email_consent_date, email_unsubscribe_date')
       .eq('id', userId)
       .single()
+      .execute()
 
-    if (error) {
-      console.error('[Account] Error loading email preferences:', error)
+    if (result.error) {
+      // Error already logged by query utility
+      return null
+    }
+
+    const data = result.data
+    if (!data) {
       return null
     }
 
@@ -712,14 +739,16 @@ export async function updateEmailPreferences(
       updateData.email_consent_date = new Date().toISOString()
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(updateData)
-      .eq('id', userId)
+    const result = await update(
+      'profiles',
+      updateData,
+      { id: userId },
+      { logPrefix: '[Account]' }
+    )
 
-    if (error) {
-      console.error('[Account] Error updating email preferences:', error)
-      return { success: false, error: error.message }
+    if (result.error) {
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
 
     console.log('[Account] Email preferences updated successfully')

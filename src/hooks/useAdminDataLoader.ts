@@ -24,7 +24,8 @@
  */
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { query } from '../lib/supabaseQuery'
+import { supabase } from '../lib/supabase' // Only needed for auth.getSession()
 // CRITICAL: Import ProfileRow from shared types to ensure consistency
 // This ensures resident verification fields are always included
 import type { ProfileRow } from '../types/admin'
@@ -233,36 +234,64 @@ export function useAdminDataLoader(
       setError(null)
 
       try {
-        // Build queries
-        const fQuery = supabase.from('funnel_responses').select('*').order('created_at', { ascending: false })
-        const bQuery = supabase.from('bookings').select('*').order('created_at', { ascending: false })
-        const fExec = isAdmin ? (selectedUser ? fQuery.eq('user_email', selectedUser) : fQuery) : fQuery.eq('user_email', userEmail)
-        const bExec = isAdmin ? (selectedUser ? bQuery.eq('user_email', selectedUser) : bQuery) : bQuery.eq('user_email', userEmail)
+        // Build queries using centralized query utility
+        // Funnel responses query
+        const fQueryBuilder = query('funnel_responses', { logPrefix: '[Admin]' })
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (!isAdmin || selectedUser) {
+          fQueryBuilder.eq('user_email', selectedUser || userEmail)
+        }
+        const fQuery = fQueryBuilder.execute()
+
+        // Bookings query
+        const bQueryBuilder = query('bookings', { logPrefix: '[Admin]' })
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (!isAdmin || selectedUser) {
+          bQueryBuilder.eq('user_email', selectedUser || userEmail)
+        }
+        const bQuery = bQueryBuilder.execute()
 
         // CRITICAL: Only load PENDING applications (not approved/rejected)
         // This prevents showing already-processed applications in the admin panel
-        const bizQuery = supabase
-          .from('business_applications')
+        const bizQuery = query('business_applications', { logPrefix: '[Admin]' })
           .select('*')
           .or('status.eq.pending,status.is.null')  // Include pending OR null (legacy apps)
           .order('created_at', { ascending: false })
+          .execute()
 
-        const conQuery = supabase.from('contact_leads').select('*').order('created_at', { ascending: false })
+        // Contact leads query
+        const conQuery = query('contact_leads', { logPrefix: '[Admin]' })
+          .select('*')
+          .order('created_at', { ascending: false })
+          .execute()
 
-        // Enhanced providers query with all featured tracking fields
-        const provQuery = isAdmin ? supabase
-          .from('providers')
+        // Enhanced providers query with all featured tracking fields (admin only)
+        const provQuery = isAdmin ? query('providers', { logPrefix: '[Admin]' })
           .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url, enable_calendar_booking, enable_call_contact, enable_email_contact, coupon_code, coupon_discount, coupon_description, coupon_expires_at')
-          .order('name', { ascending: true }) : null
+          .order('name', { ascending: true })
+          .execute() : Promise.resolve({ data: null, error: null })
 
         // Execute all queries in parallel
-        const [{ data: fData, error: fErr }, { data: bData, error: bErr }, { data: bizData, error: bizErr }, { data: conData, error: conErr }, provRes] = await Promise.all([
-          fExec,
-          bExec,
+        const [fResult, bResult, bizResult, conResult, provResult] = await Promise.all([
+          fQuery,
+          bQuery,
           bizQuery,
           conQuery,
-          provQuery as any,
+          provQuery,
         ])
+
+        // Extract data and error from results
+        const fData = fResult.data
+        const fErr = fResult.error
+        const bData = bResult.data
+        const bErr = bResult.error
+        const bizData = bizResult.data
+        const bizErr = bizResult.error
+        const conData = conResult.data
+        const conErr = conResult.error
+        const provRes = provResult
 
         if (cancelled) return
 
@@ -280,19 +309,27 @@ export function useAdminDataLoader(
         setBizApps((bizData as BusinessApplicationRow[]) || [])
         setContactLeads((conData as ContactLeadRow[]) || [])
 
-        if (provRes && 'data' in (provRes as any)) {
-          const { data: pData, error: pErr } = (provRes as any)
-          if (pErr) { console.error('[Admin] providers error', pErr); setError((prev) => prev ?? pErr.message) }
+        // Handle providers result
+        if (provRes && 'data' in provRes) {
+          const pData = provRes.data
+          const pErr = provRes.error
+          if (pErr) { 
+            // Error already logged by query utility
+            setError((prev) => prev ?? pErr.message) 
+          }
           setProviders((pData as ProviderRow[]) || [])
         }
 
         // Load flagged events (admin only)
         try {
           if (isAdmin) {
-            const { data: flags, error: flagsError } = await supabase
-              .from('event_flags')
+            const flagsResult = await query('event_flags', { logPrefix: '[Admin]' })
               .select('*, calendar_events(*), profiles(email)')
               .order('created_at', { ascending: false })
+              .execute()
+            
+            const flags = flagsResult.data
+            const flagsError = flagsResult.error
 
             if (flagsError) {
               console.warn('[Admin] Could not load flagged events (table may not exist yet):', flagsError.message, flagsError.code)

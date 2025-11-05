@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { insert } from '../lib/supabaseQuery'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORY_OPTIONS } from '../constants/categories'
 
@@ -54,10 +54,16 @@ export default function CreateBusinessForm() {
         })
       }
       
-      const { error } = await supabase.from('business_applications').insert([payload])
+      // Uses centralized query utility with retry logic and standardized error handling
+      const result = await insert(
+        'business_applications',
+        [payload],
+        { logPrefix: '[CreateBusinessForm]' }
+      )
       
-      if (error) {
-        setMessage(error.message)
+      if (result.error) {
+        // Error already logged by query utility
+        setMessage(result.error.message)
       } else {
         setMessage('Success! Your business listing request has been submitted and is now under review. We will notify you when it is approved. Redirecting to your account...')
         // Redirect to account page after 2 seconds

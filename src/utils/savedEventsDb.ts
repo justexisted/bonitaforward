@@ -1,31 +1,34 @@
 /**
  * Database operations for saved events
  * Migrated from localStorage to database for cross-device sync
+ * 
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
  */
 
-import { supabase } from '../lib/supabase'
+import { query, insert } from '../lib/supabaseQuery'
 
 /**
  * Fetch all saved event IDs for a user
+ * Uses centralized query utility with automatic retry logic
  */
 export async function fetchSavedEvents(userId: string): Promise<Set<string>> {
   try {
-    const { data, error } = await supabase
-      .from('user_saved_events')
+    const result = await query('user_saved_events', { logPrefix: '[SavedEvents]' })
       .select('event_id')
       .eq('user_id', userId)
+      .execute()
     
-    if (error) {
+    if (result.error) {
       // If table doesn't exist yet, silently return empty set (not an error condition)
-      if (error.code === 'PGRST205') {
+      if (result.error.code === 'PGRST205') {
         console.warn('[SavedEvents] Table not found - please run migrations')
         return new Set()
       }
-      console.error('[SavedEvents] Error fetching saved events:', error)
+      // Error already logged by query utility
       return new Set()
     }
     
-    return new Set((data || []).map(row => row.event_id))
+    return new Set((result.data || []).map((row: any) => row.event_id))
   } catch (error) {
     console.error('[SavedEvents] Exception fetching saved events:', error)
     return new Set()
@@ -34,25 +37,28 @@ export async function fetchSavedEvents(userId: string): Promise<Set<string>> {
 
 /**
  * Save an event for a user
+ * Uses centralized query utility with automatic retry logic
  */
 export async function saveEvent(userId: string, eventId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('user_saved_events')
-      .insert({ user_id: userId, event_id: eventId })
+    const result = await insert(
+      'user_saved_events',
+      { user_id: userId, event_id: eventId },
+      { logPrefix: '[SavedEvents]' }
+    )
     
-    if (error) {
+    if (result.error) {
       // Ignore duplicate key errors (event already saved)
-      if (error.code === '23505') {
+      if (result.error.code === '23505' || result.error.code === 'VALIDATION_ERROR') {
         return { success: true }
       }
       // If table doesn't exist, fail silently
-      if (error.code === 'PGRST205') {
+      if (result.error.code === 'PGRST205') {
         console.warn('[SavedEvents] Table not found - please run migrations')
         return { success: false, error: 'Table not found' }
       }
-      console.error('[SavedEvents] Error saving event:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
     
     return { success: true }
@@ -64,23 +70,25 @@ export async function saveEvent(userId: string, eventId: string): Promise<{ succ
 
 /**
  * Unsave an event for a user
+ * Uses centralized query utility with automatic retry logic
  */
 export async function unsaveEvent(userId: string, eventId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('user_saved_events')
+    // Use query builder for delete with multiple conditions
+    const result = await query('user_saved_events', { logPrefix: '[SavedEvents]' })
       .delete()
       .eq('user_id', userId)
       .eq('event_id', eventId)
+      .execute()
     
-    if (error) {
+    if (result.error) {
       // If table doesn't exist, fail silently
-      if (error.code === 'PGRST205') {
+      if (result.error.code === 'PGRST205') {
         console.warn('[SavedEvents] Table not found - please run migrations')
         return { success: false, error: 'Table not found' }
       }
-      console.error('[SavedEvents] Error unsaving event:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
     
     return { success: true }
@@ -135,12 +143,14 @@ export async function migrateLocalStorageToDatabase(userId: string): Promise<voi
     if (toInsert.length === 0) {
       console.log('[SavedEvents] All events already in database')
     } else {
-      const { error } = await supabase
-        .from('user_saved_events')
-        .insert(toInsert)
+      const result = await insert(
+        'user_saved_events',
+        toInsert,
+        { logPrefix: '[SavedEvents]' }
+      )
       
-      if (error) {
-        console.error('[SavedEvents] Error migrating events:', error)
+      if (result.error) {
+        console.error('[SavedEvents] Error migrating events:', result.error.message)
       } else {
         console.log(`[SavedEvents] Successfully migrated ${toInsert.length} events to database`)
       }

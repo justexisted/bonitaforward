@@ -11,6 +11,8 @@
  * - Type-safe query functions
  * - Error handling and logging
  * 
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ * 
  * Usage:
  * ```typescript
  * import { AdminDataService } from './services/adminDataService'
@@ -19,7 +21,7 @@
  * ```
  */
 
-import { supabase } from '../lib/supabase'
+import { query, update, deleteRows } from '../lib/supabaseQuery'
 import type { 
   ProviderRow, 
   FunnelRow, 
@@ -39,21 +41,22 @@ import type { CalendarEvent } from '../pages/Calendar'
 
 /**
  * Fetch all providers from database
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<ProviderRow[]>
  */
 export async function fetchProviders(): Promise<ProviderRow[]> {
   try {
-    const { data, error } = await supabase
-      .from('providers')
+    const result = await query('providers', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('name')
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching providers:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as ProviderRow[]
+    return (result.data || []) as ProviderRow[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch providers:', error)
     return []
@@ -62,6 +65,7 @@ export async function fetchProviders(): Promise<ProviderRow[]> {
 
 /**
  * Update a provider record
+ * Uses centralized query utility with automatic retry logic
  * @param id Provider ID
  * @param updates Fields to update
  * @returns Promise<boolean>
@@ -71,14 +75,16 @@ export async function updateProvider(
   updates: Partial<ProviderRow>
 ): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from('providers')
-      .update(updates)
-      .eq('id', id)
+    const result = await update(
+      'providers',
+      updates,
+      { id },
+      { logPrefix: '[AdminDataService]' }
+    )
     
-    if (error) {
-      console.error('[AdminDataService] Error updating provider:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return false
     }
     
     return true
@@ -90,19 +96,21 @@ export async function updateProvider(
 
 /**
  * Delete a provider record
+ * Uses centralized query utility with automatic retry logic
  * @param id Provider ID
  * @returns Promise<boolean>
  */
 export async function deleteProvider(id: string): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from('providers')
-      .delete()
-      .eq('id', id)
+    const result = await deleteRows(
+      'providers',
+      { id },
+      { logPrefix: '[AdminDataService]' }
+    )
     
-    if (error) {
-      console.error('[AdminDataService] Error deleting provider:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return false
     }
     
     return true
@@ -118,21 +126,22 @@ export async function deleteProvider(id: string): Promise<boolean> {
 
 /**
  * Fetch all funnel responses
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<FunnelRow[]>
  */
 export async function fetchFunnels(): Promise<FunnelRow[]> {
   try {
-    const { data, error } = await supabase
-      .from('funnel_responses')  // FIXED: Changed from 'user_tracking' to 'funnel_responses'
+    const result = await query('funnel_responses', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching funnels:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as FunnelRow[]
+    return (result.data || []) as FunnelRow[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch funnels:', error)
     return []
@@ -145,21 +154,22 @@ export async function fetchFunnels(): Promise<FunnelRow[]> {
 
 /**
  * Fetch all bookings
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<BookingRow[]>
  */
 export async function fetchBookings(): Promise<BookingRow[]> {
   try {
-    const { data, error } = await supabase
-      .from('bookings')
+    const result = await query('bookings', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching bookings:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as BookingRow[]
+    return (result.data || []) as BookingRow[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch bookings:', error)
     return []
@@ -176,24 +186,25 @@ export async function fetchBookings(): Promise<BookingRow[]> {
  * If you see RLS permission errors, you MUST run fix-booking-events-admin-access.sql
  * to add the admin policies to the booking_events table.
  * 
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<BookingEventRow[]>
  */
 export async function fetchBookingEvents(): Promise<BookingEventRow[]> {
   try {
     // Select specific columns to avoid permission errors on related tables (like users)
     // This prevents Supabase from trying to follow foreign keys we don't have access to
-    const { data, error } = await supabase
-      .from('booking_events')
+    const result = await query('booking_events', { logPrefix: '[AdminDataService]' })
       .select('id, provider_id, customer_email, customer_name, booking_date, booking_duration_minutes, booking_notes, status, created_at')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
+    if (result.error) {
       // RLS PERMISSION ERROR - log error details for troubleshooting
-      console.error('[AdminDataService] Booking events RLS error:', error.message)
+      // Error already logged by query utility with standardized format
       return [] // Return empty array, admin panel will still function
     }
     
-    return (data || []) as BookingEventRow[]
+    return (result.data || []) as BookingEventRow[]
   } catch (error) {
     console.error('[AdminDataService] Booking events fetch failed:', error)
     return []
@@ -206,22 +217,23 @@ export async function fetchBookingEvents(): Promise<BookingEventRow[]> {
 
 /**
  * Fetch all calendar events
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<CalendarEvent[]>
  */
 export async function fetchCalendarEvents(): Promise<CalendarEvent[]> {
   try {
-    const { data, error } = await supabase
-      .from('calendar_events')
+    const result = await query('calendar_events', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('date', { ascending: false })
       .limit(1000)
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching calendar events:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as CalendarEvent[]
+    return (result.data || []) as CalendarEvent[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch calendar events:', error)
     return []
@@ -230,23 +242,24 @@ export async function fetchCalendarEvents(): Promise<CalendarEvent[]> {
 
 /**
  * Fetch flagged events with reporter details
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<FlaggedEventRow[]>
  */
 export async function fetchFlaggedEvents() {
   try {
     // Simplified query without joins - avoid foreign key relationship errors
     // Flagged events can be enriched client-side if needed by matching event_id and user_id
-    const { data, error } = await supabase
-      .from('event_flags')
+    const result = await query('event_flags', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching flagged events:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return data || []
+    return result.data || []
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch flagged events:', error)
     return []
@@ -259,21 +272,22 @@ export async function fetchFlaggedEvents() {
 
 /**
  * Fetch all business applications
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<BusinessApplicationRow[]>
  */
 export async function fetchBusinessApplications(): Promise<BusinessApplicationRow[]> {
   try {
-    const { data, error } = await supabase
-      .from('contact_leads')
+    const result = await query('contact_leads', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching business applications:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as BusinessApplicationRow[]
+    return (result.data || []) as BusinessApplicationRow[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch business applications:', error)
     return []
@@ -282,6 +296,7 @@ export async function fetchBusinessApplications(): Promise<BusinessApplicationRo
 
 /**
  * Update business application status
+ * Uses centralized query utility with automatic retry logic
  * @param id Application ID
  * @param status New status
  * @returns Promise<boolean>
@@ -291,14 +306,16 @@ export async function updateBusinessApplicationStatus(
   status: string
 ): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from('contact_leads')
-      .update({ status })
-      .eq('id', id)
+    const result = await update(
+      'contact_leads',
+      { status },
+      { id },
+      { logPrefix: '[AdminDataService]' }
+    )
     
-    if (error) {
-      console.error('[AdminDataService] Error updating application status:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return false
     }
     
     return true
@@ -314,21 +331,22 @@ export async function updateBusinessApplicationStatus(
 
 /**
  * Fetch all contact leads
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<ContactLeadRow[]>
  */
 export async function fetchContactLeads(): Promise<ContactLeadRow[]> {
   try {
-    const { data, error } = await supabase
-      .from('contact_leads')
+    const result = await query('contact_leads', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching contact leads:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as ContactLeadRow[]
+    return (result.data || []) as ContactLeadRow[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch contact leads:', error)
     return []
@@ -341,21 +359,22 @@ export async function fetchContactLeads(): Promise<ContactLeadRow[]> {
 
 /**
  * Fetch all user profiles
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<ProfileRow[]>
  */
 export async function fetchProfiles(): Promise<ProfileRow[]> {
   try {
-    const { data, error } = await supabase
-      .from('profiles')
+    const result = await query('profiles', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('email')
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching profiles:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as ProfileRow[]
+    return (result.data || []) as ProfileRow[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch profiles:', error)
     return []
@@ -368,23 +387,24 @@ export async function fetchProfiles(): Promise<ProfileRow[]> {
 
 /**
  * Fetch all provider change requests with details
+ * Uses centralized query utility with automatic retry logic
  * @returns Promise<ProviderChangeRequestWithDetails[]>
  */
 export async function fetchProviderChangeRequests(): Promise<ProviderChangeRequestWithDetails[]> {
   try {
     // Simplified query without joins - avoid foreign key relationship errors
     // Change requests can be enriched client-side if needed by matching IDs
-    const { data, error } = await supabase
-      .from('provider_change_requests')
+    const result = await query('provider_change_requests', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching change requests:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as ProviderChangeRequestWithDetails[]
+    return (result.data || []) as ProviderChangeRequestWithDetails[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch change requests:', error)
     return []
@@ -403,17 +423,17 @@ export async function fetchProviderJobPosts(): Promise<ProviderJobPostWithDetail
   try {
     // Simplified query without joins - avoid foreign key relationship errors
     // Job posts can be enriched client-side if needed by matching IDs
-    const { data, error } = await supabase
-      .from('provider_job_posts')
+    const result = await query('provider_job_posts', { logPrefix: '[AdminDataService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) {
-      console.error('[AdminDataService] Error fetching job posts:', error)
-      throw error
+    if (result.error) {
+      // Error already logged by query utility
+      return []
     }
     
-    return (data || []) as ProviderJobPostWithDetails[]
+    return (result.data || []) as ProviderJobPostWithDetails[]
   } catch (error) {
     console.error('[AdminDataService] Failed to fetch job posts:', error)
     return []

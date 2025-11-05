@@ -12,7 +12,7 @@
  * into actual provider listings in the system.
  */
 
-import { supabase } from '../lib/supabase'
+import { query, insert, update, selectOne } from '../lib/supabaseQuery'
 import { notifyApplicationApproved, notifyChangeRequestRejected } from '../services/emailNotificationService'
 
 // Type definitions
@@ -124,11 +124,14 @@ export async function approveApplication(
   
   // DUPLICATE PREVENTION: Check if a provider with this name already exists
   try {
-    const { data: existingProviders, error: checkError } = await supabase
-      .from('providers')
+    const checkResult = await query('providers', { logPrefix: '[Admin]' })
       .select('id, name')
       .ilike('name', businessName)
       .limit(5)
+      .execute()
+    
+    const existingProviders = checkResult.data
+    const checkError = checkResult.error
     
     if (checkError) {
       console.error('[Admin] Error checking for duplicates:', checkError)
@@ -136,9 +139,9 @@ export async function approveApplication(
       return
     }
     
-    if (existingProviders && existingProviders.length > 0) {
+    if (existingProviders && Array.isArray(existingProviders) && existingProviders.length > 0) {
       // Found potential duplicates - warn the admin
-      const duplicateNames = existingProviders.map(p => p.name).join(', ')
+      const duplicateNames = existingProviders.map((p: any) => p.name).join(', ')
       const confirmed = window.confirm(
         `⚠️ WARNING: A business with a similar name already exists:\n\n${duplicateNames}\n\n` +
         `Are you sure you want to create "${businessName}"?\n\n` +
@@ -168,12 +171,16 @@ export async function approveApplication(
   let ownerUserId: string | null = null
   try {
     if (app.email) {
-      const { data: profRows } = await supabase
-        .from('profiles')
+      const profResult = await query('profiles', { logPrefix: '[Admin]' })
         .select('id')
         .eq('email', app.email)
         .limit(1)
-      ownerUserId = ((profRows as any[])?.[0]?.id as string | undefined) || null
+        .execute()
+      
+      if (!profResult.error && profResult.data) {
+        const profRows = Array.isArray(profResult.data) ? profResult.data : [profResult.data]
+        ownerUserId = ((profRows as any[])?.[0]?.id as string | undefined) || null
+      }
     }
   } catch (err) {
     console.warn('[Admin] Could not find owner user:', err)
@@ -207,11 +214,15 @@ export async function approveApplication(
   console.log('[Admin] Approving application with payload:', payload)
   
   // Create the provider
-  const { error: insertError } = await supabase.from('providers').insert([payload as any])
+  const insertResult = await insert(
+    'providers',
+    [payload as any],
+    { logPrefix: '[Admin]' }
+  )
   
-  if (insertError) {
-    console.error('[Admin] Error creating provider:', insertError)
-    setError(`Failed to create provider: ${insertError.message}`)
+  if (insertResult.error) {
+    // Error already logged by query utility
+    setError(`Failed to create provider: ${insertResult.error.message}`)
     
     // ROLLBACK: Re-add the application to the UI since creation failed
     setBizApps((rows) => [app, ...rows])
@@ -219,13 +230,15 @@ export async function approveApplication(
   }
   
   // Update application status to approved
-  const { error: updateError } = await supabase
-    .from('business_applications')
-    .update({ status: 'approved' })
-    .eq('id', appId)
+  const updateResult = await update(
+    'business_applications',
+    { status: 'approved' },
+    { id: appId },
+    { logPrefix: '[Admin]' }
+  )
   
-  if (updateError) {
-    console.error('[Admin] Error updating application status:', updateError)
+  if (updateResult.error) {
+    // Error already logged by query utility
     // Don't rollback here - the provider was created successfully
     // Just log the error and continue
   }
@@ -241,17 +254,22 @@ export async function approveApplication(
       console.log('[Admin] Sending approval notification to user:', ownerUserId)
       
       // FIXED: Added 'subject' field which is required by the database schema
-      const { error: notifError } = await supabase.from('user_notifications').insert({
-        user_id: ownerUserId,
-        subject: notificationTitle,  // Subject is required field in database
-        title: notificationTitle,
-        message: notificationMessage,
-        type: 'application_approved',
-        metadata: {}
-      })
+      const notifResult = await insert(
+        'user_notifications',
+        {
+          user_id: ownerUserId,
+          subject: notificationTitle,  // Subject is required field in database
+          title: notificationTitle,
+          message: notificationMessage,
+          type: 'application_approved',
+          metadata: {}
+        },
+        { logPrefix: '[Admin]' }
+      )
       
-      if (notifError) {
-        console.error('[Admin] ❌ Failed to insert approval notification:', notifError)
+      if (notifResult.error) {
+        // Error already logged by query utility
+        console.error('[Admin] ❌ Failed to insert approval notification')
       }
       
       console.log('[Admin] ✅ Approval notification sent')
@@ -280,11 +298,14 @@ export async function approveApplication(
   
   // Refresh providers list
   try {
-    const { data: pData } = await supabase
-      .from('providers')
+    const refreshResult = await query('providers', { logPrefix: '[Admin]' })
       .select('id, name, category_key, tags, badges, rating, phone, email, website, address, images, owner_user_id, is_member, is_featured, featured_since, subscription_type, created_at, updated_at, description, specialties, social_links, business_hours, service_areas, google_maps_url, bonita_resident_discount, booking_enabled, booking_type, booking_instructions, booking_url')
       .order('name', { ascending: true })
-    setProviders((pData as ProviderRow[]) || [])
+      .execute()
+    
+    if (!refreshResult.error && refreshResult.data) {
+      setProviders((refreshResult.data as ProviderRow[]) || [])
+    }
   } catch (err) {
     console.error('[Admin] Error refreshing providers:', err)
   }
@@ -306,16 +327,18 @@ export async function deleteApplication(
   setMessage(null)
   
   // Get the application details before deleting
-  const { data: app } = await supabase
-    .from('business_applications')
+  const appResult = await query('business_applications', { logPrefix: '[Admin]' })
     .select('*')
     .eq('id', appId)
     .single()
+    .execute()
   
-  if (!app) {
+  if (appResult.error || !appResult.data) {
     setError('Application not found')
     return
   }
+  
+  const app = appResult.data as BusinessApplicationRow
   
   // Ask admin for rejection reason
   const reason = prompt('Reason for rejection (will be sent to applicant):')
@@ -325,13 +348,16 @@ export async function deleteApplication(
   }
   
   // Update status to rejected before deleting the application
-  const { error: updateError } = await supabase
-    .from('business_applications')
-    .update({ status: 'rejected' })
-    .eq('id', appId)
+  const updateResult = await update(
+    'business_applications',
+    { status: 'rejected' },
+    { id: appId },
+    { logPrefix: '[Admin]' }
+  )
     
-  if (updateError) {
-    setError(updateError.message)
+  if (updateResult.error) {
+    // Error already logged by query utility
+    setError(updateResult.error.message)
     return
   }
   
@@ -339,13 +365,14 @@ export async function deleteApplication(
   if (app.email) {
     try {
       // Find user by email
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', app.email)
-        .single()
+      const profileResult = await selectOne(
+        'profiles',
+        { email: app.email },
+        { logPrefix: '[Admin]' }
+      )
       
-      if (profile) {
+      if (profileResult) {
+        const profile = profileResult as { id: string }
         const notificationTitle = '❌ Business Application Rejected'
         const notificationMessage = reason 
           ? `Your application for "${app.business_name || 'your business'}" was rejected. Reason: ${reason}\n\nYou can submit a new application after addressing these concerns.`
@@ -354,17 +381,22 @@ export async function deleteApplication(
         console.log('[Admin] Sending rejection notification to user:', profile.id)
         
         // FIXED: Added 'subject' field which is required by the database schema
-        const { error: notifError } = await supabase.from('user_notifications').insert({
-          user_id: profile.id,
-          subject: notificationTitle,  // Subject is required field in database
-          title: notificationTitle,
-          message: notificationMessage,
-          type: 'application_rejected',
-          metadata: { reason: reason || 'No reason provided' }
-        })
+        const notifResult = await insert(
+          'user_notifications',
+          {
+            user_id: profile.id,
+            subject: notificationTitle,  // Subject is required field in database
+            title: notificationTitle,
+            message: notificationMessage,
+            type: 'application_rejected',
+            metadata: { reason: reason || 'No reason provided' }
+          },
+          { logPrefix: '[Admin]' }
+        )
         
-        if (notifError) {
-          console.error('[Admin] ❌ Failed to insert rejection notification:', notifError)
+        if (notifResult.error) {
+          // Error already logged by query utility
+          console.error('[Admin] ❌ Failed to insert rejection notification')
         } else {
           console.log('[Admin] ✅ Rejection notification sent')
         }
@@ -392,10 +424,12 @@ export async function deleteApplication(
     }
   }
   
-  const { error } = await supabase
-    .from('business_applications')
+  const deleteResult = await query('business_applications', { logPrefix: '[Admin]' })
     .delete()
     .eq('id', appId)
+    .execute()
+  
+  const error = deleteResult.error
     
   if (error) {
     setError(error.message)

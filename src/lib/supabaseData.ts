@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { query, update } from './supabaseQuery'
 
 export type DbProvider = {
   id: string
@@ -78,18 +79,24 @@ function fixImageUrls(images: string[] | null): string[] | null {
   }).filter(Boolean)
 }
 
+/**
+ * Fetch all providers from Supabase
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function fetchProvidersFromSupabase(): Promise<DbProvider[]> {
   try {
     // First, let's get all providers to see what we're working with
-    const { data: allData, error: allError } = await supabase
-      .from('providers')
+    const result = await query('providers', { logPrefix: '[Supabase]' })
       .select('*')
       .limit(1000)
+      .execute()
     
-    if (allError) {
-      console.warn('[Supabase] providers select error', allError)
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
+    
+    const allData = result.data
 
     const allRows = (allData || []) as DbProvider[]
     
@@ -188,37 +195,50 @@ export type BlogPost = {
   updated_at?: string | null
 }
 
+/**
+ * Fetch all blog posts
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function fetchAllBlogPosts(): Promise<BlogPost[]> {
   try {
-    const { data, error } = await supabase
-      .from('blog_posts')
+    const result = await query('blog_posts', { logPrefix: '[Supabase]' })
       .select('id,category_key,title,content,images,created_at,updated_at')
       .order('created_at', { ascending: false })
       .limit(200)
-    if (error) {
-      console.warn('[Supabase] blog_posts select error', error)
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
-    return (data || []) as BlogPost[]
+    
+    return (result.data || []) as BlogPost[]
   } catch (err) {
     console.warn('[Supabase] blog_posts select failed', err)
     return []
   }
 }
 
+/**
+ * Fetch latest blog post by category
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function fetchLatestBlogPostByCategory(category_key: string): Promise<BlogPost | null> {
   try {
-    const { data, error } = await supabase
-      .from('blog_posts')
+    const result = await query('blog_posts', { logPrefix: '[Supabase]' })
       .select('id,category_key,title,content,images,created_at,updated_at')
       .eq('category_key', category_key)
       .order('created_at', { ascending: false })
       .limit(1)
-    if (error) {
-      console.warn('[Supabase] blog_posts select by category error', error)
+      .maybeSingle()
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
       return null
     }
-    return (data && data[0]) || null
+    
+    return result.data as BlogPost | null
   } catch (err) {
     console.warn('[Supabase] blog_posts select by category failed', err)
     return null
@@ -279,24 +299,34 @@ export async function deleteBlogImage(imageUrl: string): Promise<{ error?: strin
   }
 }
 
+/**
+ * Fetch blog posts by category
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function fetchBlogPostsByCategory(category_key: string): Promise<BlogPost[]> {
   try {
-    const { data, error } = await supabase
-      .from('blog_posts')
+    const result = await query('blog_posts', { logPrefix: '[Supabase]' })
       .select('id,category_key,title,content,created_at,updated_at')
       .eq('category_key', category_key)
       .order('created_at', { ascending: false })
-    if (error) {
-      console.warn('[Supabase] blog_posts select by category (all) error', error)
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
       return []
     }
-    return (data || []) as BlogPost[]
+    
+    return (result.data || []) as BlogPost[]
   } catch (err) {
     console.warn('[Supabase] blog_posts select by category (all) failed', err)
     return []
   }
 }
 
+/**
+ * Upsert blog post
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function upsertBlogPost(post: Partial<BlogPost>): Promise<{ error?: string }> {
   try {
     const payload: any = {
@@ -305,18 +335,38 @@ export async function upsertBlogPost(post: Partial<BlogPost>): Promise<{ error?:
       title: post.title,
       content: post.content,
     }
-    const { error } = await supabase.from('blog_posts').upsert(payload, { onConflict: 'id' })
-    if (error) return { error: error.message }
+    
+    const result = await query('blog_posts', { logPrefix: '[Supabase]' })
+      .upsert(payload, { onConflict: 'id' })
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return { error: result.error.message }
+    }
+    
     return {}
   } catch (err: any) {
     return { error: err?.message || 'Failed to save blog post' }
   }
 }
 
+/**
+ * Delete blog post
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function deleteBlogPost(id: string): Promise<{ error?: string }> {
   try {
-    const { error } = await supabase.from('blog_posts').delete().eq('id', id)
-    if (error) return { error: error.message }
+    const result = await query('blog_posts', { logPrefix: '[Supabase]' })
+      .delete()
+      .eq('id', id)
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return { error: result.error.message }
+    }
+    
     return {}
   } catch (err: any) {
     return { error: err?.message || 'Failed to delete blog post' }
@@ -336,6 +386,10 @@ export type ProviderChangeRequest = {
   decided_at?: string | null
 }
 
+/**
+ * Create provider change request
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function createProviderChangeRequest(payload: Omit<ProviderChangeRequest, 'id' | 'status' | 'created_at' | 'decided_at'> & { status?: ProviderChangeRequest['status'] }): Promise<{ error?: string; id?: string }> {
   try {
     const insertPayload: any = {
@@ -346,23 +400,41 @@ export async function createProviderChangeRequest(payload: Omit<ProviderChangeRe
       status: payload.status || 'pending',
       reason: payload.reason || null,
     }
-    const { data, error } = await supabase.from('provider_change_requests').insert([insertPayload]).select('id').single()
-    if (error) return { error: error.message }
-    return { id: (data as any)?.id as string }
+    const result = await query('provider_change_requests', { logPrefix: '[Supabase]' })
+      .insert([insertPayload])
+      .select('id')
+      .single()
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return { error: result.error.message }
+    }
+    
+    return { id: (result.data as any)?.id as string }
   } catch (err: any) {
     return { error: err?.message || 'Failed to submit change request' }
   }
 }
 
+/**
+ * List owner change requests
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function listOwnerChangeRequests(owner_user_id: string): Promise<ProviderChangeRequest[]> {
   try {
-    const { data, error } = await supabase
-      .from('provider_change_requests')
+    const result = await query('provider_change_requests', { logPrefix: '[Supabase]' })
       .select('*')
       .eq('owner_user_id', owner_user_id)
       .order('created_at', { ascending: false })
-    if (error) return []
-    return (data || []) as ProviderChangeRequest[]
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return []
+    }
+    
+    return (result.data || []) as ProviderChangeRequest[]
   } catch {
     return []
   }
@@ -382,6 +454,10 @@ export type ProviderJobPost = {
   decided_at?: string | null
 }
 
+/**
+ * Create job post
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function createJobPost(payload: Omit<ProviderJobPost, 'id' | 'status' | 'created_at' | 'decided_at'> & { status?: ProviderJobPost['status'] }): Promise<{ error?: string; id?: string }> {
   try {
     const insertPayload: any = {
@@ -393,24 +469,42 @@ export async function createJobPost(payload: Omit<ProviderJobPost, 'id' | 'statu
       salary_range: payload.salary_range || null,
       status: payload.status || 'pending',
     }
-    const { data, error } = await supabase.from('provider_job_posts').insert([insertPayload]).select('id').single()
-    if (error) return { error: error.message }
-    return { id: (data as any)?.id as string }
+    const result = await query('provider_job_posts', { logPrefix: '[Supabase]' })
+      .insert([insertPayload])
+      .select('id')
+      .single()
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return { error: result.error.message }
+    }
+    
+    return { id: (result.data as any)?.id as string }
   } catch (err: any) {
     return { error: err?.message || 'Failed to create job post' }
   }
 }
 
+/**
+ * List job posts by provider
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function listJobPostsByProvider(provider_id: string): Promise<ProviderJobPost[]> {
   try {
-    const { data, error } = await supabase
-      .from('provider_job_posts')
+    const result = await query('provider_job_posts', { logPrefix: '[Supabase]' })
       .select('*')
       .eq('provider_id', provider_id)
       .in('status', ['approved'])
       .order('created_at', { ascending: false })
-    if (error) return []
-    return (data || []) as ProviderJobPost[]
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return []
+    }
+    
+    return (result.data || []) as ProviderJobPost[]
   } catch {
     return []
   }
@@ -429,25 +523,48 @@ export type UserNotification = {
   created_at: string
 }
 
+/**
+ * List user notifications
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function listUserNotifications(user_id: string): Promise<UserNotification[]> {
   try {
-    const { data, error } = await supabase
-      .from('user_notifications')
+    const result = await query('user_notifications', { logPrefix: '[Supabase]' })
       .select('*')
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
       .limit(100)
-    if (error) return []
-    return (data || []) as UserNotification[]
+      .execute()
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return []
+    }
+    
+    return (result.data || []) as UserNotification[]
   } catch {
     return []
   }
 }
 
+/**
+ * Mark notification as read
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function markNotificationRead(id: string): Promise<{ error?: string }> {
   try {
-    const { error } = await supabase.from('user_notifications').update({ read_at: new Date().toISOString() as any }).eq('id', id)
-    if (error) return { error: error.message }
+    const result = await update(
+      'user_notifications',
+      { read_at: new Date().toISOString() as any },
+      { id },
+      { logPrefix: '[Supabase]' }
+    )
+    
+    if (result.error) {
+      // Error already logged by query utility
+      return { error: result.error.message }
+    }
+    
     return {}
   } catch (err: any) {
     return { error: err?.message || 'Failed to mark as read' }
@@ -464,6 +581,10 @@ export type DismissedNotification = {
   created_at: string
 }
 
+/**
+ * Dismiss notification
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function dismissNotification(
   user_id: string, 
   notification_type: 'pending' | 'approved' | 'rejected', 
@@ -478,58 +599,77 @@ export async function dismissNotification(
     }
     
     // Use upsert to update existing dismissal or create new one
-    const { error } = await supabase
-      .from('dismissed_notifications')
+    const result = await query('dismissed_notifications', { logPrefix: '[Supabase]' })
       .upsert(payload, { 
         onConflict: 'user_id,notification_type',
         ignoreDuplicates: false 
       })
+      .execute()
     
-    if (error) return { error: error.message }
+    if (result.error) {
+      // Error already logged by query utility
+      return { error: result.error.message }
+    }
+    
     return {}
   } catch (err: any) {
     return { error: err?.message || 'Failed to dismiss notification' }
   }
 }
 
+/**
+ * Get dismissed notifications
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function getDismissedNotifications(user_id: string): Promise<DismissedNotification[]> {
   try {
-    const { data, error } = await supabase
-      .from('dismissed_notifications')
+    const result = await query('dismissed_notifications', { logPrefix: '[Supabase]' })
       .select('*')
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) return []
-    return (data || []) as DismissedNotification[]
+    if (result.error) {
+      // Error already logged by query utility
+      return []
+    }
+    
+    return (result.data || []) as DismissedNotification[]
   } catch {
     return []
   }
 }
 
+/**
+ * Get latest activity timestamp
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
+ */
 export async function getLatestActivityTimestamp(
   user_id: string, 
   notification_type: 'pending' | 'approved' | 'rejected'
 ): Promise<string | null> {
   try {
-    let query = supabase.from('provider_change_requests').select('created_at,decided_at')
+    let builder = query('provider_change_requests', { logPrefix: '[Supabase]' })
+      .select('created_at,decided_at')
     
     if (notification_type === 'pending') {
-      query = query.eq('owner_user_id', user_id).eq('status', 'pending')
+      builder = builder.eq('owner_user_id', user_id).eq('status', 'pending') as any
     } else if (notification_type === 'approved') {
-      query = query.eq('owner_user_id', user_id).eq('status', 'approved').not('decided_at', 'is', null)
+      builder = builder.eq('owner_user_id', user_id).eq('status', 'approved').not('decided_at', 'is', null) as any
     } else if (notification_type === 'rejected') {
-      query = query.eq('owner_user_id', user_id).eq('status', 'rejected').not('decided_at', 'is', null)
+      builder = builder.eq('owner_user_id', user_id).eq('status', 'rejected').not('decided_at', 'is', null) as any
     }
     
-    const { data, error } = await query
+    const result = await builder
       .order(notification_type === 'pending' ? 'created_at' : 'decided_at', { ascending: false })
       .limit(1)
       .single()
+      .execute()
     
-    if (error || !data) return null
+    if (result.error || !result.data) return null
     
     // For pending requests, use created_at. For approved/rejected, use decided_at
+    const data = result.data as any
     const timestamp = notification_type === 'pending' ? data.created_at : data.decided_at
     return timestamp
   } catch {

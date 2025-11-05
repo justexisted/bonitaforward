@@ -15,6 +15,7 @@
  * - removeImage: Remove image from provider
  */
 
+import { query } from '../lib/supabaseQuery'
 import { supabase } from '../lib/supabase'
 import type { ProviderRow } from '../types/admin'
 
@@ -222,7 +223,10 @@ export async function saveProvider(
     
   // Force refresh the Supabase client before making the request
   try {
-    await supabase.from('providers').select('id').limit(1)
+    await query('providers', { logPrefix: '[Admin]' })
+      .select('id')
+      .limit(1)
+      .execute()
   } catch (err) {
     console.error('[Admin] Connection test failed:', err)
   }
