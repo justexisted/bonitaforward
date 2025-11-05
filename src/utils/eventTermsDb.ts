@@ -1,27 +1,30 @@
 /**
  * Database operations for event terms acceptance
  * Tracks legal compliance for terms acceptance
+ * 
+ * MIGRATED: Now uses centralized query utility with retry logic and standardized error handling
  */
 
-import { supabase } from '../lib/supabase'
+import { query, update } from '../lib/supabaseQuery'
 
 /**
  * Check if user has accepted event creation terms
+ * Uses centralized query utility with automatic retry logic
  */
 export async function hasAcceptedEventTerms(userId: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
-      .from('profiles')
+    const result = await query('profiles', { logPrefix: '[EventTerms]' })
       .select('event_terms_accepted_at')
       .eq('id', userId)
       .maybeSingle()
+      .execute()
     
-    if (error) {
-      console.error('[EventTerms] Error checking terms acceptance:', error)
+    if (result.error) {
+      // Error already logged by query utility
       return false
     }
     
-    return data?.event_terms_accepted_at != null
+    return result.data?.event_terms_accepted_at != null
   } catch (error) {
     console.error('[EventTerms] Exception checking terms acceptance:', error)
     return false
@@ -30,17 +33,20 @@ export async function hasAcceptedEventTerms(userId: string): Promise<boolean> {
 
 /**
  * Mark that user has accepted event creation terms
+ * Uses centralized query utility with automatic retry logic
  */
 export async function acceptEventTerms(userId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ event_terms_accepted_at: new Date().toISOString() })
-      .eq('id', userId)
+    const result = await update(
+      'profiles',
+      { event_terms_accepted_at: new Date().toISOString() },
+      { id: userId },
+      { logPrefix: '[EventTerms]' }
+    )
     
-    if (error) {
-      console.error('[EventTerms] Error accepting terms:', error)
-      return { success: false, error: error.message }
+    if (result.error) {
+      // Error already logged by query utility
+      return { success: false, error: result.error.message }
     }
     
     return { success: true }
