@@ -268,18 +268,21 @@ async function getEventHeaderImage(event: CalendarEvent): Promise<{
   const unsplashUrl = await fetchUnsplashImage(keywords)
   
   if (unsplashUrl) {
-    // Download and store in Supabase Storage
+    // CRITICAL: Download and store in Supabase Storage - NEVER save Unsplash URLs directly
+    // If storage fails, use gradient - NEVER fall back to Unsplash URL
     const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
     
-    if (storageUrl) {
+    if (storageUrl && storageUrl.includes('supabase.co/storage')) {
+      // Successfully stored in Supabase Storage
       return { type: 'image', value: storageUrl }
     } else {
-      console.warn(`   ⚠️  Failed to store in Supabase Storage, falling back to gradient`)
-      // Fall back to gradient if storage fails
+      // Storage failed - use gradient, NEVER save Unsplash URL
+      console.warn(`   ⚠️  Failed to store in Supabase Storage, using gradient fallback (NOT saving Unsplash URL)`)
       return { type: 'gradient', value: getEventGradient(event) }
     }
   }
   
+  // No Unsplash image available - use gradient
   return { type: 'gradient', value: getEventGradient(event) }
 }
 
@@ -320,13 +323,14 @@ async function populateEventImages() {
       try {
         console.log(`${progress} Processing: "${event.title}"`)
 
-        // Check if event already has Unsplash URL - convert it to Supabase Storage
+        // CRITICAL: Check if event already has Unsplash URL - convert it to Supabase Storage
+        // NEVER keep Unsplash URLs - always convert to Supabase Storage
         if (event.image_url && event.image_url.includes('images.unsplash.com')) {
           console.log(`   🔄 Converting Unsplash URL to Supabase Storage...`)
           const storageUrl = await downloadAndStoreImage(event.image_url, event.id)
           
-          if (storageUrl) {
-            // Update with Supabase Storage URL
+          if (storageUrl && storageUrl.includes('supabase.co/storage')) {
+            // Successfully converted - update with Supabase Storage URL
             const { data: updateData, error: updateError } = await supabase
               .from('calendar_events')
               .update({
@@ -346,11 +350,29 @@ async function populateEventImages() {
               throw new Error('RLS policy blocking update')
             }
 
-            console.log(`   ✅ Converted to Supabase Storage URL\n`)
+            console.log(`   ✅ Converted to Supabase Storage URL: ${storageUrl.substring(0, 60)}...\n`)
             successCount++
             continue // Skip to next event
           } else {
-            console.warn(`   ⚠️  Failed to convert, will fetch new image...`)
+            // Storage failed - remove Unsplash URL and use gradient instead
+            console.warn(`   ⚠️  Failed to convert to Supabase Storage, removing Unsplash URL and using gradient...`)
+            const { data: updateData, error: updateError } = await supabase
+              .from('calendar_events')
+              .update({
+                image_url: getEventGradient(event),
+                image_type: 'gradient'
+              })
+              .eq('id', event.id)
+              .select()
+
+            if (updateError) {
+              console.error(`   ❌ UPDATE ERROR:`, updateError)
+              throw updateError
+            }
+            
+            console.log(`   ✅ Removed Unsplash URL, saved gradient fallback\n`)
+            successCount++
+            continue
           }
         }
 
@@ -378,7 +400,15 @@ async function populateEventImages() {
         }
 
         if (image.type === 'image') {
-          console.log(`   ✅ Image stored in Supabase Storage (not Unsplash URL)\n`)
+          // CRITICAL: Verify it's actually a Supabase Storage URL, not Unsplash URL
+          if (image.value.includes('supabase.co/storage')) {
+            console.log(`   ✅ Image stored in Supabase Storage: ${image.value.substring(0, 60)}...\n`)
+          } else {
+            console.error(`   ❌❌❌ CRITICAL ERROR: Trying to save Unsplash URL instead of Supabase Storage URL!`)
+            console.error(`   ❌❌❌ This should NEVER happen - storage failed but we're saving Unsplash URL`)
+            console.error(`   ❌❌❌ URL: ${image.value.substring(0, 80)}...`)
+            throw new Error('Cannot save Unsplash URL - must store in Supabase Storage')
+          }
         } else {
           console.log(`   ✅ Saved gradient fallback\n`)
         }
