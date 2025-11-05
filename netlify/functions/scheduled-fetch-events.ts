@@ -441,11 +441,25 @@ const scheduledHandler: Handler = async (event, context) => {
       .from('calendar_events')
       .select('id, title, date, source')
     
-    if (existingEvents && existingEvents.length > 0) {
+    // CRITICAL: Preserve image_url and image_type when re-inserting events
+    // Fetch existing events with images before processing duplicates
+    const { data: existingEventsWithImages } = await supabase
+      .from('calendar_events')
+      .select('id, title, date, source, image_url, image_type')
+    
+    // Create a map of existing events by ID for quick lookup
+    const existingEventsMap = new Map<string, any>()
+    if (existingEventsWithImages) {
+      existingEventsWithImages.forEach(event => {
+        existingEventsMap.set(event.id, event)
+      })
+    }
+    
+    if (existingEventsWithImages && existingEventsWithImages.length > 0) {
       const duplicateIds: string[] = []
       
       for (const newEvent of filteredEvents) {
-        for (const existing of existingEvents) {
+        for (const existing of existingEventsWithImages) {
           // Check for duplicates across different sources (allowCrossSource: true)
           // Only flag as duplicate if sources are different (cross-source duplicate)
           if (isDuplicateEvent(newEvent, existing, { allowCrossSource: true }) && newEvent.source !== existing.source) {
@@ -463,12 +477,27 @@ const scheduledHandler: Handler = async (event, context) => {
       }
     }
     
+    // CRITICAL: Preserve images when inserting events
+    // If an event with the same ID already exists, preserve its image_url and image_type
+    const eventsWithPreservedImages = filteredEvents.map(newEvent => {
+      const existing = existingEventsMap.get(newEvent.id)
+      if (existing && existing.image_url) {
+        // Preserve existing image data
+        return {
+          ...newEvent,
+          image_url: existing.image_url,
+          image_type: existing.image_type
+        }
+      }
+      return newEvent
+    })
+    
     // Insert new events in batches
     const batchSize = 100
     let insertedCount = 0
     
-    for (let i = 0; i < filteredEvents.length; i += batchSize) {
-      const batch = filteredEvents.slice(i, i + batchSize)
+    for (let i = 0; i < eventsWithPreservedImages.length; i += batchSize) {
+      const batch = eventsWithPreservedImages.slice(i, i + batchSize)
       
       const { error: insertError } = await supabase
         .from('calendar_events')

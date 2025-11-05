@@ -465,8 +465,26 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
-    // Clear existing iCalendar events (those from external sources)
+    // CRITICAL: Preserve image_url and image_type before deleting events
+    // Fetch existing events with images before deleting
     const icalSources = enabledFeeds.map(feed => feed.source)
+    const { data: existingEventsWithImages } = await supabase
+      .from('calendar_events')
+      .select('id, image_url, image_type')
+      .in('source', icalSources)
+    
+    // Create a map of existing events by ID for quick lookup
+    const existingImagesMap = new Map<string, { image_url: string | null, image_type: string | null }>()
+    if (existingEventsWithImages) {
+      existingEventsWithImages.forEach(event => {
+        existingImagesMap.set(event.id, {
+          image_url: event.image_url,
+          image_type: event.image_type
+        })
+      })
+    }
+    
+    // Clear existing iCalendar events (those from external sources)
     const { error: deleteError } = await supabase
       .from('calendar_events')
       .delete()
@@ -524,10 +542,25 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
+    // CRITICAL: Preserve images when inserting events
+    // If an event with the same ID already existed, preserve its image_url and image_type
+    const eventsWithPreservedImages = filteredEvents.map(newEvent => {
+      const existing = existingImagesMap.get(newEvent.id)
+      if (existing && existing.image_url) {
+        // Preserve existing image data
+        return {
+          ...newEvent,
+          image_url: existing.image_url,
+          image_type: existing.image_type
+        }
+      }
+      return newEvent
+    })
+    
     // Insert new events
     const { error: insertError } = await supabase
       .from('calendar_events')
-      .insert(filteredEvents)
+      .insert(eventsWithPreservedImages)
     
     if (insertError) {
       console.error('Error inserting new events:', insertError)

@@ -505,6 +505,19 @@ export async function deleteEvent(eventId: string): Promise<{ success: boolean; 
 
 export async function updateEvent(eventId: string, event: Partial<CalendarEvent>): Promise<{ success: boolean; error?: string }> {
   try {
+    // CRITICAL: Preserve image_url and image_type when updating events
+    // First, fetch the existing event to preserve its image data
+    const { data: existingEvent, error: fetchError } = await supabase
+      .from('calendar_events')
+      .select('image_url, image_type')
+      .eq('id', eventId)
+      .single()
+
+    if (fetchError) {
+      console.error('[Account] Failed to fetch existing event for image preservation:', fetchError)
+      // Continue anyway - better to lose image than fail update
+    }
+
     const result = await update(
       'calendar_events',
       {
@@ -515,6 +528,9 @@ export async function updateEvent(eventId: string, event: Partial<CalendarEvent>
         location: event.location,
         address: event.address,
         category: event.category,
+        // CRITICAL: Preserve existing image_url and image_type
+        image_url: existingEvent?.image_url || event.image_url || null,
+        image_type: existingEvent?.image_type || event.image_type || null
       },
       { id: eventId },
       { logPrefix: '[Account]' }

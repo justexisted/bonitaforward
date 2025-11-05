@@ -335,6 +335,19 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
           : new Date(isoDate).toISOString()
       }
 
+      // CRITICAL: Preserve image_url and image_type when updating events
+      // First, fetch the existing event to preserve its image data
+      const { data: existingEvent, error: fetchError } = await supabase
+        .from('calendar_events')
+        .select('image_url, image_type')
+        .eq('id', eventEdit.id)
+        .single()
+
+      if (fetchError) {
+        onError(`Failed to fetch existing event: ${fetchError.message}`)
+        return
+      }
+
       const { error } = await supabase
         .from('calendar_events')
         .update({
@@ -344,7 +357,10 @@ export const CalendarEventsSection: React.FC<CalendarEventsSectionProps> = ({ on
           time: eventEdit.time || '',
           location: eventEdit.location || '',
           address: eventEdit.address || '',
-          category: eventEdit.category || 'Community'
+          category: eventEdit.category || 'Community',
+          // CRITICAL: Preserve existing image_url and image_type
+          image_url: existingEvent?.image_url || null,
+          image_type: existingEvent?.image_type || null
         })
         .eq('id', eventEdit.id)
 

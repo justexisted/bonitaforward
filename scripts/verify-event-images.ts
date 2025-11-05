@@ -1,38 +1,46 @@
 /**
- * Verify Event Images Script
+ * Verify Event Images Are Actually Stored in Supabase Storage
  * 
- * This script queries the database to verify that events have actual image URLs
- * instead of gradient strings. Use this to verify claims about image population.
+ * This script checks the actual state of the database to prove:
+ * 1. Images are stored in Supabase Storage (not Unsplash URLs)
+ * 2. No gradient strings are saved
+ * 3. Images exist in the storage bucket
  * 
  * Usage:
  *   npx tsx scripts/verify-event-images.ts
  */
 
-import { config } from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { config } from 'dotenv'
+import { existsSync } from 'fs'
+import { resolve } from 'path'
 
-// Load environment variables
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+// Load environment variables from BOTH .env and .env.local
+const envPath = resolve(process.cwd(), '.env')
+const envLocalPath = resolve(process.cwd(), '.env.local')
 
-// Load .env and .env.local (local overrides)
-config({ path: path.join(__dirname, '..', '.env') })
-config({ path: path.join(__dirname, '..', '.env.local'), override: true })
+if (existsSync(envPath)) {
+  config({ path: envPath })
+}
+if (existsSync(envLocalPath)) {
+  config({ path: envLocalPath, override: true })
+}
 
-const SUPABASE_URL = process.env.SUPABASE_URL
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('❌ Missing required environment variables:')
-  console.error('   SUPABASE_URL:', SUPABASE_URL ? '✅' : '❌')
-  console.error('   SUPABASE_SERVICE_ROLE_KEY:', SUPABASE_SERVICE_ROLE_KEY ? '✅' : '❌')
+if (!existsSync(envPath) && !existsSync(envLocalPath)) {
+  console.error('❌ No .env or .env.local file found')
   process.exit(1)
 }
 
-// Create Supabase client with service role key (bypasses RLS)
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error('❌ Missing Supabase credentials in .env file')
+  console.error('Please add VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to your .env file')
+  process.exit(1)
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -43,76 +51,117 @@ async function verifyEventImages() {
   console.log('🔍 Verifying event images in database...\n')
 
   try {
-    // Get all events with image_url
+    // Fetch all events
     const { data: events, error } = await supabase
       .from('calendar_events')
       .select('id, title, image_url, image_type')
-      .not('image_url', 'is', null)
       .order('created_at', { ascending: false })
 
     if (error) {
-      throw new Error(`Failed to fetch events: ${error.message}`)
+      console.error('❌ Error fetching events:', error)
+      throw error
     }
 
     if (!events || events.length === 0) {
-      console.log('❌ No events with image_url found in database')
+      console.log('⚠️  No events found')
       return
     }
 
-    console.log(`📊 Total events with image_url: ${events.length}\n`)
+    console.log(`📊 Total events: ${events.length}\n`)
 
-    // Categorize events
-    const eventsWithUrls = events.filter(e => e.image_url?.startsWith('http'))
-    const eventsWithGradients = events.filter(e => e.image_url?.startsWith('linear-gradient'))
-    const eventsWithOther = events.filter(e => 
-      e.image_url && 
-      !e.image_url.startsWith('http') && 
-      !e.image_url.startsWith('linear-gradient')
+    // Categorize events by image type
+    const withSupabaseStorage = events.filter(e => 
+      e.image_url && e.image_url.includes('supabase.co/storage')
+    )
+    const withUnsplashUrl = events.filter(e => 
+      e.image_url && e.image_url.includes('images.unsplash.com')
+    )
+    const withGradientString = events.filter(e => 
+      e.image_url && e.image_url.startsWith('linear-gradient')
+    )
+    const withoutImage = events.filter(e => 
+      !e.image_url || (!e.image_url.includes('supabase.co/storage') && !e.image_url.includes('images.unsplash.com') && !e.image_url.startsWith('linear-gradient'))
     )
 
-    const eventsWithImageType = events.filter(e => e.image_type === 'image')
-    const eventsWithGradientType = events.filter(e => e.image_type === 'gradient')
-
-    console.log('📈 BREAKDOWN BY URL TYPE:')
-    console.log(`   ✅ Events with HTTP URLs (actual images): ${eventsWithUrls.length}`)
-    console.log(`   🎨 Events with gradient strings: ${eventsWithGradients.length}`)
-    console.log(`   ❓ Events with other URL types: ${eventsWithOther.length}`)
-    console.log('')
-
-    console.log('📈 BREAKDOWN BY image_type FIELD:')
-    console.log(`   ✅ Events with image_type='image': ${eventsWithImageType.length}`)
-    console.log(`   🎨 Events with image_type='gradient': ${eventsWithGradientType.length}`)
-    console.log(`   ❓ Events with null/other image_type: ${events.length - eventsWithImageType.length - eventsWithGradientType.length}`)
-    console.log('')
+    console.log('📈 IMAGE STATISTICS:')
+    console.log(`   ✅ Supabase Storage URLs: ${withSupabaseStorage.length}`)
+    console.log(`   ❌ Unsplash URLs: ${withUnsplashUrl.length}`)
+    console.log(`   ⚠️  Gradient strings: ${withGradientString.length}`)
+    console.log(`   ❌ No image: ${withoutImage.length}\n`)
 
     // Show sample events
-    console.log('📋 SAMPLE EVENTS (first 10):')
-    console.log('─'.repeat(80))
-    events.slice(0, 10).forEach((event, i) => {
-      const urlType = event.image_url?.startsWith('http') ? 'URL' : 
-                     event.image_url?.startsWith('linear-gradient') ? 'GRADIENT' : 'OTHER'
-      const urlPreview = event.image_url ? event.image_url.substring(0, 60) + '...' : 'null'
-      console.log(`${i + 1}. ${event.title?.substring(0, 40) || 'Untitled'}`)
-      console.log(`   URL Type: ${urlType}`)
-      console.log(`   image_type: ${event.image_type || 'null'}`)
-      console.log(`   image_url: ${urlPreview}`)
-      console.log('')
+    console.log('📋 SAMPLE EVENTS WITH SUPABASE STORAGE:')
+    withSupabaseStorage.slice(0, 5).forEach((event, i) => {
+      console.log(`   ${i + 1}. "${event.title?.substring(0, 50)}"`)
+      console.log(`      URL: ${event.image_url?.substring(0, 80)}...`)
+      console.log(`      Type: ${event.image_type || 'null'}\n`)
     })
 
-    // Verification result
-    console.log('─'.repeat(80))
-    console.log('✅ VERIFICATION RESULT:')
-    
-    if (eventsWithGradients.length > 0) {
-      console.log(`❌ FAILED: ${eventsWithGradients.length} events still have gradient strings instead of image URLs`)
-      console.log('   These events need to be populated with actual images')
-    } else if (eventsWithUrls.length === 0) {
-      console.log('❌ FAILED: No events have HTTP URLs (actual images)')
-      console.log('   All events may need to be populated with images')
-    } else {
-      console.log(`✅ PASSED: ${eventsWithUrls.length} events have actual image URLs`)
-      console.log(`   All events with image_url have HTTP URLs (actual images)`)
+    if (withUnsplashUrl.length > 0) {
+      console.log('❌ EVENTS WITH UNSPLASH URLS (SHOULD BE CONVERTED):')
+      withUnsplashUrl.slice(0, 5).forEach((event, i) => {
+        console.log(`   ${i + 1}. "${event.title?.substring(0, 50)}"`)
+        console.log(`      URL: ${event.image_url?.substring(0, 80)}...`)
+        console.log(`      Type: ${event.image_type || 'null'}\n`)
+      })
     }
+
+    if (withGradientString.length > 0) {
+      console.log('⚠️  EVENTS WITH GRADIENT STRINGS (SHOULD BE REPLACED):')
+      withGradientString.slice(0, 5).forEach((event, i) => {
+        console.log(`   ${i + 1}. "${event.title?.substring(0, 50)}"`)
+        console.log(`      URL: ${event.image_url?.substring(0, 80)}...`)
+        console.log(`      Type: ${event.image_type || 'null'}\n`)
+      })
+    }
+
+    // Check storage bucket
+    console.log('📦 CHECKING STORAGE BUCKET...\n')
+    const { data: files, error: listError } = await supabase.storage
+      .from('event-images')
+      .list('event-images', {
+        limit: 100,
+        sortBy: { column: 'created_at', order: 'desc' }
+      })
+
+    if (listError) {
+      console.error('❌ Error listing storage bucket:', listError)
+      console.error('   Bucket might not exist or is not accessible')
+    } else {
+      console.log(`✅ Storage bucket "event-images" exists`)
+      console.log(`   Files in bucket: ${files?.length || 0}`)
+      if (files && files.length > 0) {
+        console.log(`\n📁 Sample files:`)
+        files.slice(0, 5).forEach((file, i) => {
+          console.log(`   ${i + 1}. ${file.name}`)
+          console.log(`      Size: ${(file.metadata?.size || 0) / 1024} KB`)
+          console.log(`      Created: ${file.created_at}\n`)
+        })
+      }
+    }
+
+    // Final verdict
+    console.log('\n' + '='.repeat(60))
+    console.log('📊 FINAL VERDICT:')
+    console.log('='.repeat(60))
+    
+    if (withSupabaseStorage.length === events.length) {
+      console.log('✅ SUCCESS: All events have Supabase Storage URLs!')
+    } else if (withSupabaseStorage.length > 0) {
+      console.log(`⚠️  PARTIAL: ${withSupabaseStorage.length}/${events.length} events have Supabase Storage URLs`)
+      if (withUnsplashUrl.length > 0) {
+        console.log(`   ❌ ${withUnsplashUrl.length} events still have Unsplash URLs - run populate script`)
+      }
+      if (withGradientString.length > 0) {
+        console.log(`   ⚠️  ${withGradientString.length} events have gradient strings - run populate script`)
+      }
+    } else {
+      console.log('❌ FAILURE: No events have Supabase Storage URLs!')
+      console.log('   Run: npx tsx scripts/create-event-images-bucket.ts')
+      console.log('   Then: npx tsx scripts/populate-event-images.ts')
+    }
+    
+    console.log('='.repeat(60) + '\n')
 
   } catch (error: any) {
     console.error('\n❌ Fatal error:', error.message)
@@ -120,13 +169,16 @@ async function verifyEventImages() {
   }
 }
 
-// Run verification
+// Run the script
 verifyEventImages()
   .then(() => {
-    console.log('\n✨ Verification complete!')
-    process.exit(0)
+    setTimeout(() => {
+      process.exit(0)
+    }, 100)
   })
   .catch((error) => {
-    console.error('\n❌ Verification failed:', error)
-    process.exit(1)
+    console.error('\n❌ Script failed:', error)
+    setTimeout(() => {
+      process.exit(1)
+    }, 100)
   })

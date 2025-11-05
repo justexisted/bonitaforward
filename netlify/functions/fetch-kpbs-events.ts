@@ -551,7 +551,25 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
-    // Step 7: Delete existing KPBS events from database
+    // CRITICAL: Preserve image_url and image_type before deleting events
+    // Step 7a: Fetch existing events with images before deleting
+    const { data: existingEventsWithImages } = await supabase
+      .from('calendar_events')
+      .select('id, image_url, image_type')
+      .eq('source', SOURCE_NAME)
+    
+    // Create a map of existing events by ID for quick lookup
+    const existingImagesMap = new Map<string, { image_url: string | null, image_type: string | null }>()
+    if (existingEventsWithImages) {
+      existingEventsWithImages.forEach(event => {
+        existingImagesMap.set(event.id, {
+          image_url: event.image_url,
+          image_type: event.image_type
+        })
+      })
+    }
+    
+    // Step 7b: Delete existing KPBS events from database
     const { error: deleteError } = await supabase
       .from('calendar_events')
       .delete()
@@ -564,12 +582,27 @@ export const handler: Handler = async (event, context) => {
     
     console.log(`Deleted old ${SOURCE_NAME} events`)
     
+    // CRITICAL: Preserve images when inserting events
+    // If an event with the same ID already existed, preserve its image_url and image_type
+    const eventsWithPreservedImages = filteredEvents.map(newEvent => {
+      const existing = existingImagesMap.get(newEvent.id)
+      if (existing && existing.image_url) {
+        // Preserve existing image data
+        return {
+          ...newEvent,
+          image_url: existing.image_url,
+          image_type: existing.image_type
+        }
+      }
+      return newEvent
+    })
+    
     // Step 8: Insert new events in batches
     const batchSize = 100
     let insertedCount = 0
     
-    for (let i = 0; i < filteredEvents.length; i += batchSize) {
-      const batch = filteredEvents.slice(i, i + batchSize)
+    for (let i = 0; i < eventsWithPreservedImages.length; i += batchSize) {
+      const batch = eventsWithPreservedImages.slice(i, i + batchSize)
       
       const { error: insertError } = await supabase
         .from('calendar_events')

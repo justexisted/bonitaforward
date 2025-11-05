@@ -517,18 +517,18 @@ export default function CalendarPage() {
           const tempEventId = `temp-${Date.now()}`
           const supabaseStorageUrl = await downloadAndStoreImage(unsplashImageUrl, tempEventId)
           
-          if (supabaseStorageUrl) {
+          if (supabaseStorageUrl && supabaseStorageUrl.includes('supabase.co/storage')) {
             // Use Supabase Storage URL (your own database)
             headerImage = { type: 'image', value: supabaseStorageUrl }
             console.log('[CreateEvent] ✅ Image stored in Supabase Storage:', supabaseStorageUrl.substring(0, 60) + '...')
           } else {
-            // Storage failed - check if bucket exists
+            // CRITICAL: Storage failed - NEVER save Unsplash URLs, use gradient instead
             console.error('[CreateEvent] ❌ FAILED to store in Supabase Storage')
             console.error('[CreateEvent] ❌ Check browser console for storage bucket error')
             console.error('[CreateEvent] ❌ Make sure "event-images" bucket exists in Supabase Dashboard → Storage')
-            console.error('[CreateEvent] ⚠️ Falling back to Unsplash URL (image will be served from Unsplash, not your storage)')
-            // Fall back to Unsplash URL (temporary - will be replaced once bucket is created)
-            headerImage = { type: 'image', value: unsplashImageUrl }
+            console.error('[CreateEvent] ⚠️ Using gradient fallback (NOT saving Unsplash URL)')
+            // NEVER fall back to Unsplash URL - use gradient instead
+            headerImage = { type: 'gradient', value: getEventGradient(tempEvent as CalendarEvent) }
           }
         } else {
           // Unsplash failed, use gradient
