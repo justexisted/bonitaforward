@@ -36,6 +36,9 @@ export type AdminSection =
 
 /**
  * Admin status for verification
+ * NOTE: AdminStatus is defined in src/hooks/useAdminVerification.ts
+ * This export is kept for backward compatibility but should be imported from the hook
+ * @deprecated Use AdminStatus from useAdminVerification.ts instead
  */
 export type AdminStatus = {
   isAdmin: boolean

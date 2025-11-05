@@ -35,11 +35,6 @@ export function EventCard({ event, onClick, savedEventIds, onToggleSave, isAuthe
   // Uses helper function that handles legacy events with image_url but null image_type
   const headerImage = getEventHeaderImageFromDb(event)
   
-  // DIAGNOSTIC: Log image data for debugging
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[EventCard] Event "${event.title?.substring(0, 30)}" - image_url: ${event.image_url ? event.image_url.substring(0, 60) + '...' : 'null'}, image_type: ${event.image_type || 'null'}, headerImage type: ${headerImage.type}, isImage: ${headerImage.type === 'image'}`)
-  }
-  
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       weekday: 'short',

@@ -9,11 +9,15 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "check:breaking": "tsx scripts/check-breaking-changes.ts",
-    "precommit": "npm run check:breaking && npm run lint",
+    "verify:migration": "tsx scripts/verify-query-migration.ts",
+    "verify:format": "tsx scripts/verify-query-format-compatibility.ts",
+    "verify:all": "npm run verify:migration && npm run verify:format && npm run check:breaking && npm run lint",
+    "precommit": "npm run verify:all",
     "seed:providers": "tsx scripts/seed-providers.ts",
     "seed:realty": "tsx scripts/seed-realty-report.ts",
     "seed:calendar": "tsx scripts/seed-calendar-events.ts",
     "migrate:images": "tsx scripts/migrate-google-images.ts",
+    "cleanup:gradient-strings": "tsx scripts/cleanup-gradient-strings.ts",
     "populate:event-images": "tsx scripts/populate-event-images.ts"
   },
   "dependencies": {

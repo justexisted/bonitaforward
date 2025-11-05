@@ -251,6 +251,20 @@ export default function OnboardingPage() {
           console.error('[Onboarding] Failed to update profile:', result.error)
           // Don't fail the flow, but log error for debugging
         } else {
+          // CRITICAL FIX: Refresh auth session to update auth state immediately
+          // This triggers TOKEN_REFRESHED event in AuthContext, which fetches fresh profile
+          // This ensures the name appears immediately after signup
+          try {
+            const { error: refreshError } = await supabase.auth.refreshSession()
+            if (refreshError) {
+              console.warn('[Onboarding] Failed to refresh session:', refreshError)
+              // Don't fail the flow, but log warning
+            }
+          } catch (err) {
+            console.warn('[Onboarding] Exception refreshing session:', err)
+            // Don't fail the flow if refresh fails
+          }
+
           // If email preferences were set during signup, also set email_consent_date
           // This tracks when user consented to receive emails
           if (emailPreferences.email_notifications_enabled === true || emailPreferences.marketing_emails_enabled === true) {

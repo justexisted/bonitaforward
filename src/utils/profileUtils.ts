@@ -77,7 +77,7 @@
  * See: docs/prevention/DATA_INTEGRITY_PREVENTION.md
  */
 
-import { supabase } from '../lib/supabase'
+import { query } from '../lib/supabaseQuery'
 
 /**
  * Complete profile data structure
@@ -235,8 +235,8 @@ export async function updateUserProfile(
     }
     
     // Check if profile exists
-    const { data: existing } = await supabase
-      .from('profiles')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    const { data: existing } = await query('profiles', { logPrefix: `[Profile Update from ${source}]` })
       .select('id')
       .eq('id', userId)
       .maybeSingle()
@@ -248,8 +248,8 @@ export async function updateUserProfile(
       // Profile exists - use UPDATE
       // CRITICAL: profiles.role is IMMUTABLE once set - we cannot update it
       // Check existing profile to see if role is already set, and exclude it from update if so
-      const { data: existingProfile } = await supabase
-        .from('profiles')
+      // Uses centralized query utility with automatic retry logic and standardized error handling
+      const { data: existingProfile } = await query('profiles', { logPrefix: `[Profile Update from ${source}]` })
         .select('role, name, email_notifications_enabled, marketing_emails_enabled')
         .eq('id', userId)
         .maybeSingle()
@@ -292,26 +292,26 @@ export async function updateUserProfile(
         delete updatePayload.marketing_emails_enabled
       }
       
-      const { error } = await supabase
-        .from('profiles')
+      // Uses centralized query utility with automatic retry logic and standardized error handling
+      const { error } = await query('profiles', { logPrefix: `[Profile Update from ${source}]` })
         .update(updatePayload)
         .eq('id', userId)
       
       if (error) {
-        console.error(`[Profile Update from ${source}] Error:`, error)
+        // Error already logged by query utility with standardized format
         console.error(`[Profile Update from ${source}] Payload:`, updatePayload)
-        return { success: false, error: error.message }
+        return { success: false, error: error.message || error.code || 'Update failed' }
       }
     } else {
       // Profile doesn't exist - use INSERT
-      const { error } = await supabase
-        .from('profiles')
+      // Uses centralized query utility with automatic retry logic and standardized error handling
+      const { error } = await query('profiles', { logPrefix: `[Profile Update from ${source}]` })
         .insert({ id: userId, ...payload })
       
       if (error) {
-        console.error(`[Profile Update from ${source}] Error:`, error)
+        // Error already logged by query utility with standardized format
         console.error(`[Profile Update from ${source}] Payload:`, payload)
-        return { success: false, error: error.message }
+        return { success: false, error: error.message || error.code || 'Insert failed' }
       }
     }
     

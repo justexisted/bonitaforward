@@ -15,7 +15,7 @@
  * - formatAdminDate: Format dates for admin panel display
  */
 
-import type { ProviderRow } from '../types/admin'
+import type { ProviderRow, ProfileRow } from '../types/admin'
 
 // Type definitions
 type FunnelRow = {
@@ -47,13 +47,6 @@ type BookingEvent = {
   booking_notes: string | null
   status: string | null
   created_at: string
-}
-
-type ProfileRow = {
-  id: string
-  email: string | null
-  name: string | null
-  role?: string | null
 }
 
 /**

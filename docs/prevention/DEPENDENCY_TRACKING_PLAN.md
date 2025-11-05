@@ -834,6 +834,53 @@ See: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
 
 ---
 
+### Event Images: Gradient Strings Saved to Database (2025-11-05)
+
+**Issue:** Populate scripts were saving CSS gradient strings to `image_url` column when images couldn't be fetched. Gradient strings should NEVER be stored in the database - they should be computed dynamically on the frontend when `image_url` is `null`.
+
+**Files:**
+- `netlify/functions/populate-event-images.ts` (scheduled function - fixed to never save gradient strings)
+- `scripts/populate-event-images.ts` (local script - fixed to never save gradient strings)
+- `scripts/cleanup-gradient-strings.ts` (cleanup script to remove existing gradient strings)
+- `scripts/cleanup-gradient-strings.sql` (SQL cleanup script)
+
+**Fixes:**
+- Updated all populate scripts to set `image_url: null` instead of saving gradient strings when images can't be fetched
+- Frontend already computes gradients when `image_url` is `null` - no need to save gradients to database
+- Created cleanup scripts to remove existing gradient strings from database
+- All external feed processors preserve existing `image_url` and `image_type` when re-fetching events
+
+**Dependencies:**
+- Populate scripts only process events with `null` image_url (skip events that already have images)
+- External feed processors (iCalendar/RSS/KPBS/VoSD) preserve existing `image_url` and `image_type` when re-fetching
+- Frontend computes gradients dynamically when `image_url` is `null` - no need to save gradients to database
+- `getEventHeaderImageFromDb()` helper ignores gradient strings in database (treats them as `null`)
+
+**Breaking-Change Awareness:**
+- If you restore code that saves gradient strings to `image_url` → Frontend will ignore them (wastes database space)
+- If you remove null-check logic in populate scripts → Scripts might try to re-populate events that already have images
+- If you remove image preservation logic in feed processors → Events will lose their images when re-fetched
+- If you change populate script logic to save gradients → Violates the "never save gradients" rule
+
+**Prevention:** Documented in `CASCADING_FAILURES.md` (#23). NEVER save gradient strings to `image_url` column - always use `null` when images can't be fetched. Frontend computes gradients dynamically when `image_url` is `null`.
+
+**Image Preservation Guarantees:**
+- ✅ **External feed processors preserve images**: All iCalendar/RSS/KPBS/VoSD sync functions preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ **Populate scripts only process missing images**: Scripts only populate events with `null` image_url (skip events that already have images)
+- ✅ **No automatic overwrites**: No automated process will overwrite existing images - they are preserved during re-fetches
+- ✅ **One-time population**: After images are populated, they will NOT be overwritten by automated processes
+- ✅ **Never save gradients**: All populate scripts set `image_url` to `null` when images can't be fetched (never save gradient strings)
+
+**Testing Verified (2025-11-05):**
+- ✅ Populate scripts set `image_url` to `null` when images can't be fetched (not gradient strings)
+- ✅ Frontend computes gradients when `image_url` is `null` (works correctly)
+- ✅ External feed processors preserve existing images when re-fetching events
+- ✅ Populate scripts skip events that already have images (only process `null` image_url)
+- ✅ Cleanup script removes existing gradient strings from database
+- ✅ All 33 events successfully populated with Supabase Storage URLs (not gradient strings)
+
+---
+
 ### Event Images Not Showing Due to Null image_type (2025-01-XX)
 
 **Issue:** Events with database `image_url` but null `image_type` were showing gradient fallbacks instead of their stored images, even though they had valid image URLs in the database.

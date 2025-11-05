@@ -417,7 +417,8 @@ async function populateEventImages() {
             throw new Error('Cannot save Unsplash URL - must store in Supabase Storage')
           }
         } else {
-          console.log(`   ✅ Saved gradient fallback\n`)
+          // CRITICAL: We set image_url to null (not a gradient string) - frontend will compute gradient
+          console.log(`   ✅ Set image_url to null (frontend will compute gradient)\n`)
         }
         successCount++
 

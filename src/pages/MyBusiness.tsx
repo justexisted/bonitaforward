@@ -78,6 +78,7 @@ import './MyBusiness/mobile-optimizations.css'
 // Import extracted components
 import { BusinessListingForm, JobPostForm, FeaturedUpgradeCard, PlanSelectionSection, ApplicationCard, ApplicationsEmptyState, ChangeRequestsNotifications, ChangeRequestsList, ListingsTab, HistoricalRequestsTab, JobPostsTab, SidebarNav, AnalyticsTab } from './MyBusiness/components'
 import { AdminErrorBoundary } from '../components/admin/AdminErrorBoundary'
+import EmailVerificationPrompt from '../components/EmailVerificationPrompt'
 // import { PlanSelector } from './MyBusiness/components/PlanSelector' // Available but not used yet
 // import { useBusinessData, useImageUpload } from './MyBusiness/hooks' // Available but not integrated yet
 // import { BUSINESS_CATEGORIES } from './MyBusiness/utils' // Available but not used yet
@@ -778,6 +779,11 @@ export default function MyBusinessPage() {
             <p className="text-blue-800 text-sm">{message}</p>
           </div>
         )}
+
+        {/* Email Verification Prompt */}
+        <div className="mb-6">
+          <EmailVerificationPrompt />
+        </div>
 
         {/* Featured Upgrade Confirmation - Inline Card */}
         {showFeaturedUpgradeModal && (

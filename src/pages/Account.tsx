@@ -217,10 +217,7 @@ export default function AccountPage() {
         throw new Error('Not authenticated. Please log in and try again.')
       }
 
-      console.log('[Account] Deleting account with deleteBusinesses:', shouldDeleteBusinesses)
-      if (shouldDeleteBusinesses) {
-        console.log('[Account] Will DELETE businesses:', data.myBusinesses.filter(b => selectedBusinessesToDelete.has(b.id)).map(b => b.name))
-      }
+      // Account deletion in progress - no console spam
 
       // Call Netlify function to delete user
       const response = await fetch('/.netlify/functions/user-delete', {
@@ -256,11 +253,7 @@ export default function AccountPage() {
 
       // Check for success (should have success: true or ok: true)
       if (result.success === true || result.ok === true) {
-        // Log deletion counts for debugging
-        console.log('[Account] Account deletion successful. Deleted counts:', result.deletedCounts)
-        if (shouldDeleteBusinesses && result.deletedCounts?.providers !== undefined) {
-          console.log('[Account] Businesses deleted:', result.deletedCounts.providers)
-        }
+        // Account deletion successful - no console spam
         
         // Success - sign out and redirect
         setMessage('Account deleted successfully. Signing out...')
@@ -331,15 +324,7 @@ export default function AccountPage() {
       const hasBusinesses = data.myBusinesses.length > 0
       const hasApplications = data.pendingApps.length > 0
       
-      // Debug logging to help diagnose visibility issues
-      if (!hasBusinesses && !hasApplications && auth.role === 'business') {
-        console.log('[Account] Business account but no data:', {
-          myBusinesses: data.myBusinesses,
-          pendingApps: data.pendingApps,
-          userId: auth.userId,
-          email: auth.email
-        })
-      }
+      // Visibility check complete - no console spam
       
       // Ensure business users can always access Business sections
       return hasBusinesses || hasApplications || auth.role === 'business'

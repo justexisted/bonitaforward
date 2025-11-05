@@ -748,16 +748,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // console.log('[Auth] TOKEN_REFRESHED event, session exists:', !!session)
         // Only update if we have a valid session
         if (session?.user?.email) {
-          // Fetch custom email verification status from profiles table
-          if (session.user.id) {
-            const profileData = await fetchUserProfile(session.user.id)
-            const emailConfirmed = profileData.emailConfirmed ?? false
-            if (mounted) {
-              setEmailVerified(emailConfirmed)
-            }
+          const email = session.user.email
+          const userId = session.user.id
+          
+          // CRITICAL FIX: Fetch fresh profile data from database and use it
+          // This ensures the name appears immediately after profile updates
+          let name: string | undefined
+          let role: 'business' | 'community' | undefined
+          let emailConfirmed = false
+          
+          if (userId) {
+            const profileData = await fetchUserProfile(userId)
+            name = profileData.name
+            role = profileData.role
+            emailConfirmed = profileData.emailConfirmed ?? false
           }
-          // console.log('[Auth] Token refreshed with valid session, maintaining profile, verified:', verified)
-          const newProfile = profile ? { ...profile } : null
+          
+          if (mounted) {
+            setEmailVerified(emailConfirmed)
+          }
+          
+          // CRITICAL FIX: Use fresh profile data instead of copying old profile
+          // This ensures the name appears immediately after signup/profile updates
+          const newProfile = { name, email, userId, role }
           setProfile(newProfile)
           profileRef.current = newProfile
         } else {
@@ -820,11 +833,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // console.log('[Auth] Cleared custom app data, leaving Supabase session management intact')
 
       // Then call Supabase signOut
-      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      // CRITICAL FIX: Remove scope='global' to avoid 403 errors
+      // The global scope requires special permissions that may not be available
+      const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error('Sign out error:', error)
-      } else {
-        // console.log('Sign out successful')
+        // Silently handle logout errors - user is already signed out locally
+        // Don't spam console or break the flow
       }
 
       // Force page reload to ensure clean state

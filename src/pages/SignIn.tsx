@@ -272,6 +272,67 @@ export default function SignInPage() {
           console.log('[SignIn] Starting sign-up process for:', email)
           console.log('[SignIn] Account type selected:', accountType)
           console.log('[SignIn] Password length:', password.length)
+          console.log('[SignIn] Name provided:', name || 'EMPTY')
+
+          // CRITICAL FIX: Set localStorage BEFORE calling signUpWithEmail
+          // This ensures the name is available when SIGNED_IN event fires
+          // SIGNED_IN event can fire immediately after signup, before this code runs
+          try {
+            localStorage.removeItem('bf-signup-prefill')
+            
+            // Handle Bonita resident verification
+            let verificationData: {
+              is_bonita_resident?: boolean
+              resident_verification_method?: VerificationMethod
+              resident_zip_code?: string | null
+              resident_verified_at?: string | null
+            } = {}
+
+            if (isBonitaResident) {
+              if (zipCode.trim()) {
+                const zipResult = verifyByZipCode(zipCode)
+                if (zipResult.isBonitaResident) {
+                  verificationData = {
+                    is_bonita_resident: true,
+                    resident_verification_method: 'zip-verified',
+                    resident_zip_code: zipResult.zipCode,
+                    resident_verified_at: zipResult.verifiedAt || new Date().toISOString()
+                  }
+                } else {
+                  const selfResult = verifyBySelfDeclaration(zipCode)
+                  verificationData = {
+                    is_bonita_resident: true,
+                    resident_verification_method: 'self-declared',
+                    resident_zip_code: selfResult.zipCode,
+                    resident_verified_at: selfResult.verifiedAt || new Date().toISOString()
+                  }
+                }
+              } else {
+                const selfResult = verifyBySelfDeclaration()
+                verificationData = {
+                  is_bonita_resident: true,
+                  resident_verification_method: 'self-declared',
+                  resident_zip_code: null,
+                  resident_verified_at: selfResult.verifiedAt || new Date().toISOString()
+                }
+              }
+            }
+            
+            // CRITICAL: Set localStorage BEFORE signup to ensure name is available when SIGNED_IN fires
+            localStorage.setItem('bf-pending-profile', JSON.stringify({
+              name,
+              email,
+              role: accountType,
+              ...verificationData,
+              // Email preferences from signup form
+              email_notifications_enabled: emailNotificationsEnabled,
+              marketing_emails_enabled: marketingEmailsEnabled
+            }))
+            console.log('[SignIn] ✓ Set localStorage BEFORE signup with name:', name || 'EMPTY')
+          } catch (localStorageError) {
+            console.warn('[SignIn] Failed to set localStorage before signup:', localStorageError)
+            // Continue anyway - we'll try to set it after signup
+          }
 
           const signupResult = await auth.signUpWithEmail(email, password, name, accountType || undefined)
           const { error, session, user } = signupResult
@@ -294,56 +355,22 @@ export default function SignInPage() {
              */
             console.log('[SignIn] Sign-up successful!')
             
+            // localStorage was already set above, but ensure it's still there
             try {
-              localStorage.removeItem('bf-signup-prefill')
-              
-              // Handle Bonita resident verification
-              let verificationData: {
-                is_bonita_resident?: boolean
-                resident_verification_method?: VerificationMethod
-                resident_zip_code?: string | null
-                resident_verified_at?: string | null
-              } = {}
-
-              if (isBonitaResident) {
-                if (zipCode.trim()) {
-                  const zipResult = verifyByZipCode(zipCode)
-                  if (zipResult.isBonitaResident) {
-                    verificationData = {
-                      is_bonita_resident: true,
-                      resident_verification_method: 'zip-verified',
-                      resident_zip_code: zipResult.zipCode,
-                      resident_verified_at: zipResult.verifiedAt || new Date().toISOString()
-                    }
-                  } else {
-                    const selfResult = verifyBySelfDeclaration(zipCode)
-                    verificationData = {
-                      is_bonita_resident: true,
-                      resident_verification_method: 'self-declared',
-                      resident_zip_code: selfResult.zipCode,
-                      resident_verified_at: selfResult.verifiedAt || new Date().toISOString()
-                    }
-                  }
-                } else {
-                  const selfResult = verifyBySelfDeclaration()
-                  verificationData = {
-                    is_bonita_resident: true,
-                    resident_verification_method: 'self-declared',
-                    resident_zip_code: null,
-                    resident_verified_at: selfResult.verifiedAt || new Date().toISOString()
-                  }
-                }
+              const stored = localStorage.getItem('bf-pending-profile')
+              if (!stored) {
+                // If localStorage was cleared somehow, set it again
+                localStorage.setItem('bf-pending-profile', JSON.stringify({
+                  name,
+                  email,
+                  role: accountType,
+                  email_notifications_enabled: emailNotificationsEnabled,
+                  marketing_emails_enabled: marketingEmailsEnabled
+                }))
+                console.log('[SignIn] ✓ Re-set localStorage after signup with name:', name || 'EMPTY')
+              } else {
+                console.log('[SignIn] ✓ localStorage still present after signup')
               }
-              
-              localStorage.setItem('bf-pending-profile', JSON.stringify({
-                name,
-                email,
-                role: accountType,
-                ...verificationData,
-                // Email preferences from signup form
-                email_notifications_enabled: emailNotificationsEnabled,
-                marketing_emails_enabled: marketingEmailsEnabled
-              }))
             } catch {}
 
             if (!session) {
@@ -354,6 +381,10 @@ export default function SignInPage() {
                * no session is returned until user confirms email.
                */
               console.log('[SignIn] No session returned - email confirmation might be required')
+              
+              // CRITICAL FIX: Reset busy state immediately - don't wait for ensureProfile
+              // ensureProfile runs in the background via SIGNED_IN event, but we shouldn't block UI
+              setBusy(false)
               
               // Send verification email via our custom system
               // User ID should be available from signup result
@@ -388,6 +419,9 @@ export default function SignInPage() {
               return
             } else {
               console.log('[SignIn] Session returned with sign-up, user is immediately authenticated')
+              // CRITICAL FIX: Reset busy state when session exists - don't wait for ensureProfile
+              // ensureProfile runs in the background via SIGNED_IN event, but we shouldn't block UI
+              setBusy(false)
             }
 
             // Send verification email via our custom system
@@ -434,6 +468,10 @@ export default function SignInPage() {
               }
             }
 
+            // CRITICAL FIX: Reset busy state before redirect
+            // Don't wait for ensureProfile - it runs in background via SIGNED_IN event
+            setBusy(false)
+            
             // Redirect based on account type
             console.log('[SignIn] Redirecting to account page')
             const redirectPath = accountType === 'business' ? '/account' : '/account'
@@ -544,10 +582,11 @@ export default function SignInPage() {
         }
       }
     } catch (err) {
-      console.error('Submit error:', err)
+      console.error('[SignIn] Submit error:', err)
       setMessage('Something went wrong')
+      setBusy(false) // CRITICAL FIX: Always reset busy state on error
     } finally {
-      setBusy(false)
+      setBusy(false) // CRITICAL FIX: Always reset busy state
     }
   }
 

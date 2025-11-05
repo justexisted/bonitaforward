@@ -99,31 +99,59 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       })
       
       // Load business listings owned by user from providers table
-      const { data: listingsData, error: listingsError } = await supabase
+      const { data: listingsDataRaw, error: listingsError } = await supabase
         .from('providers')
         .select('*')
         .eq('owner_user_id', auth.userId)
         .order('created_at', { ascending: false })
 
-      console.log('[MyBusiness] Providers query result:', {
+      // CRITICAL FIX: Filter out businesses with 'deleted' badge
+      const listingsData = (listingsDataRaw || []).filter((b: any) => {
+        const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+        if (hasDeletedBadge) {
+          console.log('[MyBusiness] 🔴 FILTERING OUT deleted business from owner query:', {
+            id: b.id,
+            name: b.name,
+            badges: b.badges
+          })
+        }
+        return !hasDeletedBadge
+      })
+
+      console.log('[MyBusiness] Providers query result (after filtering deleted):', {
         error: listingsError,
-        count: listingsData?.length || 0,
-        data: listingsData
+        count: listingsData.length,
+        beforeFilter: listingsDataRaw?.length || 0,
+        filteredOut: (listingsDataRaw?.length || 0) - listingsData.length
       })
 
       if (listingsError) throw listingsError
 
       // ALSO check for providers by email (in case admin didn't set owner_user_id)
-      const { data: emailListingsData, error: emailListingsError } = await supabase
+      const { data: emailListingsDataRaw, error: emailListingsError } = await supabase
         .from('providers')
         .select('*')
         .eq('email', auth.email)
         .order('created_at', { ascending: false })
 
-      console.log('[MyBusiness] Providers by email query result:', {
+      // CRITICAL FIX: Filter out businesses with 'deleted' badge
+      const emailListingsData = (emailListingsDataRaw || []).filter((b: any) => {
+        const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+        if (hasDeletedBadge) {
+          console.log('[MyBusiness] 🔴 FILTERING OUT deleted business from email query:', {
+            id: b.id,
+            name: b.name,
+            badges: b.badges
+          })
+        }
+        return !hasDeletedBadge
+      })
+
+      console.log('[MyBusiness] Providers by email query result (after filtering deleted):', {
         error: emailListingsError,
-        count: emailListingsData?.length || 0,
-        data: emailListingsData
+        count: emailListingsData.length,
+        beforeFilter: emailListingsDataRaw?.length || 0,
+        filteredOut: (emailListingsDataRaw?.length || 0) - emailListingsData.length
       })
 
       // Load business applications by email from business_applications table
@@ -240,17 +268,33 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       }
 
       // Combine listings from both queries (owned and by email)
-      const allListings = [
+      // CRITICAL FIX: Filter again to ensure no deleted businesses slip through
+      const allListingsRaw = [
         ...(listingsData || []),
         ...(emailListingsData || []).filter(item => 
           !listingsData?.some(owned => owned.id === item.id)
         )
       ]
 
-      console.log('[MyBusiness] Combined listings result:', {
+      // CRITICAL FIX: Final filter to ensure NO deleted businesses appear
+      const allListings = allListingsRaw.filter((b: any) => {
+        const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+        if (hasDeletedBadge) {
+          console.log('[MyBusiness] 🔴 CRITICAL: Found deleted business in combined list - removing:', {
+            id: b.id,
+            name: b.name,
+            badges: b.badges
+          })
+        }
+        return !hasDeletedBadge
+      })
+
+      console.log('[MyBusiness] Combined listings result (after final filter):', {
         ownedCount: listingsData?.length || 0,
         emailCount: emailListingsData?.length || 0,
-        totalCombined: allListings.length,
+        beforeFinalFilter: allListingsRaw.length,
+        afterFinalFilter: allListings.length,
+        filteredOut: allListingsRaw.length - allListings.length,
         ownedIds: listingsData?.map(l => l.id) || [],
         emailIds: emailListingsData?.map(l => l.id) || [],
         finalIds: allListings.map(l => l.id)

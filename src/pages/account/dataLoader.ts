@@ -310,14 +310,31 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
     console.log('[Account] loadMyBusinesses called:', { userId, userEmail })
     
     // First try to load by owner_user_id
+    // CRITICAL FIX: Filter out businesses with 'deleted' badge at the query level
+    // This prevents deleted businesses from even being loaded
     const ownerResult = await query('providers', { logPrefix: '[Account]' })
       .select('id, name, category_key, address, phone, email, website, published, created_at, owner_user_id, badges')
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false })
       .execute()
     
-    const ownerData = ownerResult.data
-    console.log('[Account] Query by owner_user_id result:', {
+    let ownerData = ownerResult.data
+    // CRITICAL FIX: Filter out businesses with 'deleted' badge immediately after query
+    if (ownerData && Array.isArray(ownerData)) {
+      ownerData = ownerData.filter((b: any) => {
+        const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+        if (hasDeletedBadge) {
+          console.log('[Account] 🔴 FILTERING OUT deleted business from owner query:', {
+            id: b.id,
+            name: b.name,
+            badges: b.badges
+          })
+        }
+        return !hasDeletedBadge
+      })
+    }
+    
+    console.log('[Account] Query by owner_user_id result (after filtering deleted):', {
       error: ownerResult.error,
       count: ownerData?.length || 0,
       ids: ownerData?.map((b: any) => b.id) || []
@@ -350,17 +367,30 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
         .order('created_at', { ascending: false })
         .execute()
       
-      console.log('[Account] Query by email result:', {
+      // CRITICAL FIX: Filter out businesses with 'deleted' badge immediately after query
+      if (emailResult.data && Array.isArray(emailResult.data)) {
+        emailData = emailResult.data.filter((b: any) => {
+          const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+          if (hasDeletedBadge) {
+            console.log('[Account] 🔴 FILTERING OUT deleted business from email query:', {
+              id: b.id,
+              name: b.name,
+              badges: b.badges
+            })
+          }
+          return !hasDeletedBadge
+        }) as any[]
+      }
+      
+      console.log('[Account] Query by email result (after filtering deleted):', {
         error: emailResult.error,
-        count: emailResult.data?.length || 0,
-        businesses: emailResult.data?.map((b: any) => ({ id: b.id, name: b.name, owner_user_id: b.owner_user_id })) || []
+        count: emailData.length,
+        businesses: emailData.map((b: any) => ({ id: b.id, name: b.name, owner_user_id: b.owner_user_id })) || []
       })
       
       if (emailResult.error) {
         // Error already logged by query utility
         console.log('[Account] Error loading businesses by email')
-      } else if (emailResult.data) {
-        emailData = emailResult.data as any[]
       }
     }
     
@@ -377,9 +407,36 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
       allIds: uniqueBusinesses.map(b => b.id)
     })
     
+    // CRITICAL FIX: Filter out businesses with 'deleted' badge from the final result
+    // These businesses were intentionally deleted and should NOT appear in the list
+    const businessesWithoutDeleted = uniqueBusinesses.filter(b => {
+      const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+      if (hasDeletedBadge) {
+        console.log('[Account] 🔴 FILTERING OUT deleted business from result:', {
+          id: b.id,
+          name: b.name,
+          badges: b.badges
+        })
+      }
+      return !hasDeletedBadge
+    })
+    
+    console.log('[Account] After filtering deleted businesses:', {
+      beforeFilter: uniqueBusinesses.length,
+      afterFilter: businessesWithoutDeleted.length,
+      filteredOut: uniqueBusinesses.length - businessesWithoutDeleted.length
+    })
+    
     // If we found businesses by email but not linked (owner_user_id is null or different), automatically reconnect them
     // This handles the case where user deleted account and signed up again
-    const unlinkedBusinesses = emailData.filter(b => !b.owner_user_id || b.owner_user_id !== userId)
+    // CRITICAL: Do NOT reconnect businesses with 'deleted' badge - these were intentionally deleted
+    const unlinkedBusinesses = emailData.filter(b => {
+      const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+      const isUnlinked = !b.owner_user_id || b.owner_user_id !== userId
+      // Only reconnect if unlinked AND not marked as deleted
+      return isUnlinked && !hasDeletedBadge
+    })
+    
     if (unlinkedBusinesses.length > 0) {
       console.log('[Account] Found businesses by email but not linked to user. Automatically reconnecting...', {
         userId,
@@ -389,20 +446,13 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
       })
       
       // Automatically reconnect businesses by updating owner_user_id
-      // This allows users to recover their businesses after account deletion
+      // This allows users to recover their businesses after account deletion (only if not marked as deleted)
       for (const business of unlinkedBusinesses) {
         try {
-          // Remove 'deleted' badge if present (business is being reconnected)
-          const currentBadges = Array.isArray((business as any)?.badges) 
-            ? ((business as any)?.badges as string[]) 
-            : []
-          const updatedBadges = currentBadges.filter((b: string) => b !== 'deleted')
-          
           const reconnectResult = await update(
             'providers',
             { 
-              owner_user_id: userId,
-              badges: updatedBadges.length > 0 ? updatedBadges : null
+              owner_user_id: userId
             },
             { id: business.id },
             { logPrefix: '[Account]' }
@@ -422,8 +472,24 @@ export async function loadMyBusinesses(userId: string, userEmail?: string): Prom
       }
     }
     
-    const result = uniqueBusinesses.map((b: any) => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]
-    console.log('[Account] Final loadMyBusinesses result:', {
+    // Log businesses that were NOT reconnected because they have 'deleted' badge
+    const deletedBusinesses = emailData.filter(b => {
+      const hasDeletedBadge = Array.isArray(b.badges) && b.badges.includes('deleted')
+      const isUnlinked = !b.owner_user_id || b.owner_user_id !== userId
+      return isUnlinked && hasDeletedBadge
+    })
+    if (deletedBusinesses.length > 0) {
+      console.log('[Account] ⚠️ Found businesses with "deleted" badge - NOT reconnecting (intentionally deleted):', {
+        count: deletedBusinesses.length,
+        businessNames: deletedBusinesses.map(b => b.name),
+        businessIds: deletedBusinesses.map(b => b.id)
+      })
+    }
+    
+    // CRITICAL FIX: Use businessesWithoutDeleted instead of uniqueBusinesses
+    // This ensures deleted businesses are NEVER returned to the UI
+    const result = businessesWithoutDeleted.map((b: any) => ({ ...b, slug: generateSlug(b.name) })) as MyBusiness[]
+    console.log('[Account] Final loadMyBusinesses result (after filtering deleted):', {
       count: result.length,
       names: result.map(b => b.name)
     })

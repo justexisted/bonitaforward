@@ -353,9 +353,10 @@ export class QueryBuilder<T = any> {
 
   /**
    * Select columns (maintains Supabase API)
+   * Supports count option: select('*', { count: 'exact' })
    */
-  select(columns: string = '*'): this {
-    this.builder = this.builder.select(columns)
+  select(columns: string = '*', options?: { count?: 'exact' | 'planned' | 'estimated' }): this {
+    this.builder = (this.builder as any).select(columns, options)
     return this
   }
 
@@ -460,6 +461,22 @@ export class QueryBuilder<T = any> {
    */
   not(column: string, operator: string, value: any): this {
     this.builder = (this.builder as any).not(column, operator, value)
+    return this
+  }
+
+  /**
+   * Filter by greater than or equal (maintains Supabase API)
+   */
+  gte(column: string, value: any): this {
+    this.builder = (this.builder as any).gte(column, value)
+    return this
+  }
+
+  /**
+   * Filter by less than or equal (maintains Supabase API)
+   */
+  lte(column: string, value: any): this {
+    this.builder = (this.builder as any).lte(column, value)
     return this
   }
 

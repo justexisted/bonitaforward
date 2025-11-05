@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/lib/supabase'
+import { query } from '@/lib/supabaseQuery'
 import type {
   ListingAnalytics,
   FunnelAttribution,
@@ -28,14 +29,20 @@ const SESSION_KEY = 'bf_analytics_session_id'
 /**
  * Get or create a session ID for anonymous tracking
  * Stored in sessionStorage (clears on tab close)
+ * CRITICAL: Wrapped in try/catch to handle browser storage restrictions
  */
 function getOrCreateSessionId(): string {
-  let sessionId = sessionStorage.getItem(SESSION_KEY)
-  if (!sessionId) {
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    sessionStorage.setItem(SESSION_KEY, sessionId)
+  try {
+    let sessionId = sessionStorage.getItem(SESSION_KEY)
+    if (!sessionId) {
+      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      sessionStorage.setItem(SESSION_KEY, sessionId)
+    }
+    return sessionId
+  } catch (err) {
+    // Browser storage blocked or unavailable - generate temporary ID
+    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
-  return sessionId
 }
 
 /**
@@ -93,18 +100,18 @@ export async function trackListingEvent(
     }
     
     // Insert (RLS allows public INSERT)
-    const { error } = await supabase
-      .from('listing_analytics')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    const { error } = await query('listing_analytics', { logPrefix: '[Analytics]' })
       .insert(record)
     
     if (error) {
-      console.error('[Analytics] Failed to track listing event:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility with standardized format
+      return { success: false, error: error.message || error.code || 'Insert failed' }
     }
     
     return { success: true }
   } catch (err) {
-    console.error('[Analytics] Exception tracking event:', err)
+    // Silently fail analytics - don't spam console or break UI
     return { success: false, error: 'Unknown error' }
   }
 }
@@ -112,18 +119,29 @@ export async function trackListingEvent(
 /**
  * Check if view has been tracked this session
  * Prevents double-counting page refreshes
+ * CRITICAL: Wrapped in try/catch to handle browser storage restrictions
  */
 export function hasTrackedViewThisSession(providerId: string): boolean {
-  const key = `viewed_${providerId}`
-  return sessionStorage.getItem(key) === 'true'
+  try {
+    const key = `viewed_${providerId}`
+    return sessionStorage.getItem(key) === 'true'
+  } catch {
+    // Browser storage blocked - allow tracking (will prevent duplicates server-side)
+    return false
+  }
 }
 
 /**
  * Mark view as tracked for this session
+ * CRITICAL: Wrapped in try/catch to handle browser storage restrictions
  */
 export function markViewTracked(providerId: string): void {
-  const key = `viewed_${providerId}`
-  sessionStorage.setItem(key, 'true')
+  try {
+    const key = `viewed_${providerId}`
+    sessionStorage.setItem(key, 'true')
+  } catch {
+    // Browser storage blocked - silently fail (non-critical)
+  }
 }
 
 // ============================================
@@ -154,8 +172,8 @@ export async function trackFunnelAttribution(
       referrer_url: referrerUrl || document.referrer || null,
     }
     
-    const { error } = await supabase
-      .from('funnel_attribution')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    const { error } = await query('funnel_attribution', { logPrefix: '[Analytics]' })
       .insert(record)
     
     if (error) {
@@ -164,13 +182,13 @@ export async function trackFunnelAttribution(
         return { success: true, blocked: true }
       }
       
-      console.error('[Analytics] Failed to track funnel attribution:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility with standardized format
+      return { success: false, error: error.message || error.code || 'Insert failed' }
     }
     
     return { success: true }
   } catch (err) {
-    console.error('[Analytics] Exception tracking funnel:', err)
+    // Silently fail analytics - don't spam console or break UI
     return { success: false, error: 'Unknown error' }
   }
 }
@@ -178,30 +196,41 @@ export async function trackFunnelAttribution(
 /**
  * Store last viewed provider in session
  * Used for attribution when user submits funnel
+ * CRITICAL: Wrapped in try/catch to handle browser storage restrictions
  */
 export function storeLastViewedProvider(providerId: string): void {
-  sessionStorage.setItem('last_viewed_provider', providerId)
-  sessionStorage.setItem('last_viewed_provider_time', Date.now().toString())
+  try {
+    sessionStorage.setItem('last_viewed_provider', providerId)
+    sessionStorage.setItem('last_viewed_provider_time', Date.now().toString())
+  } catch {
+    // Browser storage blocked - silently fail (non-critical)
+  }
 }
 
 /**
  * Get last viewed provider (within attribution window)
  * Returns null if no provider viewed or too much time passed
+ * CRITICAL: Wrapped in try/catch to handle browser storage restrictions
  * 
  * @param windowMinutes - Attribution window in minutes (default 30)
  */
 export function getLastViewedProvider(windowMinutes: number = 30): string | null {
-  const providerId = sessionStorage.getItem('last_viewed_provider')
-  const timeStr = sessionStorage.getItem('last_viewed_provider_time')
-  
-  if (!providerId || !timeStr) return null
-  
-  const timeSince = Date.now() - parseInt(timeStr)
-  const windowMs = windowMinutes * 60 * 1000
-  
-  if (timeSince > windowMs) return null
-  
-  return providerId
+  try {
+    const providerId = sessionStorage.getItem('last_viewed_provider')
+    const timeStr = sessionStorage.getItem('last_viewed_provider_time')
+    
+    if (!providerId || !timeStr) return null
+    
+    const timeSince = Date.now() - parseInt(timeStr)
+    const windowMs = windowMinutes * 60 * 1000
+    
+    if (timeSince > windowMs) return null
+    
+    return providerId
+  } catch {
+    // Browser storage blocked - return null (no attribution available)
+    return null
+  }
 }
 
 // ============================================
@@ -232,8 +261,8 @@ export async function trackBookingAttribution(
       session_id: sessionId,
     }
     
-    const { error } = await supabase
-      .from('booking_attribution')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    const { error } = await query('booking_attribution', { logPrefix: '[Analytics]' })
       .insert(record)
     
     if (error) {
@@ -242,13 +271,13 @@ export async function trackBookingAttribution(
         return { success: true, blocked: true }
       }
       
-      console.error('[Analytics] Failed to track booking attribution:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility with standardized format
+      return { success: false, error: error.message || error.code || 'Insert failed' }
     }
     
     return { success: true }
   } catch (err) {
-    console.error('[Analytics] Exception tracking booking:', err)
+    // Silently fail analytics - don't spam console or break UI
     return { success: false, error: 'Unknown error' }
   }
 }
@@ -271,28 +300,28 @@ export async function getProviderAnalytics(
   endDate?: Date
 ): Promise<AnalyticsResult<ListingAnalytics[]>> {
   try {
-    let query = supabase
-      .from('listing_analytics')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    let queryBuilder = query('listing_analytics', { logPrefix: '[Analytics]' })
       .select('*')
       .eq('provider_id', providerId)
     
     if (startDate) {
-      query = query.gte('created_at', startDate.toISOString())
+      queryBuilder = queryBuilder.gte('created_at', startDate.toISOString())
     }
     if (endDate) {
-      query = query.lte('created_at', endDate.toISOString())
+      queryBuilder = queryBuilder.lte('created_at', endDate.toISOString())
     }
     
-    const { data, error } = await query.order('created_at', { ascending: false })
+    const { data, error } = await queryBuilder.order('created_at', { ascending: false })
     
     if (error) {
-      console.error('[Analytics] Failed to fetch analytics:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility with standardized format
+      return { success: false, error: error.message || error.code || 'Query failed' }
     }
     
     return { success: true, data: data as ListingAnalytics[] }
   } catch (err) {
-    console.error('[Analytics] Exception fetching analytics:', err)
+    // Silently fail analytics retrieval - don't spam console
     return { success: false, error: 'Unknown error' }
   }
 }
@@ -326,8 +355,8 @@ export async function getProviderAnalyticsSummary(
     const total_website_clicks = events.filter(e => e.event_type === 'website_click').length
     
     // Get funnel responses (with date range filtering)
-    let funnelQuery = supabase
-      .from('funnel_attribution')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    let funnelQuery = query('funnel_attribution', { logPrefix: '[Analytics]' })
       .select('*', { count: 'exact' })
       .eq('provider_id', providerId)
     
@@ -341,8 +370,8 @@ export async function getProviderAnalyticsSummary(
     const { count: total_funnel_responses } = await funnelQuery
     
     // Get bookings (with date range filtering)
-    let bookingQuery = supabase
-      .from('booking_attribution')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    let bookingQuery = query('booking_attribution', { logPrefix: '[Analytics]' })
       .select('*', { count: 'exact' })
       .eq('provider_id', providerId)
     
@@ -377,7 +406,7 @@ export async function getProviderAnalyticsSummary(
     
     return { success: true, data: summary }
   } catch (err) {
-    console.error('[Analytics] Exception fetching summary:', err)
+    // Silently fail analytics retrieval - don't spam console
     return { success: false, error: 'Unknown error' }
   }
 }
@@ -395,29 +424,29 @@ export async function getFunnelResponsesFromProvider(
   endDate?: Date
 ): Promise<AnalyticsResult<FunnelAttribution[]>> {
   try {
-    let query = supabase
-      .from('funnel_attribution')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    let queryBuilder = query('funnel_attribution', { logPrefix: '[Analytics]' })
       .select('*')
       .eq('provider_id', providerId)
     
     // Apply date range filtering if provided
     if (startDate) {
-      query = query.gte('created_at', startDate.toISOString())
+      queryBuilder = queryBuilder.gte('created_at', startDate.toISOString())
     }
     if (endDate) {
-      query = query.lte('created_at', endDate.toISOString())
+      queryBuilder = queryBuilder.lte('created_at', endDate.toISOString())
     }
     
-    const { data, error } = await query.order('created_at', { ascending: false })
+    const { data, error } = await queryBuilder.order('created_at', { ascending: false })
     
     if (error) {
-      console.error('[Analytics] Failed to fetch funnel attribution:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility with standardized format
+      return { success: false, error: error.message || error.code || 'Query failed' }
     }
     
     return { success: true, data: data as FunnelAttribution[] }
   } catch (err) {
-    console.error('[Analytics] Exception fetching funnel attribution:', err)
+    // Silently fail analytics retrieval - don't spam console
     return { success: false, error: 'Unknown error' }
   }
 }
@@ -435,29 +464,29 @@ export async function getBookingsFromProvider(
   endDate?: Date
 ): Promise<AnalyticsResult<BookingAttribution[]>> {
   try {
-    let query = supabase
-      .from('booking_attribution')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    let queryBuilder = query('booking_attribution', { logPrefix: '[Analytics]' })
       .select('*')
       .eq('provider_id', providerId)
     
     // Apply date range filtering if provided
     if (startDate) {
-      query = query.gte('created_at', startDate.toISOString())
+      queryBuilder = queryBuilder.gte('created_at', startDate.toISOString())
     }
     if (endDate) {
-      query = query.lte('created_at', endDate.toISOString())
+      queryBuilder = queryBuilder.lte('created_at', endDate.toISOString())
     }
     
-    const { data, error } = await query.order('created_at', { ascending: false })
+    const { data, error } = await queryBuilder.order('created_at', { ascending: false })
     
     if (error) {
-      console.error('[Analytics] Failed to fetch booking attribution:', error)
-      return { success: false, error: error.message }
+      // Error already logged by query utility with standardized format
+      return { success: false, error: error.message || error.code || 'Query failed' }
     }
     
     return { success: true, data: data as BookingAttribution[] }
   } catch (err) {
-    console.error('[Analytics] Exception fetching booking attribution:', err)
+    // Silently fail analytics retrieval - don't spam console
     return { success: false, error: 'Unknown error' }
   }
 }
@@ -488,7 +517,7 @@ export async function getMultiProviderAnalytics(
     
     return { success: true, data: summaries }
   } catch (err) {
-    console.error('[Analytics] Exception fetching multi-provider analytics:', err)
+    // Silently fail analytics retrieval - don't spam console
     return { success: false, error: 'Unknown error' }
   }
 }

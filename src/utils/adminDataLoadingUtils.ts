@@ -15,6 +15,7 @@
  */
 
 import { supabase } from '../lib/supabase'
+import { query } from '../lib/supabaseQuery'
 import type { ProviderChangeRequest, ProviderJobPost } from '../lib/supabaseData'
 
 // Extended type for change requests with joined provider and profile data
@@ -274,12 +275,14 @@ export async function loadBookingEvents(
       console.warn('[Admin] Netlify function unavailable, trying direct query:', fetchError.message)
       
       try {
-        const { data, error: directError } = await supabase
-          .from('booking_events')
+        // Uses centralized query utility with automatic retry logic and standardized error handling
+        // Fallback query when Netlify function is unavailable (local dev)
+        const { data, error: directError } = await query('booking_events', { logPrefix: '[Admin]' })
           .select('*')
           .order('created_at', { ascending: false })
         
         if (directError) {
+          // Error already logged by query utility with standardized format
           console.warn('[Admin] Direct query also failed (expected if RLS not configured):', directError.message)
           setBookingEvents([])
         } else {

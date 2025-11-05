@@ -1170,6 +1170,7 @@ if (unsplashImageUrl) {
 **Related:**
 - Section #21: Event Images Not Showing Due to Null image_type (display logic)
 - Section #18: Event Images Not Showing from Database (original fix)
+- Section #23: Gradient Strings Saved to Database (2025-11-05)
 
 ---
 
@@ -1269,6 +1270,147 @@ const headerImage = getEventHeaderImageFromDb(event)
 **Related:**
 - Section #18: Event Images Not Showing from Database (original fix that required both fields)
 - Section #19: Explicit Column Selection Breaks When Columns Don't Exist (why we use `.select('*')`)
+- Section #23: Gradient Strings Saved to Database (2025-11-05)
+
+---
+
+### 23. Gradient Strings Saved to Database (2025-11-05)
+
+**What:** Populate scripts were saving CSS gradient strings (like `"linear-gradient(135deg, #667eea 0%, #764ba2 100%)"`) directly to the `image_url` column in the database when images couldn't be fetched. Gradient strings should NEVER be stored in the database - they should be computed dynamically on the frontend when `image_url` is `null`.
+
+**Root Cause:**
+1. `populate-event-images.ts` (both Netlify function and local script) were saving gradient strings to `image_url` when Unsplash API failed or when storage failed
+2. The code treated gradients as a "fallback value" that should be saved to the database
+3. This caused events to have gradient strings in `image_url` instead of actual image URLs or `null`
+4. Frontend code already handles `null` image_url by computing gradients dynamically - saving gradients to DB was redundant and wrong
+
+**What Happened:**
+1. Events from iCalendar feeds were inserted without `image_url` (correctly set to `null`)
+2. Populate script ran to fetch images for events without images
+3. When Unsplash API failed or Supabase Storage failed, script saved gradient strings to `image_url`
+4. Database now had gradient strings in `image_url` column
+5. Frontend code detects gradient strings and ignores them (correctly), but this defeats the purpose of having images in the database
+
+**The Fix:**
+- **Never save gradient strings**: Updated all populate scripts to set `image_url: null` instead of saving gradient strings when images can't be fetched
+- **Frontend computes gradients**: The frontend already has logic to compute gradients when `image_url` is `null` - no need to save gradients to database
+- **Preserve existing images**: All external feed processors (iCalendar, RSS, KPBS, VoSD) preserve existing `image_url` and `image_type` when re-fetching events
+- **Only populate missing images**: Populate scripts only process events with `null` image_url (not events that already have images)
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Saves gradient strings to database
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl) {
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - save gradient string to database ❌ WRONG
+      imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+      imageType = 'gradient'
+    }
+  } else {
+    // Unsplash failed - save gradient string to database ❌ WRONG
+    imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+    imageType = 'gradient'
+  }
+} else {
+  // No API key - save gradient string to database ❌ WRONG
+  imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+  imageType = 'gradient'
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ❌ Saves gradient string!
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Never saves gradient strings, sets to null instead
+let imageUrl: string | null = null
+let imageType: 'image' | null = null
+
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl && storageUrl.includes('supabase.co/storage')) {
+      // Successfully stored in Supabase Storage
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - set to null (frontend will compute gradient)
+      imageUrl = null
+      imageType = null
+    }
+  } else {
+    // Unsplash failed - set to null (frontend will compute gradient)
+    imageUrl = null
+    imageType = null
+  }
+} else {
+  // No API key - set to null (frontend will compute gradient)
+  imageUrl = null
+  imageType = null
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ✅ null if no image
+```
+
+**Prevention Checklist:**
+- ✅ NEVER save gradient strings to `image_url` column - always use `null` when images can't be fetched
+- ✅ Frontend computes gradients dynamically when `image_url` is `null` - no need to save gradients to database
+- ✅ Populate scripts only process events with `null` image_url (skip events that already have images)
+- ✅ External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ If storage fails, set `image_url` to `null` (don't fall back to saving gradient strings)
+- ✅ All functions that modify events preserve existing images (don't overwrite them)
+
+**Rule of Thumb:**
+> When handling image fallbacks:
+> 1. **NEVER** save gradient strings to `image_url` column - always use `null`
+> 2. Frontend computes gradients when `image_url` is `null` - no need to save gradients to database
+> 3. Populate scripts only process events with `null` image_url (skip events that already have images)
+> 4. External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+> 5. If image storage fails, set `image_url` to `null` (don't save gradient strings as fallback)
+
+**Files to Watch:**
+- `netlify/functions/populate-event-images.ts` - Fixed to never save gradient strings
+- `scripts/populate-event-images.ts` - Fixed to never save gradient strings
+- `netlify/functions/manual-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/scheduled-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-kpbs-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-vosd-events.ts` - Preserves existing images when re-fetching
+- `src/utils/eventImageUtils.ts` - `getEventHeaderImageFromDb()` ignores gradient strings in database
+
+**Breaking Changes:**
+- If you restore code that saves gradient strings to `image_url` → Frontend will ignore them (wastes database space)
+- If you remove null-check logic in populate scripts → Scripts might try to re-populate events that already have images
+- If you remove image preservation logic in feed processors → Events will lose their images when re-fetched
+
+**Image Preservation Guarantees:**
+- ✅ **External feed processors preserve images**: All iCalendar/RSS/KPBS/VoSD sync functions preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ **Populate scripts only process missing images**: Scripts only populate events with `null` image_url (skip events that already have images)
+- ✅ **No automatic overwrites**: No automated process will overwrite existing images - they are preserved during re-fetches
+- ✅ **One-time population**: After images are populated, they will NOT be overwritten by automated processes
+
+**Testing Verified (2025-11-05):**
+- ✅ Populate scripts set `image_url` to `null` when images can't be fetched (not gradient strings)
+- ✅ Frontend computes gradients when `image_url` is `null` (works correctly)
+- ✅ External feed processors preserve existing images when re-fetching events
+- ✅ Populate scripts skip events that already have images (only process `null` image_url)
+- ✅ Cleanup script removes existing gradient strings from database
+- ✅ All 33 events successfully populated with Supabase Storage URLs (not gradient strings)
+
+**Related:**
+- Section #22: Event Images Stored in Supabase Storage (image storage pattern)
+- Section #21: Event Images Not Showing Due to Null image_type (display logic)
+- Section #18: Event Images Not Showing from Database (original fix)
 
 ---
 

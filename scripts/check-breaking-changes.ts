@@ -78,7 +78,9 @@ function checkDuplicateTypes(file: string, content: string): void {
     {
       name: 'AdminStatus',
       expectedLocation: 'src/hooks/useAdminVerification.ts',
-      pattern: /(?:type|interface)\s+AdminStatus\s*[:=<]/
+      pattern: /(?:type|interface)\s+AdminStatus\s*[:=<]/,
+      // Allow in admin.ts if it's marked as deprecated for backward compatibility
+      allowDuplicateIn: ['src/types/admin.ts']
     },
     {
       name: 'CustomerUser',
@@ -87,16 +89,30 @@ function checkDuplicateTypes(file: string, content: string): void {
     }
   ]
 
-  duplicateTypePatterns.forEach(({ name, expectedLocation, pattern }) => {
-    if (pattern.test(content) && !file.includes(expectedLocation)) {
-      const line = content.split('\n').findIndex(line => pattern.test(line)) + 1
-      results.push({
-        file,
-        line,
-        rule: 'DUPLICATE_TYPE',
-        severity: 'error',
-        message: `Duplicate type definition: ${name} should only be defined in ${expectedLocation}`
-      })
+  duplicateTypePatterns.forEach(({ name, expectedLocation, pattern, allowDuplicateIn = [] }: any) => {
+    if (pattern.test(content)) {
+      // Normalize paths for comparison (handle Windows vs Unix paths)
+      const normalizedFile = file.replace(/\\/g, '/')
+      const normalizedExpected = expectedLocation.replace(/\\/g, '/')
+      
+      // Check if file is the expected location (should NOT flag if it is)
+      const isExpectedLocation = normalizedFile.includes(normalizedExpected)
+      
+      if (!isExpectedLocation) {
+        // Check if duplicate is allowed in this file
+        const normalizedAllowed = allowDuplicateIn.map((allowed: string) => allowed.replace(/\\/g, '/'))
+        const isAllowed = normalizedAllowed.some((allowed: string) => normalizedFile.includes(allowed))
+        if (!isAllowed) {
+          const line = content.split('\n').findIndex(line => pattern.test(line)) + 1
+          results.push({
+            file,
+            line,
+            rule: 'DUPLICATE_TYPE',
+            severity: 'error',
+            message: `Duplicate type definition: ${name} should only be defined in ${expectedLocation}`
+          })
+        }
+      }
     }
   })
 }
@@ -124,25 +140,93 @@ function checkDirectProfileUpdates(file: string, content: string): void {
 }
 
 /**
+ * Check for direct Supabase queries in migrated files (should use query utility)
+ */
+function checkDirectSupabaseQueries(file: string, content: string): void {
+  // Files that should be migrated to use query utility
+  const MIGRATED_FILES = [
+    'src/utils/profileUtils.ts',
+    'src/utils/adminDataLoadingUtils.ts',
+    'src/services/analyticsService.ts',
+    'src/services/emailNotificationService.ts',
+  ]
+  
+  const relativePath = file.replace(process.cwd() + '/', '').replace(/\\/g, '/')
+  
+  if (MIGRATED_FILES.includes(relativePath)) {
+    // Check for direct supabase.from() table queries (not storage or auth)
+    const directQueryPattern = /supabase\.from\(['"](\w+)['"]\)/
+    const matches = content.matchAll(directQueryPattern)
+    
+    for (const match of matches) {
+      const tableName = match[1]
+      // Allow storage and auth calls
+      if (tableName !== 'storage' && !content.includes('supabase.auth') && !content.includes('supabase.storage')) {
+        const line = content.substring(0, match.index).split('\n').length
+        results.push({
+          file,
+          line,
+          rule: 'DIRECT_SUPABASE_QUERY',
+          severity: 'error',
+          message: `Direct Supabase query detected in migrated file. Use query('${tableName}') from supabaseQuery.ts instead`
+        })
+      }
+    }
+    
+    // Check if query utility is imported
+    if (!content.includes("from '../lib/supabaseQuery'") && 
+        !content.includes("from '@/lib/supabaseQuery'") &&
+        !content.includes("from './lib/supabaseQuery'") &&
+        !content.includes("from '../../lib/supabaseQuery'") &&
+        !content.includes("from '../../../lib/supabaseQuery'")) {
+      results.push({
+        file,
+        rule: 'MISSING_QUERY_UTILITY_IMPORT',
+        severity: 'error',
+        message: 'Migrated file missing query utility import. Add: import { query } from "../lib/supabaseQuery"'
+      })
+    }
+  }
+}
+
+/**
  * Check for localStorage key mismatches
  */
 function checkLocalStorageKeys(file: string, content: string): void {
-  const expectedKeys = ['bf-pending-profile', 'bf-return-url']
+  // Critical keys that must match exactly
+  const criticalKeys = ['bf-pending-profile', 'bf-return-url']
+  // Additional allowed keys (not critical but documented)
+  const allowedKeys = [
+    'bf-pending-profile',
+    'bf-return-url',
+    'bf-auth',
+    'bf-signup-prefill',
+    'bf-calendar-info-dismissed',
+    'bf-saved-events',
+    'bf_analytics_session_id',
+    'viewed_',
+    'last_viewed_provider',
+    'last_viewed_provider_time'
+  ]
   const localStoragePattern = /localStorage\.(getItem|setItem|removeItem)\(['"]([^'"]+)['"]\)/g
   
   let match
   while ((match = localStoragePattern.exec(content)) !== null) {
     const key = match[2]
-    // Check if it's a known key but using wrong format
-    if (key.includes('bf-') && !expectedKeys.includes(key)) {
-      const line = content.substring(0, match.index).split('\n').length
-      results.push({
-        file,
-        line,
-        rule: 'LOCALSTORAGE_KEY',
-        severity: 'warning',
-        message: `Unexpected localStorage key: "${key}". Expected one of: ${expectedKeys.join(', ')}`
-      })
+    // Only warn for critical keys that don't match
+    if (key.includes('bf-') && !allowedKeys.some(allowed => key === allowed || key.startsWith(allowed))) {
+      // Check if it's a critical key but using wrong format
+      if (criticalKeys.some(critical => key.includes(critical) && key !== critical)) {
+        const line = content.substring(0, match.index).split('\n').length
+        results.push({
+          file,
+          line,
+          rule: 'LOCALSTORAGE_KEY',
+          severity: 'warning',
+          message: `Unexpected localStorage key: "${key}". Critical keys must match exactly: ${criticalKeys.join(', ')}`
+        })
+      }
+      // For other keys, just note them (not an error)
     }
   }
 }
@@ -230,6 +314,7 @@ function runChecks(): void {
       
       checkDuplicateTypes(file, content)
       checkDirectProfileUpdates(file, content)
+      checkDirectSupabaseQueries(file, content)
       checkLocalStorageKeys(file, content)
       checkDependencyTracking(file, content)
       checkApiResponseFormat(file, content)

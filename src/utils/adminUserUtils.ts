@@ -14,6 +14,7 @@
 
 import { query, deleteRows } from '../lib/supabaseQuery'
 import { supabase } from '../lib/supabase'
+import type { ProfileRow } from '../types/admin'
 
 // Type definitions
 type FunnelRow = {
@@ -33,13 +34,6 @@ type BookingRow = {
   answers: Record<string, string> | null
   status: string | null
   created_at: string
-}
-
-type ProfileRow = {
-  id: string
-  email: string | null
-  name: string | null
-  role?: string | null
 }
 
 /**

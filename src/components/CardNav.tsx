@@ -105,6 +105,33 @@ const CardNav: React.FC<CardNavProps> = ({
     return tl;
   };
 
+  // Reset menu state when items change (e.g., after sign out)
+  // Use a ref to track if this is the first render
+  const isFirstRender = useRef(true);
+  useLayoutEffect(() => {
+    // Skip reset on first render
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    
+    // Close menu if it's open when items change
+    if (isExpanded) {
+      setIsHamburgerOpen(false);
+      setIsExpanded(false);
+      isAnimatingRef.current = false;
+      const tl = tlRef.current;
+      if (tl) {
+        tl.kill();
+      }
+      // Reset nav height immediately
+      const navEl = navRef.current;
+      if (navEl) {
+        gsap.set(navEl, { height: 60, overflow: 'hidden' });
+      }
+    }
+  }, [items]);
+
   useLayoutEffect(() => {
     const tl = createTimeline();
     tlRef.current = tl;

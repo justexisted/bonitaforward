@@ -12,7 +12,7 @@
  * await notifyChangeRequestApproved(userEmail, businessName, 'update', ['name', 'phone'])
  */
 
-import { supabase } from '../lib/supabase'
+import { query } from '../lib/supabaseQuery'
 
 const SEND_EMAIL_ENDPOINT = '/.netlify/functions/send-email'
 
@@ -29,14 +29,15 @@ async function canSendEmail(email: string, isCritical: boolean = false): Promise
     }
 
     // Check user's email preferences
-    const { data: profile, error } = await supabase
-      .from('profiles')
+    // Uses centralized query utility with automatic retry logic and standardized error handling
+    const { data: profile, error } = await query('profiles', { logPrefix: '[EmailService]' })
       .select('email_notifications_enabled')
       .eq('email', email.toLowerCase().trim())
       .single()
 
     if (error || !profile) {
       // If user not found, allow email (they might not have an account yet)
+      // Error already logged by query utility with standardized format
       console.log('[EmailService] User not found, allowing email')
       return true
     }

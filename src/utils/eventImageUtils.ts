@@ -322,18 +322,11 @@ export function getEventHeaderImageFromDb(event: CalendarEvent): {
   // If image_url is an Unsplash URL, reject it and use gradient (should never happen)
   if (event.image_url && event.image_url.includes('supabase.co/storage')) {
     // This is a Supabase Storage URL - use it
-    if (isDev()) {
-      console.log(`[getEventHeaderImageFromDb] ✅ Event "${event.title?.substring(0, 30)}" - USING SUPABASE STORAGE URL: ${event.image_url.substring(0, 60)}...`)
-    }
     return { type: 'image', value: event.image_url }
   }
   
   // REJECT Unsplash URLs - they should never be in the database
   if (event.image_url && event.image_url.includes('images.unsplash.com')) {
-    if (isDev()) {
-      console.warn(`[getEventHeaderImageFromDb] ❌ Event "${event.title?.substring(0, 30)}" - REJECTING Unsplash URL, using gradient. URL should be in Supabase Storage!`)
-      console.warn(`[getEventHeaderImageFromDb] ❌ Run populate script to convert: npx tsx scripts/populate-event-images.ts`)
-    }
     // Reject Unsplash URL - use gradient instead
     return { type: 'gradient', value: getEventGradient(event) }
   }
@@ -341,24 +334,11 @@ export function getEventHeaderImageFromDb(event: CalendarEvent): {
   // If image_url exists but is a gradient string, ignore it and use fallback
   // This prevents storing gradient strings in the database from showing incorrectly
   if (event.image_url && event.image_url.startsWith('linear-gradient')) {
-    if (isDev()) {
-      console.warn(`[getEventHeaderImageFromDb] ⚠️ Event "${event.title?.substring(0, 30)}" - image_url is gradient string, ignoring database value, using fallback`)
-    }
     // Ignore the database gradient string, use our fallback
     return { type: 'gradient', value: getEventGradient(event) }
   }
   
-  // If image_type is set to 'image' but image_url doesn't exist or isn't an http URL, log warning
-  if (event.image_type === 'image' && !event.image_url?.startsWith('http')) {
-    if (isDev()) {
-      console.warn(`[getEventHeaderImageFromDb] ⚠️ Event "${event.title?.substring(0, 30)}" - image_type is 'image' but image_url is invalid: ${event.image_url || 'null'}`)
-    }
-  }
-  
   // No valid image_url: use gradient fallback
-  if (isDev()) {
-    console.log(`[getEventHeaderImageFromDb] Event "${event.title?.substring(0, 30)}" - NO valid image_url, using gradient fallback`)
-  }
   return { type: 'gradient', value: getEventGradient(event) }
 }
 

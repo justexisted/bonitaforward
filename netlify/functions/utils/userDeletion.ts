@@ -395,8 +395,11 @@ export async function deleteUserAndRelatedData(
     try {
       const { data: providers } = await supabaseClient
         .from('providers')
-        .select('id, badges, name')
+        .select('id, badges, name, email')
         .eq('owner_user_id', userId)
+      
+      console.log(`${logPrefix} Found ${providers?.length || 0} provider(s) owned by user ${userId}:`, 
+        providers?.map(p => ({ id: (p as any).id, name: (p as any).name, email: (p as any).email })))
       
       if (Array.isArray(providers) && providers.length > 0) {
         if (deleteBusinesses) {
@@ -407,18 +410,90 @@ export async function deleteUserAndRelatedData(
             ? providers.filter(p => businessIdsToDelete.includes((p as any).id))
             : providers
           
+          console.log(`${logPrefix} 🔴 HARD DELETING ${businessesToDelete.length} provider(s):`, 
+            businessesToDelete.map(p => ({ id: (p as any).id, name: (p as any).name, email: (p as any).email })))
+          
           let deletedCount = 0
+          const deletedBusinessIds: string[] = []
+          const failedDeletions: Array<{ id: string; name: string; error: string }> = []
+          
           for (const provider of businessesToDelete) {
-            const { error: deleteError } = await supabaseClient
+            const providerId = (provider as any).id
+            const providerName = (provider as any).name || 'Unnamed Business'
+            const providerEmail = (provider as any).email || 'No email'
+            
+            console.log(`${logPrefix} 🔴 Attempting to DELETE provider ${providerId} (${providerName})...`)
+            
+            const { error: deleteError, count } = await supabaseClient
               .from('providers')
-              .delete()
-              .eq('id', (provider as any).id)
+              .delete({ count: 'exact' })
+              .eq('id', providerId)
             
             if (deleteError) {
-              console.error(`${logPrefix} ❌ Failed to delete provider ${(provider as any).id} (${(provider as any).name}):`, deleteError)
+              console.error(`${logPrefix} ❌ FAILED to delete provider ${providerId} (${providerName}):`, {
+                error: deleteError,
+                message: deleteError.message,
+                code: deleteError.code,
+                details: deleteError.details,
+                hint: deleteError.hint
+              })
+              failedDeletions.push({ id: providerId, name: providerName, error: deleteError.message || deleteError.toString() })
             } else {
-              deletedCount++
-              console.log(`${logPrefix} ✓ Deleted provider ${(provider as any).id} (${(provider as any).name})`)
+              // Verify deletion succeeded by checking if provider still exists
+              const { data: verifyData, error: verifyError } = await supabaseClient
+                .from('providers')
+                .select('id')
+                .eq('id', providerId)
+                .maybeSingle()
+              
+              if (verifyError) {
+                console.warn(`${logPrefix} ⚠️ Could not verify deletion of provider ${providerId} (${providerName}):`, verifyError)
+              } else if (verifyData) {
+                console.error(`${logPrefix} ❌ VERIFICATION FAILED: Provider ${providerId} (${providerName}) still exists after deletion!`)
+                failedDeletions.push({ id: providerId, name: providerName, error: 'Provider still exists after deletion attempt' })
+              } else {
+                deletedCount++
+                deletedBusinessIds.push(providerId)
+                console.log(`${logPrefix} ✅ VERIFIED: Provider ${providerId} (${providerName}) successfully deleted (count: ${count || 0})`)
+              }
+            }
+          }
+          
+          // Log summary of deletions
+          console.log(`${logPrefix} 📊 DELETION SUMMARY:`)
+          console.log(`${logPrefix}   - Attempted: ${businessesToDelete.length} provider(s)`)
+          console.log(`${logPrefix}   - Successfully deleted: ${deletedCount} provider(s)`)
+          console.log(`${logPrefix}   - Failed: ${failedDeletions.length} provider(s)`)
+          if (deletedBusinessIds.length > 0) {
+            console.log(`${logPrefix}   - Deleted IDs: ${deletedBusinessIds.join(', ')}`)
+          }
+          if (failedDeletions.length > 0) {
+            console.error(`${logPrefix}   - Failed deletions:`, failedDeletions)
+            
+            // CRITICAL FIX: If hard delete failed, soft delete the businesses instead
+            // This ensures they don't get reconnected when user signs up again
+            console.log(`${logPrefix} 🔄 Attempting to soft delete businesses that failed hard delete...`)
+            for (const failed of failedDeletions) {
+              const provider = providers.find(p => (p as any).id === failed.id)
+              if (provider) {
+                const badges = Array.isArray((provider as any)?.badges) 
+                  ? ((provider as any)?.badges as string[]) 
+                  : []
+                const nextBadges = Array.from(new Set([...badges, 'deleted']))
+                const { error: softDeleteError } = await supabaseClient
+                  .from('providers')
+                  .update({ 
+                    badges: nextBadges as any, 
+                    owner_user_id: null as any 
+                  })
+                  .eq('id', failed.id)
+                
+                if (softDeleteError) {
+                  console.error(`${logPrefix} ❌ CRITICAL: Failed to soft delete provider ${failed.id} (${failed.name}) after hard delete failed:`, softDeleteError)
+                } else {
+                  console.log(`${logPrefix} ✅ Soft deleted provider ${failed.id} (${failed.name}) as fallback after hard delete failed`)
+                }
+              }
             }
           }
           
@@ -455,6 +530,12 @@ export async function deleteUserAndRelatedData(
           console.log(`${logPrefix} ✓ Deleted ${deletedCount} provider(s) permanently`)
           if (businessesKept > 0) {
             console.log(`${logPrefix} ✓ Kept ${businessesKept} provider(s) in system (soft deleted)`)
+          }
+          
+          // CRITICAL: If any businesses failed to delete, log warning
+          if (failedDeletions.length > 0) {
+            console.error(`${logPrefix} ⚠️ WARNING: ${failedDeletions.length} business(es) failed to delete permanently and were soft-deleted instead.`)
+            console.error(`${logPrefix} ⚠️ These businesses will NOT be reconnected when user signs up again (they have 'deleted' badge).`)
           }
         } else {
           // Soft delete: Archive and unlink (allows reconnection later)
