@@ -52,10 +52,12 @@ export interface QueryError {
 
 /**
  * Standardized query result
+ * CRITICAL: Includes count property when using { count: 'exact' } in select queries
  */
 export interface QueryResult<T> {
   data: T | null
   error: QueryError | null
+  count?: number | null // Count from Supabase when using { count: 'exact' }
 }
 
 /**
@@ -218,14 +220,15 @@ async function executeWithRetry<T>(
 
   while (attempt <= maxRetries) {
     try {
-      const { data, error } = await queryBuilder
+      const result = await queryBuilder
+      const { data, error, count } = result as { data: any; error: any; count?: number | null }
 
       if (!error) {
-        // Success - return data
+        // Success - return data with count if available
         if (attempt > 0 && logErrors) {
           console.log(`${logPrefix} Query succeeded after ${attempt} retry(ies)`)
         }
-        return { data: data as T, error: null }
+        return { data: data as T, error: null, count: count ?? null }
       }
 
       // Classify error
@@ -249,7 +252,8 @@ async function executeWithRetry<T>(
             details: error.details || error.hint,
             retryable: false,
             originalError: error
-          }
+          },
+          count: null
         }
       }
 
@@ -285,7 +289,8 @@ async function executeWithRetry<T>(
           retryable: true,
           retries: attempt,
           originalError: error
-        }
+        },
+        count: null
       }
     } catch (err: any) {
       // Unexpected error (not from Supabase query)
@@ -308,7 +313,8 @@ async function executeWithRetry<T>(
             retryable: errorInfo.retryable,
             retries: attempt,
             originalError: err
-          }
+          },
+          count: null
         }
       }
 
@@ -335,7 +341,8 @@ async function executeWithRetry<T>(
       retryable: true,
       retries: maxRetries,
       originalError: lastError
-    }
+    },
+    count: null
   }
 }
 
@@ -492,20 +499,22 @@ export class QueryBuilder<T = any> {
    * Makes QueryBuilder directly awaitable (Promise-like)
    * This allows: const { data, error } = await query('table').select('*')
    */
-  async then<TResult1 = { data: T | null; error: any }>(
-    onfulfilled?: ((value: { data: T | null; error: any }) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+  async then<TResult1 = { data: T | null; error: any; count?: number | null }>(
+    onfulfilled?: ((value: { data: T | null; error: any; count?: number | null }) => TResult1 | PromiseLike<TResult1>) | undefined | null,
     onrejected?: ((reason: any) => TResult1 | PromiseLike<TResult1>) | undefined | null
   ): Promise<TResult1> {
     try {
       const result = await this.execute()
-      // Convert QueryResult to Supabase format { data, error }
+      // Convert QueryResult to Supabase format { data, error, count }
+      // CRITICAL: Preserve count property when using { count: 'exact' } in select queries
       const supabaseFormat = { 
         data: result.data, 
         error: result.error ? (result.error.originalError || { 
           message: result.error.message,
           code: result.error.code,
           details: result.error.details
-        }) : null 
+        }) : null,
+        count: result.count ?? null
       }
       
       if (onfulfilled) {
@@ -523,9 +532,9 @@ export class QueryBuilder<T = any> {
   /**
    * Make QueryBuilder catchable (Promise-like)
    */
-  catch<TResult = { data: T | null; error: any }>(
+  catch<TResult = { data: T | null; error: any; count?: number | null }>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null
-  ): Promise<{ data: T | null; error: any } | TResult> {
+  ): Promise<{ data: T | null; error: any; count?: number | null } | TResult> {
     return this.then(undefined, onrejected)
   }
 }
