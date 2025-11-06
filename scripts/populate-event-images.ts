@@ -290,15 +290,12 @@ async function populateEventImages() {
   console.log('🚀 Starting event image population...\n')
 
   try {
-    // Fetch all events that need images:
-    // 1. Events with NULL image_url or image_type
-    // 2. Events with gradient strings saved (image_url LIKE 'linear-gradient%')
-    // 3. Events with image_type = 'gradient' (should have actual URLs)
-    // 4. Events with Unsplash URLs (need to be converted to Supabase Storage)
+    // BULLETPROOF: Fetch ALL events to ensure every single one gets an image
+    // This ensures all 74 events get images, not just the ones missing them
+    console.log('📋 Fetching ALL events to populate images...')
     const { data: events, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .or('image_url.is.null,image_type.is.null,image_url.like.linear-gradient%,image_type.eq.gradient,image_url.like.https://images.unsplash.com%')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -322,6 +319,17 @@ async function populateEventImages() {
 
       try {
         console.log(`${progress} Processing: "${event.title}"`)
+
+        // BULLETPROOF: If event already has a valid Supabase Storage image, skip it
+        // Only process events that don't have valid Supabase Storage images
+        if (event.image_url && 
+            event.image_url.includes('supabase.co/storage') && 
+            event.image_type === 'image' &&
+            !event.image_url.includes('linear-gradient')) {
+          console.log(`   ✅ Already has valid Supabase Storage image, skipping...\n`)
+          successCount++
+          continue
+        }
 
         // CRITICAL: Check if event already has Unsplash URL - convert it to Supabase Storage
         // NEVER keep Unsplash URLs - always convert to Supabase Storage

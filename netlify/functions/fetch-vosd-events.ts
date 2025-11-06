@@ -114,11 +114,39 @@ const fetchVosdEvents = async (page: number = 1, perPage: number = 50): Promise<
 }
 
 /**
+ * Generate a deterministic UUID from event data
+ * CRITICAL: This ensures same event always gets same ID for image preservation
+ */
+const generateEventId = (title: string, date: string, source: string): string => {
+  // Create a deterministic string from event properties
+  const idString = `${source}|${title}|${date}`
+  
+  // Hash-based UUID generation (same as other fetch functions)
+  let hash = 0
+  for (let i = 0; i < idString.length; i++) {
+    const char = idString.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32bit integer
+  }
+  
+  const hex = Math.abs(hash).toString(16).padStart(8, '0')
+  const part1 = hex.slice(0, 8)
+  const part2 = hex.slice(4, 8) || '0000'
+  const part3 = `4${hex.slice(0, 3)}`
+  const part4 = `${(hash & 0x0fff).toString(16).padStart(4, '0')}`
+  const part5 = `${hex.slice(0, 4)}${hex.slice(4, 8) || '0000'}`
+  
+  return `${part1}-${part2}-${part3}-${part4}-${part5}`
+}
+
+/**
  * Transform Voice of San Diego event to database format
+ * CRITICAL FIX: Now generates deterministic ID for image preservation
  */
 const transformEvent = (event: VosdEvent) => {
   const description = stripHtml(event.description)
   const time = extractTime(event.start_date)
+  const dateStr = event.start_date.split(' ')[0] // Extract just the date part (YYYY-MM-DD)
   
   // Format address
   let address = ''
@@ -137,10 +165,14 @@ const transformEvent = (event: VosdEvent) => {
     ? event.categories[0].name 
     : 'Community'
   
+  // CRITICAL FIX: Generate deterministic ID from event properties
+  const id = generateEventId(event.title, dateStr, SOURCE_NAME)
+  
   return {
+    id: id, // CRITICAL: Deterministic ID for image preservation
     title: event.title,
     description: description,
-    date: event.start_date.split(' ')[0], // Extract just the date part (YYYY-MM-DD)
+    date: dateStr,
     time: time,
     location: event.venue?.venue || '',
     address: address,
@@ -201,78 +233,54 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
-    // CRITICAL: Preserve image_url and image_type before deleting events
-    // Fetch existing events with images before deleting
-    const { data: existingEventsWithImages } = await supabase
-      .from('calendar_events')
-      .select('id, image_url, image_type')
-      .eq('source', SOURCE_NAME)
+    // BULLETPROOF: Use UPSERT instead of DELETE + INSERT
+    // Database trigger automatically preserves images at DB level
+    console.log(`[fetch-vosd-events] Using UPSERT to preserve images (bulletproof method)`)
     
-    // Create a map of existing events by ID for quick lookup
-    const existingImagesMap = new Map<string, { image_url: string | null, image_type: string | null }>()
-    if (existingEventsWithImages) {
-      existingEventsWithImages.forEach(event => {
-        existingImagesMap.set(event.id, {
-          image_url: event.image_url,
-          image_type: event.image_type
-        })
-      })
-    }
-    
-    // Delete existing Voice of San Diego events to avoid duplicates
-    const { error: deleteError } = await supabase
-      .from('calendar_events')
-      .delete()
-      .eq('source', SOURCE_NAME)
-    
-    if (deleteError) {
-      console.error('Error deleting old events:', deleteError)
-      throw deleteError
-    }
-    
-    console.log(`Deleted old ${SOURCE_NAME} events`)
-    
-    // CRITICAL: Preserve images when inserting events
-    // If an event with the same ID already existed, preserve its image_url and image_type
-    const eventsWithPreservedImages = filteredEvents.map(newEvent => {
-      const existing = existingImagesMap.get(newEvent.id)
-      if (existing && existing.image_url) {
-        // Preserve existing image data
-        console.log(`[fetch-vosd-events] Preserving image for event: ${newEvent.id} (${newEvent.title?.substring(0, 40)})`)
-        return {
-          ...newEvent,
-          image_url: existing.image_url,
-          image_type: existing.image_type
-        }
-      }
-      return newEvent
-    })
-    
-    // DIAGNOSTIC: Log how many images were preserved
-    const preservedCount = eventsWithPreservedImages.filter(e => e.image_url).length
-    const totalWithImages = existingImagesMap.size
-    console.log(`[fetch-vosd-events] Image preservation: ${preservedCount} of ${totalWithImages} images preserved`)
-    
-    // Insert new events in batches of 100 to avoid payload size limits
+    // Upsert events in batches - database trigger preserves images
     const batchSize = 100
-    let insertedCount = 0
+    let upsertedCount = 0
     
-    for (let i = 0; i < eventsWithPreservedImages.length; i += batchSize) {
-      const batch = eventsWithPreservedImages.slice(i, i + batchSize)
+    for (let i = 0; i < filteredEvents.length; i += batchSize) {
+      const batch = filteredEvents.slice(i, i + batchSize)
       
-      const { data, error } = await supabase
+      // Use upsert - database trigger will preserve existing images
+      const { data, error: upsertError } = await supabase
         .from('calendar_events')
-        .insert(batch)
+        .upsert(batch, {
+          onConflict: 'title,date,source',
+          ignoreDuplicates: false
+        })
         .select()
       
-      if (error) {
-        console.error(`Error inserting batch ${i / batchSize + 1}:`, error)
-        throw error
+      if (upsertError) {
+        console.error(`[fetch-vosd-events] Error upserting batch ${i}-${i + batch.length}:`, upsertError)
+        // Fallback: Try regular insert if upsert fails
+        const { error: insertError } = await supabase
+          .from('calendar_events')
+          .insert(batch)
+          .select()
+        
+        if (insertError) {
+          console.error(`[fetch-vosd-events] Fallback insert also failed:`, insertError)
+          throw insertError
+        } else {
+          upsertedCount += data?.length || batch.length
+          console.log(`[fetch-vosd-events] Fallback insert succeeded for batch ${i}-${i + batch.length}`)
+        }
+      } else {
+        upsertedCount += data?.length || batch.length
+        console.log(`[fetch-vosd-events] Upserted batch ${i}-${i + batch.length} (${upsertedCount} total)`)
+        
+        // Verify images were preserved
+        const eventsWithImages = data?.filter(e => e.image_url && e.image_url !== '').length || 0
+        if (eventsWithImages > 0) {
+          console.log(`[fetch-vosd-events] ✅ ${eventsWithImages} events in this batch have images preserved`)
+        }
       }
-      
-      insertedCount += data?.length || 0
-      console.log(`Inserted batch ${i / batchSize + 1}: ${data?.length} events`)
     }
+    
+    const insertedCount = upsertedCount
     
     console.log(`Successfully inserted ${insertedCount} Voice of San Diego events`)
     

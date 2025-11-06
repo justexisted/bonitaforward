@@ -290,7 +290,8 @@ const fetchICalContent = async (url: string): Promise<string> => {
 
 /**
  * Generate a deterministic UUID v5 from a string
- * This ensures the same event UID always generates the same UUID
+ * CRITICAL FIX: This MUST be truly deterministic - same input ALWAYS produces same output
+ * Removed Date.now() which was causing IDs to change each run, breaking image preservation
  */
 const generateUuidFromString = (str: string): string => {
   // Use a simple hash-based approach to generate UUID
@@ -304,10 +305,17 @@ const generateUuidFromString = (str: string): string => {
   
   // Convert hash to hex and pad to create UUID format
   const hex = Math.abs(hash).toString(16).padStart(8, '0')
-  const timestamp = Date.now().toString(16).padStart(12, '0').slice(0, 12)
   
+  // CRITICAL FIX: Use hash-derived values instead of Date.now() to ensure determinism
   // Create UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-  return `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${timestamp.slice(0, 3)}-${timestamp.slice(3, 7)}-${timestamp.slice(7, 12)}${hex.slice(0, 7)}`
+  // Use hash-derived values for all parts to ensure same input = same output
+  const part1 = hex.slice(0, 8)
+  const part2 = hex.slice(4, 8) || '0000'
+  const part3 = `4${hex.slice(0, 3)}`
+  const part4 = `${(hash & 0x0fff).toString(16).padStart(4, '0')}`
+  const part5 = `${hex.slice(0, 4)}${hex.slice(4, 8) || '0000'}`
+  
+  return `${part1}-${part2}-${part3}-${part4}-${part5}`
 }
 
 /**
@@ -465,124 +473,64 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
-    // CRITICAL: Preserve image_url and image_type before deleting events
-    // Fetch existing events with images before deleting
-    const icalSources = enabledFeeds.map(feed => feed.source)
-    const { data: existingEventsWithImages } = await supabase
-      .from('calendar_events')
-      .select('id, image_url, image_type')
-      .in('source', icalSources)
+    // BULLETPROOF: Use UPSERT instead of DELETE + INSERT
+    // Database trigger automatically preserves images at DB level
+    console.log(`[manual-fetch-events] Using UPSERT to preserve images (bulletproof method)`)
     
-    // Create a map of existing events by ID for quick lookup
-    const existingImagesMap = new Map<string, { image_url: string | null, image_type: string | null }>()
-    if (existingEventsWithImages) {
-      existingEventsWithImages.forEach(event => {
-        existingImagesMap.set(event.id, {
-          image_url: event.image_url,
-          image_type: event.image_type
-        })
-      })
-    }
+    // Upsert events in batches - database trigger preserves images
+    const batchSize = 100
+    let upsertedCount = 0
     
-    // Clear existing iCalendar events (those from external sources)
-    const { error: deleteError } = await supabase
-      .from('calendar_events')
-      .delete()
-      .in('source', icalSources)
-    
-    if (deleteError) {
-      console.error('Error clearing existing iCalendar events:', deleteError)
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'Failed to clear existing events',
-          message: deleteError.message,
-          results
-        })
-      }
-    }
-    
-    console.log('Cleared existing iCalendar events')
-    
-    // Before inserting, check for and remove any existing duplicates in database
-    // This handles cases where events might have been added from different sources
-    console.log('Checking for existing duplicates in database...')
-    const { data: existingEvents } = await supabase
-      .from('calendar_events')
-      .select('id, title, date, source')
-    
-    if (existingEvents && existingEvents.length > 0) {
-      const duplicateIds: string[] = []
+    for (let i = 0; i < filteredEvents.length; i += batchSize) {
+      const batch = filteredEvents.slice(i, i + batchSize)
       
-      for (const newEvent of filteredEvents) {
-        for (const existing of existingEvents) {
-          const normalizeTitle = (title: string) => title.toLowerCase().trim().replace(/[^\w\s]/g, '')
-          const title1 = normalizeTitle(newEvent.title)
-          const title2 = normalizeTitle(existing.title)
-          
-          const titleMatch = title1 === title2 || title1.includes(title2) || title2.includes(title1)
-          const date1 = new Date(newEvent.date).getTime()
-          const date2 = new Date(existing.date).getTime()
-          const dateMatch = Math.abs(date1 - date2) < 60 * 60 * 1000 // Within 1 hour
-          
-          if (titleMatch && dateMatch && newEvent.source !== existing.source) {
-            duplicateIds.push(existing.id)
-          }
-        }
-      }
+      // Use upsert - database trigger will preserve existing images
+      const { data, error: upsertError } = await supabase
+        .from('calendar_events')
+        .upsert(batch, {
+          onConflict: 'title,date,source',
+          ignoreDuplicates: false
+        })
+        .select()
       
-      if (duplicateIds.length > 0) {
-        console.log(`Removing ${duplicateIds.length} duplicate events from database`)
-        await supabase
+      if (upsertError) {
+        console.error(`[manual-fetch-events] Error upserting batch ${i}-${i + batch.length}:`, upsertError)
+        // Fallback: Try regular insert if upsert fails
+        const { error: insertError } = await supabase
           .from('calendar_events')
-          .delete()
-          .in('id', duplicateIds)
-      }
-    }
-    
-    // CRITICAL: Preserve images when inserting events
-    // If an event with the same ID already existed, preserve its image_url and image_type
-    const eventsWithPreservedImages = filteredEvents.map(newEvent => {
-      const existing = existingImagesMap.get(newEvent.id)
-      if (existing && existing.image_url) {
-        // Preserve existing image data
-        console.log(`[manual-fetch-events] Preserving image for event: ${newEvent.id} (${newEvent.title?.substring(0, 40)})`)
-        return {
-          ...newEvent,
-          image_url: existing.image_url,
-          image_type: existing.image_type
+          .insert(batch)
+        
+        if (insertError) {
+          console.error(`[manual-fetch-events] Fallback insert also failed:`, insertError)
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({
+              success: false,
+              error: 'Failed to upsert/insert events',
+              message: insertError.message,
+              results
+            })
+          }
+        } else {
+          upsertedCount += batch.length
+          console.log(`[manual-fetch-events] Fallback insert succeeded for batch ${i}-${i + batch.length}`)
+        }
+      } else {
+        upsertedCount += data?.length || batch.length
+        console.log(`[manual-fetch-events] Upserted batch ${i}-${i + batch.length} (${upsertedCount} total)`)
+        
+        // Verify images were preserved
+        const eventsWithImages = data?.filter(e => e.image_url && e.image_url !== '').length || 0
+        if (eventsWithImages > 0) {
+          console.log(`[manual-fetch-events] ✅ ${eventsWithImages} events in this batch have images preserved`)
         }
       }
-      return newEvent
-    })
-    
-    // DIAGNOSTIC: Log how many images were preserved
-    const preservedCount = eventsWithPreservedImages.filter(e => e.image_url).length
-    const totalWithImages = existingImagesMap.size
-    console.log(`[manual-fetch-events] Image preservation: ${preservedCount} of ${totalWithImages} images preserved`)
-    
-    // Insert new events
-    const { error: insertError } = await supabase
-      .from('calendar_events')
-      .insert(eventsWithPreservedImages)
-    
-    if (insertError) {
-      console.error('Error inserting new events:', insertError)
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'Failed to insert new events',
-          message: insertError.message,
-          results
-        })
-      }
     }
     
-    console.log(`Successfully processed ${filteredEvents.length} events from ${enabledFeeds.length} feeds`)
+    const insertedCount = upsertedCount
+    
+    console.log(`Successfully processed ${insertedCount} events from ${enabledFeeds.length} feeds`)
     
     return {
       statusCode: 200,

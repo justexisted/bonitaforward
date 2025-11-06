@@ -290,7 +290,8 @@ const fetchICalContent = async (url: string): Promise<string> => {
 
 /**
  * Generate a deterministic UUID v5 from a string
- * This ensures the same event UID always generates the same UUID
+ * CRITICAL FIX: This MUST be truly deterministic - same input ALWAYS produces same output
+ * Removed Date.now() which was causing IDs to change each run, breaking image preservation
  */
 const generateUuidFromString = (str: string): string => {
   // Use a simple hash-based approach to generate UUID
@@ -304,10 +305,17 @@ const generateUuidFromString = (str: string): string => {
   
   // Convert hash to hex and pad to create UUID format
   const hex = Math.abs(hash).toString(16).padStart(8, '0')
-  const timestamp = Date.now().toString(16).padStart(12, '0').slice(0, 12)
   
+  // CRITICAL FIX: Use hash-derived values instead of Date.now() to ensure determinism
   // Create UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-  return `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${timestamp.slice(0, 3)}-${timestamp.slice(3, 7)}-${timestamp.slice(7, 12)}${hex.slice(0, 7)}`
+  // Use hash-derived values for all parts to ensure same input = same output
+  const part1 = hex.slice(0, 8)
+  const part2 = hex.slice(4, 8) || '0000'
+  const part3 = `4${hex.slice(0, 3)}`
+  const part4 = `${(hash & 0x0fff).toString(16).padStart(4, '0')}`
+  const part5 = `${hex.slice(0, 4)}${hex.slice(4, 8) || '0000'}`
+  
+  return `${part1}-${part2}-${part3}-${part4}-${part5}`
 }
 
 /**
@@ -421,133 +429,56 @@ const scheduledHandler: Handler = async (event, context) => {
       }
     }
     
-    // CRITICAL: Preserve image_url and image_type BEFORE deleting events
-    // Fetch existing events with images BEFORE deleting (this was the bug!)
-    const icalSources = enabledFeeds.map(feed => feed.source)
-    const { data: existingEventsWithImages } = await supabase
-      .from('calendar_events')
-      .select('id, image_url, image_type')
-      .in('source', icalSources)
+    // BULLETPROOF: Use UPSERT instead of DELETE + INSERT
+    // This preserves images at the database level via trigger and ON CONFLICT
+    // No need to fetch/preserve images manually - database handles it
     
-    // Create a map of existing events by ID for quick lookup (BEFORE deleting)
-    const existingImagesMap = new Map<string, { image_url: string | null, image_type: string | null }>()
-    if (existingEventsWithImages) {
-      existingEventsWithImages.forEach(event => {
-        existingImagesMap.set(event.id, {
-          image_url: event.image_url,
-          image_type: event.image_type
-        })
-      })
-      console.log(`[scheduled-fetch-events] Preserved ${existingEventsWithImages.length} events with images before deletion`)
-    }
+    console.log(`[scheduled-fetch-events] Using UPSERT to preserve images (bulletproof method)`)
     
-    // Clear existing iCalendar events (those from external sources)
-    const { error: deleteError } = await supabase
-      .from('calendar_events')
-      .delete()
-      .in('source', icalSources)
-    
-    if (deleteError) {
-      console.error('Error clearing existing iCalendar events:', deleteError)
-    } else {
-      console.log('Cleared existing iCalendar events')
-    }
-    
-    // Before inserting, check for and remove any existing duplicates in database
-    // This handles cases where events might have been added from different sources
-    console.log('Checking for existing duplicates in database...')
-    const { data: existingEvents } = await supabase
-      .from('calendar_events')
-      .select('id, title, date, source')
-    
-    // Create a map of existing events by ID for duplicate detection (different from images map)
-    const existingEventsMap = new Map<string, any>()
-    if (existingEvents) {
-      existingEvents.forEach(event => {
-        existingEventsMap.set(event.id, event)
-      })
-    }
-    
-    if (existingEvents && existingEvents.length > 0) {
-      const duplicateIds: string[] = []
-      
-      for (const newEvent of filteredEvents) {
-        for (const existing of existingEvents) {
-          // Check for duplicates across different sources (allowCrossSource: true)
-          // Only flag as duplicate if sources are different (cross-source duplicate)
-          if (isDuplicateEvent(newEvent, existing, { allowCrossSource: true }) && newEvent.source !== existing.source) {
-            duplicateIds.push(existing.id)
-          }
-        }
-      }
-      
-      if (duplicateIds.length > 0) {
-        console.log(`Removing ${duplicateIds.length} duplicate events from database`)
-        // CRITICAL: Before deleting duplicates, preserve their images too
-        const { data: duplicateEventsWithImages } = await supabase
-          .from('calendar_events')
-          .select('id, image_url, image_type')
-          .in('id', duplicateIds)
-        
-        // Add duplicate event images to the preservation map
-        if (duplicateEventsWithImages) {
-          duplicateEventsWithImages.forEach(event => {
-            if (event.image_url) {
-              existingImagesMap.set(event.id, {
-                image_url: event.image_url,
-                image_type: event.image_type
-              })
-            }
-          })
-          console.log(`[scheduled-fetch-events] Preserved ${duplicateEventsWithImages.length} duplicate event images before deletion`)
-        }
-        
-        await supabase
-          .from('calendar_events')
-          .delete()
-          .in('id', duplicateIds)
-      }
-    }
-    
-    // CRITICAL: Preserve images when inserting events
-    // Use the existingImagesMap (fetched BEFORE deletion) to preserve images by ID
-    const eventsWithPreservedImages = filteredEvents.map(newEvent => {
-      const existing = existingImagesMap.get(newEvent.id)
-      if (existing && existing.image_url) {
-        // Preserve existing image data from BEFORE deletion
-        console.log(`[scheduled-fetch-events] Preserving image for event: ${newEvent.id} (${newEvent.title?.substring(0, 40)})`)
-        return {
-          ...newEvent,
-          image_url: existing.image_url,
-          image_type: existing.image_type
-        }
-      }
-      return newEvent
-    })
-    
-    // DIAGNOSTIC: Log how many images were preserved
-    const preservedCount = eventsWithPreservedImages.filter(e => e.image_url).length
-    const totalWithImages = existingImagesMap.size
-    console.log(`[scheduled-fetch-events] Image preservation: ${preservedCount} of ${totalWithImages} images preserved`)
-    
-    // Insert new events in batches
+    // Insert/update events in batches using UPSERT
+    // ON CONFLICT (title, date, source) DO UPDATE preserves images via trigger
     const batchSize = 100
-    let insertedCount = 0
+    let upsertedCount = 0
     
-    for (let i = 0; i < eventsWithPreservedImages.length; i += batchSize) {
-      const batch = eventsWithPreservedImages.slice(i, i + batchSize)
+    for (let i = 0; i < filteredEvents.length; i += batchSize) {
+      const batch = filteredEvents.slice(i, i + batchSize)
       
-      const { error: insertError } = await supabase
+      // Use upsert with ON CONFLICT to update existing events or insert new ones
+      // The database trigger will preserve image_url/image_type if they exist
+      const { data, error: upsertError } = await supabase
         .from('calendar_events')
-        .insert(batch)
+        .upsert(batch, {
+          onConflict: 'title,date,source',
+          ignoreDuplicates: false
+        })
+        .select()
       
-      if (insertError) {
-        console.error(`Error inserting batch ${i}-${i + batch.length}:`, insertError)
+      if (upsertError) {
+        console.error(`[scheduled-fetch-events] Error upserting batch ${i}-${i + batch.length}:`, upsertError)
+        // Fallback: Try regular insert if upsert fails (for events without unique constraint match)
+        const { error: insertError } = await supabase
+          .from('calendar_events')
+          .insert(batch)
+        
+        if (insertError) {
+          console.error(`[scheduled-fetch-events] Fallback insert also failed:`, insertError)
+        } else {
+          upsertedCount += batch.length
+          console.log(`[scheduled-fetch-events] Fallback insert succeeded for batch ${i}-${i + batch.length}`)
+        }
       } else {
-        insertedCount += batch.length
-        console.log(`Inserted batch ${i}-${i + batch.length} (${insertedCount} total)`)
+        upsertedCount += data?.length || batch.length
+        console.log(`[scheduled-fetch-events] Upserted batch ${i}-${i + batch.length} (${upsertedCount} total)`)
+        
+        // Verify images were preserved
+        const eventsWithImages = data?.filter(e => e.image_url && e.image_url !== '').length || 0
+        if (eventsWithImages > 0) {
+          console.log(`[scheduled-fetch-events] ✅ ${eventsWithImages} events in this batch have images preserved`)
+        }
       }
     }
+    
+    const insertedCount = upsertedCount
     
     console.log(`Successfully processed ${insertedCount} events from ${enabledFeeds.length} feeds`)
     

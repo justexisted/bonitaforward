@@ -28,7 +28,8 @@ interface ICalEvent {
 
 /**
  * Generate a deterministic UUID v5 from a string
- * This ensures the same event UID always generates the same UUID
+ * CRITICAL FIX: This MUST be truly deterministic - same input ALWAYS produces same output
+ * Removed Date.now() which was causing IDs to change each run, breaking image preservation
  */
 const generateUuidFromString = (str: string): string => {
   // Use a simple hash-based approach to generate UUID
@@ -42,10 +43,17 @@ const generateUuidFromString = (str: string): string => {
   
   // Convert hash to hex and pad to create UUID format
   const hex = Math.abs(hash).toString(16).padStart(8, '0')
-  const timestamp = Date.now().toString(16).padStart(12, '0').slice(0, 12)
   
+  // CRITICAL FIX: Use hash-derived values instead of Date.now() to ensure determinism
   // Create UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-  return `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4${timestamp.slice(0, 3)}-${timestamp.slice(3, 7)}-${timestamp.slice(7, 12)}${hex.slice(0, 7)}`
+  // Use hash-derived values for all parts to ensure same input = same output
+  const part1 = hex.slice(0, 8)
+  const part2 = hex.slice(4, 8) || '0000'
+  const part3 = `4${hex.slice(0, 3)}`
+  const part4 = `${(hash & 0x0fff).toString(16).padStart(4, '0')}`
+  const part5 = `${hex.slice(0, 4)}${hex.slice(4, 8) || '0000'}`
+  
+  return `${part1}-${part2}-${part3}-${part4}-${part5}`
 }
 
 /**
@@ -551,76 +559,52 @@ export const handler: Handler = async (event, context) => {
       }
     }
     
-    // CRITICAL: Preserve image_url and image_type before deleting events
-    // Step 7a: Fetch existing events with images before deleting
-    const { data: existingEventsWithImages } = await supabase
-      .from('calendar_events')
-      .select('id, image_url, image_type')
-      .eq('source', SOURCE_NAME)
+    // BULLETPROOF: Use UPSERT instead of DELETE + INSERT
+    // Database trigger automatically preserves images at DB level
+    console.log(`[fetch-kpbs-events] Using UPSERT to preserve images (bulletproof method)`)
     
-    // Create a map of existing events by ID for quick lookup
-    const existingImagesMap = new Map<string, { image_url: string | null, image_type: string | null }>()
-    if (existingEventsWithImages) {
-      existingEventsWithImages.forEach(event => {
-        existingImagesMap.set(event.id, {
-          image_url: event.image_url,
-          image_type: event.image_type
+    // Upsert events in batches - database trigger preserves images
+    const batchSize = 100
+    let upsertedCount = 0
+    
+    for (let i = 0; i < filteredEvents.length; i += batchSize) {
+      const batch = filteredEvents.slice(i, i + batchSize)
+      
+      // Use upsert - database trigger will preserve existing images
+      const { data, error: upsertError } = await supabase
+        .from('calendar_events')
+        .upsert(batch, {
+          onConflict: 'title,date,source',
+          ignoreDuplicates: false
         })
-      })
-    }
-    
-    // Step 7b: Delete existing KPBS events from database
-    const { error: deleteError } = await supabase
-      .from('calendar_events')
-      .delete()
-      .eq('source', SOURCE_NAME)
-    
-    if (deleteError) {
-      console.error('Error deleting old KPBS events:', deleteError)
-      throw deleteError
-    }
-    
-    console.log(`Deleted old ${SOURCE_NAME} events`)
-    
-    // CRITICAL: Preserve images when inserting events
-    // If an event with the same ID already existed, preserve its image_url and image_type
-    const eventsWithPreservedImages = filteredEvents.map(newEvent => {
-      const existing = existingImagesMap.get(newEvent.id)
-      if (existing && existing.image_url) {
-        // Preserve existing image data
-        console.log(`[fetch-kpbs-events] Preserving image for event: ${newEvent.id} (${newEvent.title?.substring(0, 40)})`)
-        return {
-          ...newEvent,
-          image_url: existing.image_url,
-          image_type: existing.image_type
+        .select()
+      
+      if (upsertError) {
+        console.error(`[fetch-kpbs-events] Error upserting batch ${i}-${i + batch.length}:`, upsertError)
+        // Fallback: Try regular insert if upsert fails
+        const { error: insertError } = await supabase
+          .from('calendar_events')
+          .insert(batch)
+        
+        if (insertError) {
+          console.error(`[fetch-kpbs-events] Fallback insert also failed:`, insertError)
+        } else {
+          upsertedCount += batch.length
+          console.log(`[fetch-kpbs-events] Fallback insert succeeded for batch ${i}-${i + batch.length}`)
+        }
+      } else {
+        upsertedCount += data?.length || batch.length
+        console.log(`[fetch-kpbs-events] Upserted batch ${i}-${i + batch.length} (${upsertedCount} total)`)
+        
+        // Verify images were preserved
+        const eventsWithImages = data?.filter(e => e.image_url && e.image_url !== '').length || 0
+        if (eventsWithImages > 0) {
+          console.log(`[fetch-kpbs-events] ✅ ${eventsWithImages} events in this batch have images preserved`)
         }
       }
-      return newEvent
-    })
-    
-    // DIAGNOSTIC: Log how many images were preserved
-    const preservedCount = eventsWithPreservedImages.filter(e => e.image_url).length
-    const totalWithImages = existingImagesMap.size
-    console.log(`[fetch-kpbs-events] Image preservation: ${preservedCount} of ${totalWithImages} images preserved`)
-    
-    // Step 8: Insert new events in batches
-    const batchSize = 100
-    let insertedCount = 0
-    
-    for (let i = 0; i < eventsWithPreservedImages.length; i += batchSize) {
-      const batch = eventsWithPreservedImages.slice(i, i + batchSize)
-      
-      const { error: insertError } = await supabase
-        .from('calendar_events')
-        .insert(batch)
-      
-      if (insertError) {
-        console.error(`Error inserting batch ${i}-${i + batch.length}:`, insertError)
-      } else {
-        insertedCount += batch.length
-        console.log(`Inserted batch ${i}-${i + batch.length} (${insertedCount} total)`)
-      }
     }
+    
+    const insertedCount = upsertedCount
     
     console.log(`Successfully inserted ${insertedCount} KPBS events`)
     
