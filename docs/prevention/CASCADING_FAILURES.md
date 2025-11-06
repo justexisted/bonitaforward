@@ -1574,7 +1574,230 @@ ORDER BY cmd, policyname;
 **Related:**
 - Section #9: Incomplete Deletion Logic (user deletion patterns)
 - Section #17: Business Ownership on Self-Deletion (business deletion patterns)
+- Section #29: Admin RLS Policy Blocking Queries (admin access issue)
 - `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 29. Admin RLS Policy Blocking Queries ⭐ CRITICAL ADMIN ACCESS ISSUE (2025-01-XX)
+
+**What:** Admin queries to `business_applications` table return 403 Forbidden errors, preventing admins from viewing pending applications.
+
+**Root Cause:**
+- Admin query in `useAdminDataLoader.ts` requests ALL pending applications without email filter
+- `applications_select_admin` policy uses `is_admin_user(auth.uid())` function
+- `is_admin_user()` function uses `(SELECT email FROM auth.users WHERE id = user_id)` subquery
+- This subquery may fail or return NULL, causing admin policy to fail
+- PostgreSQL evaluates ALL SELECT policies with OR logic - if ALL policies fail, query fails with 403
+
+**Example:**
+```typescript
+// ❌ PROBLEM: Admin query without email filter
+// File: src/hooks/useAdminDataLoader.ts (Line 258-262)
+const bizQuery = query('business_applications', { logPrefix: '[Admin]' })
+  .select('*')
+  .or('status.eq.pending,status.is.null')  // Query ALL pending apps
+  .order('created_at', { ascending: false })
+  .execute()
+// ❌ Result: 403 Forbidden - RLS policy blocks query
+```
+
+```sql
+-- ❌ PROBLEM: Admin policy uses function that may fail
+-- File: ops/rls/02-MASTER-RLS-POLICIES.sql (Line 244-246)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may fail if auth.users subquery fails
+
+-- ❌ PROBLEM: is_admin_user() function uses auth.users subquery
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail or return NULL
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+```
+
+**Symptoms:**
+- Admin queries return 403 Forbidden errors
+- Console shows: `GET .../business_applications?... 403 (Forbidden)`
+- Admin cannot view pending applications in admin panel
+- Regular users can see their own applications (owner policy works)
+- Admin policy fails silently (no error message, just 403)
+
+**Fix:**
+1. **Update `is_admin_user()` function** to use JWT email (more reliable):
+   ```sql
+   -- ✅ FIX: Use JWT email with fallback to auth.users
+   CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+   RETURNS boolean AS $$
+     SELECT EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)
+     );
+   $$ LANGUAGE sql SECURITY DEFINER;
+   ```
+
+2. **Update admin policy** to check JWT email directly (more reliable):
+   ```sql
+   -- ✅ FIX: Check JWT email directly in policy
+   DROP POLICY IF EXISTS "applications_select_admin" ON public.business_applications;
+   
+   CREATE POLICY "applications_select_admin" 
+   ON public.business_applications FOR SELECT
+   USING (
+     EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+     )
+   );
+   ```
+
+3. **Ensure `admin_emails` table exists** and has admin emails:
+   ```sql
+   CREATE TABLE IF NOT EXISTS public.admin_emails (
+     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     email text UNIQUE NOT NULL,
+     created_at timestamptz DEFAULT now()
+   );
+   
+   INSERT INTO public.admin_emails (email)
+   VALUES ('justexisted@gmail.com')
+   ON CONFLICT (email) DO NOTHING;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Using auth.users subquery that may fail
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ❌ Admin policy depends on function that may fail
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may return FALSE if subquery fails
+```
+
+**Correct Code:**
+```sql
+-- ✅ Use JWT email with fallback
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))  -- ✅ JWT email (reliable)
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)  -- ✅ Fallback
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ✅ Admin policy checks JWT email directly (more reliable)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  )
+);
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use JWT email** for admin checks (more reliable than auth.users subquery)
+- ✅ **Include fallback** to auth.users subquery for compatibility
+- ✅ **Use case-insensitive matching** with LOWER(TRIM()) to handle email variations
+- ✅ **Test admin queries** after updating RLS policies
+- ✅ **Verify admin_emails table** exists and has correct emails
+- ✅ **Check ALL admin policies** when updating is_admin_user() function (affects all tables)
+- ✅ **Document dependencies** in SQL file comments (version, dependencies, breaking changes)
+
+**Dependency Chain:**
+```
+useAdminDataLoader.ts (admin query)
+    ↓
+business_applications table (RLS enabled)
+    ↓
+applications_select_admin policy (checks is_admin_user())
+    ↓
+is_admin_user() function (checks admin_emails table)
+    ↓
+auth.users subquery (may fail) ❌
+```
+
+**What Could Break:**
+- ⚠️ **ALL admin policies** depend on `is_admin_user()` function
+- ⚠️ **Updating function** affects ALL tables with admin policies (providers, bookings, etc.)
+- ⚠️ **Admin queries** on other tables may also fail if function is broken
+- ⚠️ **admin_emails table** must exist and have correct emails
+
+**Testing Verification:**
+- ✅ Admin can query ALL pending applications (no 403 errors)
+- ✅ Admin can view applications in admin panel
+- ✅ Regular users can still see their own applications (owner policy works)
+- ✅ `is_admin_user()` function returns TRUE for admin users
+- ✅ `is_admin_user()` function returns FALSE for non-admin users
+
+**Files Changed:**
+- `ops/rls/fix-business-applications-admin-rls.sql` (v1.0) - Admin RLS fix
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (needs update)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (no changes needed, just needs RLS fix)
+
+**SQL File Versioning:**
+- `ops/rls/fix-business-applications-select-rls.sql` - v1.0 (owner policy fix)
+- `ops/rls/fix-business-applications-admin-rls.sql` - v1.0 (admin policy fix)
+- `ops/rls/DIAGNOSE-BUSINESS-APPLICATIONS-RLS.sql` - v1.0 (diagnostic queries)
+
+**Rule of Thumb:**
+> When fixing admin RLS policies:
+> 1. **ALWAYS use JWT email** for admin checks (more reliable)
+> 2. **Include fallback** to auth.users subquery for compatibility
+> 3. **Update is_admin_user() function** if it uses auth.users subquery
+> 4. **Check ALL admin policies** when updating function (affects all tables)
+> 5. **Verify admin_emails table** exists and has correct emails
+> 6. **Test admin queries** after updating policies
+> 7. **Version SQL files** with version number, dependencies, and breaking changes
+
+**How to Check Admin Access:**
+```sql
+-- Test admin check function
+SELECT 
+  auth.uid() as user_id,
+  auth.jwt() ->> 'email' as jwt_email,
+  is_admin_user(auth.uid()) as is_admin,
+  (SELECT email FROM auth.users WHERE id = auth.uid()) as auth_users_email;
+
+-- Test admin policy directly
+SELECT * FROM business_applications 
+WHERE status = 'pending' OR status IS NULL
+ORDER BY created_at DESC
+LIMIT 10;
+-- Should return results if you're admin, 403 if not
+```
+
+**Security Note:**
+- Admin policies allow admins to see ALL rows (no email filter)
+- Owner policies restrict users to their own rows (email match required)
+- Both policies use OR logic - if EITHER passes, query succeeds
+- Admin check must be reliable (use JWT email, not auth.users subquery)
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (must update is_admin_user() function)
+- `ops/rls/fix-business-applications-admin-rls.sql` - Admin RLS fix (v1.0)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (depends on RLS policy)
+- `ops/rls/fix-*-admin-rls.sql` - Other admin RLS fixes (may need updates)
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (general RLS issues)
+- Section #28: Applications Not Showing in Sections (owner policy fix)
+- `docs/prevention/BUSINESS_APPLICATIONS_COMPLETE_FIX.md` - Complete fix documentation
 
 ---
 

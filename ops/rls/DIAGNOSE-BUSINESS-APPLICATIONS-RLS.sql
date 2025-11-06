@@ -1,8 +1,12 @@
 -- ========================================
 -- DIAGNOSE BUSINESS APPLICATIONS RLS ISSUE
 -- ========================================
--- Run this to understand why applications aren't showing
--- Copy/paste ALL results to diagnose the root cause
+-- Version: v1.0
+-- Date: 2025-01-XX
+-- Purpose: Diagnostic SQL to understand why applications aren't showing
+-- Usage: Run this in Supabase SQL Editor, copy/paste ALL results to diagnose the root cause
+-- Dependencies: None (read-only diagnostic queries)
+-- Breaking Changes: None (read-only)
 
 -- 1. Show ALL policies on business_applications table
 -- CRITICAL: PostgreSQL evaluates ALL SELECT policies with OR logic
@@ -27,10 +31,33 @@ WHERE tablename = 'business_applications'
 ORDER BY cmd, policyname;
 
 -- 3. Check what email you're logged in as
+-- NOTE: In SQL Editor, these will be NULL (expected - SQL Editor doesn't have auth context)
+-- When querying from frontend, these will have values
 SELECT 
   auth.uid() as my_user_id,
   auth.jwt()->>'email' as my_email_from_jwt,
-  (SELECT email FROM auth.users WHERE id = auth.uid()) as my_email_from_auth_users;
+  (SELECT email FROM auth.users WHERE id = auth.uid()) as my_email_from_auth_users,
+  is_admin_user(auth.uid()) as is_admin_check;
+
+-- 3b. Check admin_emails table structure (this works in SQL Editor)
+SELECT 
+  column_name,
+  data_type,
+  is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'admin_emails'
+ORDER BY ordinal_position;
+
+-- 3b2. List all admin emails (works regardless of table structure)
+SELECT email FROM admin_emails ORDER BY email;
+
+-- 3c. Verify admin_emails table exists
+SELECT 
+  EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'admin_emails'
+  ) as admin_emails_table_exists;
 
 -- 4. Check if there are any applications in the database
 SELECT 

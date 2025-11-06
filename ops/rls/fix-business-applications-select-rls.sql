@@ -8,7 +8,13 @@
 -- Also add case-insensitive matching with ILIKE to handle email variations.
 --
 -- Date: 2025-01-XX
+-- Version: v1.1
 -- Status: ✅ APPLIED - Verified in production
+-- Changes in v1.1:
+--   - Removed auth.users fallback from owner policy (uses JWT email only)
+--   - This avoids "permission denied for table users" errors
+-- Dependencies: None (standalone fix)
+-- Breaking Changes: None (replaces existing policy)
 
 -- Drop existing SELECT policies
 DROP POLICY IF EXISTS "applications_select_owner" ON public.business_applications;
@@ -17,12 +23,11 @@ DROP POLICY IF EXISTS "Authenticated can select business applications" ON public
 
 -- Users can view their own applications (using JWT email for reliability)
 -- Use TRIM and LOWER for case-insensitive matching to handle email variations
+-- NOTE: Removed auth.users fallback to avoid "permission denied" errors
 CREATE POLICY "applications_select_owner" 
 ON public.business_applications FOR SELECT
 USING (
   LOWER(TRIM(email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
-  OR
-  email = (SELECT email FROM auth.users WHERE id = auth.uid())
 );
 
 -- Verify policies were created
