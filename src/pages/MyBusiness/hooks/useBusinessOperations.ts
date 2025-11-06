@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../../../lib/supabase'
+import { insert, query } from '../../../lib/supabaseQuery'
 import { createProviderChangeRequest, getDismissedNotifications, type ProviderChangeRequest, type DismissedNotification } from '../../../lib/supabaseData'
 import { getUserPlanChoice, setUserPlanChoice as savePlanChoice, migratePlanChoiceToDatabase, type PlanChoice } from '../../../utils/planChoiceDb'
 import type { BusinessListing, BusinessApplication, JobPost } from '../types'
@@ -155,19 +156,27 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       })
 
       // Load business applications by email from business_applications table
-      const { data: appsData, error: appsError } = await supabase
-        .from('business_applications')
+      // CRITICAL: Use centralized query utility with proper RLS handling
+      const appsResult = await query('business_applications', { logPrefix: '[MyBusiness]' })
         .select('*')
-        .eq('email', auth.email)
+        .eq('email', auth.email.trim())
         .order('created_at', { ascending: false })
+        .execute()
+
+      const appsData = appsResult.data
+      const appsError = appsResult.error
 
       console.log('[MyBusiness] Applications query result:', {
         error: appsError,
         count: appsData?.length || 0,
-        data: appsData
+        data: appsData,
+        queryEmail: auth.email.trim()
       })
 
-      if (appsError) throw appsError
+      if (appsError) {
+        console.error('[MyBusiness] ❌ Error loading applications:', appsError)
+        // Don't throw - continue with empty array
+      }
 
       // Load job posts for all user's providers AND job posts owned by the user
       const providerIds = [
@@ -672,8 +681,10 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         email: auth.email,  // Always use auth.email to ensure application shows in My Business page
         phone: listingData.phone || '',
         category: listingData.category_key || 'professional-services',  // Note: 'category' not 'category_key'
+        status: 'pending' as 'pending' | 'approved' | 'rejected', // Set initial status as pending
+        tier_requested: 'free' as 'free' | 'featured', // Default to free tier
         // Store additional details as JSON string in the challenge field
-        // Store the business contact email separately in the details
+        // Store the business contact email separately from the details
         challenge: JSON.stringify({
           website: listingData.website,
           address: listingData.address,
@@ -692,17 +703,28 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       
       console.log('[MyBusiness] Submitting application data:', applicationData)
       
-      const { data: insertedData, error } = await supabase
-        .from('business_applications')
-        .insert([applicationData])
-        .select()
+      // CRITICAL: Use centralized query utility with proper RLS handling
+      // This ensures the INSERT policy works correctly
+      const result = await insert(
+        'business_applications',
+        [applicationData],
+        { logPrefix: '[MyBusiness]' }
+      )
 
-      console.log('[MyBusiness] Application insert result:', { data: insertedData, error })
+      console.log('[MyBusiness] Application insert result:', { data: result.data, error: result.error })
 
-      if (error) throw error
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to submit application')
+      }
 
       setMessage('Success! Your business application has been submitted and is pending admin approval.')
-      await loadBusinessData() // Refresh data to show new application in pending state
+      
+      // CRITICAL: Wait a moment for the database to process the insert before reloading
+      // This ensures the new application is visible when we query
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Refresh data to show new application in pending state
+      await loadBusinessData() 
       setShowCreateForm(false)
     } catch (error: any) {
       setMessage(`Error submitting application: ${error.message}`)

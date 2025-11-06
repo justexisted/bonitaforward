@@ -59,8 +59,8 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
           auth.email
             ? supabase
                 .from('business_applications')
-                .select('id, business_name, status, created_at')
-                .eq('email', auth.email)
+                .select('id, business_name, status, created_at, email')
+                .eq('email', auth.email.trim())
                 .order('created_at', { ascending: false })
             : Promise.resolve({ data: null, error: null }),
           
@@ -90,24 +90,47 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
         }
 
         // Process business applications
-        if (applicationsResult.status === 'fulfilled' && applicationsResult.value.data) {
-          const applications = applicationsResult.value.data
-          if (applications && applications.length > 0) {
+        if (applicationsResult.status === 'fulfilled') {
+          const { data: applications, error: appsError } = applicationsResult.value
+          
+          // DIAGNOSTIC: Log what we found
+          console.log('[NotificationBell] Applications query result:', {
+            error: appsError,
+            count: applications?.length || 0,
+            authEmail: auth.email,
+            applications: applications?.map((a: any) => ({
+              id: a.id,
+              email: a.email,
+              businessName: a.business_name,
+              status: a.status
+            })) || []
+          })
+          
+          if (appsError) {
+            console.error('[NotificationBell] ❌ Error fetching applications:', appsError)
+          } else if (applications && applications.length > 0) {
             // Only show pending applications as unread notifications (exclude approved/rejected)
-            const appNotifs: Notification[] = applications
-              .filter(app => (app.status === 'pending' || !app.status) && app.status !== 'approved' && app.status !== 'rejected')
-              .map((app) => ({
-                id: app.id,
-                type: 'pending_application' as const,
-                title: 'Business Application Pending',
-                message: `Your application for "${app.business_name || 'your business'}" is under review.`,
-                timestamp: app.created_at,
-                read: false,
-                link: '/account',
-                linkSection: 'applications',
-                isAdminNotification: false
-              }))
+            const pendingApps = applications.filter(app => (app.status === 'pending' || !app.status) && app.status !== 'approved' && app.status !== 'rejected')
+            console.log('[NotificationBell] ✅ Found pending applications:', {
+              total: applications.length,
+              pending: pendingApps.length,
+              businessNames: pendingApps.map((a: any) => a.business_name)
+            })
+            
+            const appNotifs: Notification[] = pendingApps.map((app) => ({
+              id: app.id,
+              type: 'pending_application' as const,
+              title: 'Business Application Pending',
+              message: `Your application for "${app.business_name || 'your business'}" is under review.`,
+              timestamp: app.created_at,
+              read: false,
+              link: '/account',
+              linkSection: 'applications',
+              isAdminNotification: false
+            }))
             allNotifications.push(...appNotifs)
+          } else {
+            console.log('[NotificationBell] ⚠️ No applications found (this might be expected if user hasn\'t submitted any)')
           }
         }
 

@@ -168,31 +168,6 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    // Check if token was already used
-    if (tokenData.used_at) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
-        body: JSON.stringify({
-          success: false,
-          error: 'This verification link has already been used',
-        }),
-      }
-    }
-
-    // Mark token as used
-    const { error: updateError } = await supabase
-      .from('email_verification_tokens')
-      .update({ used_at: new Date().toISOString() })
-      .eq('token', token)
-
-    if (updateError) {
-      console.error('[VerifyEmail] Error updating token:', updateError)
-      // Continue anyway - we'll still verify the email
-    }
-
     // Check if profile exists before updating
     const { data: existingProfile, error: profileCheckError } = await supabase
       .from('profiles')
@@ -230,14 +205,18 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    // Check if email is already verified
+    // CRITICAL: Check if email is already verified FIRST
+    // If email is already verified, return success even if token was already used
+    // This handles the case where user clicks link multiple times (double-click, refresh, etc.)
     if (existingProfile.email_confirmed_at) {
       console.log('[VerifyEmail] Email already verified for user:', tokenData.user_id)
-      // Still mark token as used (if not already)
-      await supabase
-        .from('email_verification_tokens')
-        .update({ used_at: new Date().toISOString() })
-        .eq('token', token)
+      // Mark token as used if not already (idempotent operation)
+      if (!tokenData.used_at) {
+        await supabase
+          .from('email_verification_tokens')
+          .update({ used_at: new Date().toISOString() })
+          .eq('token', token)
+      }
       
       return {
         statusCode: 200,
@@ -251,6 +230,29 @@ export const handler: Handler = async (event) => {
           userId: tokenData.user_id,
           alreadyVerified: true
         }),
+      }
+    }
+
+    // If token was already used but email is NOT verified, there's a problem
+    // This shouldn't happen in normal flow, but handle it gracefully
+    if (tokenData.used_at) {
+      console.warn('[VerifyEmail] Token was already used but email is not verified. This may indicate a previous failed verification attempt.')
+      // Still try to verify the email (maybe the token was marked but profile update failed)
+      // But log this as a warning
+    }
+
+    // Mark token as used (if not already)
+    // This prevents duplicate verification attempts
+    if (!tokenData.used_at) {
+      const { error: updateError } = await supabase
+        .from('email_verification_tokens')
+        .update({ used_at: new Date().toISOString() })
+        .eq('token', token)
+
+      if (updateError) {
+        console.error('[VerifyEmail] Error updating token:', updateError)
+        // Continue anyway - we'll still verify the email
+        // But log as warning since this could cause issues if request is retried
       }
     }
 

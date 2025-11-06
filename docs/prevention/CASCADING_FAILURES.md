@@ -1763,6 +1763,138 @@ if (!dbEvents) {
 
 ---
 
+### 25. Direct Supabase Queries Breaking After Refactoring ⭐ REFACTORING BREAKAGE (2025-01-XX)
+
+**What:** After refactoring to use centralized query utility, some files still use direct `supabase.from()` calls, causing RLS errors, inconsistent error handling, and broken functionality.
+
+**Root Cause:**
+1. Migration to centralized query utility (`src/lib/supabaseQuery.ts`) was incomplete
+2. Some files were missed during migration (e.g., `adminService.ts`, `BusinessPage.tsx`)
+3. Direct Supabase queries don't use centralized retry logic, error handling, or RLS policies correctly
+4. When RLS policies change, direct queries break but centralized utility handles them correctly
+5. Forms stop working after refactoring because they still use direct queries
+
+**Example:**
+```typescript
+// ❌ BROKEN: Direct Supabase query (no retry, inconsistent error handling)
+const { data, error } = await supabase
+  .from('business_applications')
+  .select('*')
+  .eq('email', auth.email)
+
+if (error) throw error // ❌ No retry, no error classification
+return data || []
+
+// ✅ CORRECT: Centralized query utility (retry, error handling, RLS compliance)
+const result = await query('business_applications', { logPrefix: '[MyBusiness]' })
+  .select('*')
+  .eq('email', auth.email.trim())
+  .order('created_at', { ascending: false })
+  .execute()
+
+if (result.error) {
+  console.error('[MyBusiness] ❌ Error loading applications:', result.error)
+  return [] // ✅ Graceful error handling
+}
+return result.data || []
+```
+
+**What Happened:**
+1. `useBusinessOperations.ts` was migrated to use centralized `query()` utility ✅
+2. `BusinessPage.tsx` was NOT migrated - still uses direct `supabase.from('business_applications').insert()` ❌
+3. `adminService.ts` was NOT migrated - still uses direct queries for SELECT/UPDATE/DELETE ❌
+4. When RLS policies changed, direct queries started failing with 403 errors
+5. Forms that worked before stopped working after refactoring other parts
+6. User gets "Success!" message but application doesn't appear (query fails silently)
+
+**The Fix:**
+1. **Migrate ALL direct Supabase queries** to use centralized utility:
+   ```typescript
+   // Replace ALL instances of:
+   supabase.from('business_applications').select() // ❌
+   supabase.from('business_applications').insert() // ❌
+   supabase.from('business_applications').update() // ❌
+   supabase.from('business_applications').delete() // ❌
+   
+   // With:
+   query('business_applications').select().execute() // ✅
+   insert('business_applications', [data]) // ✅
+   update('business_applications', data).eq('id', id).execute() // ✅
+   delete('business_applications').eq('id', id).execute() // ✅
+   ```
+
+2. **Add delay after insert** to ensure data is visible before querying:
+   ```typescript
+   await insert('business_applications', [applicationData])
+   await new Promise(resolve => setTimeout(resolve, 500)) // ✅ Wait for DB to process
+   await loadBusinessData() // ✅ Now query will find the new application
+   ```
+
+3. **Use `.trim()` on email** to prevent whitespace mismatches:
+   ```typescript
+   .eq('email', auth.email.trim()) // ✅ Prevents whitespace issues
+   ```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use centralized query utility** for all Supabase queries (no direct `supabase.from()` calls)
+- ✅ **Search for direct Supabase queries** before refactoring: `grep -r "supabase\.from\(" src/`
+- ✅ **Migrate ALL instances** when refactoring (don't leave some behind)
+- ✅ **Add delay after insert** before querying (ensure DB has processed the insert)
+- ✅ **Use `.trim()` on email** to prevent whitespace mismatches
+- ✅ **Test forms end-to-end** after refactoring (submit → verify it appears)
+- ✅ **Check for RLS errors** in console logs after refactoring
+- ✅ **Verify data appears** in UI after submission (not just "Success!" message)
+
+**Rule of Thumb:**
+> When refactoring to use centralized query utility:
+> 1. **Search for ALL direct Supabase queries** first: `grep -r "supabase\.from\(" src/`
+> 2. **Migrate ALL instances** in one commit (don't leave some behind)
+> 3. **Test forms end-to-end** after migration (submit → verify it appears)
+> 4. **Add delay after insert** before querying (ensure DB has processed)
+> 5. **Use `.trim()` on email** to prevent whitespace issues
+> 6. **Check console logs** for RLS errors after refactoring
+> 7. **Verify data appears** in UI (not just success message)
+
+**How to Find Direct Supabase Queries:**
+```bash
+# Find all direct Supabase queries
+grep -r "supabase\.from\(" src/
+
+# Find all business_applications queries specifically
+grep -r "business_applications" src/ --include="*.ts" --include="*.tsx"
+
+# Find all INSERT operations
+grep -r "\.insert\(" src/ --include="*.ts" --include="*.tsx"
+
+# Find all SELECT operations
+grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
+```
+
+**Files to Watch:**
+- `src/services/adminService.ts` - Still uses direct queries for business_applications
+- `src/pages/BusinessPage.tsx` - Still uses direct `insert()` for business_applications
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - ✅ Already migrated (use as reference)
+- Any file that was "missed" during migration
+
+**Breaking Changes:**
+- If you refactor one file to use centralized utility but leave others using direct queries → Forms break
+- If you change RLS policies but don't migrate all direct queries → Queries fail with 403 errors
+- If you don't add delay after insert → New data doesn't appear immediately (query runs too fast)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Direct queries cause 403 errors when RLS policies change
+- ✅ Centralized utility handles RLS correctly with retry logic
+- ✅ Adding delay after insert ensures data is visible before querying
+- ✅ Using `.trim()` on email prevents whitespace mismatches
+- ✅ Forms work correctly after migrating to centralized utility
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy changes)
+- `docs/SUPABASE_QUERY_UTILITY.md` - Centralized query utility documentation
+- `docs/SUPABASE_QUERY_MIGRATION_TESTING.md` - Migration testing instructions
+
+---
+
 ## How to Prevent This (Action Plan)
 
 ### Immediate (5 minutes after EVERY change):
@@ -1803,6 +1935,8 @@ if (!dbEvents) {
   - [ ] **Are businesses soft deleted (unlinked) when admin chooses to keep them?** ⭐ NEW ✅ TESTED
   - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW ✅ TESTED
   - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+  - [ ] **Are all Supabase queries using centralized utility (no direct `supabase.from()` calls)?** ⭐ NEW
+  - [ ] **Do forms work end-to-end after refactoring (submit → verify data appears)?** ⭐ NEW
 
 3. **Manual Testing**
    - Actually USE the app after every change
@@ -1907,6 +2041,10 @@ Before committing ANY change:
   - [ ] Components updated?
   - [ ] Tests updated?
   - [ ] **RLS policies updated?** ⭐ NEW
+- [ ] **All Supabase queries migrated to centralized utility?** ⭐ NEW
+  - [ ] Search for direct queries: `grep -r "supabase\.from\(" src/`
+  - [ ] Migrate all instances in one commit
+  - [ ] Test forms end-to-end after migration
 - [ ] **Integration Test:** Does the whole flow work?
 - [ ] **Manual Testing:** Actually USE the app
 

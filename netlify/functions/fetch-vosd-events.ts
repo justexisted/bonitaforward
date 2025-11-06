@@ -238,6 +238,7 @@ export const handler: Handler = async (event, context) => {
       const existing = existingImagesMap.get(newEvent.id)
       if (existing && existing.image_url) {
         // Preserve existing image data
+        console.log(`[fetch-vosd-events] Preserving image for event: ${newEvent.id} (${newEvent.title?.substring(0, 40)})`)
         return {
           ...newEvent,
           image_url: existing.image_url,
@@ -246,6 +247,11 @@ export const handler: Handler = async (event, context) => {
       }
       return newEvent
     })
+    
+    // DIAGNOSTIC: Log how many images were preserved
+    const preservedCount = eventsWithPreservedImages.filter(e => e.image_url).length
+    const totalWithImages = existingImagesMap.size
+    console.log(`[fetch-vosd-events] Image preservation: ${preservedCount} of ${totalWithImages} images preserved`)
     
     // Insert new events in batches of 100 to avoid payload size limits
     const batchSize = 100

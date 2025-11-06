@@ -248,19 +248,23 @@ export async function loadSavedEvents(userId: string): Promise<CalendarEvent[]> 
 
 export async function loadPendingApplications(email: string): Promise<PendingApplication[]> {
   try {
+    // DIAGNOSTIC: Log what we're querying for
+    console.log('[Account] Loading pending applications for email:', email)
+    
     const result = await query('business_applications', { logPrefix: '[Account]' })
       .select('*')
-      .eq('email', email)
+      .eq('email', email?.trim() || '')
       .order('created_at', { ascending: false })
       .limit(10)
       .execute()
     
     if (result.error) {
       // Error already logged by query utility
+      console.error('[Account] ❌ Error loading applications:', result.error)
       return []
     }
     
-    return (result.data || []).map((r: any) => ({
+    const applications = (result.data || []).map((r: any) => ({
       id: r.id,
       business_name: r.business_name,
       full_name: r.full_name,
@@ -273,8 +277,17 @@ export async function loadPendingApplications(email: string): Promise<PendingApp
       created_at: r.created_at,
       updated_at: r.updated_at,
     }))
+    
+    console.log('[Account] ✅ Loaded applications:', {
+      count: applications.length,
+      emails: applications.map(a => a.email),
+      businessNames: applications.map(a => a.business_name),
+      statuses: applications.map(a => a.status)
+    })
+    
+    return applications
   } catch (err) {
-    console.log('[Account] Error loading applications:', err)
+    console.error('[Account] ❌ Exception loading applications:', err)
     return []
   }
 }

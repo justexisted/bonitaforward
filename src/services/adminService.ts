@@ -1,6 +1,7 @@
 // Admin service functions - extracted API operations from Admin.tsx
 
 import { supabase } from '../lib/supabase'
+import { query, insert, update, deleteRows } from '../lib/supabaseQuery'
 import type { 
   ProviderRow, 
   BusinessApplicationRow, 
@@ -71,33 +72,37 @@ export const providerService = {
 }
 
 // Business applications operations
+// CRITICAL: Use centralized query utility for RLS compliance and error handling
 export const businessApplicationService = {
   async loadApplications(): Promise<BusinessApplicationRow[]> {
-    const { data, error } = await supabase
-      .from('business_applications')
+    const result = await query('business_applications', { logPrefix: '[AdminService]' })
       .select('*')
       .order('created_at', { ascending: false })
+      .execute()
     
-    if (error) throw error
-    return data || []
+    if (result.error) {
+      console.error('[AdminService] ❌ Error loading applications:', result.error)
+      throw result.error
+    }
+    return result.data || []
   },
 
   async approveApplication(appId: string): Promise<void> {
-    const { error } = await supabase
-      .from('business_applications')
-      .update({ status: 'approved' })
-      .eq('id', appId)
+    const result = await update('business_applications', { status: 'approved' }, { id: appId }, { logPrefix: '[AdminService]' })
     
-    if (error) throw error
+    if (result.error) {
+      console.error('[AdminService] ❌ Error approving application:', result.error)
+      throw result.error
+    }
   },
 
   async deleteApplication(appId: string): Promise<void> {
-    const { error } = await supabase
-      .from('business_applications')
-      .delete()
-      .eq('id', appId)
+    const result = await deleteRows('business_applications', { id: appId }, { logPrefix: '[AdminService]' })
     
-    if (error) throw error
+    if (result.error) {
+      console.error('[AdminService] ❌ Error deleting application:', result.error)
+      throw result.error
+    }
   }
 }
 

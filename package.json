@@ -18,7 +18,8 @@
     "seed:calendar": "tsx scripts/seed-calendar-events.ts",
     "migrate:images": "tsx scripts/migrate-google-images.ts",
     "cleanup:gradient-strings": "tsx scripts/cleanup-gradient-strings.ts",
-    "populate:event-images": "tsx scripts/populate-event-images.ts"
+    "populate:event-images": "tsx scripts/populate-event-images.ts",
+    "diagnose:image-removal": "tsx scripts/diagnose-image-removal.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

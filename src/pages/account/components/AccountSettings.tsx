@@ -63,6 +63,7 @@
 
 import { useState, useEffect } from 'react'
 import { updateProfile, loadEmailPreferences, updateEmailPreferences } from '../dataLoader'
+import EmailVerificationBadge from '../../../components/EmailVerificationBadge'
 
 interface AccountSettingsProps {
   userId: string
@@ -160,7 +161,10 @@ export function AccountSettings({ userId, initialEmail, initialName, onMessage }
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">Profile Information</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Email</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-neutral-700">Email</label>
+              <EmailVerificationBadge />
+            </div>
             <input
               type="email"
               value={initialEmail}

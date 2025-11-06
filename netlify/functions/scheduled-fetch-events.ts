@@ -421,8 +421,27 @@ const scheduledHandler: Handler = async (event, context) => {
       }
     }
     
-    // Clear existing iCalendar events (those from external sources)
+    // CRITICAL: Preserve image_url and image_type BEFORE deleting events
+    // Fetch existing events with images BEFORE deleting (this was the bug!)
     const icalSources = enabledFeeds.map(feed => feed.source)
+    const { data: existingEventsWithImages } = await supabase
+      .from('calendar_events')
+      .select('id, image_url, image_type')
+      .in('source', icalSources)
+    
+    // Create a map of existing events by ID for quick lookup (BEFORE deleting)
+    const existingImagesMap = new Map<string, { image_url: string | null, image_type: string | null }>()
+    if (existingEventsWithImages) {
+      existingEventsWithImages.forEach(event => {
+        existingImagesMap.set(event.id, {
+          image_url: event.image_url,
+          image_type: event.image_type
+        })
+      })
+      console.log(`[scheduled-fetch-events] Preserved ${existingEventsWithImages.length} events with images before deletion`)
+    }
+    
+    // Clear existing iCalendar events (those from external sources)
     const { error: deleteError } = await supabase
       .from('calendar_events')
       .delete()
@@ -441,25 +460,19 @@ const scheduledHandler: Handler = async (event, context) => {
       .from('calendar_events')
       .select('id, title, date, source')
     
-    // CRITICAL: Preserve image_url and image_type when re-inserting events
-    // Fetch existing events with images before processing duplicates
-    const { data: existingEventsWithImages } = await supabase
-      .from('calendar_events')
-      .select('id, title, date, source, image_url, image_type')
-    
-    // Create a map of existing events by ID for quick lookup
+    // Create a map of existing events by ID for duplicate detection (different from images map)
     const existingEventsMap = new Map<string, any>()
-    if (existingEventsWithImages) {
-      existingEventsWithImages.forEach(event => {
+    if (existingEvents) {
+      existingEvents.forEach(event => {
         existingEventsMap.set(event.id, event)
       })
     }
     
-    if (existingEventsWithImages && existingEventsWithImages.length > 0) {
+    if (existingEvents && existingEvents.length > 0) {
       const duplicateIds: string[] = []
       
       for (const newEvent of filteredEvents) {
-        for (const existing of existingEventsWithImages) {
+        for (const existing of existingEvents) {
           // Check for duplicates across different sources (allowCrossSource: true)
           // Only flag as duplicate if sources are different (cross-source duplicate)
           if (isDuplicateEvent(newEvent, existing, { allowCrossSource: true }) && newEvent.source !== existing.source) {
@@ -470,6 +483,25 @@ const scheduledHandler: Handler = async (event, context) => {
       
       if (duplicateIds.length > 0) {
         console.log(`Removing ${duplicateIds.length} duplicate events from database`)
+        // CRITICAL: Before deleting duplicates, preserve their images too
+        const { data: duplicateEventsWithImages } = await supabase
+          .from('calendar_events')
+          .select('id, image_url, image_type')
+          .in('id', duplicateIds)
+        
+        // Add duplicate event images to the preservation map
+        if (duplicateEventsWithImages) {
+          duplicateEventsWithImages.forEach(event => {
+            if (event.image_url) {
+              existingImagesMap.set(event.id, {
+                image_url: event.image_url,
+                image_type: event.image_type
+              })
+            }
+          })
+          console.log(`[scheduled-fetch-events] Preserved ${duplicateEventsWithImages.length} duplicate event images before deletion`)
+        }
+        
         await supabase
           .from('calendar_events')
           .delete()
@@ -478,11 +510,12 @@ const scheduledHandler: Handler = async (event, context) => {
     }
     
     // CRITICAL: Preserve images when inserting events
-    // If an event with the same ID already exists, preserve its image_url and image_type
+    // Use the existingImagesMap (fetched BEFORE deletion) to preserve images by ID
     const eventsWithPreservedImages = filteredEvents.map(newEvent => {
-      const existing = existingEventsMap.get(newEvent.id)
+      const existing = existingImagesMap.get(newEvent.id)
       if (existing && existing.image_url) {
-        // Preserve existing image data
+        // Preserve existing image data from BEFORE deletion
+        console.log(`[scheduled-fetch-events] Preserving image for event: ${newEvent.id} (${newEvent.title?.substring(0, 40)})`)
         return {
           ...newEvent,
           image_url: existing.image_url,
@@ -491,6 +524,11 @@ const scheduledHandler: Handler = async (event, context) => {
       }
       return newEvent
     })
+    
+    // DIAGNOSTIC: Log how many images were preserved
+    const preservedCount = eventsWithPreservedImages.filter(e => e.image_url).length
+    const totalWithImages = existingImagesMap.size
+    console.log(`[scheduled-fetch-events] Image preservation: ${preservedCount} of ${totalWithImages} images preserved`)
     
     // Insert new events in batches
     const batchSize = 100

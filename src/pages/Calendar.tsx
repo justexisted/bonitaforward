@@ -162,28 +162,6 @@ export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
       return []
     }
     
-    // DIAGNOSTIC: Check if image_url is being returned from database and what type of values they are
-    if (dbEvents && dbEvents.length > 0) {
-      const eventsWithImages = dbEvents.filter(e => e.image_url).length
-      const eventsWithoutImages = dbEvents.filter(e => !e.image_url).length
-      const eventsWithImageUrls = dbEvents.filter(e => e.image_url && e.image_url.startsWith('http')).length
-      const eventsWithGradientStrings = dbEvents.filter(e => e.image_url && !e.image_url.startsWith('http')).length
-      console.log('[DEBUG] Database events image check:', {
-        total: dbEvents.length,
-        withImageUrl: eventsWithImages,
-        withoutImageUrl: eventsWithoutImages,
-        withImageUrls: eventsWithImageUrls, // URLs starting with http
-        withGradientStrings: eventsWithGradientStrings, // Gradient strings
-        sample: dbEvents.slice(0, 5).map(e => ({
-          id: e.id,
-          title: e.title?.substring(0, 30),
-          hasImageUrl: !!e.image_url,
-          imageUrl: e.image_url ? e.image_url.substring(0, 80) + '...' : null,
-          imageUrlType: e.image_url ? (e.image_url.startsWith('http') ? 'URL' : 'GRADIENT_STRING') : 'NONE',
-          imageType: e.image_type
-        }))
-      })
-    }
     
     // Fetch events from RSS feeds (disabled - all proxies failing)
     const rssPromises = RSS_FEEDS.map(feed => 
@@ -228,18 +206,6 @@ export const fetchCalendarEvents = async (): Promise<CalendarEvent[]> => {
       ...(dbEvents || []),
       ...uniqueExternalEvents
     ]
-    
-    // DIAGNOSTIC: Verify final merged events have image_url where expected
-    const finalEventsWithImages = allEvents.filter(e => e.image_url).length
-    const finalEventsWithoutImages = allEvents.filter(e => !e.image_url).length
-    console.log('[DEBUG] Final merged events image check:', {
-      total: allEvents.length,
-      withImageUrl: finalEventsWithImages,
-      withoutImageUrl: finalEventsWithoutImages,
-      dbEventsCount: dbEvents?.length || 0,
-      externalEventsCount: uniqueExternalEvents.length,
-      duplicatesRemoved: externalEvents.length - uniqueExternalEvents.length
-    })
     
     // Sort by date
     return allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())

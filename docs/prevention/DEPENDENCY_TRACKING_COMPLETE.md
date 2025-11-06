@@ -328,7 +328,14 @@ Each dependency tracking comment includes:
         - ✅ Users can now submit business applications without RLS errors
         - ✅ See: `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` for complete dependency tracking
         - ✅ See: `docs/prevention/CASCADING_FAILURES.md` - Section #24 for RLS policy prevention patterns
-  18. ⏳ Set up integration tests that verify dependencies (future)
+18. ✅ Fixed direct Supabase queries breaking after refactoring (2025-01-XX) - migrated adminService.ts and BusinessPage.tsx to centralized utility (completed)
+        - ✅ Migrated `adminService.ts` to use centralized `query()`, `update()`, and `deleteRows()` utilities
+        - ✅ Migrated `BusinessPage.tsx` to use centralized `insert()` utility
+        - ✅ Added new section to CASCADING_FAILURES.md (#25) documenting this pattern
+        - ✅ Updated smoke test checklist to include verification of centralized utility usage
+        - ✅ Added prevention checklist for finding and migrating direct Supabase queries
+        - ✅ See: `docs/prevention/CASCADING_FAILURES.md` - Section #25 for complete prevention patterns
+  19. ⏳ Set up integration tests that verify dependencies (future)
 
 ---
 

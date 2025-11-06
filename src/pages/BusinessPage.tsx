@@ -4,38 +4,56 @@ import SplitText from '../components/SplitText'
 import ScrollStack, { ScrollStackItem } from '../components/ScrollStack'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import CreateBusinessForm from './CreateBusinessForm'
+import { insert } from '../lib/supabaseQuery'
 import { CATEGORY_OPTIONS } from '../constants/categories'
 
 function Container(props: { children: React.ReactNode; className?: string }) {
   return <div className={`container-px mx-auto max-w-6xl ${props.className ?? ''}`}>{props.children}</div>
 }
 
-async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string; tier?: string }) {
+async function createBusinessApplication(params: { full_name?: string; business_name?: string; email?: string; phone?: string; category?: string; challenge?: string; tier?: string }, authEmail?: string | null) {
   try {
-    const { error } = await supabase
-      .from('business_applications')
-      .insert([
-        {
-          full_name: params.full_name || null,
-          business_name: params.business_name || null,
-          email: params.email || null,
-          phone: params.phone || null,
-          category: params.category || null,
-          challenge: params.challenge || null,
-          // TODO: Add these columns to business_applications table:
-          // tier_requested: params.tier || 'free',
-          // status: 'pending'
-        },
-      ])
-    if (error) {
-      console.error('[BusinessApp] insert error', error)
+    // CRITICAL: Use authenticated user's email if available, otherwise use form email
+    // This ensures the application can be found by the user after signup
+    // The RLS policy requires: email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    // So we must use the exact email from auth.users
+    const finalEmail = authEmail?.trim() || params.email?.trim() || null
+    
+    console.log('[BusinessApp] Creating application:', {
+      formEmail: params.email,
+      authEmail,
+      finalEmail,
+      businessName: params.business_name
+    })
+    
+    // CRITICAL: Use centralized insert utility for RLS compliance and error handling
+    const result = await insert(
+      'business_applications',
+      [{
+        full_name: params.full_name || null,
+        business_name: params.business_name || null,
+        email: finalEmail,
+        phone: params.phone || null,
+        category: params.category || null,
+        challenge: params.challenge || null,
+        tier_requested: (params.tier || 'free') as 'free' | 'featured',
+        status: 'pending' as 'pending' | 'approved' | 'rejected'
+      }],
+      { logPrefix: '[BusinessApp]' }
+    )
+    
+    if (result.error) {
+      console.error('[BusinessApp] ❌ Insert error:', result.error)
     } else {
-      console.log('[BusinessApp] insert success')
+      console.log('[BusinessApp] ✅ Insert success:', {
+        id: result.data?.[0]?.id,
+        email: result.data?.[0]?.email,
+        businessName: result.data?.[0]?.business_name
+      })
     }
-    return { data: null, error }
+    return { data: result.data, error: result.error }
   } catch (err) {
-    console.error('[BusinessApp] unexpected failure', err)
+    console.error('[BusinessApp] ❌ Unexpected failure:', err)
     return { data: null, error: err as any }
   }
 }
@@ -47,6 +65,16 @@ export default function BusinessPage() {
   const [avgSale, setAvgSale] = useState(250)
   const [goalCustomers, setGoalCustomers] = useState(5)
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), [])
+  
+  // CRITICAL: Redirect authenticated business users to /my-business where the form already works
+  // This avoids maintaining duplicate forms and ensures consistency
+  useEffect(() => {
+    if (auth.isAuthed && auth.role === 'business') {
+      console.log('[BusinessPage] User is authenticated business - redirecting to /my-business')
+      navigate('/my-business', { replace: true })
+      return
+    }
+  }, [auth.isAuthed, auth.role, navigate])
   
   useEffect(() => {
     const hasPrefill = urlParams.toString().length > 0
@@ -179,9 +207,23 @@ export default function BusinessPage() {
 
           <div className="mt-6 sm:mt-8 md:mt-10">
             <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Plans That Fit Your Business</h2>
+            <p className="mt-2 text-xs sm:text-sm text-neutral-600 text-center">Click on a plan below to see an example of how your business will appear. Your selection will be saved when you submit your application.</p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Free Listing Preview */}
-              <div className="rounded-2xl border border-neutral-200 p-4 sm:p-5 bg-white elevate">
+              <div 
+                className="rounded-2xl border border-neutral-200 p-4 sm:p-5 bg-white elevate cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
+                onClick={() => {
+                  const freeRadio = document.querySelector('input[name="tier"][value="free"]') as HTMLInputElement
+                  if (freeRadio) {
+                    freeRadio.checked = true
+                    freeRadio.dispatchEvent(new Event('change', { bubbles: true }))
+                  }
+                  // Scroll to form
+                  setTimeout(() => {
+                    document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }, 100)
+                }}
+              >
                 <div className="text-sm sm:text-base font-medium mb-2">Starter</div>
                 <div className="text-xl sm:text-2xl font-semibold mb-3">Free</div>
                 
@@ -213,12 +255,33 @@ export default function BusinessPage() {
               </div>
 
               {/* Featured Listing Preview */}
-              <div className="rounded-2xl border border-amber-200 p-4 sm:p-5 bg-white elevate relative overflow-hidden">
+              <div 
+                className="rounded-2xl border border-amber-200 p-4 sm:p-5 bg-white elevate relative overflow-hidden cursor-pointer hover:border-amber-300 hover:shadow-md transition-all"
+                onClick={() => {
+                  const featuredRadio = document.querySelector('input[name="tier"][value="featured"]') as HTMLInputElement
+                  if (featuredRadio) {
+                    featuredRadio.checked = true
+                    featuredRadio.dispatchEvent(new Event('change', { bubbles: true }))
+                  }
+                  // Scroll to form
+                  setTimeout(() => {
+                    document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }, 100)
+                }}
+              >
                 <div className="absolute top-0 right-0 bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
                   Featured
                 </div>
                 <div className="text-sm sm:text-base font-medium mb-2">Growth</div>
                 <div className="text-xl sm:text-2xl font-semibold mb-3">$97/year</div>
+                <div className="mb-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Multiple Images</span>
+                  </span>
+                </div>
                 
                 {/* Preview Card */}
                 <div className="mt-4 rounded-lg border border-amber-200 overflow-hidden bg-white shadow-md">
@@ -234,11 +297,17 @@ export default function BusinessPage() {
                         ⭐ Featured
                       </span>
                     </div>
-                    {/* Multiple images indicator */}
-                    <div className="absolute bottom-2 right-2 flex gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-600"></div>
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-300"></div>
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-200"></div>
+                    {/* Multiple images indicator - more prominent */}
+                    <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-1.5 bg-amber-600/90 backdrop-blur-sm rounded-lg px-2 py-1.5">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-[10px] font-semibold text-white">Multiple Images</span>
+                      <div className="flex gap-0.5 ml-1">
+                        <div className="w-1 h-1 rounded-full bg-white"></div>
+                        <div className="w-1 h-1 rounded-full bg-white"></div>
+                        <div className="w-1 h-1 rounded-full bg-white"></div>
+                      </div>
                     </div>
                   </div>
                   
@@ -424,6 +493,8 @@ export default function BusinessPage() {
           </div>
 
           <div id="apply" className="mt-6 sm:mt-8 md:mt-10 rounded-2xl border border-neutral-100 p-4 sm:p-5 bg-white elevate">
+            {/* Show form only for unauthenticated users or non-business users */}
+            {/* Authenticated business users are redirected to /my-business */}
             {!auth.isAuthed || String((auth as any)?.role || '').toLowerCase() !== 'business' ? (
               <>
                 <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Ready to Grow? Apply Below.</h2>
@@ -438,7 +509,7 @@ export default function BusinessPage() {
                     const phone = formData.get('phone') as string || ''
                     const category = formData.get('category') as string || ''
                     const tier = formData.get('tier') as string || 'free'
-                    const challenge = formData.get('challenge') as string || ''
+                    const challengeText = formData.get('challenge') as string || ''
                     
                     // Validation
                     if (!business_name || !category) {
@@ -446,9 +517,37 @@ export default function BusinessPage() {
                       return
                     }
                     
-                    try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, tier, challenge, ts: Date.now() })) } catch {}
+                    try { localStorage.setItem('bf-business-app', JSON.stringify({ full_name, business_name, email, phone, category, tier, challenge: challengeText, ts: Date.now() })) } catch {}
                     
-                    const { error } = await createBusinessApplication({ full_name, business_name, email, phone, category, challenge, tier })
+                    // CRITICAL: Match MyBusiness createBusinessListing structure exactly
+                    // Store challenge field as JSON matching MyBusiness format
+                    const challengeJson = JSON.stringify({
+                      website: null,
+                      address: null,
+                      description: challengeText || null, // Store challenge text in description field
+                      tags: null,
+                      specialties: null,
+                      social_links: null,
+                      business_hours: null,
+                      service_areas: null,
+                      google_maps_url: null,
+                      bonita_resident_discount: null,
+                      images: null,
+                      business_contact_email: email || null  // Store form email as business contact email
+                    })
+                    
+                    // CRITICAL: Pass authenticated user's email if available
+                    // This ensures the application can be found by the user after signup
+                    // The RLS SELECT policy requires: email = (SELECT email FROM auth.users WHERE id = auth.uid())
+                    const { error } = await createBusinessApplication({ 
+                      full_name, 
+                      business_name, 
+                      email, 
+                      phone, 
+                      category, 
+                      challenge: challengeJson, // Use JSON format matching MyBusiness
+                      tier 
+                    }, auth.email)
                     
                     if (!error) {
                       setMsg(`Thanks! We received your ${tier} listing application. Create an account to track your application status and manage your business listing.`)
@@ -535,9 +634,9 @@ export default function BusinessPage() {
               </>
             ) : (
               <>
-                <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Get My Business Listed</h2>
-                <p className="mt-2 text-xs sm:text-sm text-neutral-700">You're signed in as a business. Share your business details below to get listed on Bonita Forward.</p>
-                <CreateBusinessForm />
+                {/* This should not render - authenticated business users are redirected */}
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold tracking-tight">Redirecting to My Business...</h2>
+                <p className="mt-2 text-xs sm:text-sm text-neutral-700">You're signed in as a business. Redirecting you to the business management page...</p>
               </>
             )}
           </div>

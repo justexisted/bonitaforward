@@ -548,6 +548,7 @@ export const handler: Handler = async (event, context) => {
       const existing = existingImagesMap.get(newEvent.id)
       if (existing && existing.image_url) {
         // Preserve existing image data
+        console.log(`[manual-fetch-events] Preserving image for event: ${newEvent.id} (${newEvent.title?.substring(0, 40)})`)
         return {
           ...newEvent,
           image_url: existing.image_url,
@@ -556,6 +557,11 @@ export const handler: Handler = async (event, context) => {
       }
       return newEvent
     })
+    
+    // DIAGNOSTIC: Log how many images were preserved
+    const preservedCount = eventsWithPreservedImages.filter(e => e.image_url).length
+    const totalWithImages = existingImagesMap.size
+    console.log(`[manual-fetch-events] Image preservation: ${preservedCount} of ${totalWithImages} images preserved`)
     
     // Insert new events
     const { error: insertError } = await supabase

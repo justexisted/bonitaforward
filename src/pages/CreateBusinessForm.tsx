@@ -40,19 +40,36 @@ export default function CreateBusinessForm() {
         return
       }
 
+      // CRITICAL: Match MyBusiness createBusinessListing structure exactly
+      // IMPORTANT: business_applications table uses 'category' NOT 'category_key'
+      // IMPORTANT: Always use auth.email so the application shows up in the user's account
       const payload: any = { 
         business_name: businessName,
-        full_name: auth.name || null, // Include user's full name from auth context
-        email: auth.email, // Use signed-in user's email
-        category: category,
-        phone: phone || null,
+        full_name: auth.name || 'Business Owner', // Match MyBusiness format
+        email: auth.email, // Always use auth.email to ensure application shows in My Business page
+        category: category, // Note: 'category' not 'category_key'
+        phone: phone || '',
         status: 'pending', // Set initial status as pending
-        // Store business-specific details in challenge field (we'll parse it later)
+        tier_requested: 'free' as 'free' | 'featured', // Default to free tier
+        // Store additional details as JSON string in the challenge field (matching MyBusiness structure)
+        // Store the business contact email separately from account email
         challenge: JSON.stringify({
-          businessEmail: businessEmail || null,
-          address: address || null
+          website: null,
+          address: address || null,
+          description: null,
+          tags: null,
+          specialties: null,
+          social_links: null,
+          business_hours: null,
+          service_areas: null,
+          google_maps_url: null,
+          bonita_resident_discount: null,
+          images: null,
+          business_contact_email: businessEmail || null  // Store business email separately from account email
         })
       }
+      
+      console.log('[CreateBusinessForm] Submitting application data:', payload)
       
       // Uses centralized query utility with retry logic and standardized error handling
       const result = await insert(
@@ -61,16 +78,21 @@ export default function CreateBusinessForm() {
         { logPrefix: '[CreateBusinessForm]' }
       )
       
+      console.log('[CreateBusinessForm] Application insert result:', { data: result.data, error: result.error })
+
       if (result.error) {
         // Error already logged by query utility
-        setMessage(result.error.message)
+        setMessage(`Error submitting application: ${result.error.message}`)
       } else {
-        setMessage('Success! Your business listing request has been submitted and is now under review. We will notify you when it is approved. Redirecting to your account...')
-        // Redirect to account page after 2 seconds
+        setMessage('Success! Your business application has been submitted and is pending admin approval.')
+        // Redirect to account page after 2 seconds (matching MyBusiness behavior)
         setTimeout(() => {
           navigate('/account')
         }, 2000)
       }
+    } catch (error: any) {
+      console.error('[CreateBusinessForm] Unexpected error:', error)
+      setMessage(`Error submitting application: ${error.message}`)
     } finally {
       setBusy(false)
     }
