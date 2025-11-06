@@ -1,42 +1,67 @@
-# Complete Database Schema Reference
+# Complete Database Schema Reference v1.0
 
-## CRITICAL: Read This Before ANY Database Query
+## ⚠️ AUTHORITATIVE VERSION - USE THIS DOCUMENT ONLY
 
-This document maps the ACTUAL database schema to prevent column name mismatches.
+**Version:** 1.0  
+**Last Updated:** 2025-01-XX  
+**Source:** Verified from live Supabase database via `information_schema.columns` query
+
+**CRITICAL:** This is the **ONLY** schema reference document you should use. All other schema documents are outdated or incomplete. Always check this document before any database operation.
 
 ---
 
 ## Table: `business_applications`
 
-### Actual Database Schema
+### Verified Database Schema (v1.0 - 2025-01-XX)
+**Source:** Direct query from `information_schema.columns` on live database
+
 ```sql
 CREATE TABLE public.business_applications (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  full_name text,
-  business_name text,
-  email text,
-  phone text,
-  category text,              -- ⚠️ COLUMN IS "category" NOT "category_key"
-  challenge text,
-  created_at timestamptz DEFAULT now(),
-  tier_requested text DEFAULT 'free',
-  status text DEFAULT 'pending'
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  full_name text NULL,
+  business_name text NULL,
+  email text NULL,
+  phone text NULL,
+  category text NULL,              -- ⚠️ COLUMN IS "category" NOT "category_key"
+  challenge text NULL,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  tier_requested text NULL DEFAULT 'free'::text,
+  status text NULL DEFAULT 'pending'::text
 );
 ```
+
+### Column Details (Verified)
+| Column Name | Data Type | Nullable | Default | Notes |
+|-------------|-----------|----------|---------|-------|
+| `id` | uuid | NO | `gen_random_uuid()` | Primary key |
+| `full_name` | text | YES | NULL | Applicant's full name |
+| `business_name` | text | YES | NULL | Business name |
+| `email` | text | YES | NULL | Applicant email |
+| `phone` | text | YES | NULL | Phone number |
+| `category` | text | YES | NULL | ⚠️ **NOT** `category_key` |
+| `challenge` | text | YES | NULL | Stores JSON as string |
+| `created_at` | timestamptz | YES | `now()` | Creation timestamp |
+| `tier_requested` | text | YES | `'free'::text` | Requested tier |
+| `status` | text | YES | `'pending'::text` | Application status |
+
+### ⚠️ Columns That DO NOT Exist
+- ❌ `decided_at` - **DOES NOT EXIST** (use `created_at` as fallback)
+- ❌ `category_key` - **DOES NOT EXIST** (use `category` instead)
 
 ### TypeScript Interface (What the code should use)
 ```typescript
 interface BusinessApplication {
-  id: string
-  full_name: string | null
-  business_name: string | null
-  email: string | null
-  phone: string | null
-  category: string | null      // ⚠️ USE "category" NOT "category_key"
-  challenge: string | null
-  created_at: string
-  tier_requested: string | null
-  status: string | null
+  id: string                                    // uuid, NOT NULL, default: gen_random_uuid()
+  full_name: string | null                      // text, nullable
+  business_name: string | null                  // text, nullable
+  email: string | null                          // text, nullable
+  phone: string | null                          // text, nullable
+  category: string | null                       // ⚠️ USE "category" NOT "category_key"
+  challenge: string | null                      // text, nullable (stores JSON as string)
+  created_at: string                            // timestamptz, nullable, default: now()
+  tier_requested: string | null                 // text, nullable, default: 'free'
+  status: string | null                          // text, nullable, default: 'pending'
+  // NOTE: decided_at does NOT exist - use created_at as fallback
 }
 ```
 
@@ -264,92 +289,64 @@ This allows me to:
 
 ---
 
-## Next Steps
+## Version History
 
-Please provide the SQL query results above so I can:
-1. Verify exact column names across all tables
-2. Create accurate TypeScript interfaces
-3. Map all data flow transformations
-4. Document all FK relationships
-5. Create a single source of truth
+### v1.0 (2025-01-XX)
+- ✅ Verified `business_applications` schema from live database
+- ✅ Confirmed `decided_at` column does NOT exist
+- ✅ Confirmed `category` column exists (NOT `category_key`)
+- ✅ Documented all 10 columns with exact data types and defaults
+- ✅ Marked as authoritative version
 
-This will eliminate schema-related bugs permanently.
+---
 
-All columns details:
+## How to Update This Document
 
-[
-  {
-    "table_name": "business_applications",
-    "column_name": "id",
-    "data_type": "uuid",
-    "is_nullable": "NO",
-    "column_default": "gen_random_uuid()"
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "full_name",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": null
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "business_name",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": null
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "email",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": null
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "phone",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": null
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "category",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": null
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "challenge",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": null
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "created_at",
-    "data_type": "timestamp with time zone",
-    "is_nullable": "YES",
-    "column_default": "now()"
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "tier_requested",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": "'free'::text"
-  },
-  {
-    "table_name": "business_applications",
-    "column_name": "status",
-    "data_type": "text",
-    "is_nullable": "YES",
-    "column_default": "'pending'::text"
-  },
-  {
-    "table_name": "profiles",
+When schema changes occur:
+
+1. **Run verification query:**
+   ```sql
+   SELECT 
+     column_name,
+     data_type,
+     is_nullable,
+     column_default
+   FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name = 'business_applications'
+   ORDER BY ordinal_position;
+   ```
+
+2. **Update the document:**
+   - Update version number (v1.1, v1.2, etc.)
+   - Update "Last Updated" date
+   - Update verified schema data
+   - Add to version history
+
+3. **Mark as authoritative:**
+   - Keep the "AUTHORITATIVE VERSION" header
+   - Update verification date
+   - Document what changed
+
+---
+
+## Other Schema Documents (OUTDATED - DO NOT USE)
+
+The following documents exist but are **NOT** the authoritative source:
+- `docs/misc/SCHEMA_REFERENCE_PRODUCTION.md` - Outdated, use this document instead
+- `docs/misc/SUPABASE_SCHEMA_REFERENCE.md` - Outdated, use this document instead
+- `docs/misc/supabase_schema.md` - Raw schema dump, may be incomplete
+- `docs/misc/current_database_schema.md` - Incomplete, use this document instead
+
+**Always use this document (`DATABASE_SCHEMA_COMPLETE_REFERENCE.md`) as the single source of truth.**
+
+---
+
+## Additional Tables (Legacy Schema Data - Not Yet Verified in v1.0)
+
+The following tables are documented below but have not been verified in v1.0. They are included for reference but should be verified before use:
+
+### `profiles` Table
     "column_name": "id",
     "data_type": "uuid",
     "is_nullable": "NO",

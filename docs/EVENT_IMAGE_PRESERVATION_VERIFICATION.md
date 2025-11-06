@@ -159,3 +159,4 @@ Both populate scripts set `image_url` to `null` when images can't be fetched:
 - `docs/prevention/DEPENDENCY_TRACKING_PLAN.md` - Event Images: Gradient Strings Saved to Database
 - `docs/EVENT_IMAGE_PRESERVATION_AUDIT.md` - Previous audit of image preservation
 
+

@@ -157,6 +157,32 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
 
       // Load business applications by email from business_applications table
       // CRITICAL: Use centralized query utility with proper RLS handling
+      // DEBUGGING: First try without email filter to see if RLS is blocking
+      console.log('[MyBusiness] 🔍 DEBUGGING: Checking applications query...', {
+        userId: auth.userId,
+        email: auth.email,
+        emailTrimmed: auth.email?.trim(),
+        emailLength: auth.email?.length
+      })
+      
+      // First, try querying ALL applications (no email filter) to see if RLS allows access
+      const allAppsTest = await query('business_applications', { logPrefix: '[MyBusiness]' })
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10)
+        .execute()
+      
+      console.log('[MyBusiness] 🔍 DEBUGGING: All applications test (no filter):', {
+        count: allAppsTest.data?.length || 0,
+        error: allAppsTest.error,
+        sampleEmails: allAppsTest.data?.slice(0, 5).map((app: any) => ({
+          email: app.email,
+          status: app.status,
+          businessName: app.business_name
+        })) || []
+      })
+      
+      // Now try with email filter
       const appsResult = await query('business_applications', { logPrefix: '[MyBusiness]' })
         .select('*')
         .eq('email', auth.email.trim())
@@ -168,17 +194,77 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
 
       console.log('[MyBusiness] Applications query result:', {
         error: appsError,
+        errorCode: appsError?.code,
+        errorMessage: appsError?.message,
+        errorDetails: appsError?.details,
         count: appsData?.length || 0,
-        data: appsData,
         queryEmail: auth.email.trim(),
+        rawData: appsData,  // Log raw data to see what's actually returned
         emailMatches: appsData?.map((app: any) => ({
           id: app.id,
           businessName: app.business_name,
           email: app.email,
+          emailFromDB: app.email,
+          emailFromAuth: auth.email.trim(),
           matches: app.email === auth.email.trim(),
-          status: app.status
+          status: app.status,
+          created_at: app.created_at,
+          decided_at: app.decided_at
         })) || []
       })
+      
+      // Enhanced debugging: Log each application with full details
+      if (appsData && appsData.length > 0) {
+        console.log('[MyBusiness] 📋 Applications found:', appsData.length)
+        appsData.forEach((app: any, index: number) => {
+          console.log(`[MyBusiness] Application ${index + 1}:`, {
+            id: app.id,
+            businessName: app.business_name,
+            email: app.email,
+            status: app.status,
+            tier_requested: app.tier_requested,
+            created_at: app.created_at,
+            decided_at: app.decided_at || 'N/A',
+            fullData: app
+          })
+        })
+        
+        // Log status breakdown
+        const statusCounts = appsData.reduce((acc: any, app: any) => {
+          const status = app.status || 'null'
+          acc[status] = (acc[status] || 0) + 1
+          return acc
+        }, {})
+        console.log('[MyBusiness] 📊 Application status breakdown:', statusCounts)
+      } else {
+        console.log('[MyBusiness] ⚠️ No applications found. This might be expected if user hasn\'t submitted any.')
+        console.log('[MyBusiness] 🔍 DEBUGGING: Checking why no applications found...', {
+          queryEmail: auth.email.trim(),
+          hasEmail: !!auth.email,
+          emailLength: auth.email?.length,
+          error: appsError,
+          errorCode: appsError?.code,
+          errorMessage: appsError?.message,
+          allAppsTestCount: allAppsTest.data?.length || 0,
+          allAppsTestError: allAppsTest.error
+        })
+        
+        // If we got applications in the all-apps test but not with email filter, there's a mismatch
+        if (allAppsTest.data && allAppsTest.data.length > 0) {
+          const matchingEmails = allAppsTest.data.filter((app: any) => 
+            app.email?.trim().toLowerCase() === auth.email?.trim().toLowerCase()
+          )
+          console.log('[MyBusiness] 🔍 DEBUGGING: Found applications with matching email (case-insensitive):', {
+            matchingCount: matchingEmails.length,
+            matchingApps: matchingEmails.map((app: any) => ({
+              id: app.id,
+              email: app.email,
+              status: app.status,
+              businessName: app.business_name
+            }))
+          })
+        }
+      }
 
       if (appsError) {
         console.error('[MyBusiness] ❌ Error loading applications:', appsError)
@@ -287,8 +373,36 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         console.log('[MyBusiness] Change requests query result:', {
           error: changeRequestsError,
           count: changeRequestsData?.length || 0,
-          data: changeRequestsData
+          userId: auth.userId
         })
+        
+        // Enhanced debugging: Log each change request with full details
+        if (changeRequestsData && changeRequestsData.length > 0) {
+          console.log('[MyBusiness] 🔄 Change requests found:', changeRequestsData.length)
+          changeRequestsData.forEach((req: any, index: number) => {
+            console.log(`[MyBusiness] Change Request ${index + 1}:`, {
+              id: req.id,
+              type: req.type,
+              status: req.status,
+              provider_id: req.provider_id,
+              owner_user_id: req.owner_user_id,
+              created_at: req.created_at,
+              decided_at: req.decided_at || 'N/A',
+              reason: req.reason || 'N/A',
+              fullData: req
+            })
+          })
+          
+          // Log status breakdown
+          const statusCounts = changeRequestsData.reduce((acc: any, req: any) => {
+            const status = req.status || 'null'
+            acc[status] = (acc[status] || 0) + 1
+            return acc
+          }, {})
+          console.log('[MyBusiness] 📊 Change request status breakdown:', statusCounts)
+        } else {
+          console.log('[MyBusiness] ⚠️ No change requests found.')
+        }
 
         if (changeRequestsError) {
           console.warn('[MyBusiness] Change requests error (non-critical):', changeRequestsError)
@@ -347,9 +461,66 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       console.log('[MyBusiness] Final comprehensive state:', {
         listings: allListings.length,
         applications: appsData?.length || 0,
+        changeRequests: changeRequestsData?.length || 0,
         jobPosts: jobPostsData.length,
         dismissedNotifications: dismissedData.length
       })
+      
+      // Debug: Log applications by status for Recently Approved/Rejected sections
+      if (appsData && appsData.length > 0) {
+        const approvedApps = appsData.filter((app: any) => app.status === 'approved')
+        const rejectedApps = appsData.filter((app: any) => app.status === 'rejected')
+        const pendingApps = appsData.filter((app: any) => !app.status || app.status === 'pending')
+        
+        console.log('[MyBusiness] 📋 Applications by status:', {
+          approved: approvedApps.length,
+          rejected: rejectedApps.length,
+          pending: pendingApps.length,
+          total: appsData.length
+        })
+        
+        // Log recently approved/rejected (last 30 days) if decided_at exists
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        const recentApproved = approvedApps.filter((app: any) => 
+          app.decided_at && new Date(app.decided_at) > thirtyDaysAgo
+        )
+        const recentRejected = rejectedApps.filter((app: any) => 
+          app.decided_at && new Date(app.decided_at) > thirtyDaysAgo
+        )
+        
+        console.log('[MyBusiness] 📅 Recent applications (last 30 days):', {
+          approved: recentApproved.length,
+          rejected: recentRejected.length
+        })
+      }
+      
+      // Debug: Log change requests by status for Recently Approved/Rejected sections
+      if (changeRequestsData && changeRequestsData.length > 0) {
+        const approvedReqs = changeRequestsData.filter((req: any) => req.status === 'approved')
+        const rejectedReqs = changeRequestsData.filter((req: any) => req.status === 'rejected')
+        const pendingReqs = changeRequestsData.filter((req: any) => req.status === 'pending')
+        
+        console.log('[MyBusiness] 🔄 Change requests by status:', {
+          approved: approvedReqs.length,
+          rejected: rejectedReqs.length,
+          pending: pendingReqs.length,
+          total: changeRequestsData.length
+        })
+        
+        // Log recently approved/rejected (last 30 days)
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        const recentApproved = approvedReqs.filter((req: any) => 
+          req.decided_at && new Date(req.decided_at) > thirtyDaysAgo
+        )
+        const recentRejected = rejectedReqs.filter((req: any) => 
+          req.decided_at && new Date(req.decided_at) > thirtyDaysAgo
+        )
+        
+        console.log('[MyBusiness] 📅 Recent change requests (last 30 days):', {
+          approved: recentApproved.length,
+          rejected: recentRejected.length
+        })
+      }
       
       // Debug: Log the actual listing data to see what's being displayed
       if (allListings && allListings.length > 0) {

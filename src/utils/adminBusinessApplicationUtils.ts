@@ -347,7 +347,10 @@ export async function deleteApplication(
     return
   }
   
-  // Update status to rejected before deleting the application
+  // Update status to rejected - DO NOT DELETE
+  // CRITICAL: Keep rejected applications for audit trail and user visibility
+  // Users need to see their rejected applications in "Recently Rejected" section
+  // TODO: Add decided_at column to database and set it here when column exists
   const updateResult = await update(
     'business_applications',
     { status: 'rejected' },
@@ -424,18 +427,13 @@ export async function deleteApplication(
     }
   }
   
-  const deleteResult = await query('business_applications', { logPrefix: '[Admin]' })
-    .delete()
-    .eq('id', appId)
-    .execute()
+  // CRITICAL FIX: DO NOT DELETE REJECTED APPLICATIONS
+  // Keep them in the database so users can see them in "Recently Rejected" section
+  // Only remove from UI list, but keep in database
+  setMessage(`Application rejected. ${app.email ? 'Applicant has been notified.' : ''}`)
+  setBizApps((rows) => rows.filter((r) => r.id !== appId))
   
-  const error = deleteResult.error
-    
-  if (error) {
-    setError(error.message)
-  } else {
-    setMessage(`Application rejected and deleted. ${app.email ? 'Applicant has been notified.' : ''}`)
-    setBizApps((rows) => rows.filter((r) => r.id !== appId))
-  }
+  // NOTE: Application remains in database with status = 'rejected'
+  // This allows users to see their rejected applications in /my-business page
 }
 

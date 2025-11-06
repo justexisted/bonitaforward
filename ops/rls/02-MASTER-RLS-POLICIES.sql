@@ -234,7 +234,11 @@ WITH CHECK (true);
 -- Users can view their own applications
 CREATE POLICY "applications_select_owner" 
 ON public.business_applications FOR SELECT
-USING (email = (SELECT email FROM auth.users WHERE id = auth.uid()));
+USING (
+  LOWER(TRIM(email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+  OR
+  email = (SELECT email FROM auth.users WHERE id = auth.uid())
+);
 
 -- Admins can view all
 CREATE POLICY "applications_select_admin" 

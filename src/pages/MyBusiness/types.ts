@@ -63,6 +63,7 @@ export type BusinessApplication = {
   tier_requested: 'free' | 'featured' | null
   status: 'pending' | 'approved' | 'rejected' | null
   created_at: string
+  decided_at?: string | null  // Optional field - may not exist in all database schemas
 }
 
 // Type definition for job posts in the provider_job_posts table

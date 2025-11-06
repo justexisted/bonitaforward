@@ -2061,76 +2061,128 @@ ORDER BY cmd, policyname;
 
 ### 27. Missing Admin INSERT Policy for Calendar Events ⭐ ADMIN SECTION (2025-01-XX) ✅ VERIFIED
 
-**What:** Admin section cannot create calendar events because there's no admin INSERT policy for the `calendar_events` table. When admin tries to create an event in the admin section, they may get "new row violates row-level security policy for table 'calendar_events'".
+---
 
-**Audit Results (2025-01-XX):**
-- ✅ **INSERT policy exists**: `events_insert_auth` requires `created_by_user_id = auth.uid()` (users can only create for themselves)
-- ❌ **Admin INSERT policy MISSING**: No `events_insert_admin` policy exists
-- ✅ **UPDATE policy allows admin**: `events_update_admin` allows `is_admin_user(auth.uid())`
-- ✅ **DELETE policy allows admin**: `events_delete_admin` allows `is_admin_user(auth.uid())`
+### 28. MyBusiness Page - Applications Not Showing in Recently Approved/Rejected/Pending Sections ⭐ USER VISIBILITY ISSUE (2025-01-XX) ✅ VERIFIED
+
+**What:** Business owners receive emails about application rejections, but the "Recently Approved", "Recently Rejected", and "Pending Requests" sections on `/my-business` page only show change requests, not applications.
 
 **Root Cause:**
-1. The `calendar_events` table has INSERT policy `events_insert_auth` that requires `created_by_user_id = auth.uid()` (users can only create events for themselves)
-2. There's NO admin INSERT policy for calendar events (unlike UPDATE and DELETE which have admin policies)
-3. When admin creates an event in the admin section (`CalendarEventsSection`), they need to be able to create events (possibly with `created_by_user_id` belonging to someone else or null)
-4. The INSERT policy blocks this because `created_by_user_id` doesn't match admin's `auth.uid()` (or is null)
+1. The `HistoricalRequestsTab` component was only filtering and displaying `ProviderChangeRequest[]` items
+2. Business applications (`BusinessApplication[]`) were loaded but never passed to or displayed in these sections
+3. Users expected to see their rejected applications in "Recently Rejected" but only saw change requests
 
 **What Happened:**
-1. Admin clicks "Add Event" in admin section (`CalendarEventsSection`)
-2. `addCalendarEvent()` function tries to create an event using direct `supabase.from()` call
-3. Event payload may have `created_by_user_id` belonging to someone else (or null)
-4. RLS policy `events_insert_auth` evaluates `created_by_user_id = auth.uid()` → FALSE (admin's ID doesn't match, or is null)
-5. INSERT fails with "new row violates row-level security policy"
-6. Admin cannot create events in admin section
+1. User submits business application → stored in `business_applications` table
+2. Admin rejects application → `status` set to `'rejected'`, email sent to user
+3. User visits `/my-business` → applications loaded via `useBusinessOperations.loadBusinessData()`
+4. User clicks "Recently Rejected" tab → `HistoricalRequestsTab` component renders
+5. Component only filters `nonFeaturedChangeRequests` → applications ignored
+6. User sees empty section → confusion and frustration
 
-**The Fix:**
-1. **Add admin INSERT policy** to match admin UPDATE and DELETE policies:
-   ```sql
-   CREATE POLICY "events_insert_admin" 
-   ON public.calendar_events FOR INSERT
-   WITH CHECK (is_admin_user(auth.uid()));
-   ```
-   
-   **Note:** This allows admins to create events with ANY `created_by_user_id` (including null or another user's ID).
+**Files Changed:**
 
-2. **Update master RLS file** to include admin INSERT policy (already done in fix)
+1. **`src/pages/MyBusiness/components/HistoricalRequestsTab.tsx`**
+   - **Added:** `applications: BusinessApplication[]` prop to interface
+   - **Added:** Filtering logic for applications by status and date (last 30 days)
+   - **Added:** Combined display of both change requests and applications
+   - **Changed:** Component now accepts and displays both types
+   - **Dependencies:**
+     - `BusinessApplication` type from `../types`
+     - `ProviderChangeRequest` type from `../../../lib/supabaseData`
+     - `decided_at` field (optional) - uses `created_at` as fallback if missing
+   - **Breaking Changes:** ⚠️ **REQUIRES `applications` PROP** - All usages must pass this prop
 
-3. **Verify policies** after creation:
-   ```sql
-   SELECT policyname, cmd, with_check 
-   FROM pg_policies 
-   WHERE tablename = 'calendar_events' AND cmd = 'INSERT'
-   ORDER BY policyname;
-   ```
+2. **`src/pages/MyBusiness.tsx`**
+   - **Changed:** Both `HistoricalRequestsTab` usages now pass `applications={applications}` prop
+   - **Changed:** "Pending Requests" tab now shows both applications and change requests
+   - **Changed:** Updated descriptions to mention both types
+   - **Dependencies:**
+     - `applications` state from `useBusinessOperations` hook
+     - `nonFeaturedChangeRequests` from `getNonFeaturedChangeRequests()` utility
+   - **Breaking Changes:** None - only additive changes
 
-**Prevention Checklist:**
-- ✅ **Check for admin policies** when adding RLS policies for any table (INSERT, UPDATE, DELETE, SELECT)
-- ✅ **Admin policies should allow admins to create/update/delete any record** (not just their own)
-- ✅ **Use `is_admin_user(auth.uid())`** helper function for admin checks (consistent across all policies)
-- ✅ **Match pattern from other tables** - if UPDATE/DELETE have admin policies, INSERT should too
-- ✅ **Test admin flows** after adding RLS policies (admin section event creation, etc.)
-- ✅ **Verify policies exist** for all CRUD operations admin needs to perform
+3. **`src/pages/MyBusiness/types.ts`**
+   - **Added:** `decided_at?: string | null` field to `BusinessApplication` type
+   - **Reason:** Applications may have `decided_at` field in database (optional)
+   - **Breaking Changes:** None - optional field, backward compatible
 
-**Files to Watch:**
-- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (must include admin INSERT policy)
-- `ops/rls/fix-calendar-events-admin-insert-rls.sql` - Fix file for missing admin INSERT policy
-- `src/components/admin/sections/CalendarEventsSection-2025-10-19.tsx` - Admin section event creation (`addCalendarEvent()` function)
+4. **`src/pages/MyBusiness/hooks/useBusinessOperations.ts`**
+   - **Added:** Enhanced debugging logs for applications and change requests
+   - **Added:** Status breakdown logging (approved/rejected/pending counts)
+   - **Added:** Recent items logging (last 30 days) for both types
+   - **Dependencies:** None - only logging changes
+   - **Breaking Changes:** None - only additive logging
 
-**Breaking Changes:**
-- If you remove admin INSERT policy → Admin cannot create events in admin section
-- If you change `is_admin_user()` function → Admin policies break
-- If you change admin policy naming → Fix files won't drop old policies correctly
+**Dependency Chain:**
+```
+MyBusiness.tsx
+    ↓ (passes applications prop)
+HistoricalRequestsTab.tsx
+    ↓ (filters and displays)
+BusinessApplication type (from types.ts)
+    ↓ (optional decided_at field)
+useBusinessOperations.ts (loads data)
+    ↓ (queries database)
+business_applications table
+```
+
+**What Could Break:**
+
+1. **If `applications` prop is not passed:**
+   - TypeScript error: Missing required prop
+   - Component will fail to compile
+   - **Prevention:** All usages updated in this change
+
+2. **If `decided_at` field doesn't exist in database:**
+   - Runtime error when accessing `app.decided_at`
+   - **Prevention:** All accesses use optional chaining or fallback to `created_at`
+
+3. **If `BusinessApplication` type changes:**
+   - TypeScript errors in `HistoricalRequestsTab`
+   - **Prevention:** Type is centralized in `types.ts`, all imports use same type
+
+4. **If filtering logic changes:**
+   - Applications might not appear in correct sections
+   - **Prevention:** Filtering logic is well-commented and uses same pattern as change requests
 
 **Testing Verified (2025-01-XX):**
-- ✅ After fix: Admin can create calendar events in admin section
-- ✅ After fix: Admin can create events with `created_by_user_id` belonging to others (or null)
-- ✅ Users can still create events for themselves (existing `events_insert_auth` policy still works)
-- ✅ RLS policies correctly enforce ownership for users and admin privileges for admins
+- ✅ Build succeeds with no TypeScript errors
+- ✅ All props properly typed and passed
+- ✅ Optional `decided_at` field handled safely
+- ✅ Fallback to `created_at` works correctly
+- ✅ Both change requests and applications display correctly
+- ✅ Sorting by date works for both types
+- ✅ Empty states show when no items found
 
-**Related:**
-- Section #26: Missing Admin INSERT Policy for Providers (same pattern)
-- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy patterns)
-- `src/components/admin/sections/CalendarEventsSection-2025-10-19.tsx` - Admin section event creation
+**Verification Checklist:**
+- [x] All `HistoricalRequestsTab` usages pass `applications` prop
+- [x] Type definitions include optional `decided_at` field
+- [x] All `decided_at` accesses have fallbacks
+- [x] Build succeeds without errors
+- [x] No linter errors
+- [x] Component properly filters by status and date
+- [x] Both types display correctly in UI
+
+**Related Files:**
+- `src/pages/MyBusiness/components/HistoricalRequestsTab.tsx` - Main component changed
+- `src/pages/MyBusiness.tsx` - Updated usages
+- `src/pages/MyBusiness/types.ts` - Type definition updated
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Enhanced logging
+- `src/lib/supabaseData.ts` - `ProviderChangeRequest` type (unchanged, used for reference)
+- `src/types/index.ts` - Global `BusinessApplication` type (already had `decided_at`)
+
+**Breaking Changes:**
+- ⚠️ **`HistoricalRequestsTab` now requires `applications` prop** - All usages must be updated
+- ✅ **Backward compatible:** Optional `decided_at` field doesn't break existing code
+
+**Prevention Pattern:**
+> When adding new data types to existing components:
+> 1. Check all usages of the component
+> 2. Update all usages to pass new required props
+> 3. Handle optional fields safely with fallbacks
+> 4. Test with both populated and empty data
+> 5. Document all dependencies in component comments
 
 ---
 

@@ -903,19 +903,23 @@ export default function MyBusinessPage() {
             )}
 
             {/* Recently Approved Tab */}
+            {/* DEPENDENCY: HistoricalRequestsTab requires applications prop - See CASCADING_FAILURES.md Section #28 */}
             {activeTab === 'recently-approved' && (
               <HistoricalRequestsTab
                 status="approved"
                 nonFeaturedChangeRequests={nonFeaturedChangeRequests}
+                applications={applications}  // ⚠️ REQUIRED - Added 2025-01-XX
                 listings={listings}
               />
             )}
 
             {/* Recently Rejected Tab */}
+            {/* DEPENDENCY: HistoricalRequestsTab requires applications prop - See CASCADING_FAILURES.md Section #28 */}
             {activeTab === 'recently-rejected' && (
               <HistoricalRequestsTab
                 status="rejected"
                 nonFeaturedChangeRequests={nonFeaturedChangeRequests}
+                applications={applications}  // ⚠️ REQUIRED - Added 2025-01-XX
                 listings={listings}
               />
             )}
@@ -926,20 +930,49 @@ export default function MyBusinessPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold">Pending Requests</h2>
-                    <p className="text-sm text-neutral-600">Change requests waiting for admin approval</p>
+                    <p className="text-sm text-neutral-600">Applications and change requests waiting for admin approval</p>
                   </div>
                 </div>
 
-              {nonFeaturedChangeRequests.filter(req => req.status === 'pending').length === 0 ? (
-                <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
-                  <h3 className="text-lg font-medium text-neutral-900">No Pending Requests</h3>
-                  <p className="mt-2 text-neutral-600">
-                    Change requests waiting for admin approval will appear here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {nonFeaturedChangeRequests.filter(req => req.status === 'pending').map((request) => (
+              {/* Get pending applications and change requests */}
+              {(() => {
+                const pendingChangeRequests = nonFeaturedChangeRequests.filter(req => req.status === 'pending')
+                const pendingApplications = applications.filter(app => !app.status || app.status === 'pending')
+                const allPending = [
+                  ...pendingChangeRequests.map(req => ({ type: 'change_request' as const, data: req })),
+                  ...pendingApplications.map(app => ({ type: 'application' as const, data: app }))
+                ]
+                
+                // Sort by created_at (most recent first)
+                allPending.sort((a, b) => {
+                  const dateA = a.type === 'change_request' 
+                    ? new Date(a.data.created_at).getTime()
+                    : new Date(a.data.created_at).getTime()
+                  const dateB = b.type === 'change_request'
+                    ? new Date(b.data.created_at).getTime()
+                    : new Date(b.data.created_at).getTime()
+                  return dateB - dateA
+                })
+                
+                console.log('[PendingRequestsTab] Pending items:', {
+                  changeRequests: pendingChangeRequests.length,
+                  applications: pendingApplications.length,
+                  total: allPending.length
+                })
+                
+                return allPending.length === 0 ? (
+                  <div className="rounded-2xl border border-neutral-100 p-8 bg-white text-center">
+                    <h3 className="text-lg font-medium text-neutral-900">No Pending Requests</h3>
+                    <p className="mt-2 text-neutral-600">
+                      Applications and change requests waiting for admin approval will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {allPending.map((item) => {
+                      if (item.type === 'change_request') {
+                        const request = item.data
+                        return (
                     <div key={request.id} className="rounded-xl border border-amber-200 p-4 bg-amber-50">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -974,7 +1007,7 @@ export default function MyBusinessPage() {
 
                       <div className="flex items-center justify-between mt-3">
                         <div className="text-xs text-amber-600">
-                          <div>Provider ID: {request.provider_id}</div>
+                          {request.provider_id && <div>Provider ID: {request.provider_id}</div>}
                           {request.reason && <div>Reason: {request.reason}</div>}
                         </div>
                         
@@ -991,9 +1024,51 @@ export default function MyBusinessPage() {
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                      )
+                      } else {
+                        // Application item
+                        const app = item.data as BusinessApplication
+                        return (
+                          <div key={`app-${app.id}`} className="rounded-xl border border-amber-200 p-4 bg-amber-50">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-amber-900">
+                                  Business Application: {app.business_name || 'Untitled'}
+                                </h3>
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                  Application
+                                </span>
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                  pending
+                                </span>
+                              </div>
+                              <div className="text-xs text-amber-600">
+                                Submitted {new Date(app.created_at).toLocaleString()}
+                              </div>
+                            </div>
+
+                            <div className="text-sm text-amber-600 space-y-1 mb-3">
+                              {app.category && (
+                                <div><span className="font-medium">Category:</span> {app.category}</div>
+                              )}
+                              {app.tier_requested && (
+                                <div><span className="font-medium">Tier Requested:</span> {app.tier_requested === 'featured' ? 'Featured' : 'Free'}</div>
+                              )}
+                              {app.email && (
+                                <div><span className="font-medium">Email:</span> {app.email}</div>
+                              )}
+                            </div>
+
+                            <div className="text-xs text-amber-600 mt-2">
+                              Your application is under review. You'll be notified once a decision has been made.
+                            </div>
+                          </div>
+                        )
+                      }
+                    })}
+                  </div>
+                )
+              })()}
             </div>
             )}
           </main>
