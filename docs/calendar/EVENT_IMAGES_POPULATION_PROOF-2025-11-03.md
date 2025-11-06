@@ -1,11 +1,23 @@
 # Event Images Population Proof - November 3, 2025, 9:00 PM PST
 
+## ⚠️ Important Note - January 2025
+
+**What Actually Happened:** Despite this document claiming the fix was "permanent" and "protected from breaking again," the issue occurred again in January 2025. The root cause was overly restrictive URL validation in `getEventHeaderImageFromDb()` that only accepted URLs containing `'supabase.co/storage'`, causing valid image URLs to be rejected and fall back to gradients.
+
+**Actual Fix (January 2025):** Updated `getEventHeaderImageFromDb()` to accept any valid HTTP/HTTPS URL (not just Supabase Storage URLs), while still rejecting Unsplash URLs and gradient strings. See `src/utils/eventImageUtils.ts` for the current implementation.
+
+**Lesson Learned:** Never claim a fix is "permanent" without thorough testing with actual production data. Always make validation logic flexible enough to handle various URL formats.
+
+---
+
 ## Executive Summary
 
 **Date:** November 3, 2025, 9:00 PM PST  
 **Status:** ✅ **SUCCESS** - All 74 calendar events now have database images  
 **Action Taken:** Ran `populate-event-images.ts` script to populate 33 missing images  
 **Result:** 33 Unsplash images successfully saved to database
+
+**Note:** This document was created with overly confident claims. The issue reoccurred - see note above.
 
 ---
 
@@ -151,7 +163,7 @@ console.log('[DEBUG] Database events image check:', {
 
 ---
 
-## How It Won't Break Again
+## Safeguards (Not Guarantees - See Note Above)
 
 ### Fix #1: Query Uses `.select('*')` (Section #19)
 
@@ -379,7 +391,7 @@ Use this checklist to verify images are working:
 - Automated population (scheduled function)
 - Component-level checks
 
-**Status:** ✅ **ALL SYSTEMS OPERATIONAL** - Images are saved and protected from breaking again.
+**Status:** ✅ Images were successfully populated in November 2025, but the issue reoccurred in January 2025 due to overly restrictive URL validation. The fix has been updated to accept any valid HTTP/HTTPS URL format.
 
 ---
 

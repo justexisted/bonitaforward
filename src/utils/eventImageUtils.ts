@@ -317,25 +317,30 @@ export function getEventHeaderImageFromDb(event: CalendarEvent): {
   type: 'image' | 'gradient'
   value: string
 } {
-  // CRITICAL FIX: Only accept Supabase Storage URLs, NOT Unsplash URLs
-  // If image_url exists and is a Supabase Storage URL, use it
-  // If image_url is an Unsplash URL, reject it and use gradient (should never happen)
-  if (event.image_url && event.image_url.includes('supabase.co/storage')) {
-    // This is a Supabase Storage URL - use it
-    return { type: 'image', value: event.image_url }
-  }
-  
-  // REJECT Unsplash URLs - they should never be in the database
-  if (event.image_url && event.image_url.includes('images.unsplash.com')) {
-    // Reject Unsplash URL - use gradient instead
-    return { type: 'gradient', value: getEventGradient(event) }
-  }
-  
-  // If image_url exists but is a gradient string, ignore it and use fallback
-  // This prevents storing gradient strings in the database from showing incorrectly
-  if (event.image_url && event.image_url.startsWith('linear-gradient')) {
-    // Ignore the database gradient string, use our fallback
-    return { type: 'gradient', value: getEventGradient(event) }
+  // CRITICAL: Check for image_url first - if it exists and is a valid URL, use it
+  // We accept any URL that starts with 'http' or 'https' (Supabase Storage, CDN, etc.)
+  // This is more flexible and handles various storage URL formats
+  if (event.image_url) {
+    // REJECT Unsplash URLs - they should never be in the database
+    if (event.image_url.includes('images.unsplash.com')) {
+      // Reject Unsplash URL - use gradient instead
+      return { type: 'gradient', value: getEventGradient(event) }
+    }
+    
+    // REJECT gradient strings stored in database - they should never be there
+    if (event.image_url.startsWith('linear-gradient')) {
+      // Ignore the database gradient string, use our fallback
+      return { type: 'gradient', value: getEventGradient(event) }
+    }
+    
+    // ACCEPT any valid HTTP/HTTPS URL (Supabase Storage, CDN, etc.)
+    // This includes:
+    // - Supabase Storage URLs: https://[project].supabase.co/storage/v1/object/public/...
+    // - Any other valid image URLs
+    if (event.image_url.startsWith('http://') || event.image_url.startsWith('https://')) {
+      // This is a valid image URL - use it
+      return { type: 'image', value: event.image_url }
+    }
   }
   
   // No valid image_url: use gradient fallback

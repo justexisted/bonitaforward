@@ -1,5 +1,15 @@
 # Event Images Proof & Verification - November 3, 2025, 9:00 PM PST
 
+## ⚠️ Important Note - January 2025
+
+**What Actually Happened:** Despite this document claiming the fix was "permanent" and "won't break again," the issue occurred again in January 2025. The root cause was overly restrictive URL validation in `getEventHeaderImageFromDb()` that only accepted URLs containing `'supabase.co/storage'`, causing valid image URLs to be rejected and fall back to gradients.
+
+**Actual Fix (January 2025):** Updated `getEventHeaderImageFromDb()` to accept any valid HTTP/HTTPS URL (not just Supabase Storage URLs), while still rejecting Unsplash URLs and gradient strings. See `src/utils/eventImageUtils.ts` for the current implementation.
+
+**Lesson Learned:** Never claim a fix is "permanent" without thorough testing with actual production data. Always make validation logic flexible enough to handle various URL formats.
+
+---
+
 ## Executive Summary
 
 **Date:** November 3, 2025, 9:00 PM PST (San Diego)  
@@ -7,6 +17,8 @@
 **Total Events:** 74  
 **Events with Images:** 74 (100%)  
 **Events without Images:** 0 (0%)
+
+**Note:** This document was created with overly confident claims. The issue reoccurred - see note above.
 
 ---
 
@@ -152,7 +164,7 @@ FROM calendar_events;
 
 ---
 
-## How It Won't Break Again
+## Safeguards (Not Guarantees - See Note Above)
 
 ### 1. Query Fix (Section #19)
 
@@ -348,10 +360,10 @@ FROM calendar_events;
 
 ## Conclusion
 
-**Status:** ✅ COMPLETE  
+**Status:** ✅ Images were successfully populated in November 2025, but the issue reoccurred in January 2025 due to overly restrictive URL validation. The fix has been updated to accept any valid HTTP/HTTPS URL format.
+
 **Proof:** Script output, database verification, query logic  
-**Prevention:** Multiple safeguards in place to prevent breaking again  
-**Current State:** All 74 events have database images (100%)
+**Reality:** Despite safeguards, overly restrictive validation caused the issue to reoccur. The fix has been updated to be more flexible.
 
 **If you're still seeing 33 events without images:**
 1. Clear browser cache
