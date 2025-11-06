@@ -170,12 +170,38 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         error: appsError,
         count: appsData?.length || 0,
         data: appsData,
-        queryEmail: auth.email.trim()
+        queryEmail: auth.email.trim(),
+        emailMatches: appsData?.map((app: any) => ({
+          id: app.id,
+          businessName: app.business_name,
+          email: app.email,
+          matches: app.email === auth.email.trim(),
+          status: app.status
+        })) || []
       })
 
       if (appsError) {
         console.error('[MyBusiness] ❌ Error loading applications:', appsError)
+        console.error('[MyBusiness] Error details:', {
+          code: appsError.code,
+          message: appsError.message,
+          details: appsError.details,
+          hint: appsError.hint
+        })
         // Don't throw - continue with empty array
+      } else if (appsData && appsData.length > 0) {
+        console.log('[MyBusiness] ✅ Successfully loaded applications:', appsData.length)
+        appsData.forEach((app: any, index: number) => {
+          console.log(`[MyBusiness] Application ${index + 1}:`, {
+            id: app.id,
+            businessName: app.business_name,
+            email: app.email,
+            status: app.status,
+            created_at: app.created_at
+          })
+        })
+      } else {
+        console.log('[MyBusiness] ⚠️ No applications found. This might be expected if user hasn\'t submitted any.')
       }
 
       // Load job posts for all user's providers AND job posts owned by the user
@@ -711,20 +737,48 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         { logPrefix: '[MyBusiness]' }
       )
 
-      console.log('[MyBusiness] Application insert result:', { data: result.data, error: result.error })
+      console.log('[MyBusiness] Application insert result:', { 
+        data: result.data, 
+        error: result.error,
+        insertedCount: result.data?.length || 0,
+        insertedId: result.data?.[0]?.id || null
+      })
 
       if (result.error) {
+        console.error('[MyBusiness] ❌ INSERT FAILED:', result.error)
         throw new Error(result.error.message || 'Failed to submit application')
       }
 
-      setMessage('Success! Your business application has been submitted and is pending admin approval.')
+      // CRITICAL: Verify the insert actually succeeded
+      if (!result.data || result.data.length === 0) {
+        console.error('[MyBusiness] ❌ INSERT RETURNED NO DATA:', result)
+        throw new Error('Application submitted but no confirmation received. Please check your Applications tab.')
+      }
+
+      const insertedApplication = result.data[0]
+      console.log('[MyBusiness] ✅ INSERT SUCCEEDED:', {
+        applicationId: insertedApplication.id,
+        businessName: insertedApplication.business_name,
+        email: insertedApplication.email,
+        status: insertedApplication.status
+      })
+
+      // CRITICAL: Set success message BEFORE delay to ensure it's visible
+      setMessage(`Success! Your business application "${insertedApplication.business_name || 'application'}" has been submitted and is pending admin approval. You can view it in the Applications tab.`)
       
       // CRITICAL: Wait a moment for the database to process the insert before reloading
       // This ensures the new application is visible when we query
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 1000))
       
       // Refresh data to show new application in pending state
+      console.log('[MyBusiness] Refreshing data to show new application...')
+      console.log('[MyBusiness] Query email will be:', auth.email.trim())
       await loadBusinessData() 
+      
+      // Note: applications state will be updated by loadBusinessData via setApplications
+      // Don't log applications.length here - it's still the old state (closure)
+      console.log('[MyBusiness] Data refreshed. Application should appear in Applications tab.')
+      
       setShowCreateForm(false)
     } catch (error: any) {
       setMessage(`Error submitting application: ${error.message}`)

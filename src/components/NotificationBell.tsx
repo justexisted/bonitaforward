@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Bell } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { query } from '../lib/supabaseQuery'
 import { useAuth } from '../contexts/AuthContext'
 
 type Notification = {
@@ -56,12 +57,13 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
             .limit(20),
           
           // 2. Fetch pending business applications (if user has email)
+          // CRITICAL: Use centralized query utility for proper RLS handling
           auth.email
-            ? supabase
-                .from('business_applications')
+            ? query('business_applications', { logPrefix: '[NotificationBell]' })
                 .select('id, business_name, status, created_at, email')
                 .eq('email', auth.email.trim())
                 .order('created_at', { ascending: false })
+                .execute()
             : Promise.resolve({ data: null, error: null }),
           
           // 3. Fetch providers owned by user (needed for change requests)
