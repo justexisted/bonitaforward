@@ -121,9 +121,13 @@ export default function MyBusinessPage() {
   // State to control subscription card visibility
   const [showSubscriptionCard, setShowSubscriptionCard] = useState(true)
   // State to track user's plan choice and status (database-backed)
-  // Note: Only setter is used; value is for internal state tracking
   const [userPlanChoice, setUserPlanChoice] = useState<PlanChoice>(null)
-  void userPlanChoice // Suppress unused variable warning
+  
+  // Check if user has chosen a plan (free, featured, or featured-pending)
+  const hasPlanChosen = userPlanChoice !== null && userPlanChoice !== undefined
+  
+  // Reference for plan selection section (for scrolling)
+  const planSelectionRef = useRef<HTMLDivElement>(null)
   
   // State to track dismissed notifications (database-based)
   const [dismissedNotifications, setDismissedNotifications] = useState<DismissedNotification[]>([])
@@ -790,12 +794,14 @@ export default function MyBusinessPage() {
           <FeaturedUpgradeCard onDismiss={() => setShowFeaturedUpgradeModal(false)} />
         )}
 
-        {/* Subscription Comparison Section - hidden if any listing is featured */}
-        {showSubscriptionCard && listings.every(l => !l.is_member) && (
-          <PlanSelectionSection
-            onSelectFree={selectFreeAccount}
-            onSelectFeatured={() => upgradeToFeatured()}
-          />
+        {/* Subscription Comparison Section - shown if no plan chosen yet */}
+        {(showSubscriptionCard || !hasPlanChosen) && listings.every(l => !l.is_member) && (
+          <div ref={planSelectionRef}>
+            <PlanSelectionSection
+              onSelectFree={selectFreeAccount}
+              onSelectFeatured={() => upgradeToFeatured()}
+            />
+          </div>
         )}
 
         {/* Change Requests Status Section */}
@@ -825,7 +831,11 @@ export default function MyBusinessPage() {
               <ListingsTab
                 listings={listings}
                 changeRequests={changeRequests}
-                onCreateNew={() => setShowCreateForm(true)}
+                onCreateNew={() => {
+                  if (hasPlanChosen) {
+                    setShowCreateForm(true)
+                  }
+                }}
                 onEdit={setEditingListing}
                 onUpgradeToFeatured={upgradeToFeatured}
                 onPromptAndUploadImages={promptAndUploadImages}
@@ -834,6 +844,10 @@ export default function MyBusinessPage() {
                 onDowngradeToFree={downgradeToFree}
                 onDelete={deleteBusinessListing}
                 connectingCalendar={connectingCalendar}
+                hasPlanChosen={hasPlanChosen}
+                onScrollToPlanSelection={() => {
+                  planSelectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
               />
             )}
 

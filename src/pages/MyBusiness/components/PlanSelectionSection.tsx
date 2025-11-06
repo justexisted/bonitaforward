@@ -16,7 +16,12 @@ interface PlanSelectionSectionProps {
 export function PlanSelectionSection({ onSelectFree, onSelectFeatured }: PlanSelectionSectionProps) {
   return (
     <div className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm my-business-plan-card">
-      <h2 className="text-xl font-semibold text-neutral-900 mb-6 text-center my-business-heading-xl">Choose Your Business Plan</h2>
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-semibold">
+          1
+        </span>
+        <h2 className="text-xl font-semibold text-neutral-900 text-center my-business-heading-xl">Choose Your Business Plan</h2>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Free Account Section */}
         <div className="space-y-4">

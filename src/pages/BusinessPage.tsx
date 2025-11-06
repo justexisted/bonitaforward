@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import SplitText from '../components/SplitText'
 import ScrollStack, { ScrollStackItem } from '../components/ScrollStack'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
 import { insert } from '../lib/supabaseQuery'
 import { CATEGORY_OPTIONS } from '../constants/categories'
 

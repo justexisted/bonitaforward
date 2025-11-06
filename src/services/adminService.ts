@@ -1,7 +1,7 @@
 // Admin service functions - extracted API operations from Admin.tsx
 
 import { supabase } from '../lib/supabase'
-import { query, insert, update, deleteRows } from '../lib/supabaseQuery'
+import { query, update, deleteRows } from '../lib/supabaseQuery'
 import type { 
   ProviderRow, 
   BusinessApplicationRow, 

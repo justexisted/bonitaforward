@@ -280,9 +280,9 @@ export async function loadPendingApplications(email: string): Promise<PendingApp
     
     console.log('[Account] ✅ Loaded applications:', {
       count: applications.length,
-      emails: applications.map(a => a.email),
-      businessNames: applications.map(a => a.business_name),
-      statuses: applications.map(a => a.status)
+      emails: applications.map((a: PendingApplication) => a.email),
+      businessNames: applications.map((a: PendingApplication) => a.business_name),
+      statuses: applications.map((a: PendingApplication) => a.status)
     })
     
     return applications
