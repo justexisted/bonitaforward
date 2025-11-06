@@ -16,24 +16,122 @@ interface ApplicationCardProps {
 }
 
 export function ApplicationCard({ application, onRequestFreeListing }: ApplicationCardProps) {
+  // Determine status badge styling based on application status
+  const getStatusBadge = () => {
+    const status = application.status || 'pending'
+    
+    if (status === 'approved') {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+          <svg 
+            className="w-3.5 h-3.5" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+            />
+          </svg>
+          <span>Approved</span>
+        </span>
+      )
+    }
+    
+    if (status === 'rejected') {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+          <svg 
+            className="w-3.5 h-3.5" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" 
+            />
+          </svg>
+          <span>Rejected</span>
+        </span>
+      )
+    }
+    
+    // Pending status (default)
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+        <svg 
+          className="w-3.5 h-3.5" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
+          />
+        </svg>
+        <span>Pending Review</span>
+      </span>
+    )
+  }
+  
+  // Only show "Request Free Listing" button for pending applications
+  const showRequestButton = (application.status === 'pending' || !application.status)
+  
   return (
-    <div key={application.id} className="rounded-2xl border border-neutral-100 p-1 bg-white">
-      <div className="flex items-start justify-between">
+    <div key={application.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold">{application.business_name}</h3>
-          <p className="text-sm text-neutral-600 mt-1">{application.category}</p>
-          <p className="text-sm text-neutral-600">{application.email} • {application.phone}</p>
-          <p className="text-sm text-neutral-500 mt-2">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-lg font-semibold">{application.business_name}</h3>
+            {getStatusBadge()}
+          </div>
+          <p className="text-sm text-neutral-600 mt-1">
+            <span className="font-medium">Category:</span> {application.category}
+          </p>
+          <p className="text-sm text-neutral-600 mt-1">
+            {application.email} {application.phone && `• ${application.phone}`}
+          </p>
+          <p className="text-sm text-neutral-500 mt-3">
             Applied: {new Date(application.created_at).toLocaleDateString()}
           </p>
+          
+          {/* Status-specific messaging */}
+          {application.status === 'approved' && (
+            <p className="text-sm text-green-700 mt-3 font-medium">
+              ✅ Your application has been approved! Your business listing should now be visible in the directory.
+            </p>
+          )}
+          
+          {application.status === 'rejected' && (
+            <p className="text-sm text-red-700 mt-3 font-medium">
+              ❌ Your application was not approved. Please review the requirements and submit a new application if needed.
+            </p>
+          )}
+          
+          {showRequestButton && (
+            <p className="text-sm text-amber-700 mt-3">
+              ⏳ Your application is under review. You'll be notified once a decision has been made.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => onRequestFreeListing(application.id)}
-            className="rounded-full bg-green-50 text-green-700 px-3 py-1.5 text-xs border border-green-200 hover:bg-green-100"
-          >
-            Request Free Listing
-          </button>
+          {showRequestButton && (
+            <button
+              onClick={() => onRequestFreeListing(application.id)}
+              className="rounded-full bg-green-50 text-green-700 px-3 py-1.5 text-xs border border-green-200 hover:bg-green-100 transition-colors"
+            >
+              Request Free Listing
+            </button>
+          )}
         </div>
       </div>
     </div>
