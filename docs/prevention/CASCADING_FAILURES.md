@@ -1847,7 +1847,9 @@ return result.data || []
 
 **Rule of Thumb:**
 > When refactoring to use centralized query utility:
-> 1. **Search for ALL direct Supabase queries** first: `grep -r "supabase\.from\(" src/`
+> 1. **Search for ALL direct Supabase queries** first: 
+>    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+>    - Bash: `grep -r "supabase\.from\(" src/`
 > 2. **Migrate ALL instances** in one commit (don't leave some behind)
 > 3. **Test forms end-to-end** after migration (submit → verify it appears)
 > 4. **Add delay after insert** before querying (ensure DB has processed)
@@ -1856,6 +1858,23 @@ return result.data || []
 > 7. **Verify data appears** in UI (not just success message)
 
 **How to Find Direct Supabase Queries:**
+
+**PowerShell (Windows):**
+```powershell
+# Find all direct Supabase queries
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("
+
+# Find all business_applications queries specifically
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "business_applications"
+
+# Find all INSERT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.insert\("
+
+# Find all SELECT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.select\("
+```
+
+**Bash/Linux/Mac:**
 ```bash
 # Find all direct Supabase queries
 grep -r "supabase\.from\(" src/
@@ -1900,6 +1919,17 @@ grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
 ### Immediate (5 minutes after EVERY change):
 
 1. **Impact Analysis**
+
+   **PowerShell (Windows):**
+   ```powershell
+   # What files import what I changed?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-file"
+   
+   # What depends on this functionality?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-function"
+   ```
+
+   **Bash/Linux/Mac:**
    ```bash
    # What files import what I changed?
    grep -r "changed-file" src/
@@ -2016,6 +2046,13 @@ grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
 Before committing ANY change:
 
 - [ ] **Impact Analysis:** What else might be affected?
+  
+  **PowerShell (Windows):**
+  ```powershell
+  Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-thing"
+  ```
+  
+  **Bash/Linux/Mac:**
   ```bash
   grep -r "changed-thing" src/
   ```
@@ -2042,7 +2079,9 @@ Before committing ANY change:
   - [ ] Tests updated?
   - [ ] **RLS policies updated?** ⭐ NEW
 - [ ] **All Supabase queries migrated to centralized utility?** ⭐ NEW
-  - [ ] Search for direct queries: `grep -r "supabase\.from\(" src/`
+  - [ ] Search for direct queries:
+    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+    - Bash: `grep -r "supabase\.from\(" src/`
   - [ ] Migrate all instances in one commit
   - [ ] Test forms end-to-end after migration
 - [ ] **Integration Test:** Does the whole flow work?
