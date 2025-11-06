@@ -186,7 +186,7 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
           code: appsError.code,
           message: appsError.message,
           details: appsError.details,
-          hint: appsError.hint
+          hint: appsError.originalError?.hint || undefined
         })
         // Don't throw - continue with empty array
       } else if (appsData && appsData.length > 0) {

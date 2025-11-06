@@ -112,14 +112,14 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
             console.error('[NotificationBell] ❌ Error fetching applications:', appsError)
           } else if (applications && applications.length > 0) {
             // Only show pending applications as unread notifications (exclude approved/rejected)
-            const pendingApps = applications.filter(app => (app.status === 'pending' || !app.status) && app.status !== 'approved' && app.status !== 'rejected')
+            const pendingApps = applications.filter((app: { status?: string | null; business_name?: string | null; id: string; created_at: string }) => (app.status === 'pending' || !app.status) && app.status !== 'approved' && app.status !== 'rejected')
             console.log('[NotificationBell] ✅ Found pending applications:', {
               total: applications.length,
               pending: pendingApps.length,
-              businessNames: pendingApps.map((a: any) => a.business_name)
+              businessNames: pendingApps.map((a: { business_name?: string | null }) => a.business_name)
             })
             
-            const appNotifs: Notification[] = pendingApps.map((app) => ({
+            const appNotifs: Notification[] = pendingApps.map((app: { status?: string | null; business_name?: string | null; id: string; created_at: string }) => ({
               id: app.id,
               type: 'pending_application' as const,
               title: 'Business Application Pending',
