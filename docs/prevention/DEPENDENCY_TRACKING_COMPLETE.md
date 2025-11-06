@@ -335,7 +335,16 @@ Each dependency tracking comment includes:
         - ✅ Updated smoke test checklist to include verification of centralized utility usage
         - ✅ Added prevention checklist for finding and migrating direct Supabase queries
         - ✅ See: `docs/prevention/CASCADING_FAILURES.md` - Section #25 for complete prevention patterns
-  19. ⏳ Set up integration tests that verify dependencies (future)
+19. ✅ Fixed missing admin INSERT policy for calendar_events (2025-01-XX) - added `events_insert_admin` policy to allow admin section to create events (completed)
+        - ✅ Created fix file: `ops/rls/fix-calendar-events-admin-insert-rls.sql`
+        - ✅ Updated master RLS file: `ops/rls/02-MASTER-RLS-POLICIES.sql` to include admin INSERT policy
+        - ✅ Added new section to CASCADING_FAILURES.md (#27) documenting this pattern
+        - ✅ Matches pattern from `providers` table (same issue, same fix)
+        - ✅ Security maintained: User policy still enforces ownership, admin policy allows admin creation
+        - ✅ Admin section can now create calendar events without RLS errors
+        - ✅ See: `docs/prevention/CASCADING_FAILURES.md` - Section #27 for complete details
+        - ✅ See: `docs/prevention/ADMIN_INSERT_POLICIES_SAFETY_ANALYSIS.md` for safety analysis
+  20. ⏳ Set up integration tests that verify dependencies (future)
 
 ---
 

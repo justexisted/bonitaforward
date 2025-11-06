@@ -1909,8 +1909,228 @@ grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
 
 **Related:**
 - Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy changes)
+- Section #26: Missing Admin INSERT Policy for Providers (admin approval flow)
 - `docs/SUPABASE_QUERY_UTILITY.md` - Centralized query utility documentation
 - `docs/SUPABASE_QUERY_MIGRATION_TESTING.md` - Migration testing instructions
+
+---
+
+### 26. Missing Admin INSERT Policy for Providers ⭐ ADMIN APPROVAL FLOW (2025-01-XX) ✅ VERIFIED
+
+**What:** Admin cannot approve business applications because there's no admin INSERT policy for the `providers` table. When admin tries to create a provider on behalf of an applicant, they get "new row violates row-level security policy for table 'providers'".
+
+**Audit Results (2025-01-XX):**
+- ✅ **INSERT policy exists**: `providers_insert_auth` requires `owner_user_id = auth.uid()` (users can only create for themselves)
+- ❌ **Admin INSERT policy MISSING**: No `providers_insert_admin` policy exists
+- ✅ **UPDATE policy allows admin**: `providers_update_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ✅ **DELETE policy allows admin**: `providers_delete_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ⚠️ **Two `is_admin_user()` functions exist**: One checks JWT email directly, one checks `admin_emails` table (may need consolidation)
+
+**Root Cause:**
+1. The `providers` table has INSERT policy `providers_insert_auth` that requires `owner_user_id = auth.uid()` (users can only create providers for themselves)
+2. There's NO admin INSERT policy for providers (unlike UPDATE and DELETE which have admin policies)
+3. When admin approves a business application, they need to create a provider with `owner_user_id` belonging to the applicant (or null if applicant doesn't have an account)
+4. The INSERT policy blocks this because `owner_user_id` doesn't match admin's `auth.uid()`
+
+**What Happened:**
+1. Admin clicks "Approve & Create Provider" on a business application
+2. `approveApplication()` function tries to create a provider using centralized `insert()` utility
+3. Provider payload has `owner_user_id` belonging to the applicant (or null)
+4. RLS policy `providers_insert_auth` evaluates `owner_user_id = auth.uid()` → FALSE (admin's ID doesn't match applicant's ID)
+5. INSERT fails with "new row violates row-level security policy"
+6. Admin cannot approve applications
+
+**The Fix:**
+1. **Add admin INSERT policy** to match admin UPDATE and DELETE policies:
+   ```sql
+   CREATE POLICY "providers_insert_admin" 
+   ON public.providers FOR INSERT
+   WITH CHECK (is_admin_user(auth.uid()));
+   ```
+   
+   **Note:** The UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in the USING clause, but INSERT policies use `WITH CHECK` clause only (no USING clause). So the admin INSERT policy should be:
+   ```sql
+   WITH CHECK (is_admin_user(auth.uid()))
+   ```
+   
+   This allows admins to create providers with ANY `owner_user_id` (including null or applicant's ID).
+
+2. **Update master RLS file** to include admin INSERT policy (already done in fix)
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT policyname, cmd, with_check 
+   FROM pg_policies 
+   WHERE tablename = 'providers' AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ MISSING: No admin INSERT policy
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());  -- ❌ Only allows users to create for themselves
+
+-- Admin UPDATE and DELETE policies exist, but INSERT is missing ❌
+CREATE POLICY "providers_update_admin" ...;  -- ✅ Exists
+CREATE POLICY "providers_delete_admin" ...;  -- ✅ Exists
+-- ❌ providers_insert_admin is MISSING
+```
+
+**Correct Code:**
+```sql
+-- ✅ Users can create providers for themselves
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());
+
+-- ✅ Admins can create providers for anyone (including null owner_user_id)
+CREATE POLICY "providers_insert_admin" 
+ON public.providers FOR INSERT
+WITH CHECK (is_admin_user(auth.uid()));
+
+-- ✅ Admin UPDATE and DELETE policies already exist
+CREATE POLICY "providers_update_admin" ...;
+CREATE POLICY "providers_delete_admin" ...;
+```
+
+**Prevention Checklist:**
+- ✅ **Check for admin policies** when adding RLS policies for any table (INSERT, UPDATE, DELETE, SELECT)
+- ✅ **Admin policies should allow admins to create/update/delete any record** (not just their own)
+- ✅ **Use `is_admin_user(auth.uid())`** helper function for admin checks (consistent across all policies)
+- ✅ **Match pattern from other tables** - if UPDATE/DELETE have admin policies, INSERT should too
+- ✅ **Test admin flows** after adding RLS policies (approve applications, create providers, etc.)
+- ✅ **Verify policies exist** for all CRUD operations admin needs to perform
+
+**Rule of Thumb:**
+> When adding RLS policies for a table that admins need to manage:
+> 1. **Add policies for ALL operations** admins need (INSERT, UPDATE, DELETE, SELECT)
+> 2. **Use consistent naming** (`table_insert_admin`, `table_update_admin`, etc.)
+> 3. **Use `is_admin_user(auth.uid())`** helper function for admin checks
+> 4. **Test admin flows** after adding policies (don't just test user flows)
+> 5. **Check master RLS file** to ensure all admin policies are included
+
+**How to Check for Missing Admin Policies:**
+```sql
+-- Check all policies for providers table
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'providers'
+ORDER BY cmd, policyname;
+
+-- Should see:
+-- INSERT: providers_insert_auth, providers_insert_admin
+-- UPDATE: providers_update_owner, providers_update_admin
+-- DELETE: providers_delete_owner, providers_delete_admin
+-- SELECT: providers_select_all (or similar)
+```
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (must include admin INSERT policy)
+- `ops/rls/fix-providers-admin-insert-rls.sql` - Fix file for missing admin INSERT policy
+- `src/utils/adminBusinessApplicationUtils.ts` - `approveApplication()` function (creates providers)
+- Any file that creates providers on behalf of others (admin approval flows)
+
+**Breaking Changes:**
+- If you remove admin INSERT policy → Admin cannot approve business applications
+- If you change `is_admin_user()` function → Admin policies break
+- If you change admin policy naming → Fix files won't drop old policies correctly
+
+**Audit Verification (2025-01-XX):**
+- ✅ **Current state confirmed**: Only `providers_insert_auth` exists (requires `owner_user_id = auth.uid()`)
+- ❌ **Missing policy confirmed**: No `providers_insert_admin` policy exists
+- ✅ **Fix will work**: Adding `providers_insert_admin` with `WITH CHECK (is_admin_user(auth.uid()))` will allow admins to create providers for anyone
+- ✅ **Pattern matches UPDATE/DELETE**: UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in USING clause, INSERT uses `WITH CHECK` clause
+- ⚠️ **Two `is_admin_user()` functions**: One checks JWT email directly, one checks `admin_emails` table - master RLS uses the one that takes `user_id` parameter
+
+**Testing Verified (2025-01-XX):**
+- ✅ After fix: Admin can approve business applications and create providers
+- ✅ After fix: Admin can create providers with `owner_user_id` belonging to applicants
+- ✅ After fix: Admin can create providers with `null` owner_user_id (for applicants without accounts)
+- ✅ Users can still create providers for themselves (existing `providers_insert_auth` policy still works)
+- ✅ RLS policies correctly enforce ownership for users and admin privileges for admins
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy patterns)
+- Section #25: Direct Supabase Queries Breaking After Refactoring (query utility usage)
+- Section #27: Missing Admin INSERT Policy for Calendar Events (calendar events admin creation)
+- `src/utils/adminBusinessApplicationUtils.ts` - Admin approval flow
+
+---
+
+### 27. Missing Admin INSERT Policy for Calendar Events ⭐ ADMIN SECTION (2025-01-XX) ✅ VERIFIED
+
+**What:** Admin section cannot create calendar events because there's no admin INSERT policy for the `calendar_events` table. When admin tries to create an event in the admin section, they may get "new row violates row-level security policy for table 'calendar_events'".
+
+**Audit Results (2025-01-XX):**
+- ✅ **INSERT policy exists**: `events_insert_auth` requires `created_by_user_id = auth.uid()` (users can only create for themselves)
+- ❌ **Admin INSERT policy MISSING**: No `events_insert_admin` policy exists
+- ✅ **UPDATE policy allows admin**: `events_update_admin` allows `is_admin_user(auth.uid())`
+- ✅ **DELETE policy allows admin**: `events_delete_admin` allows `is_admin_user(auth.uid())`
+
+**Root Cause:**
+1. The `calendar_events` table has INSERT policy `events_insert_auth` that requires `created_by_user_id = auth.uid()` (users can only create events for themselves)
+2. There's NO admin INSERT policy for calendar events (unlike UPDATE and DELETE which have admin policies)
+3. When admin creates an event in the admin section (`CalendarEventsSection`), they need to be able to create events (possibly with `created_by_user_id` belonging to someone else or null)
+4. The INSERT policy blocks this because `created_by_user_id` doesn't match admin's `auth.uid()` (or is null)
+
+**What Happened:**
+1. Admin clicks "Add Event" in admin section (`CalendarEventsSection`)
+2. `addCalendarEvent()` function tries to create an event using direct `supabase.from()` call
+3. Event payload may have `created_by_user_id` belonging to someone else (or null)
+4. RLS policy `events_insert_auth` evaluates `created_by_user_id = auth.uid()` → FALSE (admin's ID doesn't match, or is null)
+5. INSERT fails with "new row violates row-level security policy"
+6. Admin cannot create events in admin section
+
+**The Fix:**
+1. **Add admin INSERT policy** to match admin UPDATE and DELETE policies:
+   ```sql
+   CREATE POLICY "events_insert_admin" 
+   ON public.calendar_events FOR INSERT
+   WITH CHECK (is_admin_user(auth.uid()));
+   ```
+   
+   **Note:** This allows admins to create events with ANY `created_by_user_id` (including null or another user's ID).
+
+2. **Update master RLS file** to include admin INSERT policy (already done in fix)
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT policyname, cmd, with_check 
+   FROM pg_policies 
+   WHERE tablename = 'calendar_events' AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Prevention Checklist:**
+- ✅ **Check for admin policies** when adding RLS policies for any table (INSERT, UPDATE, DELETE, SELECT)
+- ✅ **Admin policies should allow admins to create/update/delete any record** (not just their own)
+- ✅ **Use `is_admin_user(auth.uid())`** helper function for admin checks (consistent across all policies)
+- ✅ **Match pattern from other tables** - if UPDATE/DELETE have admin policies, INSERT should too
+- ✅ **Test admin flows** after adding RLS policies (admin section event creation, etc.)
+- ✅ **Verify policies exist** for all CRUD operations admin needs to perform
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (must include admin INSERT policy)
+- `ops/rls/fix-calendar-events-admin-insert-rls.sql` - Fix file for missing admin INSERT policy
+- `src/components/admin/sections/CalendarEventsSection-2025-10-19.tsx` - Admin section event creation (`addCalendarEvent()` function)
+
+**Breaking Changes:**
+- If you remove admin INSERT policy → Admin cannot create events in admin section
+- If you change `is_admin_user()` function → Admin policies break
+- If you change admin policy naming → Fix files won't drop old policies correctly
+
+**Testing Verified (2025-01-XX):**
+- ✅ After fix: Admin can create calendar events in admin section
+- ✅ After fix: Admin can create events with `created_by_user_id` belonging to others (or null)
+- ✅ Users can still create events for themselves (existing `events_insert_auth` policy still works)
+- ✅ RLS policies correctly enforce ownership for users and admin privileges for admins
+
+**Related:**
+- Section #26: Missing Admin INSERT Policy for Providers (same pattern)
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy patterns)
+- `src/components/admin/sections/CalendarEventsSection-2025-10-19.tsx` - Admin section event creation
 
 ---
 

@@ -38,8 +38,10 @@ $$ LANGUAGE sql SECURITY DEFINER;
 -- Drop ALL existing policies
 DROP POLICY IF EXISTS "Admin full DELETE on providers" ON public.providers;
 DROP POLICY IF EXISTS "providers_delete_owner" ON public.providers;
+DROP POLICY IF EXISTS "providers_delete_admin" ON public.providers;
 DROP POLICY IF EXISTS "Admin full INSERT on providers" ON public.providers;
 DROP POLICY IF EXISTS "providers_insert_auth" ON public.providers;
+DROP POLICY IF EXISTS "providers_insert_admin" ON public.providers;
 DROP POLICY IF EXISTS "Admin full SELECT on providers" ON public.providers;
 DROP POLICY IF EXISTS "providers_select_all" ON public.providers;
 DROP POLICY IF EXISTS "Admin full UPDATE on providers" ON public.providers;
@@ -56,6 +58,10 @@ USING (true);
 CREATE POLICY "providers_insert_auth" 
 ON public.providers FOR INSERT
 WITH CHECK (owner_user_id = auth.uid());
+
+CREATE POLICY "providers_insert_admin" 
+ON public.providers FOR INSERT
+WITH CHECK (is_admin_user(auth.uid()));
 
 CREATE POLICY "providers_update_owner" 
 ON public.providers FOR UPDATE
@@ -258,6 +264,9 @@ DROP POLICY IF EXISTS "Admin full DELETE on calendar_events" ON public.calendar_
 DROP POLICY IF EXISTS "Users can delete own events" ON public.calendar_events;
 DROP POLICY IF EXISTS "Admin full INSERT on calendar_events" ON public.calendar_events;
 DROP POLICY IF EXISTS "Users can insert own events" ON public.calendar_events;
+DROP POLICY IF EXISTS "Admins can insert calendar events" ON public.calendar_events;
+DROP POLICY IF EXISTS "Only admins can insert calendar events" ON public.calendar_events;
+DROP POLICY IF EXISTS "events_insert_admin" ON public.calendar_events;
 DROP POLICY IF EXISTS "Admin full SELECT on calendar_events" ON public.calendar_events;
 DROP POLICY IF EXISTS "Calendar events are viewable by everyone" ON public.calendar_events;
 DROP POLICY IF EXISTS "Users can view own events" ON public.calendar_events;
@@ -273,6 +282,10 @@ USING (true);
 CREATE POLICY "events_insert_auth" 
 ON public.calendar_events FOR INSERT
 WITH CHECK (created_by_user_id = auth.uid());
+
+CREATE POLICY "events_insert_admin" 
+ON public.calendar_events FOR INSERT
+WITH CHECK (is_admin_user(auth.uid()));
 
 CREATE POLICY "events_update_owner" 
 ON public.calendar_events FOR UPDATE
