@@ -52,12 +52,14 @@ export function BusinessListingForm({
     listing, 
     onSave, 
     onCancel,
-    isUpdating = false
+    isUpdating = false,
+    isSubmittingApplication = false
   }: { 
     listing: BusinessListing | null
     onSave: (data: Partial<BusinessListing>) => void
     onCancel: () => void
     isUpdating?: boolean
+    isSubmittingApplication?: boolean
   }) {
     console.log('[BusinessListingForm] Rendering with listing:', listing?.id, listing?.name)
     
@@ -209,8 +211,8 @@ export function BusinessListingForm({
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault()
       
-      // Prevent multiple submissions
-      if (isUpdating) {
+      // Prevent multiple submissions (covers both edit and create flows)
+      if (listing ? isUpdating : isSubmittingApplication) {
         return
       }
       
@@ -1496,20 +1498,20 @@ export function BusinessListingForm({
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  disabled={isUpdating}
+                  disabled={listing ? isUpdating : isSubmittingApplication}
                   className={`flex-1 px-6 py-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all ${
-                    isUpdating 
+                    listing ? isUpdating : isSubmittingApplication
                       ? 'bg-blue-500 text-white cursor-wait shadow-lg' 
                       : 'bg-neutral-900 text-white hover:bg-neutral-800 hover:shadow-md'
                   }`}
                 >
-                  {isUpdating ? (
+                  {(listing ? isUpdating : isSubmittingApplication) ? (
                     <>
                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      <span>{listing ? 'Submitting Changes...' : 'Creating Listing...'}</span>
+                      <span>{listing ? 'Submitting Changes...' : 'Submitting Application...'}</span>
                     </>
                   ) : (
                     <>
@@ -1523,9 +1525,9 @@ export function BusinessListingForm({
                 <button
                   type="button"
                   onClick={onCancel}
-                  disabled={isUpdating}
+                  disabled={listing ? isUpdating : isSubmittingApplication}
                   className={`px-6 py-3 border rounded-lg font-medium transition-colors ${
-                    isUpdating 
+                    (listing ? isUpdating : isSubmittingApplication)
                       ? 'border-neutral-300 text-neutral-400 cursor-not-allowed bg-neutral-50' 
                       : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50'
                   }`}

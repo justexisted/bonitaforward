@@ -33,6 +33,8 @@ interface UseBusinessOperationsProps {
   setShowCreateForm: (show: boolean) => void
   isUpdating: boolean
   setIsUpdating: (updating: boolean) => void
+  isSubmittingApplication: boolean
+  setIsSubmittingApplication: (submitting: boolean) => void
   listings: BusinessListing[]
   applications: BusinessApplication[]
 }
@@ -56,6 +58,8 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
     setShowCreateForm,
     isUpdating,
     setIsUpdating,
+    isSubmittingApplication,
+    setIsSubmittingApplication,
     listings,
     applications
   } = props
@@ -860,12 +864,19 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
    * Creates a business application (not a provider directly) that requires admin approval.
    */
   const createBusinessListing = async (listingData: Partial<BusinessListing>) => {
+    if (isSubmittingApplication) {
+      console.log('[MyBusiness] Application submission already in progress, ignoring duplicate request')
+      return
+    }
+
     if (!auth.email) {
       setMessage('Error: User email not available. Please sign in again.')
       return
     }
     
     try {
+      // Track submission state so the UI can show loading feedback and prevent duplicates
+      setIsSubmittingApplication(true)
       setMessage('Submitting business application...')
       
       // Create a business application (NOT a provider directly)
@@ -953,6 +964,9 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       setShowCreateForm(false)
     } catch (error: any) {
       setMessage(`Error submitting application: ${error.message}`)
+    } finally {
+      // Ensure UI loading state is always cleared
+      setIsSubmittingApplication(false)
     }
   }
 

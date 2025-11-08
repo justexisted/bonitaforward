@@ -116,6 +116,7 @@ export default function MyBusinessPage() {
   const [showJobForm, setShowJobForm] = useState(false)
   const [editingJob, setEditingJob] = useState<JobPost | null>(null) // State for editing existing job posts
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isSubmittingApplication, setIsSubmittingApplication] = useState(false)
   // Google Calendar connection state
   const [connectingCalendar, setConnectingCalendar] = useState(false)
   // State to control subscription card visibility
@@ -155,6 +156,8 @@ export default function MyBusinessPage() {
     setShowCreateForm,
     isUpdating,
     setIsUpdating,
+    isSubmittingApplication,
+    setIsSubmittingApplication,
     listings,
     applications
   })
@@ -1087,6 +1090,7 @@ export default function MyBusinessPage() {
               }
             }
             isUpdating={isUpdating}
+            isSubmittingApplication={isSubmittingApplication}
             onCancel={() => {
               setShowCreateForm(false)
               setEditingListing(null)
