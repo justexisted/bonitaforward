@@ -31,7 +31,6 @@ interface UseBusinessOperationsProps {
   setShowSubscriptionCard: (show: boolean) => void
   setUserPlanChoice: (choice: PlanChoice) => void
   setEditingListing: (listing: BusinessListing | null) => void
-  setShowCreateForm: (show: boolean) => void
   isUpdating: boolean
   setIsUpdating: (updating: boolean) => void
   isSubmittingApplication: boolean
@@ -56,7 +55,6 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
     setShowSubscriptionCard,
     setUserPlanChoice,
     setEditingListing,
-    setShowCreateForm,
     isUpdating,
     setIsUpdating,
     isSubmittingApplication,

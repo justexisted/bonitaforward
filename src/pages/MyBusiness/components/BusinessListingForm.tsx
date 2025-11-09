@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { BusinessListing, ImageUploadProgress } from '../types'
 import { useHideDock } from '../../../hooks/useHideDock'
+import { funnelConfig, type FunnelQuestion } from '../../../utils/funnelQuestions'
+import type { CategoryKey } from '../../../types'
 
 
 /**
@@ -214,6 +216,62 @@ export function BusinessListingForm({
       { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
       { key: 'professional-services', name: 'Professional Services' }
     ]
+
+    const activeFunnelQuestions = useMemo<FunnelQuestion[]>(() => {
+      const key = (formData.category_key || '') as CategoryKey
+      if (!key || !funnelConfig[key]) {
+        return []
+      }
+      return funnelConfig[key]
+    }, [formData.category_key])
+
+    const previousFunnelLabelsRef = useRef<string[]>([])
+
+    useEffect(() => {
+      const newLabels = activeFunnelQuestions.flatMap((question) =>
+        question.options.map((option) => option.label)
+      )
+
+      if (!listing && previousFunnelLabelsRef.current.length > 0) {
+        setFormData((prev) => {
+          const existingTags = prev.tags || []
+          const filteredTags = existingTags.filter(
+            (tag) => !previousFunnelLabelsRef.current.includes(tag)
+          )
+          if (filteredTags.length === existingTags.length) {
+            return prev
+          }
+          return {
+            ...prev,
+            tags: filteredTags
+          }
+        })
+      }
+
+      previousFunnelLabelsRef.current = newLabels
+    }, [activeFunnelQuestions, listing, setFormData])
+
+    const updateFunnelTag = (question: FunnelQuestion, selectedLabel: string) => {
+      const allowedLabels = question.options.map((option) => option.label)
+      setFormData((prev) => {
+        const existingTags = prev.tags || []
+        const remainingTags = existingTags.filter((tag) => !allowedLabels.includes(tag))
+        const nextTags =
+          selectedLabel && !remainingTags.includes(selectedLabel)
+            ? [...remainingTags, selectedLabel]
+            : remainingTags
+        return {
+          ...prev,
+          tags: nextTags
+        }
+      })
+    }
+
+    const getSelectedFunnelLabel = (question: FunnelQuestion): string => {
+      const tags = formData.tags || []
+      const match = question.options.find((option) => tags.includes(option.label))
+      return match?.label || ''
+    }
   
     const handlePlanSelect = (plan: 'free' | 'featured') => {
       if (listing) return
@@ -591,6 +649,43 @@ export function BusinessListingForm({
                   <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${isFeaturedSelected ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700'}`}>
                     {isFeaturedSelected ? 'Featured listing' : 'Free listing'}
                   </span>
+                </div>
+              )}
+
+              {activeFunnelQuestions.length > 0 && (
+                <div className="border border-neutral-200 rounded-xl p-4 bg-white shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-800">Match Customer Preferences</p>
+                      <p className="text-xs text-neutral-600">
+                        These answers become tags customers use in the discovery funnel. Choose the best fit for your business.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {activeFunnelQuestions.map((question) => {
+                      const selectedLabel = getSelectedFunnelLabel(question)
+                      return (
+                        <div key={question.id} className="flex flex-col">
+                          <label className="text-sm font-medium text-neutral-700 mb-1">
+                            {question.prompt}
+                          </label>
+                          <select
+                            value={selectedLabel}
+                            onChange={(e) => updateFunnelTag(question, e.target.value)}
+                            className="rounded-lg border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-500 bg-white text-sm"
+                          >
+                            <option value="">Select an option</option>
+                            {question.options.map((option) => (
+                              <option key={option.id} value={option.label}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
