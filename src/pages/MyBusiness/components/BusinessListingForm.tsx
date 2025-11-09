@@ -170,6 +170,13 @@ export function BusinessListingForm({
   const [uploadingImages, setUploadingImages] = useState(false)
   const [imageUploadProgress, setImageUploadProgress] = useState<ImageUploadProgress>({})
   
+    const isSubmittingPrimaryAction = listing ? isUpdating : isSubmittingApplication
+
+    // Align the primary action styling with the refreshed blue palette so it reads as a button.
+    const primaryActionButtonClasses = isSubmittingPrimaryAction
+      ? 'bg-blue-500 text-white cursor-wait shadow-lg border border-blue-500'
+      : 'bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 text-white hover:from-blue-500 hover:to-indigo-400 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 shadow-md border border-blue-500/60 cursor-pointer'
+
     const categories = [
       { key: 'real-estate', name: 'Real Estate' },
       { key: 'home-services', name: 'Home Services' },
@@ -593,7 +600,7 @@ export function BusinessListingForm({
                     <div>
                       <p className="text-sm font-medium text-neutral-800">Match Customer Preferences</p>
                       <p className="text-xs text-neutral-600">
-                        These answers become tags customers use in the discovery funnel. Choose the best fit for your business.
+                        Choose the best fit for your business. These are the ideal answers for customers to find your business.
                       </p>
                     </div>
                   </div>
@@ -1506,14 +1513,12 @@ export function BusinessListingForm({
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  disabled={listing ? isUpdating : isSubmittingApplication}
-                  className={`flex-1 px-6 py-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all ${
-                    listing ? isUpdating : isSubmittingApplication
-                      ? 'bg-blue-500 text-white cursor-wait shadow-lg' 
-                      : 'bg-neutral-900 text-white hover:bg-neutral-800 hover:shadow-md'
-                  }`}
+                  disabled={isSubmittingPrimaryAction}
+                  aria-disabled={isSubmittingPrimaryAction}
+                  aria-busy={isSubmittingPrimaryAction}
+                  className={`flex-1 px-6 py-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all duration-200 ease-out ${primaryActionButtonClasses}`}
                 >
-                  {(listing ? isUpdating : isSubmittingApplication) ? (
+                  {isSubmittingPrimaryAction ? (
                     <>
                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -1533,9 +1538,9 @@ export function BusinessListingForm({
                 <button
                   type="button"
                   onClick={onCancel}
-                  disabled={listing ? isUpdating : isSubmittingApplication}
+                  disabled={isSubmittingPrimaryAction}
                   className={`px-6 py-3 border rounded-lg font-medium transition-colors ${
-                    (listing ? isUpdating : isSubmittingApplication)
+                    isSubmittingPrimaryAction
                       ? 'border-neutral-300 text-neutral-400 cursor-not-allowed bg-neutral-50' 
                       : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50'
                   }`}

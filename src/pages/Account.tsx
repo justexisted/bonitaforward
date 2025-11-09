@@ -22,6 +22,104 @@ import {
 import { AccountSettings, MyBookings, SavedBusinesses, SavedCoupons } from './account/components'
 import EmailVerificationPrompt from '../components/EmailVerificationPrompt'
 
+type ParsedChallengeDetails = {
+  description: string | null
+  details: Array<{ key: string; label: string; value: string }>
+}
+
+const CHALLENGE_FIELDS_IN_DISPLAY_ORDER: Array<{ key: string; label: string }> = [
+  { key: 'website', label: 'Website' },
+  { key: 'address', label: 'Address' },
+  { key: 'tags', label: 'Tags' },
+  { key: 'specialties', label: 'Specialties' },
+  { key: 'service_areas', label: 'Service Areas' },
+  { key: 'business_contact_email', label: 'Business Contact Email' },
+  { key: 'bonita_resident_discount', label: 'Bonita Resident Discount' },
+  { key: 'google_maps_url', label: 'Google Maps URL' },
+  { key: 'social_links', label: 'Social Links' },
+  { key: 'business_hours', label: 'Business Hours' },
+  { key: 'images', label: 'Images' },
+]
+
+const formatChallengeLabel = (rawKey: string) => {
+  return rawKey
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, char => char.toUpperCase())
+}
+
+const formatChallengeValue = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : null
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No'
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map(item => formatChallengeValue(item))
+      .filter((item): item is string => Boolean(item))
+
+    return parts.length > 0 ? parts.join(', ') : null
+  }
+
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => {
+        const formatted = formatChallengeValue(nestedValue)
+        if (!formatted) return null
+        return `${formatChallengeLabel(key)}: ${formatted}`
+      })
+      .filter((item): item is string => Boolean(item))
+
+    return entries.length > 0 ? entries.join('; ') : null
+  }
+
+  return null
+}
+
+const parseChallengeDetails = (challenge: string | null | undefined): ParsedChallengeDetails | null => {
+  if (!challenge) return null
+
+  try {
+    const parsed = JSON.parse(challenge)
+
+    if (!parsed || typeof parsed !== 'object') {
+      return null
+    }
+
+    const description = formatChallengeValue((parsed as Record<string, unknown>).description)
+
+    const details = CHALLENGE_FIELDS_IN_DISPLAY_ORDER.map(({ key, label }) => {
+      const formattedValue = formatChallengeValue((parsed as Record<string, unknown>)[key])
+      if (!formattedValue) return null
+
+      return {
+        key,
+        label,
+        value: formattedValue,
+      }
+    }).filter((item): item is { key: string; label: string; value: string } => Boolean(item))
+
+    return {
+      description,
+      details,
+    }
+  } catch (error) {
+    console.warn('[Account] Failed to parse application notes JSON:', error)
+    return null
+  }
+}
+
 export default function AccountPage() {
   const auth = useAuth()
   const location = useLocation()
@@ -222,6 +320,55 @@ export default function AccountPage() {
       setMessage(`Error deleting application: ${err.message}`)
       setMessageType('error')
     }
+  }
+
+  const renderChallengeDetails = (challenge: string | null) => {
+    // Applications now store structured JSON; parse and format it so applicants see a readable summary.
+    const parsedDetails = parseChallengeDetails(challenge)
+
+    if (!parsedDetails) {
+      if (!challenge) return null
+
+      return (
+        <div className="text-sm">
+          <span className="font-medium text-neutral-700">Message/Notes:</span>
+          <p className="text-neutral-600 whitespace-pre-line mt-1 bg-neutral-50 p-3 rounded-lg">{challenge}</p>
+        </div>
+      )
+    }
+
+    const { description, details } = parsedDetails
+
+    if (!description && details.length === 0) {
+      if (!challenge) return null
+
+      return (
+        <div className="text-sm">
+          <span className="font-medium text-neutral-700">Message/Notes:</span>
+          <p className="text-neutral-600 whitespace-pre-line mt-1 bg-neutral-50 p-3 rounded-lg">{challenge}</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="text-sm">
+        <span className="font-medium text-neutral-700">Message/Notes:</span>
+        <div className="mt-1 bg-neutral-50 p-3 rounded-lg space-y-2">
+          {description && (
+            <p className="text-neutral-600 whitespace-pre-line leading-relaxed">{description}</p>
+          )}
+          {details.length > 0 && (
+            <ul className="list-disc list-inside text-neutral-600 space-y-1">
+              {details.map(detail => (
+                <li key={detail.key}>
+                  <span className="font-medium text-neutral-700">{detail.label}:</span> {detail.value}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    )
   }
 
   // Helper: remove event locally
@@ -972,12 +1119,7 @@ export default function AccountPage() {
                             )}
                           </div>
 
-                          {app.challenge && (
-                            <div className="text-sm">
-                              <span className="font-medium text-neutral-700">Message/Notes:</span>
-                              <p className="text-neutral-600 mt-1 bg-neutral-50 p-3 rounded-lg">{app.challenge}</p>
-                            </div>
-                          )}
+                          {renderChallengeDetails(app.challenge)}
 
                           <div className="flex items-center justify-between text-xs text-neutral-500 pt-2 border-t border-neutral-100">
                             <span>Submitted: {new Date(app.created_at).toLocaleString()}</span>
@@ -1604,12 +1746,7 @@ export default function AccountPage() {
                             )}
                           </div>
 
-                          {app.challenge && (
-                            <div className="text-sm">
-                              <span className="font-medium text-neutral-700">Message/Notes:</span>
-                              <p className="text-neutral-600 mt-1 bg-neutral-50 p-3 rounded-lg">{app.challenge}</p>
-                            </div>
-                          )}
+                          {renderChallengeDetails(app.challenge)}
 
                           <div className="flex items-center justify-between text-xs text-neutral-500 pt-2 border-t border-neutral-100">
                             <span>Submitted: {new Date(app.created_at).toLocaleString()}</span>

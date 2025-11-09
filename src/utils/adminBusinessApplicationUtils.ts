@@ -258,11 +258,15 @@ export async function approveApplication(
         'user_notifications',
         {
           user_id: ownerUserId,
-          subject: notificationTitle,  // Subject is required field in database
-          title: notificationTitle,
+          subject: notificationTitle, // Database schema uses subject/body
+          body: notificationMessage,
+          title: notificationTitle, // Retained for forward compatibility with newer UI mapping
           message: notificationMessage,
           type: 'application_approved',
-          metadata: {}
+          metadata: {
+            type: 'application_approved',
+            link: '/my-business'
+          }
         },
         { logPrefix: '[Admin]' }
       )
@@ -388,11 +392,17 @@ export async function deleteApplication(
           'user_notifications',
           {
             user_id: profile.id,
-            subject: notificationTitle,  // Subject is required field in database
+            subject: notificationTitle,
+            body: notificationMessage,
             title: notificationTitle,
             message: notificationMessage,
             type: 'application_rejected',
-            metadata: { reason: reason || 'No reason provided' }
+            metadata: {
+              type: 'application_rejected',
+              reason: reason || 'No reason provided',
+              link: '/account',
+              link_section: 'applications'
+            }
           },
           { logPrefix: '[Admin]' }
         )

@@ -128,6 +128,13 @@ See: `docs/prevention/CASCADING_FAILURES.md` - Sections #11 and #12
    - Breaking Changes: verifyAuthAndAdmin() API, response format changes
    - **Status:** ✅ Completed - dependency tracking added
 
+15. ✅ **src/components/NotificationBell.tsx** ⭐ HIGH PRIORITY
+   - Issue: Notifications reappearing after users read them (ack state not persisted)
+   - Dependencies: Supabase `user_notifications` table (REST + realtime), `query('business_applications')`, `providers` + `provider_change_requests` tables, `dismissed_notifications` helper data, `useAuth` (userId/email), React Router `useNavigate`, localStorage key `bf_notification_acknowledged_ids`
+   - Consumers: Navbar layout, every authenticated page showing the bell
+   - Breaking Changes: Changing `.select('*')` columns, removing acknowledgement persistence, renaming the storage key, or bypassing the query utility will reintroduce duplicate notifications or 400 errors
+   - **Status:** ✅ Completed - acknowledgement persistence + schema-safe querying documented
+
 ### ✅ Immutable Database Fields Fix (COMPLETED)
 
 **Issue:** `profiles.role is immutable once set` error on login  

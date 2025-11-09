@@ -611,42 +611,58 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
   }
 
   /**
-   * REQUEST FREE LISTING FROM APPLICATION
+   * REQUEST APPLICATION UPDATE
    * 
-   * Creates a change request to convert an approved application into a free listing.
+   * Records an owner update request on the application so admins can review it.
    */
   const requestFreeListingFromApp = async (appId: string) => {
     try {
-      setMessage('Creating free listing request...')
-      
+      setMessage('Requesting application update...')
+
       const app = applications.find(a => a.id === appId)
       if (!app) throw new Error('Application not found')
 
-      // Create a provider change request for admin to review
-      // This uses the existing admin workflow for approving new listings
+      const tierLabel = app.tier_requested === 'featured' ? 'Featured Listing' : 'Free Listing'
+      const now = new Date().toISOString()
+      const updateEntry = {
+        message: `Update Requested for ${tierLabel}`,
+        requested_at: now,
+        requested_by: auth.email || auth.userId || 'unknown-user'
+      }
+
+      let challengeData: any = {}
+      if (app.challenge) {
+        try {
+          challengeData = JSON.parse(app.challenge)
+        } catch {
+          challengeData = { legacy_challenge_text: app.challenge }
+        }
+      }
+
+      if (Array.isArray(challengeData.update_requests)) {
+        challengeData.update_requests.push(updateEntry)
+      } else if (challengeData.update_request && !Array.isArray(challengeData.update_request)) {
+        challengeData.update_requests = [challengeData.update_request, updateEntry]
+        delete challengeData.update_request
+      } else {
+        challengeData.update_requests = [updateEntry]
+      }
+
       const { error } = await supabase
-        .from('provider_change_requests')
-        .insert([{
-          provider_id: null, // Will be created by admin
-          owner_user_id: auth.userId,
-          type: 'create_free_listing',
-          changes: {
-            business_name: app.business_name,
-            category: app.category,
-            phone: app.phone,
-            email: app.email,
-            tier: 'free',
-            source_application_id: appId
-          },
-          status: 'pending'
-        }])
+        .from('business_applications')
+        .update({
+          challenge: JSON.stringify(challengeData),
+          updated_at: now
+        })
+        .eq('id', appId)
 
       if (error) throw error
 
-      setMessage('Free listing request submitted! We\'ll review and approve it shortly.')
-      loadBusinessData() // Refresh data to show updated state
+      setMessage(`Update requested for your ${tierLabel.toLowerCase()}. We'll let you know when the admin responds.`)
+      await loadBusinessData()
     } catch (error: any) {
-      setMessage(`Error: ${error.message}`)
+      console.error('[MyBusiness] Error requesting application update:', error)
+      setMessage(`❌ Error requesting update: ${error.message}`)
     }
   }
 

@@ -31,6 +31,43 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right?: number | string; left?: number | string }>({ top: 0, right: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(new Set())
+  const acknowledgedIdsRef = useRef<Set<string>>(new Set())
+
+  const ACK_STORAGE_KEY = 'bf_notification_acknowledged_ids'
+
+  // Load acknowledged notification ids from localStorage so we remember which notifications the user already opened.
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(ACK_STORAGE_KEY) : null
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          const restored = new Set<string>(parsed.filter((id) => typeof id === 'string'))
+          setAcknowledgedIds(restored)
+          acknowledgedIdsRef.current = restored
+        }
+      }
+    } catch (err) {
+      console.warn('[NotificationBell] Failed to restore acknowledged notifications from storage:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    acknowledgedIdsRef.current = acknowledgedIds
+  }, [acknowledgedIds])
+
+  const persistAcknowledgedIds = (next: Set<string>) => {
+    acknowledgedIdsRef.current = next
+    setAcknowledgedIds(new Set(next))
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(ACK_STORAGE_KEY, JSON.stringify(Array.from(next)))
+      }
+    } catch (err) {
+      console.warn('[NotificationBell] Failed to persist acknowledged notifications:', err)
+    }
+  }
 
   // Load notifications
   useEffect(() => {
@@ -51,7 +88,7 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
           // 1. Fetch admin notifications from user_notifications table
           supabase
             .from('user_notifications')
-            .select('id, title, message, created_at, is_read')
+            .select('*')
             .eq('user_id', auth.userId)
             .order('created_at', { ascending: false })
             .limit(20),
@@ -75,18 +112,104 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
 
         // Process user notifications
         if (userNotifsResult.status === 'fulfilled') {
-          const { data: userNotifs } = userNotifsResult.value
+          const { data: userNotifs, error: userNotifsError } = userNotifsResult.value
+
+          if (userNotifsError) {
+            console.error('[NotificationBell] ❌ Error fetching user notifications:', userNotifsError)
+          }
+
           if (userNotifs && userNotifs.length > 0) {
-            const adminNotifs: Notification[] = userNotifs.map((notif) => ({
-              id: notif.id,
-              type: 'admin_notification' as const,
-              title: notif.title,
-              message: notif.message,
-              timestamp: notif.created_at,
-              read: notif.is_read,
-              link: '/my-business',
-              isAdminNotification: true
-            }))
+            const adminNotifs: Notification[] = userNotifs.map((rawNotif) => {
+              let metadata: Record<string, any> | null = null
+              if (rawNotif.metadata) {
+                if (typeof rawNotif.metadata === 'string') {
+                  try {
+                    metadata = JSON.parse(rawNotif.metadata)
+                  } catch (err) {
+                    console.warn('[NotificationBell] Failed to parse notification metadata JSON:', err)
+                  }
+                } else {
+                  metadata = rawNotif.metadata
+                }
+              }
+
+              let dataPayload: Record<string, any> | null = null
+              if (rawNotif.data) {
+                if (typeof rawNotif.data === 'string') {
+                  try {
+                    dataPayload = JSON.parse(rawNotif.data)
+                  } catch (err) {
+                    console.warn('[NotificationBell] Failed to parse notification data JSON:', err)
+                  }
+                } else {
+                  dataPayload = rawNotif.data
+                }
+              }
+
+              // Consolidated mapping: table has evolved (subject/body vs title/message + optional metadata).
+              const title =
+                rawNotif.title ||
+                rawNotif.subject ||
+                (dataPayload?.title as string | undefined) ||
+                (metadata?.title as string | undefined) ||
+                'Notification'
+
+              const message =
+                rawNotif.message ||
+                rawNotif.body ||
+                (dataPayload?.message as string | undefined) ||
+                (metadata?.message as string | undefined) ||
+                ''
+
+              const notifType: string | undefined =
+                (rawNotif.type as string | undefined) ||
+                (metadata?.type as string | undefined) ||
+                (dataPayload?.type as string | undefined)
+
+              const inferredType: Notification['type'] =
+                notifType === 'application_approved'
+                  ? 'approved_application'
+                  : notifType === 'application_rejected'
+                  ? 'rejected_application'
+                  : notifType === 'application_pending'
+                  ? 'pending_application'
+                  : 'admin_notification'
+
+              const linkOverride =
+                rawNotif.link ||
+                dataPayload?.link ||
+                metadata?.link ||
+                (inferredType === 'approved_application'
+                  ? '/my-business'
+                  : inferredType === 'rejected_application'
+                  ? '/account'
+                  : '/my-business')
+
+              const linkSectionOverride =
+                rawNotif.link_section ||
+                dataPayload?.link_section ||
+                metadata?.link_section ||
+                (inferredType === 'rejected_application' ? 'applications' : undefined)
+
+              const readState =
+                rawNotif.is_read ??
+                rawNotif.read ??
+                Boolean(rawNotif.read_at) ??
+                false
+
+              return {
+                id: rawNotif.id,
+                type: inferredType,
+                title,
+                message,
+                timestamp: rawNotif.created_at,
+                read: Boolean(readState),
+                link: linkOverride,
+                linkSection: linkSectionOverride,
+                isAdminNotification: true
+              }
+            })
+
             allNotifications.push(...adminNotifs)
           }
         }
@@ -174,7 +297,12 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         )
 
-        setNotifications(allNotifications)
+        const filteredNotifications = allNotifications.filter((notification) => {
+          if (notification.isAdminNotification) return true
+          return !acknowledgedIdsRef.current.has(notification.id)
+        })
+
+        setNotifications(filteredNotifications)
       } catch (error) {
         console.error('[NotificationBell] Error loading notifications:', error)
       }
@@ -302,11 +430,37 @@ export default function NotificationBell({ buttonBgColor = '#89D185', buttonText
 
   const unreadCount = notifications.filter(n => !n.read).length
 
+  useEffect(() => {
+    setNotifications(prev =>
+      prev.filter(notification => notification.isAdminNotification || !acknowledgedIds.has(notification.id))
+    )
+  }, [acknowledgedIds])
+
+  useEffect(() => {
+    if (!isOpen || notifications.length === 0) return
+
+    const toAcknowledge = notifications.filter(notification => 
+      !notification.isAdminNotification && !acknowledgedIdsRef.current.has(notification.id)
+    )
+
+    if (toAcknowledge.length === 0) return
+
+    const next = new Set(acknowledgedIdsRef.current)
+    toAcknowledge.forEach(notification => next.add(notification.id))
+    persistAcknowledgedIds(next)
+  }, [isOpen, notifications])
+
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read in local state
     setNotifications(prev =>
       prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
     )
+
+    if (!notification.isAdminNotification) {
+      const next = new Set(acknowledgedIdsRef.current)
+      next.add(notification.id)
+      persistAcknowledgedIds(next)
+    }
 
     // If it's an admin notification, mark as read in database
     if (notification.isAdminNotification) {

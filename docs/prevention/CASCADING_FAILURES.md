@@ -1,5 +1,15 @@
 # Why Fixing One Thing Breaks Another - Cascading Failures Prevention
 
+## Table of Contents
+- [The Core Problem](#the-core-problem)
+- [✅ Verified Solutions (2025-01-XX)](#-verified-solutions-2025-01-xx)
+- [Why This Happens](#why-this-happens)
+- [Appendix A – Archived Incident Library](#appendix-a--archived-incident-library)
+- [How to Prevent This (Action Plan)](#how-to-prevent-this-action-plan)
+- [Checklist for Every Change](#checklist-for-every-change)
+- [Most Important Rule](#most-important-rule)
+- [Summary](#summary)
+
 ## The Core Problem
 
 You're experiencing **cascading failures** - fixing one issue creates another:
@@ -955,7 +965,7 @@ if (!token && (event as any).rawQuery) {
 ```
 
 **Prevention Checklist:**
-- ✅ Always check your platform’s request shape (Netlify: `queryStringParameters` is an object)
+- ✅ Always check your platform's request shape (Netlify: `queryStringParameters` is an object)
 - ✅ Add a defensive fallback (`rawQuery`) for environments/dev servers
 - ✅ Log clear errors that point to setup/migration issues vs bad tokens
 - ✅ Document parameter contracts in the function header
@@ -992,292 +1002,13 @@ if (!token && (event as any).rawQuery) {
 
 ### 20. Admin Business Deletion Choice (2025-01-XX)
 
-**What:** When an admin deletes a user account, they need to choose whether to permanently delete or keep (unlink) the user's businesses.
-
-**Failure Mode:**
-```typescript
-// WRONG: Admin deletion doesn't handle businesses
-async function deleteUser(userId: string) {
-  // ❌ No prompt about businesses
-  // ❌ No option to delete or keep businesses
-  await deleteUserAndRelatedData(userId)
-  // Businesses are always soft-deleted (unlinked), admin has no choice
-}
-```
-
-**What Happened:**
-1. Admin deletes user account via admin panel
-2. User has businesses linked to their account
-3. Backend always soft-deletes businesses (unlinks them)
-4. Admin has no control over whether businesses should be permanently deleted
-5. Result: Businesses remain in database even if admin wants them deleted
-
-**The Fix:**
-```typescript
-// CORRECT: Check for businesses and prompt admin
-async function deleteUser(userId: string, deleteBusinesses?: boolean) {
-  // Check if user has businesses
-  let shouldDeleteBusinesses = deleteBusinesses
-  if (shouldDeleteBusinesses === undefined) {
-    const { data: businesses } = await supabase
-      .from('providers')
-      .select('id, name')
-      .eq('owner_user_id', userId)
-    
-    if (businesses && businesses.length > 0) {
-      // Prompt admin about businesses
-      const confirmMessage = 
-        `This user has ${businesses.length} business(es):\n\n` +
-        `${businessNames}\n\n` +
-        `Delete businesses permanently? (OK = delete, Cancel = keep)`
-      shouldDeleteBusinesses = confirm(confirmMessage)
-    }
-  }
-  
-  // Pass deleteBusinesses to backend
-  await fetch('/api/delete-user', {
-    body: JSON.stringify({ 
-      user_id: userId,
-      deleteBusinesses: shouldDeleteBusinesses === true
-    })
-  })
-}
-```
-
-**Prevention Checklist:**
-- ✅ Check for businesses before deletion (query providers table by owner_user_id)
-- ✅ Prompt admin if businesses exist (show business names)
-- ✅ Pass deleteBusinesses parameter to backend (true = hard delete, false = soft delete)
-- ✅ Backend handles both cases (hard delete removes businesses, soft delete unlinks them)
-- ✅ Success message indicates what happened with businesses
-- ✅ Handle RLS policy failures gracefully (continue deletion even if business check fails)
-
-**Rule of Thumb:**
-> When deleting user accounts (admin or self-delete):
-> 1. Check if user has businesses (query providers table by owner_user_id)
-> 2. If businesses exist, prompt admin/user about deletion choice
-> 3. Pass deleteBusinesses parameter to backend (true = hard delete, false = soft delete)
-> 4. Backend handles deletion based on parameter (hard delete vs soft delete)
-> 5. Success message should indicate what happened with businesses
-> 6. Handle errors gracefully (continue deletion even if business check fails)
-
-**Files to Watch:**
-- `src/utils/adminUserUtils.ts` - Checks for businesses, prompts admin (deleteUser function)
-- `netlify/functions/admin-delete-user.ts` - Accepts deleteBusinesses parameter
-- `netlify/functions/user-delete.ts` - Accepts deleteBusinesses parameter (self-delete)
-- `netlify/functions/utils/userDeletion.ts` - Handles hard/soft delete logic
-- `src/pages/Account.tsx` - Prompts user about businesses (self-delete)
-
-**Breaking Changes:**
-- If you remove deleteBusinesses parameter → Businesses always soft-deleted (unlinked)
-- If providers table RLS changes → Can't check for businesses before deletion
-- If providers table structure changes → Business deletion logic fails
-- If you change deleteBusinesses parameter name → Frontend breaks
-
-**Testing Verified (2025-01-XX):**
-- ✅ Admin is prompted about businesses when deleting user with businesses
-- ✅ Hard delete (deleteBusinesses=true) permanently removes businesses
-- ✅ Soft delete (deleteBusinesses=false) unlinks businesses (can be reconnected)
-- ✅ Success message shows what happened with businesses
-- ✅ Deletion continues even if business check fails (graceful error handling)
-
-**Related:**
-- Section #17: Business Ownership on Self‑Deletion (similar pattern for self-delete)
-- Section #9: Incomplete Deletion Logic (comprehensive deletion patterns)
+_Archived:_ See Appendix entry 20 in [Appendix A – Archived Incident Library](#appendix-a--archived-incident-library) for summary and related links.
 
 ---
 
 ### 22. Event Images Stored in Supabase Storage (2025-01-XX)
 
-**What:** New events automatically download images from Unsplash and store them in Supabase Storage. The database stores Supabase Storage URLs (your own storage), not Unsplash URLs.
-
-**Root Cause:**
-1. Previously, event creation saved Unsplash URLs directly to database
-2. Images were served from Unsplash servers (not your own storage)
-3. Browser inspector showed `background-image: url(https://images.unsplash.com/...)`
-4. User wanted images stored in their own database/storage, not referenced from Unsplash
-
-**The Fix:**
-- **Automatic image download and storage**: When creating new events, the system:
-  1. Fetches Unsplash image URL
-  2. Downloads the image file
-  3. Uploads to Supabase Storage (your own storage bucket `event-images`)
-  4. Saves Supabase Storage URL to database (not Unsplash URL)
-- **Existing events left alone**: Only NEW events trigger Unsplash → Supabase Storage flow
-- **Display uses database only**: All images come from database (no external API calls on page load)
-
-**Wrong Code:**
-```typescript
-// ❌ BROKEN: Saves Unsplash URL directly to database
-const unsplashImageUrl = await fetchUnsplashImage(keywords)
-if (unsplashImageUrl) {
-  headerImage = { type: 'image', value: unsplashImageUrl } // Unsplash URL saved
-  // Database stores: https://images.unsplash.com/...
-  // Images served from Unsplash servers
-}
-```
-
-**Correct Code:**
-```typescript
-// ✅ CORRECT: Downloads image and stores in Supabase Storage
-const unsplashImageUrl = await fetchUnsplashImage(keywords)
-if (unsplashImageUrl) {
-  // Download image from Unsplash
-  const supabaseStorageUrl = await downloadAndStoreImage(unsplashImageUrl, tempEventId)
-  if (supabaseStorageUrl) {
-    headerImage = { type: 'image', value: supabaseStorageUrl } // Supabase Storage URL saved
-    // Database stores: https://your-project.supabase.co/storage/v1/object/public/event-images/...
-    // Images served from YOUR Supabase Storage
-  }
-}
-```
-
-**Prevention Checklist:**
-- ✅ Only NEW events trigger Unsplash API calls (automatic on event creation)
-- ✅ Existing events are NEVER touched (left as-is in database)
-- ✅ Images downloaded and stored in Supabase Storage (your own storage)
-- ✅ Database stores Supabase Storage URLs (not Unsplash URLs)
-- ✅ Display code uses database only (no external API calls on page load)
-- ✅ Supabase Storage bucket `event-images` must exist (public bucket)
-
-**Rule of Thumb:**
-> When storing images from external APIs:
-> 1. Download the image file (don't just save the URL)
-> 2. Upload to your own storage (Supabase Storage, S3, etc.)
-> 3. Save your storage URL to database (not external API URL)
-> 4. Only trigger for NEW records (never touch existing data automatically)
-> 5. Display always uses database (no external API calls)
-
-**Files to Watch:**
-- `src/pages/Calendar.tsx` (`handleCreateEvent` - downloads and stores images for new events only)
-- `src/utils/eventImageStorage.ts` (`downloadAndStoreImage` - downloads from Unsplash, uploads to Supabase Storage)
-- `src/utils/eventImageUtils.ts` (`fetchUnsplashImage` - fetches Unsplash URL, used only during event creation)
-- `src/components/EventCard.tsx` (uses `getEventHeaderImageFromDb` - reads from database only, no API calls)
-- `src/components/CalendarSection.tsx` (uses `getEventHeaderImageFromDb` - reads from database only, no API calls)
-
-**Breaking Changes:**
-- If you remove `downloadAndStoreImage` → New events won't store images in Supabase Storage
-- If Supabase Storage bucket `event-images` doesn't exist → Image storage fails (falls back to Unsplash URL)
-- If you change Supabase Storage bucket name → Image storage fails
-- If you remove Unsplash API key → New events use gradient fallback (existing events unaffected)
-
-**Dependencies:**
-- Supabase Storage bucket `event-images` must exist (create in Supabase Dashboard → Storage)
-- Bucket must be public (for public image URLs)
-- Unsplash API key required for new event creation (only)
-- Existing events in database are NOT modified (left as-is)
-
-**Testing Verified (2025-01-XX):**
-- ✅ New event creation downloads Unsplash image and stores in Supabase Storage
-- ✅ Database stores Supabase Storage URL (not Unsplash URL)
-- ✅ Display code reads from database only (no Unsplash API calls on page load)
-- ✅ Existing events left unchanged (not modified automatically)
-- ✅ Browser inspector shows Supabase Storage URLs (not Unsplash URLs)
-
-**Related:**
-- Section #21: Event Images Not Showing Due to Null image_type (display logic)
-- Section #18: Event Images Not Showing from Database (original fix)
-- Section #23: Gradient Strings Saved to Database (2025-11-05)
-
----
-
-### 21. Event Images Not Showing Due to Null image_type (2025-01-XX)
-
-**What:** Events with database `image_url` but null `image_type` were showing gradient fallbacks instead of their stored images, even though they had valid image URLs in the database.
-
-**Root Cause:**
-1. EventCard and Calendar.tsx require BOTH `image_url` AND `image_type` to display database images
-2. Legacy events were created/populated with `image_url` but `image_type` was null
-3. When `image_type` is null, the code falls back to gradient even though `image_url` exists
-4. This is a cascading failure from Section #18 fix - the fix required both fields, but didn't handle legacy data
-
-**What Happened:**
-1. Events were populated with `image_url` values (Unsplash URLs or gradient strings)
-2. Some events had `image_url` but `image_type` was null (legacy data or incomplete population)
-3. EventCard checks `event.image_url && event.image_type` - if either is null, it falls back to gradient
-4. Result: Events with valid database images show gradients instead of images
-
-**The Fix:**
-- **Legacy data handling**: Created `getEventHeaderImageFromDb()` helper that infers `image_type` from `image_url` format if `image_type` is null
-- **Type inference**: If `image_url` starts with 'http', assume it's 'image' type; if it starts with 'linear-gradient', assume it's 'gradient' type
-- **Updated all components**: EventCard, Calendar.tsx (3 locations), and CalendarSection now use the helper function
-- **Database backfill script**: Created `scripts/backfill-event-image-types.ts` to set `image_type` for legacy events
-
-**Wrong Code:**
-```typescript
-// ❌ BROKEN: Requires both fields, falls back to gradient if image_type is null
-const headerImage = event.image_url && event.image_type
-  ? { type: event.image_type as 'image' | 'gradient', value: event.image_url }
-  : { type: 'gradient' as const, value: getEventGradient(event) }
-// If image_type is null → always falls back to gradient, even if image_url exists
-```
-
-**Correct Code:**
-```typescript
-// ✅ CORRECT: Handles legacy events with null image_type
-export function getEventHeaderImageFromDb(event: CalendarEvent): {
-  type: 'image' | 'gradient'
-  value: string
-} {
-  if (event.image_url) {
-    // If image_type is set, use it
-    if (event.image_type) {
-      return { type: event.image_type as 'image' | 'gradient', value: event.image_url }
-    }
-    // Legacy events: infer type from image_url format
-    // URLs (http/https) are image type, gradients are gradient type
-    const inferredType = event.image_url.startsWith('http') ? 'image' : 'gradient'
-    return { type: inferredType, value: event.image_url }
-  }
-  
-  // No image_url: use gradient fallback
-  return { type: 'gradient', value: getEventGradient(event) }
-}
-
-// Usage:
-const headerImage = getEventHeaderImageFromDb(event)
-```
-
-**Prevention Checklist:**
-- ✅ Handle legacy data where optional fields might be null (don't require both fields if one can be inferred)
-- ✅ Infer missing field values from existing data when possible (image_type from image_url format)
-- ✅ Use helper functions for complex logic (prevents duplication and inconsistency)
-- ✅ Update all components that use the same logic (EventCard, Calendar.tsx, CalendarSection)
-- ✅ Create database backfill scripts to fix legacy data
-- ✅ Add logging to verify image_url is present in final events
-
-**Rule of Thumb:**
-> When checking for optional fields that depend on each other:
-> 1. If one field can be inferred from another, don't require both to be non-null
-> 2. Create helper functions for complex field validation/inference logic
-> 3. Update all components that use the same logic (don't duplicate code)
-> 4. Create database backfill scripts to fix legacy data with missing fields
-> 5. Test with legacy data where optional fields might be null
-
-**Files to Watch:**
-- `src/components/EventCard.tsx` - Uses `getEventHeaderImageFromDb()` helper
-- `src/pages/Calendar.tsx` - Uses `getEventHeaderImageFromDb()` helper (3 locations)
-- `src/components/CalendarSection.tsx` - Updated logging to check for both fields or infer type
-- `src/utils/eventImageUtils.ts` - Contains `getEventHeaderImageFromDb()` helper function
-- `scripts/backfill-event-image-types.ts` - Backfill script to set image_type for legacy events
-
-**Breaking Changes:**
-- If you remove `getEventHeaderImageFromDb()` helper → All components break (code duplication)
-- If you change image_type inference logic → Must update helper function and all usages
-- If you change image_url format → Type inference logic might break
-
-**Testing Verified (2025-01-XX):**
-- ✅ Events with image_url and image_type show images correctly
-- ✅ Events with image_url but null image_type infer type and show images correctly
-- ✅ Events with image_url starting with 'http' are treated as 'image' type
-- ✅ Events with image_url starting with 'linear-gradient' are treated as 'gradient' type
-- ✅ Events without image_url show gradient fallback
-- ✅ Database backfill script sets image_type for legacy events
-
-**Related:**
-- Section #18: Event Images Not Showing from Database (original fix that required both fields)
-- Section #19: Explicit Column Selection Breaks When Columns Don't Exist (why we use `.select('*')`)
-- Section #23: Gradient Strings Saved to Database (2025-11-05)
+_Archived:_ See Appendix entry 22 for the storage workflow summary.
 
 ---
 
@@ -1797,7 +1528,7 @@ LIMIT 10;
 **Related:**
 - Section #24: RLS Policy Conflicts and Duplicate Policies (general RLS issues)
 - Section #28: Applications Not Showing in Sections (owner policy fix)
-- `docs/prevention/BUSINESS_APPLICATIONS_COMPLETE_FIX.md` - Complete fix documentation
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
 
 ---
 
@@ -2407,6 +2138,98 @@ business_applications table
 > 4. Test with both populated and empty data
 > 5. Document all dependencies in component comments
 
+
+### 30. Notifications Reappearing After Viewing (2025-11-09)
+
+**What:** Business owners kept seeing the same "Business Application Pending" toast in the global notification bell even after clicking and reviewing it. The badge would clear briefly, then reappear after Supabase realtime triggered another refresh.
+
+**Root Cause:**
+1. `NotificationBell.tsx` only flipped a local `read` flag when the button was clicked. Pending/pending-change notifications are re-derived from live Supabase queries (`business_applications`, `provider_change_requests`), so a reload reconstructed the array and ignored the previous click.
+2. There was no persisted acknowledgement list. When the realtime subscription re-fetched, the component rebuilt the notifications from scratch and the "read" state vanished.
+3. A recent column evolution on `user_notifications` meant the REST query using an explicit column list (`select('id,title,subject,message,body,type,data,metadata,created_at,is_read,read,read_at,link,link_section')`) started 400'ing because `link`/`link_section` are JSON metadata, not top-level columns. The failure short-circuited acknowledgement logic and forced a retry that rebuilt the array again.
+
+**What Happened:**
+1. Admin approves an application → `adminBusinessApplicationUtils.approveBusinessApplication()` inserts a `user_notifications` row with metadata.
+2. Business owner opens the bell → notification marked `read: true` locally but not persisted anywhere else.
+3. Realtime `postgres_changes` fires → `loadNotifications()` reruns, the same "pending application" object is rebuilt, unread count increments again.
+4. REST query 400 error floods console (`select=...&link=...`) → bell refresh loops, reinforcing the regression.
+
+**The Fix:**
+- Switched the Supabase REST call to `.select('*')` and normalized the result on the client, so schema changes won't 400.
+- Added resilient JSON parsing for `metadata`/`data` because Supabase may return them as plain strings.
+- Introduced `bf_notification_acknowledged_ids` localStorage key. When the dropdown opens, non-admin notifications get added to the acknowledged set and filtered out of future renders.
+- Persist acknowledged IDs across sessions (and tab reloads) via `acknowledgedIdsRef` + `persistAcknowledgedIds()` helper.
+- Auto-acknowledge immediately when the dropdown is opened so users aren't forced to click each row just to clear the badge.
+- Updated approval/rejection flows to write both `subject/body` and `title/message` plus metadata links so future parsing stays consistent.
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only flips local state; no persistence, so realtime rebuilds re-add items.
+const handleNotificationClick = async (notification: Notification) => {
+  setNotifications(prev =>
+    prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+  )
+  // No acknowledgement persistence → notification reappears on next reload.
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Persist acknowledgement ids and auto-ack on dropdown open.
+const ACK_STORAGE_KEY = 'bf_notification_acknowledged_ids'
+const acknowledgedIdsRef = useRef<Set<string>>(new Set())
+
+const persistAcknowledgedIds = (next: Set<string>) => {
+  acknowledgedIdsRef.current = next
+  setAcknowledgedIds(new Set(next))
+  window.localStorage.setItem(ACK_STORAGE_KEY, JSON.stringify(Array.from(next)))
+}
+
+useEffect(() => {
+  if (!isOpen || notifications.length === 0) return
+  const toAcknowledge = notifications.filter(
+    n => !n.isAdminNotification && !acknowledgedIdsRef.current.has(n.id)
+  )
+  if (toAcknowledge.length === 0) return
+  const next = new Set(acknowledgedIdsRef.current)
+  toAcknowledge.forEach(n => next.add(n.id))
+  persistAcknowledgedIds(next)
+}, [isOpen, notifications])
+```
+
+**Prevention Checklist:**
+- ✅ Keep Supabase queries using `.select('*')` unless you control the schema; normalize in code instead.
+- ✅ Persist acknowledgement state (localStorage or database) for any notification that can't be marked read server-side.
+- ✅ Update both the notification writer (`adminBusinessApplicationUtils`) and reader (`NotificationBell`) when metadata shape changes.
+- ✅ Guard JSON parsing on `metadata`/`data` because Supabase may return them as text.
+- ✅ Document new localStorage keys and reason for existence (see dependency tracking entry #15).
+
+**Rule of Thumb:**
+> If a notification is derived data (not a single row you can mark `read` in the database), you MUST persist acknowledgement out-of-band or it will keep coming back on every refresh.
+
+**Files to Watch:**
+- `src/components/NotificationBell.tsx` (acknowledgement + normalization logic)
+- `src/utils/adminBusinessApplicationUtils.ts` (writes notifications + metadata)
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` (entry #15 documents dependencies)
+- Supabase tables: `user_notifications`, `business_applications`, `provider_change_requests`, `dismissed_notifications`
+
+**Breaking Changes:**
+- Renaming/removing `bf_notification_acknowledged_ids` without migration will resurrect old notifications.
+- Reverting to explicit column selection will break as soon as the table schema evolves.
+- Removing the auto-acknowledgement effect will make notifications reappear when realtime fires.
+
+**Testing Verified (2025-11-09):**
+- ✅ Notification bell REST call no longer returns 400.
+- ✅ Opening the dropdown once clears the badge permanently for that notification.
+- ✅ Refreshing the page keeps the notification hidden (localStorage persists).
+- ✅ `user_notifications` rows with either `subject/body` or `title/message` render correctly.
+- ✅ Admin-sent approvals include deep links (`/my-business`) in metadata.
+
+**Related:**
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
+- Section #28: MyBusiness visibility issues (same data sources)
+- Section #24: RLS conflicts (same tables, keep policies consistent)
+
 ---
 
 ## How to Prevent This (Action Plan)
@@ -2632,3 +2455,5930 @@ Fix X
   → Then commit
 ```
 
+---
+
+## Appendix A – Archived Incident Library
+
+*Resolved incidents retained for historical reference. See the main sections above for active patterns and prevention playbooks.*
+
+### 20. Admin Business Deletion Choice (2025-01-XX)
+
+_Archived:_ See Appendix entry 20 in [Appendix A – Archived Incident Library](#appendix-a--archived-incident-library) for summary and related links.
+
+---
+
+### 22. Event Images Stored in Supabase Storage (2025-01-XX)
+
+_Archived:_ See Appendix entry 22 for the storage workflow summary.
+
+---
+
+### 23. Gradient Strings Saved to Database (2025-11-05)
+
+**What:** Populate scripts were saving CSS gradient strings (like `"linear-gradient(135deg, #667eea 0%, #764ba2 100%)"`) directly to the `image_url` column in the database when images couldn't be fetched. Gradient strings should NEVER be stored in the database - they should be computed dynamically on the frontend when `image_url` is `null`.
+
+**Root Cause:**
+1. `populate-event-images.ts` (both Netlify function and local script) were saving gradient strings to `image_url` when Unsplash API failed or when storage failed
+2. The code treated gradients as a "fallback value" that should be saved to the database
+3. This caused events to have gradient strings in `image_url` instead of actual image URLs or `null`
+4. Frontend code already handles `null` image_url by computing gradients dynamically - saving gradients to DB was redundant and wrong
+
+**What Happened:**
+1. Events from iCalendar feeds were inserted without `image_url` (correctly set to `null`)
+2. Populate script ran to fetch images for events without images
+3. When Unsplash API failed or Supabase Storage failed, script saved gradient strings to `image_url`
+4. Database now had gradient strings in `image_url` column
+5. Frontend code detects gradient strings and ignores them (correctly), but this defeats the purpose of having images in the database
+
+**The Fix:**
+- **Never save gradient strings**: Updated all populate scripts to set `image_url: null` instead of saving gradient strings when images can't be fetched
+- **Frontend computes gradients**: The frontend already has logic to compute gradients when `image_url` is `null` - no need to save gradients to database
+- **Preserve existing images**: All external feed processors (iCalendar, RSS, KPBS, VoSD) preserve existing `image_url` and `image_type` when re-fetching events
+- **Only populate missing images**: Populate scripts only process events with `null` image_url (not events that already have images)
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Saves gradient strings to database
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl) {
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - save gradient string to database ❌ WRONG
+      imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+      imageType = 'gradient'
+    }
+  } else {
+    // Unsplash failed - save gradient string to database ❌ WRONG
+    imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+    imageType = 'gradient'
+  }
+} else {
+  // No API key - save gradient string to database ❌ WRONG
+  imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+  imageType = 'gradient'
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ❌ Saves gradient string!
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Never saves gradient strings, sets to null instead
+let imageUrl: string | null = null
+let imageType: 'image' | null = null
+
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl && storageUrl.includes('supabase.co/storage')) {
+      // Successfully stored in Supabase Storage
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - set to null (frontend will compute gradient)
+      imageUrl = null
+      imageType = null
+    }
+  } else {
+    // Unsplash failed - set to null (frontend will compute gradient)
+    imageUrl = null
+    imageType = null
+  }
+} else {
+  // No API key - set to null (frontend will compute gradient)
+  imageUrl = null
+  imageType = null
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ✅ null if no image
+```
+
+**Prevention Checklist:**
+- ✅ NEVER save gradient strings to `image_url` column - always use `null` when images can't be fetched
+- ✅ Frontend computes gradients dynamically when `image_url` is `null` - no need to save gradients to database
+- ✅ Populate scripts only process events with `null` image_url (skip events that already have images)
+- ✅ External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ If storage fails, set `image_url` to `null` (don't fall back to saving gradient strings)
+- ✅ All functions that modify events preserve existing images (don't overwrite them)
+
+**Rule of Thumb:**
+> When handling image fallbacks:
+> 1. **NEVER** save gradient strings to `image_url` column - always use `null`
+> 2. Frontend computes gradients when `image_url` is `null` - no need to save gradients to database
+> 3. Populate scripts only process events with `null` image_url (skip events that already have images)
+> 4. External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+> 5. If image storage fails, set `image_url` to `null` (don't save gradient strings as fallback)
+
+**Files to Watch:**
+- `netlify/functions/populate-event-images.ts` - Fixed to never save gradient strings
+- `scripts/populate-event-images.ts` - Fixed to never save gradient strings
+- `netlify/functions/manual-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/scheduled-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-kpbs-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-vosd-events.ts` - Preserves existing images when re-fetching
+- `src/utils/eventImageUtils.ts` - `getEventHeaderImageFromDb()` ignores gradient strings in database
+
+**Breaking Changes:**
+- If you restore code that saves gradient strings to `image_url` → Frontend will ignore them (wastes database space)
+- If you remove null-check logic in populate scripts → Scripts might try to re-populate events that already have images
+- If you remove image preservation logic in feed processors → Events will lose their images when re-fetched
+
+**Image Preservation Guarantees:**
+- ✅ **External feed processors preserve images**: All iCalendar/RSS/KPBS/VoSD sync functions preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ **Populate scripts only process missing images**: Scripts only populate events with `null` image_url (skip events that already have images)
+- ✅ **No automatic overwrites**: No automated process will overwrite existing images - they are preserved during re-fetches
+- ✅ **One-time population**: After images are populated, they will NOT be overwritten by automated processes
+
+**Testing Verified (2025-11-05):**
+- ✅ Populate scripts set `image_url` to `null` when images can't be fetched (not gradient strings)
+- ✅ Frontend computes gradients when `image_url` is `null` (works correctly)
+- ✅ External feed processors preserve existing images when re-fetching events
+- ✅ Populate scripts skip events that already have images (only process `null` image_url)
+- ✅ Cleanup script removes existing gradient strings from database
+- ✅ All 33 events successfully populated with Supabase Storage URLs (not gradient strings)
+
+**Related:**
+- Section #22: Event Images Stored in Supabase Storage (image storage pattern)
+- Section #21: Event Images Not Showing Due to Null image_type (display logic)
+- Section #18: Event Images Not Showing from Database (original fix)
+
+---
+
+### 24. RLS Policy Conflicts and Duplicate Policies ⭐ DATABASE SECURITY ISSUE (2025-01-XX)
+
+**What:** Row Level Security (RLS) policies can conflict or duplicate, causing inserts/updates/deletes to fail silently or with confusing errors.
+
+**Root Cause:**
+- Multiple RLS policy files can create duplicate policies with different names
+- Conflicting policies (e.g., restrictive vs. public) can cause evaluation failures
+- `auth.jwt() ->> 'email'` may not be available or match exactly, causing restrictive policies to fail
+- Policies from different migration files can conflict with master policies
+
+**Example:**
+```sql
+-- ❌ PROBLEM: Two INSERT policies with different names
+-- From migration file:
+CREATE POLICY "applications_insert_all" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- From master RLS file:
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ❌ PROBLEM: Restrictive policy that fails
+-- From fix file:
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ auth.jwt() ->> 'email' may not be available
+```
+
+**Symptoms:**
+- Users get "new row violates row-level security policy" errors
+- Inserts fail even when they should work
+- Multiple policies with similar names exist
+- Policies from different files conflict
+
+**Fix:**
+1. **Drop ALL existing policies** before creating new ones:
+   ```sql
+   -- Drop ALL existing INSERT policies
+   DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+   DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+   DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+   -- ... drop all variations
+   ```
+
+2. **Create single consistent policy** matching master RLS file:
+   ```sql
+   -- Create single public INSERT policy
+   CREATE POLICY "applications_insert_public" 
+   ON public.business_applications FOR INSERT
+   WITH CHECK (true);
+   ```
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT 
+     schemaname, 
+     tablename, 
+     policyname, 
+     cmd,
+     qual,
+     with_check
+   FROM pg_policies 
+   WHERE tablename = 'business_applications'
+     AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Creating policy without dropping existing ones
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ May fail if JWT email not available
+
+-- ❌ Multiple policies with different names
+CREATE POLICY "applications_insert_all" ...;  -- From migration
+CREATE POLICY "applications_insert_public" ...;  -- From master
+-- ❌ Both exist, but one might be restrictive and block inserts
+```
+
+**Correct Code:**
+```sql
+-- ✅ Drop ALL existing policies first
+DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications (auth)" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_anon_insert" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_auth_insert" ON public.business_applications;
+
+-- ✅ Create single consistent policy
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ✅ Verify only one policy exists
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' AND cmd = 'INSERT';
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS drop existing policies** before creating new ones
+- ✅ **Check for duplicate policies** before creating new ones
+- ✅ **Use consistent policy names** matching master RLS file
+- ✅ **Avoid restrictive policies** that depend on `auth.jwt() ->> 'email'` (may not be available)
+- ✅ **Use public INSERT policies** for public forms (similar to `contact_leads`)
+- ✅ **Rely on SELECT/DELETE policies** for security (email matching, admin checks)
+- ✅ **Verify policies after creation** to ensure only one exists per operation
+- ✅ **Document policy rationale** in SQL comments
+
+**Rule of Thumb:**
+> When fixing RLS policies:
+> 1. **Drop ALL existing policies** for the operation (INSERT/UPDATE/DELETE/SELECT)
+> 2. **Create single consistent policy** matching master RLS file
+> 3. **Use public INSERT policies** for public forms (security enforced by SELECT/DELETE)
+> 4. **Avoid `auth.jwt() ->> 'email'`** - use `auth.uid()` or `auth.users` table instead
+> 5. **Verify policies after creation** to ensure clean state
+> 6. **Check for duplicate policies** from different migration files
+
+**How to Check for Duplicate Policies:**
+```sql
+-- Check all INSERT policies
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' 
+  AND cmd = 'INSERT'
+ORDER BY policyname;
+
+-- Check all policies for a table
+SELECT policyname, cmd, qual, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications'
+ORDER BY cmd, policyname;
+```
+
+**Security Note:**
+- Public INSERT policies don't compromise security if SELECT/DELETE policies enforce email matching
+- Users can submit applications, but can only VIEW/DELETE their own (by email)
+- Admins can VIEW/UPDATE/DELETE all applications
+- Email matching is enforced by SELECT/DELETE policies, not INSERT
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (source of truth)
+- `ops/rls/fix-*.sql` - Individual fix files (should match master)
+- `ops/migrations/*.sql` - Migration files (may create duplicate policies)
+- Any file that modifies RLS policies
+
+**Related:**
+- Section #9: Incomplete Deletion Logic (user deletion patterns)
+- Section #17: Business Ownership on Self-Deletion (business deletion patterns)
+- Section #29: Admin RLS Policy Blocking Queries (admin access issue)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 29. Admin RLS Policy Blocking Queries ⭐ CRITICAL ADMIN ACCESS ISSUE (2025-01-XX)
+
+**What:** Admin queries to `business_applications` table return 403 Forbidden errors, preventing admins from viewing pending applications.
+
+**Root Cause:**
+- Admin query in `useAdminDataLoader.ts` requests ALL pending applications without email filter
+- `applications_select_admin` policy uses `is_admin_user(auth.uid())` function
+- `is_admin_user()` function uses `(SELECT email FROM auth.users WHERE id = user_id)` subquery
+- This subquery may fail or return NULL, causing admin policy to fail
+- PostgreSQL evaluates ALL SELECT policies with OR logic - if ALL policies fail, query fails with 403
+
+**Example:**
+```typescript
+// ❌ PROBLEM: Admin query without email filter
+// File: src/hooks/useAdminDataLoader.ts (Line 258-262)
+const bizQuery = query('business_applications', { logPrefix: '[Admin]' })
+  .select('*')
+  .or('status.eq.pending,status.is.null')  // Query ALL pending apps
+  .order('created_at', { ascending: false })
+  .execute()
+// ❌ Result: 403 Forbidden - RLS policy blocks query
+```
+
+```sql
+-- ❌ PROBLEM: Admin policy uses function that may fail
+-- File: ops/rls/02-MASTER-RLS-POLICIES.sql (Line 244-246)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may fail if auth.users subquery fails
+
+-- ❌ PROBLEM: is_admin_user() function uses auth.users subquery
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail or return NULL
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+```
+
+**Symptoms:**
+- Admin queries return 403 Forbidden errors
+- Console shows: `GET .../business_applications?... 403 (Forbidden)`
+- Admin cannot view pending applications in admin panel
+- Regular users can see their own applications (owner policy works)
+- Admin policy fails silently (no error message, just 403)
+
+**Fix:**
+1. **Update `is_admin_user()` function** to use JWT email (more reliable):
+   ```sql
+   -- ✅ FIX: Use JWT email with fallback to auth.users
+   CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+   RETURNS boolean AS $$
+     SELECT EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)
+     );
+   $$ LANGUAGE sql SECURITY DEFINER;
+   ```
+
+2. **Update admin policy** to check JWT email directly (more reliable):
+   ```sql
+   -- ✅ FIX: Check JWT email directly in policy
+   DROP POLICY IF EXISTS "applications_select_admin" ON public.business_applications;
+   
+   CREATE POLICY "applications_select_admin" 
+   ON public.business_applications FOR SELECT
+   USING (
+     EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+     )
+   );
+   ```
+
+3. **Ensure `admin_emails` table exists** and has admin emails:
+   ```sql
+   CREATE TABLE IF NOT EXISTS public.admin_emails (
+     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     email text UNIQUE NOT NULL,
+     created_at timestamptz DEFAULT now()
+   );
+   
+   INSERT INTO public.admin_emails (email)
+   VALUES ('justexisted@gmail.com')
+   ON CONFLICT (email) DO NOTHING;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Using auth.users subquery that may fail
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ❌ Admin policy depends on function that may fail
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may return FALSE if subquery fails
+```
+
+**Correct Code:**
+```sql
+-- ✅ Use JWT email with fallback
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))  -- ✅ JWT email (reliable)
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)  -- ✅ Fallback
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ✅ Admin policy checks JWT email directly (more reliable)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  )
+);
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use JWT email** for admin checks (more reliable than auth.users subquery)
+- ✅ **Include fallback** to auth.users subquery for compatibility
+- ✅ **Use case-insensitive matching** with LOWER(TRIM()) to handle email variations
+- ✅ **Test admin queries** after updating RLS policies
+- ✅ **Verify admin_emails table** exists and has correct emails
+- ✅ **Check ALL admin policies** when updating is_admin_user() function (affects all tables)
+- ✅ **Document dependencies** in SQL file comments (version, dependencies, breaking changes)
+
+**Dependency Chain:**
+```
+useAdminDataLoader.ts (admin query)
+    ↓
+business_applications table (RLS enabled)
+    ↓
+applications_select_admin policy (checks is_admin_user())
+    ↓
+is_admin_user() function (checks admin_emails table)
+    ↓
+auth.users subquery (may fail) ❌
+```
+
+**What Could Break:**
+- ⚠️ **ALL admin policies** depend on `is_admin_user()` function
+- ⚠️ **Updating function** affects ALL tables with admin policies (providers, bookings, etc.)
+- ⚠️ **Admin queries** on other tables may also fail if function is broken
+- ⚠️ **admin_emails table** must exist and have correct emails
+
+**Testing Verification:**
+- ✅ Admin can query ALL pending applications (no 403 errors)
+- ✅ Admin can view applications in admin panel
+- ✅ Regular users can still see their own applications (owner policy works)
+- ✅ `is_admin_user()` function returns TRUE for admin users
+- ✅ `is_admin_user()` function returns FALSE for non-admin users
+
+**Files Changed:**
+- `ops/rls/fix-business-applications-admin-rls.sql` (v1.0) - Admin RLS fix
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (needs update)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (no changes needed, just needs RLS fix)
+
+**SQL File Versioning:**
+- `ops/rls/fix-business-applications-select-rls.sql` - v1.0 (owner policy fix)
+- `ops/rls/fix-business-applications-admin-rls.sql` - v1.0 (admin policy fix)
+- `ops/rls/DIAGNOSE-BUSINESS-APPLICATIONS-RLS.sql` - v1.0 (diagnostic queries)
+
+**Rule of Thumb:**
+> When fixing admin RLS policies:
+> 1. **ALWAYS use JWT email** for admin checks (more reliable)
+> 2. **Include fallback** to auth.users subquery for compatibility
+> 3. **Update is_admin_user() function** if it uses auth.users subquery
+> 4. **Check ALL admin policies** when updating function (affects all tables)
+> 5. **Verify admin_emails table** exists and has correct emails
+> 6. **Test admin queries** after updating policies
+> 7. **Version SQL files** with version number, dependencies, and breaking changes
+
+**How to Check Admin Access:**
+```sql
+-- Test admin check function
+SELECT 
+  auth.uid() as user_id,
+  auth.jwt() ->> 'email' as jwt_email,
+  is_admin_user(auth.uid()) as is_admin,
+  (SELECT email FROM auth.users WHERE id = auth.uid()) as auth_users_email;
+
+-- Test admin policy directly
+SELECT * FROM business_applications 
+WHERE status = 'pending' OR status IS NULL
+ORDER BY created_at DESC
+LIMIT 10;
+-- Should return results if you're admin, 403 if not
+```
+
+**Security Note:**
+- Admin policies allow admins to see ALL rows (no email filter)
+- Owner policies restrict users to their own rows (email match required)
+- Both policies use OR logic - if EITHER passes, query succeeds
+- Admin check must be reliable (use JWT email, not auth.users subquery)
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (must update is_admin_user() function)
+- `ops/rls/fix-business-applications-admin-rls.sql` - Admin RLS fix (v1.0)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (depends on RLS policy)
+- `ops/rls/fix-*-admin-rls.sql` - Other admin RLS fixes (may need updates)
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (general RLS issues)
+- Section #28: Applications Not Showing in Sections (owner policy fix)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 18. Event Images Not Showing from Database (2025-11-03)
+
+**What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.
+
+**Root Cause:**
+1. Query using `.select('*')` might not include `image_url` if RLS filters columns (though policy allows reading all fields)
+2. External events (iCalendar) were merged with database events without deduplication
+3. If external events had same IDs as database events, they could override database events (losing `image_url`)
+
+**Fix:**
+- **Explicit field selection**: Changed from `.select('*')` to explicitly selecting all fields including `image_url` and `image_type`
+- **Deduplication logic**: Created a Map of database events by ID, then filter out external events that match database event IDs (database events have priority)
+- **Preserve database images**: Database events are placed first in the merged array, external events are filtered to remove duplicates
+
+**Wrong Code:**
+```typescript
+// Query might not include image_url if RLS filters
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('*') // ❌ Might not include image_url
+
+// Merge without deduplication - external events can override database events
+const allEvents = [
+  ...(dbEvents || []),
+  ...rssEvents, // ❌ No image_url
+  ...calendarEvents // ❌ No image_url, might override database events
+]
+```
+
+**Correct Code:**
+```typescript
+// Explicitly select image_url and image_type to ensure they're included
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('id, title, description, date, time, location, address, category, source, upvotes, downvotes, created_at, updated_at, user_id, provider_id, created_by_user_id, is_flagged, flag_count, url, image_url, image_type') // ✅ Explicit
+
+// Create map of database events to preserve image data
+const dbEventsMap = new Map<string, CalendarEvent>()
+dbEvents?.forEach(event => {
+  dbEventsMap.set(event.id, event)
+})
+
+// Filter external events to remove duplicates (database has priority)
+const uniqueExternalEvents = externalEvents.filter(externalEvent => {
+  return !dbEventsMap.has(externalEvent.id) // ✅ Skip if database event exists
+})
+
+// Combine: Database first (has images), then unique external events
+const allEvents = [
+  ...(dbEvents || []), // ✅ Database events with images first
+  ...uniqueExternalEvents // ✅ Only unique external events
+]
+```
+
+**Prevention Checklist:**
+- ✅ Explicitly select `image_url` and `image_type` in queries (don't rely on `*`)
+- ✅ Deduplicate external events to prevent overriding database events
+- ✅ Database events have priority over external events (preserve images)
+- ✅ Add logging to verify `image_url` is present in final merged events
+- ✅ Test with events that have database images to verify they show images
+
+**Rule of Thumb:**
+> When merging database events with external events:
+> 1. Explicitly select all fields including `image_url` and `image_type` (don't use `*`)
+> 2. Create a Map of database events by ID to preserve image data
+> 3. Filter external events to remove duplicates (database events have priority)
+> 4. Database events should be first in the merged array
+> 5. Add diagnostic logging to verify `image_url` is present in final events
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')` and deduplication)
+- `src/components/CalendarSection.tsx` (uses `fetchCalendarEvents()` - automatically benefits)
+- `src/components/EventCard.tsx` (checks `event.image_url` and `event.image_type`)
+
+**Related:**
+- Section #14: Async Operation Order in SIGNED_IN Handler
+- Section #15: Custom Email Verification System
+- Section #19: Explicit Column Selection Breaks When Columns Don't Exist (⚠️ **This fix caused Section #19** - explicit column selection broke the query)
+
+---
+
+### 19. Explicit Column Selection Breaks When Columns Don't Exist (2025-11-03)
+
+**What:** When explicitly selecting columns in Supabase queries, if any column doesn't exist in the database, the query fails and returns no data (or empty results).
+
+**Root Cause:**
+- Explicit column selection (e.g., `.select('id, title, image_url')`) requires ALL listed columns to exist
+- If you select columns that were never added via migrations, Supabase returns an error or empty results
+- TypeScript types may include optional fields that don't exist in the actual database schema
+- Using `.select('*')` is safer because it only selects columns that actually exist
+
+**Example:**
+```typescript
+// ❌ BROKEN: Tries to select columns that might not exist
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // If ANY of these columns don't exist → query fails → returns empty/no data
+
+// ✅ CORRECT: Selects all existing columns automatically
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('*')
+  // Only selects columns that actually exist in the database
+```
+
+**Fix:**
+- Use `.select('*')` instead of explicit column lists
+- If you need specific columns, verify they exist in the database first (check migrations)
+- Add error handling to detect query failures
+- Log query errors with full details (message, code, hint, details)
+
+**Wrong Code:**
+```typescript
+// Selecting columns that might not exist
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // ❌ If user_id, provider_id, is_flagged, flag_count, or url don't exist → FAILS
+
+// No error handling
+if (dbError) {
+  console.warn('Error:', dbError) // ❌ Not enough detail
+}
+```
+
+**Correct Code:**
+```typescript
+// Use * to select all existing columns
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('*') // ✅ Automatically selects only existing columns
+  .order('date', { ascending: true })
+
+// Comprehensive error handling
+if (dbError) {
+  console.error('[fetchCalendarEvents] Database query error:', dbError)
+  console.error('[fetchCalendarEvents] Error details:', {
+    message: dbError.message,
+    details: dbError.details,
+    hint: dbError.hint,
+    code: dbError.code
+  })
+  return [] // ✅ Return empty array on error to prevent breaking app
+}
+
+if (!dbEvents) {
+  console.warn('[fetchCalendarEvents] No events returned')
+  return []
+}
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use `.select('*')`** unless you're 100% certain all columns exist
+- ✅ **Check migrations** before explicitly selecting columns
+- ✅ **Add comprehensive error logging** to detect query failures
+- ✅ **Return empty array on error** to prevent breaking the app
+- ✅ **Verify database schema** matches TypeScript types before explicit selection
+- ✅ **Test with actual database** to ensure columns exist
+
+**Rule of Thumb:**
+> When querying Supabase:
+> 1. **Default to `.select('*')`** - it's safer and automatically selects existing columns
+> 2. **Only use explicit column selection** if you've verified all columns exist via migrations
+> 3. **Always check for errors** and log full error details (message, code, hint, details)
+> 4. **Return empty array on error** to prevent breaking the app
+> 5. **TypeScript types may include optional fields that don't exist** - don't assume types match database
+
+**How to Verify Database Schema:**
+1. Check migration files in `ops/migrations/` to see what columns were added
+2. Check base table creation in `scripts/create-*-tables.sql`
+3. Query database directly: `SELECT column_name FROM information_schema.columns WHERE table_name = 'table_name'`
+4. Use Supabase dashboard to inspect table structure
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')`)
+- Any file using explicit column selection in Supabase queries
+- Migration files to verify which columns actually exist
+
+**Related:**
+- Section #18: Event Images Not Showing from Database
+- Section #15: Custom Email Verification System
+
+---
+
+### 25. Direct Supabase Queries Breaking After Refactoring ⭐ REFACTORING BREAKAGE (2025-01-XX)
+
+**What:** After refactoring to use centralized query utility, some files still use direct `supabase.from()` calls, causing RLS errors, inconsistent error handling, and broken functionality.
+
+**Root Cause:**
+1. Migration to centralized query utility (`src/lib/supabaseQuery.ts`) was incomplete
+2. Some files were missed during migration (e.g., `adminService.ts`, `BusinessPage.tsx`)
+3. Direct Supabase queries don't use centralized retry logic, error handling, or RLS policies correctly
+4. When RLS policies change, direct queries break but centralized utility handles them correctly
+5. Forms stop working after refactoring because they still use direct queries
+
+**Example:**
+```typescript
+// ❌ BROKEN: Direct Supabase query (no retry, inconsistent error handling)
+const { data, error } = await supabase
+  .from('business_applications')
+  .select('*')
+  .eq('email', auth.email)
+
+if (error) throw error // ❌ No retry, no error classification
+return data || []
+
+// ✅ CORRECT: Centralized query utility (retry, error handling, RLS compliance)
+const result = await query('business_applications', { logPrefix: '[MyBusiness]' })
+  .select('*')
+  .eq('email', auth.email.trim())
+  .order('created_at', { ascending: false })
+  .execute()
+
+if (result.error) {
+  console.error('[MyBusiness] ❌ Error loading applications:', result.error)
+  return [] // ✅ Graceful error handling
+}
+return result.data || []
+```
+
+**What Happened:**
+1. `useBusinessOperations.ts` was migrated to use centralized `query()` utility ✅
+2. `BusinessPage.tsx` was NOT migrated - still uses direct `supabase.from('business_applications').insert()` ❌
+3. `adminService.ts` was NOT migrated - still uses direct queries for SELECT/UPDATE/DELETE ❌
+4. When RLS policies changed, direct queries started failing with 403 errors
+5. Forms that worked before stopped working after refactoring other parts
+6. User gets "Success!" message but application doesn't appear (query fails silently)
+
+**The Fix:**
+1. **Migrate ALL direct Supabase queries** to use centralized utility:
+   ```typescript
+   // Replace ALL instances of:
+   supabase.from('business_applications').select() // ❌
+   supabase.from('business_applications').insert() // ❌
+   supabase.from('business_applications').update() // ❌
+   supabase.from('business_applications').delete() // ❌
+   
+   // With:
+   query('business_applications').select().execute() // ✅
+   insert('business_applications', [data]) // ✅
+   update('business_applications', data).eq('id', id).execute() // ✅
+   delete('business_applications').eq('id', id).execute() // ✅
+   ```
+
+2. **Add delay after insert** to ensure data is visible before querying:
+   ```typescript
+   await insert('business_applications', [applicationData])
+   await new Promise(resolve => setTimeout(resolve, 500)) // ✅ Wait for DB to process
+   await loadBusinessData() // ✅ Now query will find the new application
+   ```
+
+3. **Use `.trim()` on email** to prevent whitespace mismatches:
+   ```typescript
+   .eq('email', auth.email.trim()) // ✅ Prevents whitespace issues
+   ```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use centralized query utility** for all Supabase queries (no direct `supabase.from()` calls)
+- ✅ **Search for direct Supabase queries** before refactoring: `grep -r "supabase\.from\(" src/`
+- ✅ **Migrate ALL instances** when refactoring (don't leave some behind)
+- ✅ **Add delay after insert** before querying (ensure DB has processed the insert)
+- ✅ **Use `.trim()` on email** to prevent whitespace mismatches
+- ✅ **Test forms end-to-end** after refactoring (submit → verify it appears)
+- ✅ **Check for RLS errors** in console logs after refactoring
+- ✅ **Verify data appears** in UI after submission (not just "Success!" message)
+
+**Rule of Thumb:**
+> When refactoring to use centralized query utility:
+> 1. **Search for ALL direct Supabase queries** first: 
+>    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+>    - Bash: `grep -r "supabase\.from\(" src/`
+> 2. **Migrate ALL instances** in one commit (don't leave some behind)
+> 3. **Test forms end-to-end** after migration (submit → verify it appears)
+> 4. **Add delay after insert** before querying (ensure DB has processed)
+> 5. **Use `.trim()` on email** to prevent whitespace issues
+> 6. **Check console logs** for RLS errors after refactoring
+> 7. **Verify data appears** in UI (not just success message)
+
+**How to Find Direct Supabase Queries:**
+
+**PowerShell (Windows):**
+```powershell
+# Find all direct Supabase queries
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("
+
+# Find all business_applications queries specifically
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "business_applications"
+
+# Find all INSERT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.insert\("
+
+# Find all SELECT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.select\("
+```
+
+**Bash/Linux/Mac:**
+```bash
+# Find all direct Supabase queries
+grep -r "supabase\.from\(" src/
+
+# Find all business_applications queries specifically
+grep -r "business_applications" src/ --include="*.ts" --include="*.tsx"
+
+# Find all INSERT operations
+grep -r "\.insert\(" src/ --include="*.ts" --include="*.tsx"
+
+# Find all SELECT operations
+grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
+```
+
+**Files to Watch:**
+- `src/services/adminService.ts` - Still uses direct queries for business_applications
+- `src/pages/BusinessPage.tsx` - Still uses direct `insert()` for business_applications
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - ✅ Already migrated (use as reference)
+- Any file that was "missed" during migration
+
+**Breaking Changes:**
+- If you refactor one file to use centralized utility but leave others using direct queries → Forms break
+- If you change RLS policies but don't migrate all direct queries → Queries fail with 403 errors
+- If you don't add delay after insert → New data doesn't appear immediately (query runs too fast)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Direct queries cause 403 errors when RLS policies change
+- ✅ Centralized utility handles RLS correctly with retry logic
+- ✅ Adding delay after insert ensures data is visible before querying
+- ✅ Using `.trim()` on email prevents whitespace mismatches
+- ✅ Forms work correctly after migrating to centralized utility
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy changes)
+- Section #26: Missing Admin INSERT Policy for Providers (admin approval flow)
+- `docs/SUPABASE_QUERY_UTILITY.md` - Centralized query utility documentation
+- `docs/SUPABASE_QUERY_MIGRATION_TESTING.md` - Migration testing instructions
+
+---
+
+### 26. Missing Admin INSERT Policy for Providers ⭐ ADMIN APPROVAL FLOW (2025-01-XX) ✅ VERIFIED
+
+**What:** Admin cannot approve business applications because there's no admin INSERT policy for the `providers` table. When admin tries to create a provider on behalf of an applicant, they get "new row violates row-level security policy for table 'providers'".
+
+**Audit Results (2025-01-XX):**
+- ✅ **INSERT policy exists**: `providers_insert_auth` requires `owner_user_id = auth.uid()` (users can only create for themselves)
+- ❌ **Admin INSERT policy MISSING**: No `providers_insert_admin` policy exists
+- ✅ **UPDATE policy allows admin**: `providers_update_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ✅ **DELETE policy allows admin**: `providers_delete_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ⚠️ **Two `is_admin_user()` functions exist**: One checks JWT email directly, one checks `admin_emails` table (may need consolidation)
+
+**Root Cause:**
+1. The `providers` table has INSERT policy `providers_insert_auth` that requires `owner_user_id = auth.uid()` (users can only create providers for themselves)
+2. There's NO admin INSERT policy for providers (unlike UPDATE and DELETE which have admin policies)
+3. When admin approves a business application, they need to create a provider with `owner_user_id` belonging to the applicant (or null if applicant doesn't have an account)
+4. The INSERT policy blocks this because `owner_user_id` doesn't match admin's `auth.uid()`
+
+**What Happened:**
+1. Admin clicks "Approve & Create Provider" on a business application
+2. `approveApplication()` function tries to create a provider using centralized `insert()` utility
+3. Provider payload has `owner_user_id` belonging to the applicant (or null)
+4. RLS policy `providers_insert_auth` evaluates `owner_user_id = auth.uid()` → FALSE (admin's ID doesn't match applicant's ID)
+5. INSERT fails with "new row violates row-level security policy"
+6. Admin cannot approve applications
+
+**The Fix:**
+1. **Add admin INSERT policy** to match admin UPDATE and DELETE policies:
+   ```sql
+   CREATE POLICY "providers_insert_admin" 
+   ON public.providers FOR INSERT
+   WITH CHECK (is_admin_user(auth.uid()));
+   ```
+   
+   **Note:** The UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in the USING clause, but INSERT policies use `WITH CHECK` clause only (no USING clause). So the admin INSERT policy should be:
+   ```sql
+   WITH CHECK (is_admin_user(auth.uid()))
+   ```
+   
+   This allows admins to create providers with ANY `owner_user_id` (including null or applicant's ID).
+
+2. **Update master RLS file** to include admin INSERT policy (already done in fix)
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT policyname, cmd, with_check 
+   FROM pg_policies 
+   WHERE tablename = 'providers' AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ MISSING: No admin INSERT policy
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());  -- ❌ Only allows users to create for themselves
+
+-- Admin UPDATE and DELETE policies exist, but INSERT is missing ❌
+CREATE POLICY "providers_update_admin" ...;  -- ✅ Exists
+CREATE POLICY "providers_delete_admin" ...;  -- ✅ Exists
+-- ❌ providers_insert_admin is MISSING
+```
+
+**Correct Code:**
+```sql
+-- ✅ Users can create providers for themselves
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());
+
+-- ✅ Admins can create providers for anyone (including null owner_user_id)
+CREATE POLICY "providers_insert_admin" 
+ON public.providers FOR INSERT
+WITH CHECK (is_admin_user(auth.uid()));
+
+-- ✅ Admin UPDATE and DELETE policies already exist
+CREATE POLICY "providers_update_admin" ...;
+CREATE POLICY "providers_delete_admin" ...;
+```
+
+**Prevention Checklist:**
+- ✅ **Check for admin policies** when adding RLS policies for any table (INSERT, UPDATE, DELETE, SELECT)
+- ✅ **Admin policies should allow admins to create/update/delete any record** (not just their own)
+- ✅ **Use `is_admin_user(auth.uid())`** helper function for admin checks (consistent across all policies)
+- ✅ **Match pattern from other tables** - if UPDATE/DELETE have admin policies, INSERT should too
+- ✅ **Test admin flows** after adding RLS policies (approve applications, create providers, etc.)
+- ✅ **Verify policies exist** for all CRUD operations admin needs to perform
+
+**Rule of Thumb:**
+> When adding RLS policies for a table that admins need to manage:
+> 1. **Add policies for ALL operations** admins need (INSERT, UPDATE, DELETE, SELECT)
+> 2. **Use consistent naming** (`table_insert_admin`, `table_update_admin`, etc.)
+> 3. **Use `is_admin_user(auth.uid())`** helper function for admin checks
+> 4. **Test admin flows** after adding policies (don't just test user flows)
+> 5. **Check master RLS file** to ensure all admin policies are included
+
+**How to Check for Missing Admin Policies:**
+```sql
+-- Check all policies for providers table
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'providers'
+ORDER BY cmd, policyname;
+
+-- Should see:
+-- INSERT: providers_insert_auth, providers_insert_admin
+-- UPDATE: providers_update_owner, providers_update_admin
+-- DELETE: providers_delete_owner, providers_delete_admin
+-- SELECT: providers_select_all (or similar)
+```
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (must include admin INSERT policy)
+- `ops/rls/fix-providers-admin-insert-rls.sql` - Fix file for missing admin INSERT policy
+- `src/utils/adminBusinessApplicationUtils.ts` - `approveApplication()` function (creates providers)
+- Any file that creates providers on behalf of others (admin approval flows)
+
+**Breaking Changes:**
+- If you remove admin INSERT policy → Admin cannot approve business applications
+- If you change `is_admin_user()` function → Admin policies break
+- If you change admin policy naming → Fix files won't drop old policies correctly
+
+**Audit Verification (2025-01-XX):**
+- ✅ **Current state confirmed**: Only `providers_insert_auth` exists (requires `owner_user_id = auth.uid()`)
+- ❌ **Missing policy confirmed**: No `providers_insert_admin` policy exists
+- ✅ **Fix will work**: Adding `providers_insert_admin` with `WITH CHECK (is_admin_user(auth.uid()))` will allow admins to create providers for anyone
+- ✅ **Pattern matches UPDATE/DELETE**: UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in USING clause, INSERT uses `WITH CHECK` clause
+- ⚠️ **Two `is_admin_user()` functions**: One checks JWT email directly, one checks `admin_emails` table - master RLS uses the one that takes `user_id` parameter
+
+**Testing Verified (2025-01-XX):**
+- ✅ After fix: Admin can approve business applications and create providers
+- ✅ After fix: Admin can create providers with `owner_user_id` belonging to applicants
+- ✅ After fix: Admin can create providers with `null` owner_user_id (for applicants without accounts)
+- ✅ Users can still create providers for themselves (existing `providers_insert_auth` policy still works)
+- ✅ RLS policies correctly enforce ownership for users and admin privileges for admins
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy patterns)
+- Section #25: Direct Supabase Queries Breaking After Refactoring (query utility usage)
+- Section #27: Missing Admin INSERT Policy for Calendar Events (calendar events admin creation)
+- `src/utils/adminBusinessApplicationUtils.ts` - Admin approval flow
+
+---
+
+### 27. Missing Admin INSERT Policy for Calendar Events ⭐ ADMIN SECTION (2025-01-XX) ✅ VERIFIED
+
+---
+
+### 28. MyBusiness Page - Applications Not Showing in Recently Approved/Rejected/Pending Sections ⭐ USER VISIBILITY ISSUE (2025-01-XX) ✅ VERIFIED
+
+**What:** Business owners receive emails about application rejections, but the "Recently Approved", "Recently Rejected", and "Pending Requests" sections on `/my-business` page only show change requests, not applications.
+
+**Root Cause:**
+1. The `HistoricalRequestsTab` component was only filtering and displaying `ProviderChangeRequest[]` items
+2. Business applications (`BusinessApplication[]`) were loaded but never passed to or displayed in these sections
+3. Users expected to see their rejected applications in "Recently Rejected" but only saw change requests
+
+**What Happened:**
+1. User submits business application → stored in `business_applications` table
+2. Admin rejects application → `status` set to `'rejected'`, email sent to user
+3. User visits `/my-business` → applications loaded via `useBusinessOperations.loadBusinessData()`
+4. User clicks "Recently Rejected" tab → `HistoricalRequestsTab` component renders
+5. Component only filters `nonFeaturedChangeRequests` → applications ignored
+6. User sees empty section → confusion and frustration
+
+**Files Changed:**
+
+1. **`src/pages/MyBusiness/components/HistoricalRequestsTab.tsx`**
+   - **Added:** `applications: BusinessApplication[]` prop to interface
+   - **Added:** Filtering logic for applications by status and date (last 30 days)
+   - **Added:** Combined display of both change requests and applications
+   - **Changed:** Component now accepts and displays both types
+   - **Dependencies:**
+     - `BusinessApplication` type from `../types`
+     - `ProviderChangeRequest` type from `../../../lib/supabaseData`
+     - `decided_at` field (optional) - uses `created_at` as fallback if missing
+   - **Breaking Changes:** ⚠️ **REQUIRES `applications` PROP** - All usages must pass this prop
+
+2. **`src/pages/MyBusiness.tsx`**
+   - **Changed:** Both `HistoricalRequestsTab` usages now pass `applications={applications}` prop
+   - **Changed:** "Pending Requests" tab now shows both applications and change requests
+   - **Changed:** Updated descriptions to mention both types
+   - **Dependencies:**
+     - `applications` state from `useBusinessOperations` hook
+     - `nonFeaturedChangeRequests` from `getNonFeaturedChangeRequests()` utility
+   - **Breaking Changes:** None - only additive changes
+
+3. **`src/pages/MyBusiness/types.ts`**
+   - **Added:** `decided_at?: string | null` field to `BusinessApplication` type
+   - **Reason:** Applications may have `decided_at` field in database (optional)
+   - **Breaking Changes:** None - optional field, backward compatible
+
+4. **`src/pages/MyBusiness/hooks/useBusinessOperations.ts`**
+   - **Added:** Enhanced debugging logs for applications and change requests
+   - **Added:** Status breakdown logging (approved/rejected/pending counts)
+   - **Added:** Recent items logging (last 30 days) for both types
+   - **Dependencies:** None - only logging changes
+   - **Breaking Changes:** None - only additive logging
+
+**Dependency Chain:**
+```
+MyBusiness.tsx
+    ↓ (passes applications prop)
+HistoricalRequestsTab.tsx
+    ↓ (filters and displays)
+BusinessApplication type (from types.ts)
+    ↓ (optional decided_at field)
+useBusinessOperations.ts (loads data)
+    ↓ (queries database)
+business_applications table
+```
+
+**What Could Break:**
+
+1. **If `applications` prop is not passed:**
+   - TypeScript error: Missing required prop
+   - Component will fail to compile
+   - **Prevention:** All usages updated in this change
+
+2. **If `decided_at` field doesn't exist in database:**
+   - Runtime error when accessing `app.decided_at`
+   - **Prevention:** All accesses use optional chaining or fallback to `created_at`
+
+3. **If `BusinessApplication` type changes:**
+   - TypeScript errors in `HistoricalRequestsTab`
+   - **Prevention:** Type is centralized in `types.ts`, all imports use same type
+
+4. **If filtering logic changes:**
+   - Applications might not appear in correct sections
+   - **Prevention:** Filtering logic is well-commented and uses same pattern as change requests
+
+**Testing Verified (2025-01-XX):**
+- ✅ Build succeeds with no TypeScript errors
+- ✅ All props properly typed and passed
+- ✅ Optional `decided_at` field handled safely
+- ✅ Fallback to `created_at` works correctly
+- ✅ Both change requests and applications display correctly
+- ✅ Sorting by date works for both types
+- ✅ Empty states show when no items found
+
+**Verification Checklist:**
+- [x] All `HistoricalRequestsTab` usages pass `applications` prop
+- [x] Type definitions include optional `decided_at` field
+- [x] All `decided_at` accesses have fallbacks
+- [x] Build succeeds without errors
+- [x] No linter errors
+- [x] Component properly filters by status and date
+- [x] Both types display correctly in UI
+
+**Related Files:**
+- `src/pages/MyBusiness/components/HistoricalRequestsTab.tsx` - Main component changed
+- `src/pages/MyBusiness.tsx` - Updated usages
+- `src/pages/MyBusiness/types.ts` - Type definition updated
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Enhanced logging
+- `src/lib/supabaseData.ts` - `ProviderChangeRequest` type (unchanged, used for reference)
+- `src/types/index.ts` - Global `BusinessApplication` type (already had `decided_at`)
+
+**Breaking Changes:**
+- ⚠️ **`HistoricalRequestsTab` now requires `applications` prop** - All usages must be updated
+- ✅ **Backward compatible:** Optional `decided_at` field doesn't break existing code
+
+**Prevention Pattern:**
+> When adding new data types to existing components:
+> 1. Check all usages of the component
+> 2. Update all usages to pass new required props
+> 3. Handle optional fields safely with fallbacks
+> 4. Test with both populated and empty data
+> 5. Document all dependencies in component comments
+
+
+### 30. Notifications Reappearing After Viewing (2025-11-09)
+
+**What:** Business owners kept seeing the same "Business Application Pending" toast in the global notification bell even after clicking and reviewing it. The badge would clear briefly, then reappear after Supabase realtime triggered another refresh.
+
+**Root Cause:**
+1. `NotificationBell.tsx` only flipped a local `read` flag when the button was clicked. Pending/pending-change notifications are re-derived from live Supabase queries (`business_applications`, `provider_change_requests`), so a reload reconstructed the array and ignored the previous click.
+2. There was no persisted acknowledgement list. When the realtime subscription re-fetched, the component rebuilt the notifications from scratch and the "read" state vanished.
+3. A recent column evolution on `user_notifications` meant the REST query using an explicit column list (`select('id,title,subject,message,body,type,data,metadata,created_at,is_read,read,read_at,link,link_section')`) started 400'ing because `link`/`link_section` are JSON metadata, not top-level columns. The failure short-circuited acknowledgement logic and forced a retry that rebuilt the array again.
+
+**What Happened:**
+1. Admin approves an application → `adminBusinessApplicationUtils.approveBusinessApplication()` inserts a `user_notifications` row with metadata.
+2. Business owner opens the bell → notification marked `read: true` locally but not persisted anywhere else.
+3. Realtime `postgres_changes` fires → `loadNotifications()` reruns, the same "pending application" object is rebuilt, unread count increments again.
+4. REST query 400 error floods console (`select=...&link=...`) → bell refresh loops, reinforcing the regression.
+
+**The Fix:**
+- Switched the Supabase REST call to `.select('*')` and normalized the result on the client, so schema changes won't 400.
+- Added resilient JSON parsing for `metadata`/`data` because Supabase may return them as plain strings.
+- Introduced `bf_notification_acknowledged_ids` localStorage key. When the dropdown opens, non-admin notifications get added to the acknowledged set and filtered out of future renders.
+- Persist acknowledged IDs across sessions (and tab reloads) via `acknowledgedIdsRef` + `persistAcknowledgedIds()` helper.
+- Auto-acknowledge immediately when the dropdown is opened so users aren't forced to click each row just to clear the badge.
+- Updated approval/rejection flows to write both `subject/body` and `title/message` plus metadata links so future parsing stays consistent.
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only flips local state; no persistence, so realtime rebuilds re-add items.
+const handleNotificationClick = async (notification: Notification) => {
+  setNotifications(prev =>
+    prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+  )
+  // No acknowledgement persistence → notification reappears on next reload.
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Persist acknowledgement ids and auto-ack on dropdown open.
+const ACK_STORAGE_KEY = 'bf_notification_acknowledged_ids'
+const acknowledgedIdsRef = useRef<Set<string>>(new Set())
+
+const persistAcknowledgedIds = (next: Set<string>) => {
+  acknowledgedIdsRef.current = next
+  setAcknowledgedIds(new Set(next))
+  window.localStorage.setItem(ACK_STORAGE_KEY, JSON.stringify(Array.from(next)))
+}
+
+useEffect(() => {
+  if (!isOpen || notifications.length === 0) return
+  const toAcknowledge = notifications.filter(
+    n => !n.isAdminNotification && !acknowledgedIdsRef.current.has(n.id)
+  )
+  if (toAcknowledge.length === 0) return
+  const next = new Set(acknowledgedIdsRef.current)
+  toAcknowledge.forEach(n => next.add(n.id))
+  persistAcknowledgedIds(next)
+}, [isOpen, notifications])
+```
+
+**Prevention Checklist:**
+- ✅ Keep Supabase queries using `.select('*')` unless you control the schema; normalize in code instead.
+- ✅ Persist acknowledgement state (localStorage or database) for any notification that can't be marked read server-side.
+- ✅ Update both the notification writer (`adminBusinessApplicationUtils`) and reader (`NotificationBell`) when metadata shape changes.
+- ✅ Guard JSON parsing on `metadata`/`data` because Supabase may return them as text.
+- ✅ Document new localStorage keys and reason for existence (see dependency tracking entry #15).
+
+**Rule of Thumb:**
+> If a notification is derived data (not a single row you can mark `read` in the database), you MUST persist acknowledgement out-of-band or it will keep coming back on every refresh.
+
+**Files to Watch:**
+- `src/components/NotificationBell.tsx` (acknowledgement + normalization logic)
+- `src/utils/adminBusinessApplicationUtils.ts` (writes notifications + metadata)
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` (entry #15 documents dependencies)
+- Supabase tables: `user_notifications`, `business_applications`, `provider_change_requests`, `dismissed_notifications`
+
+**Breaking Changes:**
+- Renaming/removing `bf_notification_acknowledged_ids` without migration will resurrect old notifications.
+- Reverting to explicit column selection will break as soon as the table schema evolves.
+- Removing the auto-acknowledgement effect will make notifications reappear when realtime fires.
+
+**Testing Verified (2025-11-09):**
+- ✅ Notification bell REST call no longer returns 400.
+- ✅ Opening the dropdown once clears the badge permanently for that notification.
+- ✅ Refreshing the page keeps the notification hidden (localStorage persists).
+- ✅ `user_notifications` rows with either `subject/body` or `title/message` render correctly.
+- ✅ Admin-sent approvals include deep links (`/my-business`) in metadata.
+
+**Related:**
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
+- Section #28: MyBusiness visibility issues (same data sources)
+- Section #24: RLS conflicts (same tables, keep policies consistent)
+
+---
+
+## How to Prevent This (Action Plan)
+
+### Immediate (5 minutes after EVERY change):
+
+1. **Impact Analysis**
+
+   **PowerShell (Windows):**
+   ```powershell
+   # What files import what I changed?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-file"
+   
+   # What depends on this functionality?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-function"
+   ```
+
+   **Bash/Linux/Mac:**
+   ```bash
+   # What files import what I changed?
+   grep -r "changed-file" src/
+   
+   # What depends on this functionality?
+   grep -r "changed-function" src/
+   ```
+
+2. **Smoke Test Checklist**
+   - [ ] Can user sign up? 
+   - [ ] Can admin view profiles?
+   - [ ] Can admin view resident verification?
+   - [ ] Does name display correctly?
+   - [ ] Do other admin sections work?
+   - [ ] **Can admin navigate between pages without getting logged out?** ⭐ NEW
+   - [ ] **Does admin status persist during navigation?** ⭐ NEW
+  - [ ] **Can users log in without immutable field errors?** ⭐ NEW
+  - [ ] **Does user deletion remove ALL related data?** ⭐ NEW
+  - [ ] **Do all React components receive their props correctly?** ⭐ NEW
+  - [ ] **Are function props called with guard checks?** ⭐ NEW
+  - [ ] **Do deleted users stay deleted after page refresh?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete users who only exist in funnels/bookings without profiles?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete both business and customer accounts successfully?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users verify their email via custom verification system?** ⭐ NEW
+  - [ ] **Does email verification status update correctly after verification?** ⭐ NEW
+  - [ ] **Are unverified users blocked from protected features?** ⭐ NEW
+  - [ ] **Can users resend verification emails from account page?** ⭐ NEW
+  - [ ] **Do calendar events with database images show their images (not gradients)?** ⭐ NEW
+  - [ ] **Do calendar events without database images show gradient fallbacks?** ⭐ NEW
+  - [ ] **Can admin choose to delete or keep businesses when deleting user account?** ⭐ NEW ✅ TESTED
+  - [ ] **Does admin deletion prompt show business names when user has businesses?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses hard deleted when admin chooses to delete them?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses soft deleted (unlinked) when admin chooses to keep them?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW ✅ TESTED
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+  - [ ] **Are all Supabase queries using centralized utility (no direct `supabase.from()` calls)?** ⭐ NEW
+  - [ ] **Do forms work end-to-end after refactoring (submit → verify data appears)?** ⭐ NEW
+
+3. **Manual Testing**
+   - Actually USE the app after every change
+   - Click through ALL related pages
+   - Don't just test the one thing you changed
+
+---
+
+### Short-term (1-2 days):
+
+1. **Integration Tests**
+   ```typescript
+   // Test critical flows end-to-end
+   describe('Signup to Admin View Flow', () => {
+     it('should work end-to-end', async () => {
+       // 1. Sign up with name and resident status
+       // 2. Verify name saved
+       // 3. Verify resident data saved
+       // 4. Admin logs in
+       // 5. Admin sees name
+       // 6. Admin sees resident verification data
+     })
+   })
+   ```
+
+2. **Dependency Documentation**
+   ```typescript
+   /**
+    * DEPENDENCIES:
+    * - AuthContext: Provides user session
+    * - admin-list-profiles: Returns profile data
+    * - ProfileRow type: Defines data structure
+    * 
+    * CONSUMERS:
+    * - ResidentVerificationSection: Displays data
+    * - UsersSection: Displays user list
+    * 
+    * IF YOU CHANGE THIS:
+    * - Update ProfileRow type
+    * - Update admin-list-profiles query
+    * - Test all consumers
+    */
+   ```
+
+3. **Change Impact Checklist**
+   - [ ] What files import this?
+   - [ ] What functions depend on this?
+   - [ ] What UI components use this?
+   - [ ] What data flows through this?
+   - [ ] Have I tested ALL of these?
+
+---
+
+### Long-term (1 week):
+
+1. **Architecture Review**
+   - Reduce shared state
+   - Create clear boundaries
+   - Document data flow
+   - Create integration tests for each boundary
+
+2. **Automated Testing**
+   - Unit tests for individual functions
+   - Integration tests for critical flows
+   - E2E tests for user journeys
+   - Run all tests before merging
+
+3. **Code Review Process**
+   - Reviewer checks: "What else might be affected?"
+   - Reviewer tests: "Does everything still work?"
+   - Reviewer verifies: "Are related files updated?"
+
+---
+
+## Checklist for Every Change
+
+Before committing ANY change:
+
+- [ ] **Impact Analysis:** What else might be affected?
+  
+  **PowerShell (Windows):**
+  ```powershell
+  Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-thing"
+  ```
+  
+  **Bash/Linux/Mac:**
+  ```bash
+  grep -r "changed-thing" src/
+  ```
+- [ ] **Smoke Tests:** Does everything still work?
+  - [ ] Signup works - name must appear immediately after signup
+  - [ ] Signin works
+  - [ ] Admin pages load
+  - [ ] All sections display correctly
+  - [ ] Name is stored in database after signup
+  - [ ] Name is read from localStorage before database during signup
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+- [ ] **RLS Policy Checks** (if modifying database policies):
+  - [ ] Checked for duplicate policies before creating new ones
+  - [ ] Dropped ALL existing policies for the operation before creating new ones
+  - [ ] Verified only one policy exists per operation after creation
+  - [ ] Policy names match master RLS file
+  - [ ] Tested that inserts/updates/deletes work correctly
+  - [ ] Verified security (SELECT/DELETE policies still enforce email matching)
+- [ ] **Related Files:** Are they all updated?
+  - [ ] Types updated?
+  - [ ] Functions updated?
+  - [ ] Components updated?
+  - [ ] Tests updated?
+  - [ ] **RLS policies updated?** ⭐ NEW
+- [ ] **All Supabase queries migrated to centralized utility?** ⭐ NEW
+  - [ ] Search for direct queries:
+    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+    - Bash: `grep -r "supabase\.from\(" src/`
+  - [ ] Migrate all instances in one commit
+  - [ ] Test forms end-to-end after migration
+- [ ] **Integration Test:** Does the whole flow work?
+- [ ] **Manual Testing:** Actually USE the app
+
+---
+
+## Most Important Rule
+
+**Before making ANY change, ask yourself:**
+
+1. "What ELSE might be affected?"
+2. "Have I tested ALL related functionality?"
+3. "Does the WHOLE system still work?"
+
+**If you can't answer these, DON'T commit the change yet.**
+
+---
+
+## Summary
+
+**Root Cause:** 
+Fixing one thing without checking what ELSE depends on it.
+
+**Quick Fix (5 min):**
+- Run impact analysis (grep)
+- Run smoke tests manually
+- Don't commit until everything works
+
+**Long-term Fix:**
+- Integration tests
+- Dependency documentation
+- Architecture improvements
+- Automated testing
+
+**The Pattern:**
+```
+Fix X
+  → Break Y (hidden dependency)
+    → Fix Y
+      → Break Z (another hidden dependency)
+        → Fix Z
+          → Break X again (circular dependency)
+            → 🔥 BURN IT ALL DOWN
+```
+
+**The Solution:**
+```
+Fix X
+  → Check what depends on X
+  → Fix ALL related things
+  → Test EVERYTHING
+  → Then commit
+```
+
+---
+
+## Appendix A – Archived Incident Library
+
+*Resolved incidents retained for historical reference. See the main sections above for active patterns and prevention playbooks.*
+
+### 20. Admin Business Deletion Choice (2025-01-XX)
+
+_Archived:_ See Appendix entry 20 in [Appendix A – Archived Incident Library](#appendix-a--archived-incident-library) for summary and related links.
+
+---
+
+### 22. Event Images Stored in Supabase Storage (2025-01-XX)
+
+_Archived:_ See Appendix entry 22 for the storage workflow summary.
+
+---
+
+### 23. Gradient Strings Saved to Database (2025-11-05)
+
+**What:** Populate scripts were saving CSS gradient strings (like `"linear-gradient(135deg, #667eea 0%, #764ba2 100%)"`) directly to the `image_url` column in the database when images couldn't be fetched. Gradient strings should NEVER be stored in the database - they should be computed dynamically on the frontend when `image_url` is `null`.
+
+**Root Cause:**
+1. `populate-event-images.ts` (both Netlify function and local script) were saving gradient strings to `image_url` when Unsplash API failed or when storage failed
+2. The code treated gradients as a "fallback value" that should be saved to the database
+3. This caused events to have gradient strings in `image_url` instead of actual image URLs or `null`
+4. Frontend code already handles `null` image_url by computing gradients dynamically - saving gradients to DB was redundant and wrong
+
+**What Happened:**
+1. Events from iCalendar feeds were inserted without `image_url` (correctly set to `null`)
+2. Populate script ran to fetch images for events without images
+3. When Unsplash API failed or Supabase Storage failed, script saved gradient strings to `image_url`
+4. Database now had gradient strings in `image_url` column
+5. Frontend code detects gradient strings and ignores them (correctly), but this defeats the purpose of having images in the database
+
+**The Fix:**
+- **Never save gradient strings**: Updated all populate scripts to set `image_url: null` instead of saving gradient strings when images can't be fetched
+- **Frontend computes gradients**: The frontend already has logic to compute gradients when `image_url` is `null` - no need to save gradients to database
+- **Preserve existing images**: All external feed processors (iCalendar, RSS, KPBS, VoSD) preserve existing `image_url` and `image_type` when re-fetching events
+- **Only populate missing images**: Populate scripts only process events with `null` image_url (not events that already have images)
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Saves gradient strings to database
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl) {
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - save gradient string to database ❌ WRONG
+      imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+      imageType = 'gradient'
+    }
+  } else {
+    // Unsplash failed - save gradient string to database ❌ WRONG
+    imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+    imageType = 'gradient'
+  }
+} else {
+  // No API key - save gradient string to database ❌ WRONG
+  imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+  imageType = 'gradient'
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ❌ Saves gradient string!
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Never saves gradient strings, sets to null instead
+let imageUrl: string | null = null
+let imageType: 'image' | null = null
+
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl && storageUrl.includes('supabase.co/storage')) {
+      // Successfully stored in Supabase Storage
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - set to null (frontend will compute gradient)
+      imageUrl = null
+      imageType = null
+    }
+  } else {
+    // Unsplash failed - set to null (frontend will compute gradient)
+    imageUrl = null
+    imageType = null
+  }
+} else {
+  // No API key - set to null (frontend will compute gradient)
+  imageUrl = null
+  imageType = null
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ✅ null if no image
+```
+
+**Prevention Checklist:**
+- ✅ NEVER save gradient strings to `image_url` column - always use `null` when images can't be fetched
+- ✅ Frontend computes gradients dynamically when `image_url` is `null` - no need to save gradients to database
+- ✅ Populate scripts only process events with `null` image_url (skip events that already have images)
+- ✅ External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ If storage fails, set `image_url` to `null` (don't fall back to saving gradient strings)
+- ✅ All functions that modify events preserve existing images (don't overwrite them)
+
+**Rule of Thumb:**
+> When handling image fallbacks:
+> 1. **NEVER** save gradient strings to `image_url` column - always use `null`
+> 2. Frontend computes gradients when `image_url` is `null` - no need to save gradients to database
+> 3. Populate scripts only process events with `null` image_url (skip events that already have images)
+> 4. External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+> 5. If image storage fails, set `image_url` to `null` (don't save gradient strings as fallback)
+
+**Files to Watch:**
+- `netlify/functions/populate-event-images.ts` - Fixed to never save gradient strings
+- `scripts/populate-event-images.ts` - Fixed to never save gradient strings
+- `netlify/functions/manual-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/scheduled-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-kpbs-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-vosd-events.ts` - Preserves existing images when re-fetching
+- `src/utils/eventImageUtils.ts` - `getEventHeaderImageFromDb()` ignores gradient strings in database
+
+**Breaking Changes:**
+- If you restore code that saves gradient strings to `image_url` → Frontend will ignore them (wastes database space)
+- If you remove null-check logic in populate scripts → Scripts might try to re-populate events that already have images
+- If you remove image preservation logic in feed processors → Events will lose their images when re-fetched
+
+**Image Preservation Guarantees:**
+- ✅ **External feed processors preserve images**: All iCalendar/RSS/KPBS/VoSD sync functions preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ **Populate scripts only process missing images**: Scripts only populate events with `null` image_url (skip events that already have images)
+- ✅ **No automatic overwrites**: No automated process will overwrite existing images - they are preserved during re-fetches
+- ✅ **One-time population**: After images are populated, they will NOT be overwritten by automated processes
+
+**Testing Verified (2025-11-05):**
+- ✅ Populate scripts set `image_url` to `null` when images can't be fetched (not gradient strings)
+- ✅ Frontend computes gradients when `image_url` is `null` (works correctly)
+- ✅ External feed processors preserve existing images when re-fetching events
+- ✅ Populate scripts skip events that already have images (only process `null` image_url)
+- ✅ Cleanup script removes existing gradient strings from database
+- ✅ All 33 events successfully populated with Supabase Storage URLs (not gradient strings)
+
+**Related:**
+- Section #22: Event Images Stored in Supabase Storage (image storage pattern)
+- Section #21: Event Images Not Showing Due to Null image_type (display logic)
+- Section #18: Event Images Not Showing from Database (original fix)
+
+---
+
+### 24. RLS Policy Conflicts and Duplicate Policies ⭐ DATABASE SECURITY ISSUE (2025-01-XX)
+
+**What:** Row Level Security (RLS) policies can conflict or duplicate, causing inserts/updates/deletes to fail silently or with confusing errors.
+
+**Root Cause:**
+- Multiple RLS policy files can create duplicate policies with different names
+- Conflicting policies (e.g., restrictive vs. public) can cause evaluation failures
+- `auth.jwt() ->> 'email'` may not be available or match exactly, causing restrictive policies to fail
+- Policies from different migration files can conflict with master policies
+
+**Example:**
+```sql
+-- ❌ PROBLEM: Two INSERT policies with different names
+-- From migration file:
+CREATE POLICY "applications_insert_all" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- From master RLS file:
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ❌ PROBLEM: Restrictive policy that fails
+-- From fix file:
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ auth.jwt() ->> 'email' may not be available
+```
+
+**Symptoms:**
+- Users get "new row violates row-level security policy" errors
+- Inserts fail even when they should work
+- Multiple policies with similar names exist
+- Policies from different files conflict
+
+**Fix:**
+1. **Drop ALL existing policies** before creating new ones:
+   ```sql
+   -- Drop ALL existing INSERT policies
+   DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+   DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+   DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+   -- ... drop all variations
+   ```
+
+2. **Create single consistent policy** matching master RLS file:
+   ```sql
+   -- Create single public INSERT policy
+   CREATE POLICY "applications_insert_public" 
+   ON public.business_applications FOR INSERT
+   WITH CHECK (true);
+   ```
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT 
+     schemaname, 
+     tablename, 
+     policyname, 
+     cmd,
+     qual,
+     with_check
+   FROM pg_policies 
+   WHERE tablename = 'business_applications'
+     AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Creating policy without dropping existing ones
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ May fail if JWT email not available
+
+-- ❌ Multiple policies with different names
+CREATE POLICY "applications_insert_all" ...;  -- From migration
+CREATE POLICY "applications_insert_public" ...;  -- From master
+-- ❌ Both exist, but one might be restrictive and block inserts
+```
+
+**Correct Code:**
+```sql
+-- ✅ Drop ALL existing policies first
+DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications (auth)" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_anon_insert" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_auth_insert" ON public.business_applications;
+
+-- ✅ Create single consistent policy
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ✅ Verify only one policy exists
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' AND cmd = 'INSERT';
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS drop existing policies** before creating new ones
+- ✅ **Check for duplicate policies** before creating new ones
+- ✅ **Use consistent policy names** matching master RLS file
+- ✅ **Avoid restrictive policies** that depend on `auth.jwt() ->> 'email'` (may not be available)
+- ✅ **Use public INSERT policies** for public forms (similar to `contact_leads`)
+- ✅ **Rely on SELECT/DELETE policies** for security (email matching, admin checks)
+- ✅ **Verify policies after creation** to ensure only one exists per operation
+- ✅ **Document policy rationale** in SQL comments
+
+**Rule of Thumb:**
+> When fixing RLS policies:
+> 1. **Drop ALL existing policies** for the operation (INSERT/UPDATE/DELETE/SELECT)
+> 2. **Create single consistent policy** matching master RLS file
+> 3. **Use public INSERT policies** for public forms (security enforced by SELECT/DELETE)
+> 4. **Avoid `auth.jwt() ->> 'email'`** - use `auth.uid()` or `auth.users` table instead
+> 5. **Verify policies after creation** to ensure clean state
+> 6. **Check for duplicate policies** from different migration files
+
+**How to Check for Duplicate Policies:**
+```sql
+-- Check all INSERT policies
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' 
+  AND cmd = 'INSERT'
+ORDER BY policyname;
+
+-- Check all policies for a table
+SELECT policyname, cmd, qual, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications'
+ORDER BY cmd, policyname;
+```
+
+**Security Note:**
+- Public INSERT policies don't compromise security if SELECT/DELETE policies enforce email matching
+- Users can submit applications, but can only VIEW/DELETE their own (by email)
+- Admins can VIEW/UPDATE/DELETE all applications
+- Email matching is enforced by SELECT/DELETE policies, not INSERT
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (source of truth)
+- `ops/rls/fix-*.sql` - Individual fix files (should match master)
+- `ops/migrations/*.sql` - Migration files (may create duplicate policies)
+- Any file that modifies RLS policies
+
+**Related:**
+- Section #9: Incomplete Deletion Logic (user deletion patterns)
+- Section #17: Business Ownership on Self-Deletion (business deletion patterns)
+- Section #29: Admin RLS Policy Blocking Queries (admin access issue)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 29. Admin RLS Policy Blocking Queries ⭐ CRITICAL ADMIN ACCESS ISSUE (2025-01-XX)
+
+**What:** Admin queries to `business_applications` table return 403 Forbidden errors, preventing admins from viewing pending applications.
+
+**Root Cause:**
+- Admin query in `useAdminDataLoader.ts` requests ALL pending applications without email filter
+- `applications_select_admin` policy uses `is_admin_user(auth.uid())` function
+- `is_admin_user()` function uses `(SELECT email FROM auth.users WHERE id = user_id)` subquery
+- This subquery may fail or return NULL, causing admin policy to fail
+- PostgreSQL evaluates ALL SELECT policies with OR logic - if ALL policies fail, query fails with 403
+
+**Example:**
+```typescript
+// ❌ PROBLEM: Admin query without email filter
+// File: src/hooks/useAdminDataLoader.ts (Line 258-262)
+const bizQuery = query('business_applications', { logPrefix: '[Admin]' })
+  .select('*')
+  .or('status.eq.pending,status.is.null')  // Query ALL pending apps
+  .order('created_at', { ascending: false })
+  .execute()
+// ❌ Result: 403 Forbidden - RLS policy blocks query
+```
+
+```sql
+-- ❌ PROBLEM: Admin policy uses function that may fail
+-- File: ops/rls/02-MASTER-RLS-POLICIES.sql (Line 244-246)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may fail if auth.users subquery fails
+
+-- ❌ PROBLEM: is_admin_user() function uses auth.users subquery
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail or return NULL
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+```
+
+**Symptoms:**
+- Admin queries return 403 Forbidden errors
+- Console shows: `GET .../business_applications?... 403 (Forbidden)`
+- Admin cannot view pending applications in admin panel
+- Regular users can see their own applications (owner policy works)
+- Admin policy fails silently (no error message, just 403)
+
+**Fix:**
+1. **Update `is_admin_user()` function** to use JWT email (more reliable):
+   ```sql
+   -- ✅ FIX: Use JWT email with fallback to auth.users
+   CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+   RETURNS boolean AS $$
+     SELECT EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)
+     );
+   $$ LANGUAGE sql SECURITY DEFINER;
+   ```
+
+2. **Update admin policy** to check JWT email directly (more reliable):
+   ```sql
+   -- ✅ FIX: Check JWT email directly in policy
+   DROP POLICY IF EXISTS "applications_select_admin" ON public.business_applications;
+   
+   CREATE POLICY "applications_select_admin" 
+   ON public.business_applications FOR SELECT
+   USING (
+     EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+     )
+   );
+   ```
+
+3. **Ensure `admin_emails` table exists** and has admin emails:
+   ```sql
+   CREATE TABLE IF NOT EXISTS public.admin_emails (
+     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     email text UNIQUE NOT NULL,
+     created_at timestamptz DEFAULT now()
+   );
+   
+   INSERT INTO public.admin_emails (email)
+   VALUES ('justexisted@gmail.com')
+   ON CONFLICT (email) DO NOTHING;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Using auth.users subquery that may fail
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ❌ Admin policy depends on function that may fail
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may return FALSE if subquery fails
+```
+
+**Correct Code:**
+```sql
+-- ✅ Use JWT email with fallback
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))  -- ✅ JWT email (reliable)
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)  -- ✅ Fallback
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ✅ Admin policy checks JWT email directly (more reliable)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  )
+);
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use JWT email** for admin checks (more reliable than auth.users subquery)
+- ✅ **Include fallback** to auth.users subquery for compatibility
+- ✅ **Use case-insensitive matching** with LOWER(TRIM()) to handle email variations
+- ✅ **Test admin queries** after updating RLS policies
+- ✅ **Verify admin_emails table** exists and has correct emails
+- ✅ **Check ALL admin policies** when updating is_admin_user() function (affects all tables)
+- ✅ **Document dependencies** in SQL file comments (version, dependencies, breaking changes)
+
+**Dependency Chain:**
+```
+useAdminDataLoader.ts (admin query)
+    ↓
+business_applications table (RLS enabled)
+    ↓
+applications_select_admin policy (checks is_admin_user())
+    ↓
+is_admin_user() function (checks admin_emails table)
+    ↓
+auth.users subquery (may fail) ❌
+```
+
+**What Could Break:**
+- ⚠️ **ALL admin policies** depend on `is_admin_user()` function
+- ⚠️ **Updating function** affects ALL tables with admin policies (providers, bookings, etc.)
+- ⚠️ **Admin queries** on other tables may also fail if function is broken
+- ⚠️ **admin_emails table** must exist and have correct emails
+
+**Testing Verification:**
+- ✅ Admin can query ALL pending applications (no 403 errors)
+- ✅ Admin can view applications in admin panel
+- ✅ Regular users can still see their own applications (owner policy works)
+- ✅ `is_admin_user()` function returns TRUE for admin users
+- ✅ `is_admin_user()` function returns FALSE for non-admin users
+
+**Files Changed:**
+- `ops/rls/fix-business-applications-admin-rls.sql` (v1.0) - Admin RLS fix
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (needs update)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (no changes needed, just needs RLS fix)
+
+**SQL File Versioning:**
+- `ops/rls/fix-business-applications-select-rls.sql` - v1.0 (owner policy fix)
+- `ops/rls/fix-business-applications-admin-rls.sql` - v1.0 (admin policy fix)
+- `ops/rls/DIAGNOSE-BUSINESS-APPLICATIONS-RLS.sql` - v1.0 (diagnostic queries)
+
+**Rule of Thumb:**
+> When fixing admin RLS policies:
+> 1. **ALWAYS use JWT email** for admin checks (more reliable)
+> 2. **Include fallback** to auth.users subquery for compatibility
+> 3. **Update is_admin_user() function** if it uses auth.users subquery
+> 4. **Check ALL admin policies** when updating function (affects all tables)
+> 5. **Verify admin_emails table** exists and has correct emails
+> 6. **Test admin queries** after updating policies
+> 7. **Version SQL files** with version number, dependencies, and breaking changes
+
+**How to Check Admin Access:**
+```sql
+-- Test admin check function
+SELECT 
+  auth.uid() as user_id,
+  auth.jwt() ->> 'email' as jwt_email,
+  is_admin_user(auth.uid()) as is_admin,
+  (SELECT email FROM auth.users WHERE id = auth.uid()) as auth_users_email;
+
+-- Test admin policy directly
+SELECT * FROM business_applications 
+WHERE status = 'pending' OR status IS NULL
+ORDER BY created_at DESC
+LIMIT 10;
+-- Should return results if you're admin, 403 if not
+```
+
+**Security Note:**
+- Admin policies allow admins to see ALL rows (no email filter)
+- Owner policies restrict users to their own rows (email match required)
+- Both policies use OR logic - if EITHER passes, query succeeds
+- Admin check must be reliable (use JWT email, not auth.users subquery)
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (must update is_admin_user() function)
+- `ops/rls/fix-business-applications-admin-rls.sql` - Admin RLS fix (v1.0)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (depends on RLS policy)
+- `ops/rls/fix-*-admin-rls.sql` - Other admin RLS fixes (may need updates)
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (general RLS issues)
+- Section #28: Applications Not Showing in Sections (owner policy fix)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 18. Event Images Not Showing from Database (2025-11-03)
+
+**What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.
+
+**Root Cause:**
+1. Query using `.select('*')` might not include `image_url` if RLS filters columns (though policy allows reading all fields)
+2. External events (iCalendar) were merged with database events without deduplication
+3. If external events had same IDs as database events, they could override database events (losing `image_url`)
+
+**Fix:**
+- **Explicit field selection**: Changed from `.select('*')` to explicitly selecting all fields including `image_url` and `image_type`
+- **Deduplication logic**: Created a Map of database events by ID, then filter out external events that match database event IDs (database events have priority)
+- **Preserve database images**: Database events are placed first in the merged array, external events are filtered to remove duplicates
+
+**Wrong Code:**
+```typescript
+// Query might not include image_url if RLS filters
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('*') // ❌ Might not include image_url
+
+// Merge without deduplication - external events can override database events
+const allEvents = [
+  ...(dbEvents || []),
+  ...rssEvents, // ❌ No image_url
+  ...calendarEvents // ❌ No image_url, might override database events
+]
+```
+
+**Correct Code:**
+```typescript
+// Explicitly select image_url and image_type to ensure they're included
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('id, title, description, date, time, location, address, category, source, upvotes, downvotes, created_at, updated_at, user_id, provider_id, created_by_user_id, is_flagged, flag_count, url, image_url, image_type') // ✅ Explicit
+
+// Create map of database events to preserve image data
+const dbEventsMap = new Map<string, CalendarEvent>()
+dbEvents?.forEach(event => {
+  dbEventsMap.set(event.id, event)
+})
+
+// Filter external events to remove duplicates (database has priority)
+const uniqueExternalEvents = externalEvents.filter(externalEvent => {
+  return !dbEventsMap.has(externalEvent.id) // ✅ Skip if database event exists
+})
+
+// Combine: Database first (has images), then unique external events
+const allEvents = [
+  ...(dbEvents || []), // ✅ Database events with images first
+  ...uniqueExternalEvents // ✅ Only unique external events
+]
+```
+
+**Prevention Checklist:**
+- ✅ Explicitly select `image_url` and `image_type` in queries (don't rely on `*`)
+- ✅ Deduplicate external events to prevent overriding database events
+- ✅ Database events have priority over external events (preserve images)
+- ✅ Add logging to verify `image_url` is present in final merged events
+- ✅ Test with events that have database images to verify they show images
+
+**Rule of Thumb:**
+> When merging database events with external events:
+> 1. Explicitly select all fields including `image_url` and `image_type` (don't use `*`)
+> 2. Create a Map of database events by ID to preserve image data
+> 3. Filter external events to remove duplicates (database events have priority)
+> 4. Database events should be first in the merged array
+> 5. Add diagnostic logging to verify `image_url` is present in final events
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')` and deduplication)
+- `src/components/CalendarSection.tsx` (uses `fetchCalendarEvents()` - automatically benefits)
+- `src/components/EventCard.tsx` (checks `event.image_url` and `event.image_type`)
+
+**Related:**
+- Section #14: Async Operation Order in SIGNED_IN Handler
+- Section #15: Custom Email Verification System
+- Section #19: Explicit Column Selection Breaks When Columns Don't Exist (⚠️ **This fix caused Section #19** - explicit column selection broke the query)
+
+---
+
+### 19. Explicit Column Selection Breaks When Columns Don't Exist (2025-11-03)
+
+**What:** When explicitly selecting columns in Supabase queries, if any column doesn't exist in the database, the query fails and returns no data (or empty results).
+
+**Root Cause:**
+- Explicit column selection (e.g., `.select('id, title, image_url')`) requires ALL listed columns to exist
+- If you select columns that were never added via migrations, Supabase returns an error or empty results
+- TypeScript types may include optional fields that don't exist in the actual database schema
+- Using `.select('*')` is safer because it only selects columns that actually exist
+
+**Example:**
+```typescript
+// ❌ BROKEN: Tries to select columns that might not exist
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // If ANY of these columns don't exist → query fails → returns empty/no data
+
+// ✅ CORRECT: Selects all existing columns automatically
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('*')
+  // Only selects columns that actually exist in the database
+```
+
+**Fix:**
+- Use `.select('*')` instead of explicit column lists
+- If you need specific columns, verify they exist in the database first (check migrations)
+- Add error handling to detect query failures
+- Log query errors with full details (message, code, hint, details)
+
+**Wrong Code:**
+```typescript
+// Selecting columns that might not exist
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // ❌ If user_id, provider_id, is_flagged, flag_count, or url don't exist → FAILS
+
+// No error handling
+if (dbError) {
+  console.warn('Error:', dbError) // ❌ Not enough detail
+}
+```
+
+**Correct Code:**
+```typescript
+// Use * to select all existing columns
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('*') // ✅ Automatically selects only existing columns
+  .order('date', { ascending: true })
+
+// Comprehensive error handling
+if (dbError) {
+  console.error('[fetchCalendarEvents] Database query error:', dbError)
+  console.error('[fetchCalendarEvents] Error details:', {
+    message: dbError.message,
+    details: dbError.details,
+    hint: dbError.hint,
+    code: dbError.code
+  })
+  return [] // ✅ Return empty array on error to prevent breaking app
+}
+
+if (!dbEvents) {
+  console.warn('[fetchCalendarEvents] No events returned')
+  return []
+}
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use `.select('*')`** unless you're 100% certain all columns exist
+- ✅ **Check migrations** before explicitly selecting columns
+- ✅ **Add comprehensive error logging** to detect query failures
+- ✅ **Return empty array on error** to prevent breaking the app
+- ✅ **Verify database schema** matches TypeScript types before explicit selection
+- ✅ **Test with actual database** to ensure columns exist
+
+**Rule of Thumb:**
+> When querying Supabase:
+> 1. **Default to `.select('*')`** - it's safer and automatically selects existing columns
+> 2. **Only use explicit column selection** if you've verified all columns exist via migrations
+> 3. **Always check for errors** and log full error details (message, code, hint, details)
+> 4. **Return empty array on error** to prevent breaking the app
+> 5. **TypeScript types may include optional fields that don't exist** - don't assume types match database
+
+**How to Verify Database Schema:**
+1. Check migration files in `ops/migrations/` to see what columns were added
+2. Check base table creation in `scripts/create-*-tables.sql`
+3. Query database directly: `SELECT column_name FROM information_schema.columns WHERE table_name = 'table_name'`
+4. Use Supabase dashboard to inspect table structure
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')`)
+- Any file using explicit column selection in Supabase queries
+- Migration files to verify which columns actually exist
+
+**Related:**
+- Section #18: Event Images Not Showing from Database
+- Section #15: Custom Email Verification System
+
+---
+
+### 25. Direct Supabase Queries Breaking After Refactoring ⭐ REFACTORING BREAKAGE (2025-01-XX)
+
+**What:** After refactoring to use centralized query utility, some files still use direct `supabase.from()` calls, causing RLS errors, inconsistent error handling, and broken functionality.
+
+**Root Cause:**
+1. Migration to centralized query utility (`src/lib/supabaseQuery.ts`) was incomplete
+2. Some files were missed during migration (e.g., `adminService.ts`, `BusinessPage.tsx`)
+3. Direct Supabase queries don't use centralized retry logic, error handling, or RLS policies correctly
+4. When RLS policies change, direct queries break but centralized utility handles them correctly
+5. Forms stop working after refactoring because they still use direct queries
+
+**Example:**
+```typescript
+// ❌ BROKEN: Direct Supabase query (no retry, inconsistent error handling)
+const { data, error } = await supabase
+  .from('business_applications')
+  .select('*')
+  .eq('email', auth.email)
+
+if (error) throw error // ❌ No retry, no error classification
+return data || []
+
+// ✅ CORRECT: Centralized query utility (retry, error handling, RLS compliance)
+const result = await query('business_applications', { logPrefix: '[MyBusiness]' })
+  .select('*')
+  .eq('email', auth.email.trim())
+  .order('created_at', { ascending: false })
+  .execute()
+
+if (result.error) {
+  console.error('[MyBusiness] ❌ Error loading applications:', result.error)
+  return [] // ✅ Graceful error handling
+}
+return result.data || []
+```
+
+**What Happened:**
+1. `useBusinessOperations.ts` was migrated to use centralized `query()` utility ✅
+2. `BusinessPage.tsx` was NOT migrated - still uses direct `supabase.from('business_applications').insert()` ❌
+3. `adminService.ts` was NOT migrated - still uses direct queries for SELECT/UPDATE/DELETE ❌
+4. When RLS policies changed, direct queries started failing with 403 errors
+5. Forms that worked before stopped working after refactoring other parts
+6. User gets "Success!" message but application doesn't appear (query fails silently)
+
+**The Fix:**
+1. **Migrate ALL direct Supabase queries** to use centralized utility:
+   ```typescript
+   // Replace ALL instances of:
+   supabase.from('business_applications').select() // ❌
+   supabase.from('business_applications').insert() // ❌
+   supabase.from('business_applications').update() // ❌
+   supabase.from('business_applications').delete() // ❌
+   
+   // With:
+   query('business_applications').select().execute() // ✅
+   insert('business_applications', [data]) // ✅
+   update('business_applications', data).eq('id', id).execute() // ✅
+   delete('business_applications').eq('id', id).execute() // ✅
+   ```
+
+2. **Add delay after insert** to ensure data is visible before querying:
+   ```typescript
+   await insert('business_applications', [applicationData])
+   await new Promise(resolve => setTimeout(resolve, 500)) // ✅ Wait for DB to process
+   await loadBusinessData() // ✅ Now query will find the new application
+   ```
+
+3. **Use `.trim()` on email** to prevent whitespace mismatches:
+   ```typescript
+   .eq('email', auth.email.trim()) // ✅ Prevents whitespace issues
+   ```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use centralized query utility** for all Supabase queries (no direct `supabase.from()` calls)
+- ✅ **Search for direct Supabase queries** before refactoring: `grep -r "supabase\.from\(" src/`
+- ✅ **Migrate ALL instances** when refactoring (don't leave some behind)
+- ✅ **Add delay after insert** before querying (ensure DB has processed the insert)
+- ✅ **Use `.trim()` on email** to prevent whitespace mismatches
+- ✅ **Test forms end-to-end** after refactoring (submit → verify it appears)
+- ✅ **Check for RLS errors** in console logs after refactoring
+- ✅ **Verify data appears** in UI after submission (not just "Success!" message)
+
+**Rule of Thumb:**
+> When refactoring to use centralized query utility:
+> 1. **Search for ALL direct Supabase queries** first: 
+>    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+>    - Bash: `grep -r "supabase\.from\(" src/`
+> 2. **Migrate ALL instances** in one commit (don't leave some behind)
+> 3. **Test forms end-to-end** after migration (submit → verify it appears)
+> 4. **Add delay after insert** before querying (ensure DB has processed)
+> 5. **Use `.trim()` on email** to prevent whitespace issues
+> 6. **Check console logs** for RLS errors after refactoring
+> 7. **Verify data appears** in UI (not just success message)
+
+**How to Find Direct Supabase Queries:**
+
+**PowerShell (Windows):**
+```powershell
+# Find all direct Supabase queries
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("
+
+# Find all business_applications queries specifically
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "business_applications"
+
+# Find all INSERT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.insert\("
+
+# Find all SELECT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.select\("
+```
+
+**Bash/Linux/Mac:**
+```bash
+# Find all direct Supabase queries
+grep -r "supabase\.from\(" src/
+
+# Find all business_applications queries specifically
+grep -r "business_applications" src/ --include="*.ts" --include="*.tsx"
+
+# Find all INSERT operations
+grep -r "\.insert\(" src/ --include="*.ts" --include="*.tsx"
+
+# Find all SELECT operations
+grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
+```
+
+**Files to Watch:**
+- `src/services/adminService.ts` - Still uses direct queries for business_applications
+- `src/pages/BusinessPage.tsx` - Still uses direct `insert()` for business_applications
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - ✅ Already migrated (use as reference)
+- Any file that was "missed" during migration
+
+**Breaking Changes:**
+- If you refactor one file to use centralized utility but leave others using direct queries → Forms break
+- If you change RLS policies but don't migrate all direct queries → Queries fail with 403 errors
+- If you don't add delay after insert → New data doesn't appear immediately (query runs too fast)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Direct queries cause 403 errors when RLS policies change
+- ✅ Centralized utility handles RLS correctly with retry logic
+- ✅ Adding delay after insert ensures data is visible before querying
+- ✅ Using `.trim()` on email prevents whitespace mismatches
+- ✅ Forms work correctly after migrating to centralized utility
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy changes)
+- Section #26: Missing Admin INSERT Policy for Providers (admin approval flow)
+- `docs/SUPABASE_QUERY_UTILITY.md` - Centralized query utility documentation
+- `docs/SUPABASE_QUERY_MIGRATION_TESTING.md` - Migration testing instructions
+
+---
+
+### 26. Missing Admin INSERT Policy for Providers ⭐ ADMIN APPROVAL FLOW (2025-01-XX) ✅ VERIFIED
+
+**What:** Admin cannot approve business applications because there's no admin INSERT policy for the `providers` table. When admin tries to create a provider on behalf of an applicant, they get "new row violates row-level security policy for table 'providers'".
+
+**Audit Results (2025-01-XX):**
+- ✅ **INSERT policy exists**: `providers_insert_auth` requires `owner_user_id = auth.uid()` (users can only create for themselves)
+- ❌ **Admin INSERT policy MISSING**: No `providers_insert_admin` policy exists
+- ✅ **UPDATE policy allows admin**: `providers_update_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ✅ **DELETE policy allows admin**: `providers_delete_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ⚠️ **Two `is_admin_user()` functions exist**: One checks JWT email directly, one checks `admin_emails` table (may need consolidation)
+
+**Root Cause:**
+1. The `providers` table has INSERT policy `providers_insert_auth` that requires `owner_user_id = auth.uid()` (users can only create providers for themselves)
+2. There's NO admin INSERT policy for providers (unlike UPDATE and DELETE which have admin policies)
+3. When admin approves a business application, they need to create a provider with `owner_user_id` belonging to the applicant (or null if applicant doesn't have an account)
+4. The INSERT policy blocks this because `owner_user_id` doesn't match admin's `auth.uid()`
+
+**What Happened:**
+1. Admin clicks "Approve & Create Provider" on a business application
+2. `approveApplication()` function tries to create a provider using centralized `insert()` utility
+3. Provider payload has `owner_user_id` belonging to the applicant (or null)
+4. RLS policy `providers_insert_auth` evaluates `owner_user_id = auth.uid()` → FALSE (admin's ID doesn't match applicant's ID)
+5. INSERT fails with "new row violates row-level security policy"
+6. Admin cannot approve applications
+
+**The Fix:**
+1. **Add admin INSERT policy** to match admin UPDATE and DELETE policies:
+   ```sql
+   CREATE POLICY "providers_insert_admin" 
+   ON public.providers FOR INSERT
+   WITH CHECK (is_admin_user(auth.uid()));
+   ```
+   
+   **Note:** The UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in the USING clause, but INSERT policies use `WITH CHECK` clause only (no USING clause). So the admin INSERT policy should be:
+   ```sql
+   WITH CHECK (is_admin_user(auth.uid()))
+   ```
+   
+   This allows admins to create providers with ANY `owner_user_id` (including null or applicant's ID).
+
+2. **Update master RLS file** to include admin INSERT policy (already done in fix)
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT policyname, cmd, with_check 
+   FROM pg_policies 
+   WHERE tablename = 'providers' AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ MISSING: No admin INSERT policy
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());  -- ❌ Only allows users to create for themselves
+
+-- Admin UPDATE and DELETE policies exist, but INSERT is missing ❌
+CREATE POLICY "providers_update_admin" ...;  -- ✅ Exists
+CREATE POLICY "providers_delete_admin" ...;  -- ✅ Exists
+-- ❌ providers_insert_admin is MISSING
+```
+
+**Correct Code:**
+```sql
+-- ✅ Users can create providers for themselves
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());
+
+-- ✅ Admins can create providers for anyone (including null owner_user_id)
+CREATE POLICY "providers_insert_admin" 
+ON public.providers FOR INSERT
+WITH CHECK (is_admin_user(auth.uid()));
+
+-- ✅ Admin UPDATE and DELETE policies already exist
+CREATE POLICY "providers_update_admin" ...;
+CREATE POLICY "providers_delete_admin" ...;
+```
+
+**Prevention Checklist:**
+- ✅ **Check for admin policies** when adding RLS policies for any table (INSERT, UPDATE, DELETE, SELECT)
+- ✅ **Admin policies should allow admins to create/update/delete any record** (not just their own)
+- ✅ **Use `is_admin_user(auth.uid())`** helper function for admin checks (consistent across all policies)
+- ✅ **Match pattern from other tables** - if UPDATE/DELETE have admin policies, INSERT should too
+- ✅ **Test admin flows** after adding RLS policies (approve applications, create providers, etc.)
+- ✅ **Verify policies exist** for all CRUD operations admin needs to perform
+
+**Rule of Thumb:**
+> When adding RLS policies for a table that admins need to manage:
+> 1. **Add policies for ALL operations** admins need (INSERT, UPDATE, DELETE, SELECT)
+> 2. **Use consistent naming** (`table_insert_admin`, `table_update_admin`, etc.)
+> 3. **Use `is_admin_user(auth.uid())`** helper function for admin checks
+> 4. **Test admin flows** after adding policies (don't just test user flows)
+> 5. **Check master RLS file** to ensure all admin policies are included
+
+**How to Check for Missing Admin Policies:**
+```sql
+-- Check all policies for providers table
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'providers'
+ORDER BY cmd, policyname;
+
+-- Should see:
+-- INSERT: providers_insert_auth, providers_insert_admin
+-- UPDATE: providers_update_owner, providers_update_admin
+-- DELETE: providers_delete_owner, providers_delete_admin
+-- SELECT: providers_select_all (or similar)
+```
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (must include admin INSERT policy)
+- `ops/rls/fix-providers-admin-insert-rls.sql` - Fix file for missing admin INSERT policy
+- `src/utils/adminBusinessApplicationUtils.ts` - `approveApplication()` function (creates providers)
+- Any file that creates providers on behalf of others (admin approval flows)
+
+**Breaking Changes:**
+- If you remove admin INSERT policy → Admin cannot approve business applications
+- If you change `is_admin_user()` function → Admin policies break
+- If you change admin policy naming → Fix files won't drop old policies correctly
+
+**Audit Verification (2025-01-XX):**
+- ✅ **Current state confirmed**: Only `providers_insert_auth` exists (requires `owner_user_id = auth.uid()`)
+- ❌ **Missing policy confirmed**: No `providers_insert_admin` policy exists
+- ✅ **Fix will work**: Adding `providers_insert_admin` with `WITH CHECK (is_admin_user(auth.uid()))` will allow admins to create providers for anyone
+- ✅ **Pattern matches UPDATE/DELETE**: UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in USING clause, INSERT uses `WITH CHECK` clause
+- ⚠️ **Two `is_admin_user()` functions**: One checks JWT email directly, one checks `admin_emails` table - master RLS uses the one that takes `user_id` parameter
+
+**Testing Verified (2025-01-XX):**
+- ✅ After fix: Admin can approve business applications and create providers
+- ✅ After fix: Admin can create providers with `owner_user_id` belonging to applicants
+- ✅ After fix: Admin can create providers with `null` owner_user_id (for applicants without accounts)
+- ✅ Users can still create providers for themselves (existing `providers_insert_auth` policy still works)
+- ✅ RLS policies correctly enforce ownership for users and admin privileges for admins
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy patterns)
+- Section #25: Direct Supabase Queries Breaking After Refactoring (query utility usage)
+- Section #27: Missing Admin INSERT Policy for Calendar Events (calendar events admin creation)
+- `src/utils/adminBusinessApplicationUtils.ts` - Admin approval flow
+
+---
+
+### 27. Missing Admin INSERT Policy for Calendar Events ⭐ ADMIN SECTION (2025-01-XX) ✅ VERIFIED
+
+---
+
+### 28. MyBusiness Page - Applications Not Showing in Recently Approved/Rejected/Pending Sections ⭐ USER VISIBILITY ISSUE (2025-01-XX) ✅ VERIFIED
+
+**What:** Business owners receive emails about application rejections, but the "Recently Approved", "Recently Rejected", and "Pending Requests" sections on `/my-business` page only show change requests, not applications.
+
+**Root Cause:**
+1. The `HistoricalRequestsTab` component was only filtering and displaying `ProviderChangeRequest[]` items
+2. Business applications (`BusinessApplication[]`) were loaded but never passed to or displayed in these sections
+3. Users expected to see their rejected applications in "Recently Rejected" but only saw change requests
+
+**What Happened:**
+1. User submits business application → stored in `business_applications` table
+2. Admin rejects application → `status` set to `'rejected'`, email sent to user
+3. User visits `/my-business` → applications loaded via `useBusinessOperations.loadBusinessData()`
+4. User clicks "Recently Rejected" tab → `HistoricalRequestsTab` component renders
+5. Component only filters `nonFeaturedChangeRequests` → applications ignored
+6. User sees empty section → confusion and frustration
+
+**Files Changed:**
+
+1. **`src/pages/MyBusiness/components/HistoricalRequestsTab.tsx`**
+   - **Added:** `applications: BusinessApplication[]` prop to interface
+   - **Added:** Filtering logic for applications by status and date (last 30 days)
+   - **Added:** Combined display of both change requests and applications
+   - **Changed:** Component now accepts and displays both types
+   - **Dependencies:**
+     - `BusinessApplication` type from `../types`
+     - `ProviderChangeRequest` type from `../../../lib/supabaseData`
+     - `decided_at` field (optional) - uses `created_at` as fallback if missing
+   - **Breaking Changes:** ⚠️ **REQUIRES `applications` PROP** - All usages must pass this prop
+
+2. **`src/pages/MyBusiness.tsx`**
+   - **Changed:** Both `HistoricalRequestsTab` usages now pass `applications={applications}` prop
+   - **Changed:** "Pending Requests" tab now shows both applications and change requests
+   - **Changed:** Updated descriptions to mention both types
+   - **Dependencies:**
+     - `applications` state from `useBusinessOperations` hook
+     - `nonFeaturedChangeRequests` from `getNonFeaturedChangeRequests()` utility
+   - **Breaking Changes:** None - only additive changes
+
+3. **`src/pages/MyBusiness/types.ts`**
+   - **Added:** `decided_at?: string | null` field to `BusinessApplication` type
+   - **Reason:** Applications may have `decided_at` field in database (optional)
+   - **Breaking Changes:** None - optional field, backward compatible
+
+4. **`src/pages/MyBusiness/hooks/useBusinessOperations.ts`**
+   - **Added:** Enhanced debugging logs for applications and change requests
+   - **Added:** Status breakdown logging (approved/rejected/pending counts)
+   - **Added:** Recent items logging (last 30 days) for both types
+   - **Dependencies:** None - only logging changes
+   - **Breaking Changes:** None - only additive logging
+
+**Dependency Chain:**
+```
+MyBusiness.tsx
+    ↓ (passes applications prop)
+HistoricalRequestsTab.tsx
+    ↓ (filters and displays)
+BusinessApplication type (from types.ts)
+    ↓ (optional decided_at field)
+useBusinessOperations.ts (loads data)
+    ↓ (queries database)
+business_applications table
+```
+
+**What Could Break:**
+
+1. **If `applications` prop is not passed:**
+   - TypeScript error: Missing required prop
+   - Component will fail to compile
+   - **Prevention:** All usages updated in this change
+
+2. **If `decided_at` field doesn't exist in database:**
+   - Runtime error when accessing `app.decided_at`
+   - **Prevention:** All accesses use optional chaining or fallback to `created_at`
+
+3. **If `BusinessApplication` type changes:**
+   - TypeScript errors in `HistoricalRequestsTab`
+   - **Prevention:** Type is centralized in `types.ts`, all imports use same type
+
+4. **If filtering logic changes:**
+   - Applications might not appear in correct sections
+   - **Prevention:** Filtering logic is well-commented and uses same pattern as change requests
+
+**Testing Verified (2025-01-XX):**
+- ✅ Build succeeds with no TypeScript errors
+- ✅ All props properly typed and passed
+- ✅ Optional `decided_at` field handled safely
+- ✅ Fallback to `created_at` works correctly
+- ✅ Both change requests and applications display correctly
+- ✅ Sorting by date works for both types
+- ✅ Empty states show when no items found
+
+**Verification Checklist:**
+- [x] All `HistoricalRequestsTab` usages pass `applications` prop
+- [x] Type definitions include optional `decided_at` field
+- [x] All `decided_at` accesses have fallbacks
+- [x] Build succeeds without errors
+- [x] No linter errors
+- [x] Component properly filters by status and date
+- [x] Both types display correctly in UI
+
+**Related Files:**
+- `src/pages/MyBusiness/components/HistoricalRequestsTab.tsx` - Main component changed
+- `src/pages/MyBusiness.tsx` - Updated usages
+- `src/pages/MyBusiness/types.ts` - Type definition updated
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Enhanced logging
+- `src/lib/supabaseData.ts` - `ProviderChangeRequest` type (unchanged, used for reference)
+- `src/types/index.ts` - Global `BusinessApplication` type (already had `decided_at`)
+
+**Breaking Changes:**
+- ⚠️ **`HistoricalRequestsTab` now requires `applications` prop** - All usages must be updated
+- ✅ **Backward compatible:** Optional `decided_at` field doesn't break existing code
+
+**Prevention Pattern:**
+> When adding new data types to existing components:
+> 1. Check all usages of the component
+> 2. Update all usages to pass new required props
+> 3. Handle optional fields safely with fallbacks
+> 4. Test with both populated and empty data
+> 5. Document all dependencies in component comments
+
+
+### 30. Notifications Reappearing After Viewing (2025-11-09)
+
+**What:** Business owners kept seeing the same "Business Application Pending" toast in the global notification bell even after clicking and reviewing it. The badge would clear briefly, then reappear after Supabase realtime triggered another refresh.
+
+**Root Cause:**
+1. `NotificationBell.tsx` only flipped a local `read` flag when the button was clicked. Pending/pending-change notifications are re-derived from live Supabase queries (`business_applications`, `provider_change_requests`), so a reload reconstructed the array and ignored the previous click.
+2. There was no persisted acknowledgement list. When the realtime subscription re-fetched, the component rebuilt the notifications from scratch and the "read" state vanished.
+3. A recent column evolution on `user_notifications` meant the REST query using an explicit column list (`select('id,title,subject,message,body,type,data,metadata,created_at,is_read,read,read_at,link,link_section')`) started 400'ing because `link`/`link_section` are JSON metadata, not top-level columns. The failure short-circuited acknowledgement logic and forced a retry that rebuilt the array again.
+
+**What Happened:**
+1. Admin approves an application → `adminBusinessApplicationUtils.approveBusinessApplication()` inserts a `user_notifications` row with metadata.
+2. Business owner opens the bell → notification marked `read: true` locally but not persisted anywhere else.
+3. Realtime `postgres_changes` fires → `loadNotifications()` reruns, the same "pending application" object is rebuilt, unread count increments again.
+4. REST query 400 error floods console (`select=...&link=...`) → bell refresh loops, reinforcing the regression.
+
+**The Fix:**
+- Switched the Supabase REST call to `.select('*')` and normalized the result on the client, so schema changes won't 400.
+- Added resilient JSON parsing for `metadata`/`data` because Supabase may return them as plain strings.
+- Introduced `bf_notification_acknowledged_ids` localStorage key. When the dropdown opens, non-admin notifications get added to the acknowledged set and filtered out of future renders.
+- Persist acknowledged IDs across sessions (and tab reloads) via `acknowledgedIdsRef` + `persistAcknowledgedIds()` helper.
+- Auto-acknowledge immediately when the dropdown is opened so users aren't forced to click each row just to clear the badge.
+- Updated approval/rejection flows to write both `subject/body` and `title/message` plus metadata links so future parsing stays consistent.
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only flips local state; no persistence, so realtime rebuilds re-add items.
+const handleNotificationClick = async (notification: Notification) => {
+  setNotifications(prev =>
+    prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+  )
+  // No acknowledgement persistence → notification reappears on next reload.
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Persist acknowledgement ids and auto-ack on dropdown open.
+const ACK_STORAGE_KEY = 'bf_notification_acknowledged_ids'
+const acknowledgedIdsRef = useRef<Set<string>>(new Set())
+
+const persistAcknowledgedIds = (next: Set<string>) => {
+  acknowledgedIdsRef.current = next
+  setAcknowledgedIds(new Set(next))
+  window.localStorage.setItem(ACK_STORAGE_KEY, JSON.stringify(Array.from(next)))
+}
+
+useEffect(() => {
+  if (!isOpen || notifications.length === 0) return
+  const toAcknowledge = notifications.filter(
+    n => !n.isAdminNotification && !acknowledgedIdsRef.current.has(n.id)
+  )
+  if (toAcknowledge.length === 0) return
+  const next = new Set(acknowledgedIdsRef.current)
+  toAcknowledge.forEach(n => next.add(n.id))
+  persistAcknowledgedIds(next)
+}, [isOpen, notifications])
+```
+
+**Prevention Checklist:**
+- ✅ Keep Supabase queries using `.select('*')` unless you control the schema; normalize in code instead.
+- ✅ Persist acknowledgement state (localStorage or database) for any notification that can't be marked read server-side.
+- ✅ Update both the notification writer (`adminBusinessApplicationUtils`) and reader (`NotificationBell`) when metadata shape changes.
+- ✅ Guard JSON parsing on `metadata`/`data` because Supabase may return them as text.
+- ✅ Document new localStorage keys and reason for existence (see dependency tracking entry #15).
+
+**Rule of Thumb:**
+> If a notification is derived data (not a single row you can mark `read` in the database), you MUST persist acknowledgement out-of-band or it will keep coming back on every refresh.
+
+**Files to Watch:**
+- `src/components/NotificationBell.tsx` (acknowledgement + normalization logic)
+- `src/utils/adminBusinessApplicationUtils.ts` (writes notifications + metadata)
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` (entry #15 documents dependencies)
+- Supabase tables: `user_notifications`, `business_applications`, `provider_change_requests`, `dismissed_notifications`
+
+**Breaking Changes:**
+- Renaming/removing `bf_notification_acknowledged_ids` without migration will resurrect old notifications.
+- Reverting to explicit column selection will break as soon as the table schema evolves.
+- Removing the auto-acknowledgement effect will make notifications reappear when realtime fires.
+
+**Testing Verified (2025-11-09):**
+- ✅ Notification bell REST call no longer returns 400.
+- ✅ Opening the dropdown once clears the badge permanently for that notification.
+- ✅ Refreshing the page keeps the notification hidden (localStorage persists).
+- ✅ `user_notifications` rows with either `subject/body` or `title/message` render correctly.
+- ✅ Admin-sent approvals include deep links (`/my-business`) in metadata.
+
+**Related:**
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
+- Section #28: MyBusiness visibility issues (same data sources)
+- Section #24: RLS conflicts (same tables, keep policies consistent)
+
+---
+
+## How to Prevent This (Action Plan)
+
+### Immediate (5 minutes after EVERY change):
+
+1. **Impact Analysis**
+
+   **PowerShell (Windows):**
+   ```powershell
+   # What files import what I changed?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-file"
+   
+   # What depends on this functionality?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-function"
+   ```
+
+   **Bash/Linux/Mac:**
+   ```bash
+   # What files import what I changed?
+   grep -r "changed-file" src/
+   
+   # What depends on this functionality?
+   grep -r "changed-function" src/
+   ```
+
+2. **Smoke Test Checklist**
+   - [ ] Can user sign up? 
+   - [ ] Can admin view profiles?
+   - [ ] Can admin view resident verification?
+   - [ ] Does name display correctly?
+   - [ ] Do other admin sections work?
+   - [ ] **Can admin navigate between pages without getting logged out?** ⭐ NEW
+   - [ ] **Does admin status persist during navigation?** ⭐ NEW
+  - [ ] **Can users log in without immutable field errors?** ⭐ NEW
+  - [ ] **Does user deletion remove ALL related data?** ⭐ NEW
+  - [ ] **Do all React components receive their props correctly?** ⭐ NEW
+  - [ ] **Are function props called with guard checks?** ⭐ NEW
+  - [ ] **Do deleted users stay deleted after page refresh?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete users who only exist in funnels/bookings without profiles?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete both business and customer accounts successfully?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users verify their email via custom verification system?** ⭐ NEW
+  - [ ] **Does email verification status update correctly after verification?** ⭐ NEW
+  - [ ] **Are unverified users blocked from protected features?** ⭐ NEW
+  - [ ] **Can users resend verification emails from account page?** ⭐ NEW
+  - [ ] **Do calendar events with database images show their images (not gradients)?** ⭐ NEW
+  - [ ] **Do calendar events without database images show gradient fallbacks?** ⭐ NEW
+  - [ ] **Can admin choose to delete or keep businesses when deleting user account?** ⭐ NEW ✅ TESTED
+  - [ ] **Does admin deletion prompt show business names when user has businesses?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses hard deleted when admin chooses to delete them?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses soft deleted (unlinked) when admin chooses to keep them?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW ✅ TESTED
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+  - [ ] **Are all Supabase queries using centralized utility (no direct `supabase.from()` calls)?** ⭐ NEW
+  - [ ] **Do forms work end-to-end after refactoring (submit → verify data appears)?** ⭐ NEW
+
+3. **Manual Testing**
+   - Actually USE the app after every change
+   - Click through ALL related pages
+   - Don't just test the one thing you changed
+
+---
+
+### Short-term (1-2 days):
+
+1. **Integration Tests**
+   ```typescript
+   // Test critical flows end-to-end
+   describe('Signup to Admin View Flow', () => {
+     it('should work end-to-end', async () => {
+       // 1. Sign up with name and resident status
+       // 2. Verify name saved
+       // 3. Verify resident data saved
+       // 4. Admin logs in
+       // 5. Admin sees name
+       // 6. Admin sees resident verification data
+     })
+   })
+   ```
+
+2. **Dependency Documentation**
+   ```typescript
+   /**
+    * DEPENDENCIES:
+    * - AuthContext: Provides user session
+    * - admin-list-profiles: Returns profile data
+    * - ProfileRow type: Defines data structure
+    * 
+    * CONSUMERS:
+    * - ResidentVerificationSection: Displays data
+    * - UsersSection: Displays user list
+    * 
+    * IF YOU CHANGE THIS:
+    * - Update ProfileRow type
+    * - Update admin-list-profiles query
+    * - Test all consumers
+    */
+   ```
+
+3. **Change Impact Checklist**
+   - [ ] What files import this?
+   - [ ] What functions depend on this?
+   - [ ] What UI components use this?
+   - [ ] What data flows through this?
+   - [ ] Have I tested ALL of these?
+
+---
+
+### Long-term (1 week):
+
+1. **Architecture Review**
+   - Reduce shared state
+   - Create clear boundaries
+   - Document data flow
+   - Create integration tests for each boundary
+
+2. **Automated Testing**
+   - Unit tests for individual functions
+   - Integration tests for critical flows
+   - E2E tests for user journeys
+   - Run all tests before merging
+
+3. **Code Review Process**
+   - Reviewer checks: "What else might be affected?"
+   - Reviewer tests: "Does everything still work?"
+   - Reviewer verifies: "Are related files updated?"
+
+---
+
+## Checklist for Every Change
+
+Before committing ANY change:
+
+- [ ] **Impact Analysis:** What else might be affected?
+  
+  **PowerShell (Windows):**
+  ```powershell
+  Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-thing"
+  ```
+  
+  **Bash/Linux/Mac:**
+  ```bash
+  grep -r "changed-thing" src/
+  ```
+- [ ] **Smoke Tests:** Does everything still work?
+  - [ ] Signup works - name must appear immediately after signup
+  - [ ] Signin works
+  - [ ] Admin pages load
+  - [ ] All sections display correctly
+  - [ ] Name is stored in database after signup
+  - [ ] Name is read from localStorage before database during signup
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+- [ ] **RLS Policy Checks** (if modifying database policies):
+  - [ ] Checked for duplicate policies before creating new ones
+  - [ ] Dropped ALL existing policies for the operation before creating new ones
+  - [ ] Verified only one policy exists per operation after creation
+  - [ ] Policy names match master RLS file
+  - [ ] Tested that inserts/updates/deletes work correctly
+  - [ ] Verified security (SELECT/DELETE policies still enforce email matching)
+- [ ] **Related Files:** Are they all updated?
+  - [ ] Types updated?
+  - [ ] Functions updated?
+  - [ ] Components updated?
+  - [ ] Tests updated?
+  - [ ] **RLS policies updated?** ⭐ NEW
+- [ ] **All Supabase queries migrated to centralized utility?** ⭐ NEW
+  - [ ] Search for direct queries:
+    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+    - Bash: `grep -r "supabase\.from\(" src/`
+  - [ ] Migrate all instances in one commit
+  - [ ] Test forms end-to-end after migration
+- [ ] **Integration Test:** Does the whole flow work?
+- [ ] **Manual Testing:** Actually USE the app
+
+---
+
+## Most Important Rule
+
+**Before making ANY change, ask yourself:**
+
+1. "What ELSE might be affected?"
+2. "Have I tested ALL related functionality?"
+3. "Does the WHOLE system still work?"
+
+**If you can't answer these, DON'T commit the change yet.**
+
+---
+
+## Summary
+
+**Root Cause:** 
+Fixing one thing without checking what ELSE depends on it.
+
+**Quick Fix (5 min):**
+- Run impact analysis (grep)
+- Run smoke tests manually
+- Don't commit until everything works
+
+**Long-term Fix:**
+- Integration tests
+- Dependency documentation
+- Architecture improvements
+- Automated testing
+
+**The Pattern:**
+```
+Fix X
+  → Break Y (hidden dependency)
+    → Fix Y
+      → Break Z (another hidden dependency)
+        → Fix Z
+          → Break X again (circular dependency)
+            → 🔥 BURN IT ALL DOWN
+```
+
+**The Solution:**
+```
+Fix X
+  → Check what depends on X
+  → Fix ALL related things
+  → Test EVERYTHING
+  → Then commit
+```
+
+---
+
+## Appendix A – Archived Incident Library
+
+*Resolved incidents retained for historical reference. See the main sections above for active patterns and prevention playbooks.*
+
+### 20. Admin Business Deletion Choice (2025-01-XX)
+
+_Archived:_ See Appendix entry 20 in [Appendix A – Archived Incident Library](#appendix-a--archived-incident-library) for summary and related links.
+
+---
+
+### 22. Event Images Stored in Supabase Storage (2025-01-XX)
+
+_Archived:_ See Appendix entry 22 for the storage workflow summary.
+
+---
+
+### 23. Gradient Strings Saved to Database (2025-11-05)
+
+**What:** Populate scripts were saving CSS gradient strings (like `"linear-gradient(135deg, #667eea 0%, #764ba2 100%)"`) directly to the `image_url` column in the database when images couldn't be fetched. Gradient strings should NEVER be stored in the database - they should be computed dynamically on the frontend when `image_url` is `null`.
+
+**Root Cause:**
+1. `populate-event-images.ts` (both Netlify function and local script) were saving gradient strings to `image_url` when Unsplash API failed or when storage failed
+2. The code treated gradients as a "fallback value" that should be saved to the database
+3. This caused events to have gradient strings in `image_url` instead of actual image URLs or `null`
+4. Frontend code already handles `null` image_url by computing gradients dynamically - saving gradients to DB was redundant and wrong
+
+**What Happened:**
+1. Events from iCalendar feeds were inserted without `image_url` (correctly set to `null`)
+2. Populate script ran to fetch images for events without images
+3. When Unsplash API failed or Supabase Storage failed, script saved gradient strings to `image_url`
+4. Database now had gradient strings in `image_url` column
+5. Frontend code detects gradient strings and ignores them (correctly), but this defeats the purpose of having images in the database
+
+**The Fix:**
+- **Never save gradient strings**: Updated all populate scripts to set `image_url: null` instead of saving gradient strings when images can't be fetched
+- **Frontend computes gradients**: The frontend already has logic to compute gradients when `image_url` is `null` - no need to save gradients to database
+- **Preserve existing images**: All external feed processors (iCalendar, RSS, KPBS, VoSD) preserve existing `image_url` and `image_type` when re-fetching events
+- **Only populate missing images**: Populate scripts only process events with `null` image_url (not events that already have images)
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Saves gradient strings to database
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl) {
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - save gradient string to database ❌ WRONG
+      imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+      imageType = 'gradient'
+    }
+  } else {
+    // Unsplash failed - save gradient string to database ❌ WRONG
+    imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+    imageType = 'gradient'
+  }
+} else {
+  // No API key - save gradient string to database ❌ WRONG
+  imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+  imageType = 'gradient'
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ❌ Saves gradient string!
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Never saves gradient strings, sets to null instead
+let imageUrl: string | null = null
+let imageType: 'image' | null = null
+
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl && storageUrl.includes('supabase.co/storage')) {
+      // Successfully stored in Supabase Storage
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - set to null (frontend will compute gradient)
+      imageUrl = null
+      imageType = null
+    }
+  } else {
+    // Unsplash failed - set to null (frontend will compute gradient)
+    imageUrl = null
+    imageType = null
+  }
+} else {
+  // No API key - set to null (frontend will compute gradient)
+  imageUrl = null
+  imageType = null
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ✅ null if no image
+```
+
+**Prevention Checklist:**
+- ✅ NEVER save gradient strings to `image_url` column - always use `null` when images can't be fetched
+- ✅ Frontend computes gradients dynamically when `image_url` is `null` - no need to save gradients to database
+- ✅ Populate scripts only process events with `null` image_url (skip events that already have images)
+- ✅ External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ If storage fails, set `image_url` to `null` (don't fall back to saving gradient strings)
+- ✅ All functions that modify events preserve existing images (don't overwrite them)
+
+**Rule of Thumb:**
+> When handling image fallbacks:
+> 1. **NEVER** save gradient strings to `image_url` column - always use `null`
+> 2. Frontend computes gradients when `image_url` is `null` - no need to save gradients to database
+> 3. Populate scripts only process events with `null` image_url (skip events that already have images)
+> 4. External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+> 5. If image storage fails, set `image_url` to `null` (don't save gradient strings as fallback)
+
+**Files to Watch:**
+- `netlify/functions/populate-event-images.ts` - Fixed to never save gradient strings
+- `scripts/populate-event-images.ts` - Fixed to never save gradient strings
+- `netlify/functions/manual-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/scheduled-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-kpbs-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-vosd-events.ts` - Preserves existing images when re-fetching
+- `src/utils/eventImageUtils.ts` - `getEventHeaderImageFromDb()` ignores gradient strings in database
+
+**Breaking Changes:**
+- If you restore code that saves gradient strings to `image_url` → Frontend will ignore them (wastes database space)
+- If you remove null-check logic in populate scripts → Scripts might try to re-populate events that already have images
+- If you remove image preservation logic in feed processors → Events will lose their images when re-fetched
+
+**Image Preservation Guarantees:**
+- ✅ **External feed processors preserve images**: All iCalendar/RSS/KPBS/VoSD sync functions preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ **Populate scripts only process missing images**: Scripts only populate events with `null` image_url (skip events that already have images)
+- ✅ **No automatic overwrites**: No automated process will overwrite existing images - they are preserved during re-fetches
+- ✅ **One-time population**: After images are populated, they will NOT be overwritten by automated processes
+
+**Testing Verified (2025-11-05):**
+- ✅ Populate scripts set `image_url` to `null` when images can't be fetched (not gradient strings)
+- ✅ Frontend computes gradients when `image_url` is `null` (works correctly)
+- ✅ External feed processors preserve existing images when re-fetching events
+- ✅ Populate scripts skip events that already have images (only process `null` image_url)
+- ✅ Cleanup script removes existing gradient strings from database
+- ✅ All 33 events successfully populated with Supabase Storage URLs (not gradient strings)
+
+**Related:**
+- Section #22: Event Images Stored in Supabase Storage (image storage pattern)
+- Section #21: Event Images Not Showing Due to Null image_type (display logic)
+- Section #18: Event Images Not Showing from Database (original fix)
+
+---
+
+### 24. RLS Policy Conflicts and Duplicate Policies ⭐ DATABASE SECURITY ISSUE (2025-01-XX)
+
+**What:** Row Level Security (RLS) policies can conflict or duplicate, causing inserts/updates/deletes to fail silently or with confusing errors.
+
+**Root Cause:**
+- Multiple RLS policy files can create duplicate policies with different names
+- Conflicting policies (e.g., restrictive vs. public) can cause evaluation failures
+- `auth.jwt() ->> 'email'` may not be available or match exactly, causing restrictive policies to fail
+- Policies from different migration files can conflict with master policies
+
+**Example:**
+```sql
+-- ❌ PROBLEM: Two INSERT policies with different names
+-- From migration file:
+CREATE POLICY "applications_insert_all" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- From master RLS file:
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ❌ PROBLEM: Restrictive policy that fails
+-- From fix file:
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ auth.jwt() ->> 'email' may not be available
+```
+
+**Symptoms:**
+- Users get "new row violates row-level security policy" errors
+- Inserts fail even when they should work
+- Multiple policies with similar names exist
+- Policies from different files conflict
+
+**Fix:**
+1. **Drop ALL existing policies** before creating new ones:
+   ```sql
+   -- Drop ALL existing INSERT policies
+   DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+   DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+   DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+   -- ... drop all variations
+   ```
+
+2. **Create single consistent policy** matching master RLS file:
+   ```sql
+   -- Create single public INSERT policy
+   CREATE POLICY "applications_insert_public" 
+   ON public.business_applications FOR INSERT
+   WITH CHECK (true);
+   ```
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT 
+     schemaname, 
+     tablename, 
+     policyname, 
+     cmd,
+     qual,
+     with_check
+   FROM pg_policies 
+   WHERE tablename = 'business_applications'
+     AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Creating policy without dropping existing ones
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ May fail if JWT email not available
+
+-- ❌ Multiple policies with different names
+CREATE POLICY "applications_insert_all" ...;  -- From migration
+CREATE POLICY "applications_insert_public" ...;  -- From master
+-- ❌ Both exist, but one might be restrictive and block inserts
+```
+
+**Correct Code:**
+```sql
+-- ✅ Drop ALL existing policies first
+DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications (auth)" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_anon_insert" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_auth_insert" ON public.business_applications;
+
+-- ✅ Create single consistent policy
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ✅ Verify only one policy exists
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' AND cmd = 'INSERT';
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS drop existing policies** before creating new ones
+- ✅ **Check for duplicate policies** before creating new ones
+- ✅ **Use consistent policy names** matching master RLS file
+- ✅ **Avoid restrictive policies** that depend on `auth.jwt() ->> 'email'` (may not be available)
+- ✅ **Use public INSERT policies** for public forms (similar to `contact_leads`)
+- ✅ **Rely on SELECT/DELETE policies** for security (email matching, admin checks)
+- ✅ **Verify policies after creation** to ensure only one exists per operation
+- ✅ **Document policy rationale** in SQL comments
+
+**Rule of Thumb:**
+> When fixing RLS policies:
+> 1. **Drop ALL existing policies** for the operation (INSERT/UPDATE/DELETE/SELECT)
+> 2. **Create single consistent policy** matching master RLS file
+> 3. **Use public INSERT policies** for public forms (security enforced by SELECT/DELETE)
+> 4. **Avoid `auth.jwt() ->> 'email'`** - use `auth.uid()` or `auth.users` table instead
+> 5. **Verify policies after creation** to ensure clean state
+> 6. **Check for duplicate policies** from different migration files
+
+**How to Check for Duplicate Policies:**
+```sql
+-- Check all INSERT policies
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' 
+  AND cmd = 'INSERT'
+ORDER BY policyname;
+
+-- Check all policies for a table
+SELECT policyname, cmd, qual, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications'
+ORDER BY cmd, policyname;
+```
+
+**Security Note:**
+- Public INSERT policies don't compromise security if SELECT/DELETE policies enforce email matching
+- Users can submit applications, but can only VIEW/DELETE their own (by email)
+- Admins can VIEW/UPDATE/DELETE all applications
+- Email matching is enforced by SELECT/DELETE policies, not INSERT
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (source of truth)
+- `ops/rls/fix-*.sql` - Individual fix files (should match master)
+- `ops/migrations/*.sql` - Migration files (may create duplicate policies)
+- Any file that modifies RLS policies
+
+**Related:**
+- Section #9: Incomplete Deletion Logic (user deletion patterns)
+- Section #17: Business Ownership on Self-Deletion (business deletion patterns)
+- Section #29: Admin RLS Policy Blocking Queries (admin access issue)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 29. Admin RLS Policy Blocking Queries ⭐ CRITICAL ADMIN ACCESS ISSUE (2025-01-XX)
+
+**What:** Admin queries to `business_applications` table return 403 Forbidden errors, preventing admins from viewing pending applications.
+
+**Root Cause:**
+- Admin query in `useAdminDataLoader.ts` requests ALL pending applications without email filter
+- `applications_select_admin` policy uses `is_admin_user(auth.uid())` function
+- `is_admin_user()` function uses `(SELECT email FROM auth.users WHERE id = user_id)` subquery
+- This subquery may fail or return NULL, causing admin policy to fail
+- PostgreSQL evaluates ALL SELECT policies with OR logic - if ALL policies fail, query fails with 403
+
+**Example:**
+```typescript
+// ❌ PROBLEM: Admin query without email filter
+// File: src/hooks/useAdminDataLoader.ts (Line 258-262)
+const bizQuery = query('business_applications', { logPrefix: '[Admin]' })
+  .select('*')
+  .or('status.eq.pending,status.is.null')  // Query ALL pending apps
+  .order('created_at', { ascending: false })
+  .execute()
+// ❌ Result: 403 Forbidden - RLS policy blocks query
+```
+
+```sql
+-- ❌ PROBLEM: Admin policy uses function that may fail
+-- File: ops/rls/02-MASTER-RLS-POLICIES.sql (Line 244-246)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may fail if auth.users subquery fails
+
+-- ❌ PROBLEM: is_admin_user() function uses auth.users subquery
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail or return NULL
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+```
+
+**Symptoms:**
+- Admin queries return 403 Forbidden errors
+- Console shows: `GET .../business_applications?... 403 (Forbidden)`
+- Admin cannot view pending applications in admin panel
+- Regular users can see their own applications (owner policy works)
+- Admin policy fails silently (no error message, just 403)
+
+**Fix:**
+1. **Update `is_admin_user()` function** to use JWT email (more reliable):
+   ```sql
+   -- ✅ FIX: Use JWT email with fallback to auth.users
+   CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+   RETURNS boolean AS $$
+     SELECT EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)
+     );
+   $$ LANGUAGE sql SECURITY DEFINER;
+   ```
+
+2. **Update admin policy** to check JWT email directly (more reliable):
+   ```sql
+   -- ✅ FIX: Check JWT email directly in policy
+   DROP POLICY IF EXISTS "applications_select_admin" ON public.business_applications;
+   
+   CREATE POLICY "applications_select_admin" 
+   ON public.business_applications FOR SELECT
+   USING (
+     EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+     )
+   );
+   ```
+
+3. **Ensure `admin_emails` table exists** and has admin emails:
+   ```sql
+   CREATE TABLE IF NOT EXISTS public.admin_emails (
+     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     email text UNIQUE NOT NULL,
+     created_at timestamptz DEFAULT now()
+   );
+   
+   INSERT INTO public.admin_emails (email)
+   VALUES ('justexisted@gmail.com')
+   ON CONFLICT (email) DO NOTHING;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Using auth.users subquery that may fail
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ❌ Admin policy depends on function that may fail
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may return FALSE if subquery fails
+```
+
+**Correct Code:**
+```sql
+-- ✅ Use JWT email with fallback
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))  -- ✅ JWT email (reliable)
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)  -- ✅ Fallback
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ✅ Admin policy checks JWT email directly (more reliable)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  )
+);
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use JWT email** for admin checks (more reliable than auth.users subquery)
+- ✅ **Include fallback** to auth.users subquery for compatibility
+- ✅ **Use case-insensitive matching** with LOWER(TRIM()) to handle email variations
+- ✅ **Test admin queries** after updating RLS policies
+- ✅ **Verify admin_emails table** exists and has correct emails
+- ✅ **Check ALL admin policies** when updating is_admin_user() function (affects all tables)
+- ✅ **Document dependencies** in SQL file comments (version, dependencies, breaking changes)
+
+**Dependency Chain:**
+```
+useAdminDataLoader.ts (admin query)
+    ↓
+business_applications table (RLS enabled)
+    ↓
+applications_select_admin policy (checks is_admin_user())
+    ↓
+is_admin_user() function (checks admin_emails table)
+    ↓
+auth.users subquery (may fail) ❌
+```
+
+**What Could Break:**
+- ⚠️ **ALL admin policies** depend on `is_admin_user()` function
+- ⚠️ **Updating function** affects ALL tables with admin policies (providers, bookings, etc.)
+- ⚠️ **Admin queries** on other tables may also fail if function is broken
+- ⚠️ **admin_emails table** must exist and have correct emails
+
+**Testing Verification:**
+- ✅ Admin can query ALL pending applications (no 403 errors)
+- ✅ Admin can view applications in admin panel
+- ✅ Regular users can still see their own applications (owner policy works)
+- ✅ `is_admin_user()` function returns TRUE for admin users
+- ✅ `is_admin_user()` function returns FALSE for non-admin users
+
+**Files Changed:**
+- `ops/rls/fix-business-applications-admin-rls.sql` (v1.0) - Admin RLS fix
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (needs update)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (no changes needed, just needs RLS fix)
+
+**SQL File Versioning:**
+- `ops/rls/fix-business-applications-select-rls.sql` - v1.0 (owner policy fix)
+- `ops/rls/fix-business-applications-admin-rls.sql` - v1.0 (admin policy fix)
+- `ops/rls/DIAGNOSE-BUSINESS-APPLICATIONS-RLS.sql` - v1.0 (diagnostic queries)
+
+**Rule of Thumb:**
+> When fixing admin RLS policies:
+> 1. **ALWAYS use JWT email** for admin checks (more reliable)
+> 2. **Include fallback** to auth.users subquery for compatibility
+> 3. **Update is_admin_user() function** if it uses auth.users subquery
+> 4. **Check ALL admin policies** when updating function (affects all tables)
+> 5. **Verify admin_emails table** exists and has correct emails
+> 6. **Test admin queries** after updating policies
+> 7. **Version SQL files** with version number, dependencies, and breaking changes
+
+**How to Check Admin Access:**
+```sql
+-- Test admin check function
+SELECT 
+  auth.uid() as user_id,
+  auth.jwt() ->> 'email' as jwt_email,
+  is_admin_user(auth.uid()) as is_admin,
+  (SELECT email FROM auth.users WHERE id = auth.uid()) as auth_users_email;
+
+-- Test admin policy directly
+SELECT * FROM business_applications 
+WHERE status = 'pending' OR status IS NULL
+ORDER BY created_at DESC
+LIMIT 10;
+-- Should return results if you're admin, 403 if not
+```
+
+**Security Note:**
+- Admin policies allow admins to see ALL rows (no email filter)
+- Owner policies restrict users to their own rows (email match required)
+- Both policies use OR logic - if EITHER passes, query succeeds
+- Admin check must be reliable (use JWT email, not auth.users subquery)
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (must update is_admin_user() function)
+- `ops/rls/fix-business-applications-admin-rls.sql` - Admin RLS fix (v1.0)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (depends on RLS policy)
+- `ops/rls/fix-*-admin-rls.sql` - Other admin RLS fixes (may need updates)
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (general RLS issues)
+- Section #28: Applications Not Showing in Sections (owner policy fix)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 18. Event Images Not Showing from Database (2025-11-03)
+
+**What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.
+
+**Root Cause:**
+1. Query using `.select('*')` might not include `image_url` if RLS filters columns (though policy allows reading all fields)
+2. External events (iCalendar) were merged with database events without deduplication
+3. If external events had same IDs as database events, they could override database events (losing `image_url`)
+
+**Fix:**
+- **Explicit field selection**: Changed from `.select('*')` to explicitly selecting all fields including `image_url` and `image_type`
+- **Deduplication logic**: Created a Map of database events by ID, then filter out external events that match database event IDs (database events have priority)
+- **Preserve database images**: Database events are placed first in the merged array, external events are filtered to remove duplicates
+
+**Wrong Code:**
+```typescript
+// Query might not include image_url if RLS filters
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('*') // ❌ Might not include image_url
+
+// Merge without deduplication - external events can override database events
+const allEvents = [
+  ...(dbEvents || []),
+  ...rssEvents, // ❌ No image_url
+  ...calendarEvents // ❌ No image_url, might override database events
+]
+```
+
+**Correct Code:**
+```typescript
+// Explicitly select image_url and image_type to ensure they're included
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('id, title, description, date, time, location, address, category, source, upvotes, downvotes, created_at, updated_at, user_id, provider_id, created_by_user_id, is_flagged, flag_count, url, image_url, image_type') // ✅ Explicit
+
+// Create map of database events to preserve image data
+const dbEventsMap = new Map<string, CalendarEvent>()
+dbEvents?.forEach(event => {
+  dbEventsMap.set(event.id, event)
+})
+
+// Filter external events to remove duplicates (database has priority)
+const uniqueExternalEvents = externalEvents.filter(externalEvent => {
+  return !dbEventsMap.has(externalEvent.id) // ✅ Skip if database event exists
+})
+
+// Combine: Database first (has images), then unique external events
+const allEvents = [
+  ...(dbEvents || []), // ✅ Database events with images first
+  ...uniqueExternalEvents // ✅ Only unique external events
+]
+```
+
+**Prevention Checklist:**
+- ✅ Explicitly select `image_url` and `image_type` in queries (don't rely on `*`)
+- ✅ Deduplicate external events to prevent overriding database events
+- ✅ Database events have priority over external events (preserve images)
+- ✅ Add logging to verify `image_url` is present in final merged events
+- ✅ Test with events that have database images to verify they show images
+
+**Rule of Thumb:**
+> When merging database events with external events:
+> 1. Explicitly select all fields including `image_url` and `image_type` (don't use `*`)
+> 2. Create a Map of database events by ID to preserve image data
+> 3. Filter external events to remove duplicates (database events have priority)
+> 4. Database events should be first in the merged array
+> 5. Add diagnostic logging to verify `image_url` is present in final events
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')` and deduplication)
+- `src/components/CalendarSection.tsx` (uses `fetchCalendarEvents()` - automatically benefits)
+- `src/components/EventCard.tsx` (checks `event.image_url` and `event.image_type`)
+
+**Related:**
+- Section #14: Async Operation Order in SIGNED_IN Handler
+- Section #15: Custom Email Verification System
+- Section #19: Explicit Column Selection Breaks When Columns Don't Exist (⚠️ **This fix caused Section #19** - explicit column selection broke the query)
+
+---
+
+### 19. Explicit Column Selection Breaks When Columns Don't Exist (2025-11-03)
+
+**What:** When explicitly selecting columns in Supabase queries, if any column doesn't exist in the database, the query fails and returns no data (or empty results).
+
+**Root Cause:**
+- Explicit column selection (e.g., `.select('id, title, image_url')`) requires ALL listed columns to exist
+- If you select columns that were never added via migrations, Supabase returns an error or empty results
+- TypeScript types may include optional fields that don't exist in the actual database schema
+- Using `.select('*')` is safer because it only selects columns that actually exist
+
+**Example:**
+```typescript
+// ❌ BROKEN: Tries to select columns that might not exist
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // If ANY of these columns don't exist → query fails → returns empty/no data
+
+// ✅ CORRECT: Selects all existing columns automatically
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('*')
+  // Only selects columns that actually exist in the database
+```
+
+**Fix:**
+- Use `.select('*')` instead of explicit column lists
+- If you need specific columns, verify they exist in the database first (check migrations)
+- Add error handling to detect query failures
+- Log query errors with full details (message, code, hint, details)
+
+**Wrong Code:**
+```typescript
+// Selecting columns that might not exist
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // ❌ If user_id, provider_id, is_flagged, flag_count, or url don't exist → FAILS
+
+// No error handling
+if (dbError) {
+  console.warn('Error:', dbError) // ❌ Not enough detail
+}
+```
+
+**Correct Code:**
+```typescript
+// Use * to select all existing columns
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('*') // ✅ Automatically selects only existing columns
+  .order('date', { ascending: true })
+
+// Comprehensive error handling
+if (dbError) {
+  console.error('[fetchCalendarEvents] Database query error:', dbError)
+  console.error('[fetchCalendarEvents] Error details:', {
+    message: dbError.message,
+    details: dbError.details,
+    hint: dbError.hint,
+    code: dbError.code
+  })
+  return [] // ✅ Return empty array on error to prevent breaking app
+}
+
+if (!dbEvents) {
+  console.warn('[fetchCalendarEvents] No events returned')
+  return []
+}
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use `.select('*')`** unless you're 100% certain all columns exist
+- ✅ **Check migrations** before explicitly selecting columns
+- ✅ **Add comprehensive error logging** to detect query failures
+- ✅ **Return empty array on error** to prevent breaking the app
+- ✅ **Verify database schema** matches TypeScript types before explicit selection
+- ✅ **Test with actual database** to ensure columns exist
+
+**Rule of Thumb:**
+> When querying Supabase:
+> 1. **Default to `.select('*')`** - it's safer and automatically selects existing columns
+> 2. **Only use explicit column selection** if you've verified all columns exist via migrations
+> 3. **Always check for errors** and log full error details (message, code, hint, details)
+> 4. **Return empty array on error** to prevent breaking the app
+> 5. **TypeScript types may include optional fields that don't exist** - don't assume types match database
+
+**How to Verify Database Schema:**
+1. Check migration files in `ops/migrations/` to see what columns were added
+2. Check base table creation in `scripts/create-*-tables.sql`
+3. Query database directly: `SELECT column_name FROM information_schema.columns WHERE table_name = 'table_name'`
+4. Use Supabase dashboard to inspect table structure
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')`)
+- Any file using explicit column selection in Supabase queries
+- Migration files to verify which columns actually exist
+
+**Related:**
+- Section #18: Event Images Not Showing from Database
+- Section #15: Custom Email Verification System
+
+---
+
+### 25. Direct Supabase Queries Breaking After Refactoring ⭐ REFACTORING BREAKAGE (2025-01-XX)
+
+**What:** After refactoring to use centralized query utility, some files still use direct `supabase.from()` calls, causing RLS errors, inconsistent error handling, and broken functionality.
+
+**Root Cause:**
+1. Migration to centralized query utility (`src/lib/supabaseQuery.ts`) was incomplete
+2. Some files were missed during migration (e.g., `adminService.ts`, `BusinessPage.tsx`)
+3. Direct Supabase queries don't use centralized retry logic, error handling, or RLS policies correctly
+4. When RLS policies change, direct queries break but centralized utility handles them correctly
+5. Forms stop working after refactoring because they still use direct queries
+
+**Example:**
+```typescript
+// ❌ BROKEN: Direct Supabase query (no retry, inconsistent error handling)
+const { data, error } = await supabase
+  .from('business_applications')
+  .select('*')
+  .eq('email', auth.email)
+
+if (error) throw error // ❌ No retry, no error classification
+return data || []
+
+// ✅ CORRECT: Centralized query utility (retry, error handling, RLS compliance)
+const result = await query('business_applications', { logPrefix: '[MyBusiness]' })
+  .select('*')
+  .eq('email', auth.email.trim())
+  .order('created_at', { ascending: false })
+  .execute()
+
+if (result.error) {
+  console.error('[MyBusiness] ❌ Error loading applications:', result.error)
+  return [] // ✅ Graceful error handling
+}
+return result.data || []
+```
+
+**What Happened:**
+1. `useBusinessOperations.ts` was migrated to use centralized `query()` utility ✅
+2. `BusinessPage.tsx` was NOT migrated - still uses direct `supabase.from('business_applications').insert()` ❌
+3. `adminService.ts` was NOT migrated - still uses direct queries for SELECT/UPDATE/DELETE ❌
+4. When RLS policies changed, direct queries started failing with 403 errors
+5. Forms that worked before stopped working after refactoring other parts
+6. User gets "Success!" message but application doesn't appear (query fails silently)
+
+**The Fix:**
+1. **Migrate ALL direct Supabase queries** to use centralized utility:
+   ```typescript
+   // Replace ALL instances of:
+   supabase.from('business_applications').select() // ❌
+   supabase.from('business_applications').insert() // ❌
+   supabase.from('business_applications').update() // ❌
+   supabase.from('business_applications').delete() // ❌
+   
+   // With:
+   query('business_applications').select().execute() // ✅
+   insert('business_applications', [data]) // ✅
+   update('business_applications', data).eq('id', id).execute() // ✅
+   delete('business_applications').eq('id', id).execute() // ✅
+   ```
+
+2. **Add delay after insert** to ensure data is visible before querying:
+   ```typescript
+   await insert('business_applications', [applicationData])
+   await new Promise(resolve => setTimeout(resolve, 500)) // ✅ Wait for DB to process
+   await loadBusinessData() // ✅ Now query will find the new application
+   ```
+
+3. **Use `.trim()` on email** to prevent whitespace mismatches:
+   ```typescript
+   .eq('email', auth.email.trim()) // ✅ Prevents whitespace issues
+   ```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use centralized query utility** for all Supabase queries (no direct `supabase.from()` calls)
+- ✅ **Search for direct Supabase queries** before refactoring: `grep -r "supabase\.from\(" src/`
+- ✅ **Migrate ALL instances** when refactoring (don't leave some behind)
+- ✅ **Add delay after insert** before querying (ensure DB has processed the insert)
+- ✅ **Use `.trim()` on email** to prevent whitespace mismatches
+- ✅ **Test forms end-to-end** after refactoring (submit → verify it appears)
+- ✅ **Check for RLS errors** in console logs after refactoring
+- ✅ **Verify data appears** in UI after submission (not just "Success!" message)
+
+**Rule of Thumb:**
+> When refactoring to use centralized query utility:
+> 1. **Search for ALL direct Supabase queries** first: 
+>    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+>    - Bash: `grep -r "supabase\.from\(" src/`
+> 2. **Migrate ALL instances** in one commit (don't leave some behind)
+> 3. **Test forms end-to-end** after migration (submit → verify it appears)
+> 4. **Add delay after insert** before querying (ensure DB has processed)
+> 5. **Use `.trim()` on email** to prevent whitespace issues
+> 6. **Check console logs** for RLS errors after refactoring
+> 7. **Verify data appears** in UI (not just success message)
+
+**How to Find Direct Supabase Queries:**
+
+**PowerShell (Windows):**
+```powershell
+# Find all direct Supabase queries
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("
+
+# Find all business_applications queries specifically
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "business_applications"
+
+# Find all INSERT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.insert\("
+
+# Find all SELECT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.select\("
+```
+
+**Bash/Linux/Mac:**
+```bash
+# Find all direct Supabase queries
+grep -r "supabase\.from\(" src/
+
+# Find all business_applications queries specifically
+grep -r "business_applications" src/ --include="*.ts" --include="*.tsx"
+
+# Find all INSERT operations
+grep -r "\.insert\(" src/ --include="*.ts" --include="*.tsx"
+
+# Find all SELECT operations
+grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
+```
+
+**Files to Watch:**
+- `src/services/adminService.ts` - Still uses direct queries for business_applications
+- `src/pages/BusinessPage.tsx` - Still uses direct `insert()` for business_applications
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - ✅ Already migrated (use as reference)
+- Any file that was "missed" during migration
+
+**Breaking Changes:**
+- If you refactor one file to use centralized utility but leave others using direct queries → Forms break
+- If you change RLS policies but don't migrate all direct queries → Queries fail with 403 errors
+- If you don't add delay after insert → New data doesn't appear immediately (query runs too fast)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Direct queries cause 403 errors when RLS policies change
+- ✅ Centralized utility handles RLS correctly with retry logic
+- ✅ Adding delay after insert ensures data is visible before querying
+- ✅ Using `.trim()` on email prevents whitespace mismatches
+- ✅ Forms work correctly after migrating to centralized utility
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy changes)
+- Section #26: Missing Admin INSERT Policy for Providers (admin approval flow)
+- `docs/SUPABASE_QUERY_UTILITY.md` - Centralized query utility documentation
+- `docs/SUPABASE_QUERY_MIGRATION_TESTING.md` - Migration testing instructions
+
+---
+
+### 26. Missing Admin INSERT Policy for Providers ⭐ ADMIN APPROVAL FLOW (2025-01-XX) ✅ VERIFIED
+
+**What:** Admin cannot approve business applications because there's no admin INSERT policy for the `providers` table. When admin tries to create a provider on behalf of an applicant, they get "new row violates row-level security policy for table 'providers'".
+
+**Audit Results (2025-01-XX):**
+- ✅ **INSERT policy exists**: `providers_insert_auth` requires `owner_user_id = auth.uid()` (users can only create for themselves)
+- ❌ **Admin INSERT policy MISSING**: No `providers_insert_admin` policy exists
+- ✅ **UPDATE policy allows admin**: `providers_update_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ✅ **DELETE policy allows admin**: `providers_delete_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ⚠️ **Two `is_admin_user()` functions exist**: One checks JWT email directly, one checks `admin_emails` table (may need consolidation)
+
+**Root Cause:**
+1. The `providers` table has INSERT policy `providers_insert_auth` that requires `owner_user_id = auth.uid()` (users can only create providers for themselves)
+2. There's NO admin INSERT policy for providers (unlike UPDATE and DELETE which have admin policies)
+3. When admin approves a business application, they need to create a provider with `owner_user_id` belonging to the applicant (or null if applicant doesn't have an account)
+4. The INSERT policy blocks this because `owner_user_id` doesn't match admin's `auth.uid()`
+
+**What Happened:**
+1. Admin clicks "Approve & Create Provider" on a business application
+2. `approveApplication()` function tries to create a provider using centralized `insert()` utility
+3. Provider payload has `owner_user_id` belonging to the applicant (or null)
+4. RLS policy `providers_insert_auth` evaluates `owner_user_id = auth.uid()` → FALSE (admin's ID doesn't match applicant's ID)
+5. INSERT fails with "new row violates row-level security policy"
+6. Admin cannot approve applications
+
+**The Fix:**
+1. **Add admin INSERT policy** to match admin UPDATE and DELETE policies:
+   ```sql
+   CREATE POLICY "providers_insert_admin" 
+   ON public.providers FOR INSERT
+   WITH CHECK (is_admin_user(auth.uid()));
+   ```
+   
+   **Note:** The UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in the USING clause, but INSERT policies use `WITH CHECK` clause only (no USING clause). So the admin INSERT policy should be:
+   ```sql
+   WITH CHECK (is_admin_user(auth.uid()))
+   ```
+   
+   This allows admins to create providers with ANY `owner_user_id` (including null or applicant's ID).
+
+2. **Update master RLS file** to include admin INSERT policy (already done in fix)
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT policyname, cmd, with_check 
+   FROM pg_policies 
+   WHERE tablename = 'providers' AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ MISSING: No admin INSERT policy
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());  -- ❌ Only allows users to create for themselves
+
+-- Admin UPDATE and DELETE policies exist, but INSERT is missing ❌
+CREATE POLICY "providers_update_admin" ...;  -- ✅ Exists
+CREATE POLICY "providers_delete_admin" ...;  -- ✅ Exists
+-- ❌ providers_insert_admin is MISSING
+```
+
+**Correct Code:**
+```sql
+-- ✅ Users can create providers for themselves
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());
+
+-- ✅ Admins can create providers for anyone (including null owner_user_id)
+CREATE POLICY "providers_insert_admin" 
+ON public.providers FOR INSERT
+WITH CHECK (is_admin_user(auth.uid()));
+
+-- ✅ Admin UPDATE and DELETE policies already exist
+CREATE POLICY "providers_update_admin" ...;
+CREATE POLICY "providers_delete_admin" ...;
+```
+
+**Prevention Checklist:**
+- ✅ **Check for admin policies** when adding RLS policies for any table (INSERT, UPDATE, DELETE, SELECT)
+- ✅ **Admin policies should allow admins to create/update/delete any record** (not just their own)
+- ✅ **Use `is_admin_user(auth.uid())`** helper function for admin checks (consistent across all policies)
+- ✅ **Match pattern from other tables** - if UPDATE/DELETE have admin policies, INSERT should too
+- ✅ **Test admin flows** after adding RLS policies (approve applications, create providers, etc.)
+- ✅ **Verify policies exist** for all CRUD operations admin needs to perform
+
+**Rule of Thumb:**
+> When adding RLS policies for a table that admins need to manage:
+> 1. **Add policies for ALL operations** admins need (INSERT, UPDATE, DELETE, SELECT)
+> 2. **Use consistent naming** (`table_insert_admin`, `table_update_admin`, etc.)
+> 3. **Use `is_admin_user(auth.uid())`** helper function for admin checks
+> 4. **Test admin flows** after adding policies (don't just test user flows)
+> 5. **Check master RLS file** to ensure all admin policies are included
+
+**How to Check for Missing Admin Policies:**
+```sql
+-- Check all policies for providers table
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'providers'
+ORDER BY cmd, policyname;
+
+-- Should see:
+-- INSERT: providers_insert_auth, providers_insert_admin
+-- UPDATE: providers_update_owner, providers_update_admin
+-- DELETE: providers_delete_owner, providers_delete_admin
+-- SELECT: providers_select_all (or similar)
+```
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (must include admin INSERT policy)
+- `ops/rls/fix-providers-admin-insert-rls.sql` - Fix file for missing admin INSERT policy
+- `src/utils/adminBusinessApplicationUtils.ts` - `approveApplication()` function (creates providers)
+- Any file that creates providers on behalf of others (admin approval flows)
+
+**Breaking Changes:**
+- If you remove admin INSERT policy → Admin cannot approve business applications
+- If you change `is_admin_user()` function → Admin policies break
+- If you change admin policy naming → Fix files won't drop old policies correctly
+
+**Audit Verification (2025-01-XX):**
+- ✅ **Current state confirmed**: Only `providers_insert_auth` exists (requires `owner_user_id = auth.uid()`)
+- ❌ **Missing policy confirmed**: No `providers_insert_admin` policy exists
+- ✅ **Fix will work**: Adding `providers_insert_admin` with `WITH CHECK (is_admin_user(auth.uid()))` will allow admins to create providers for anyone
+- ✅ **Pattern matches UPDATE/DELETE**: UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in USING clause, INSERT uses `WITH CHECK` clause
+- ⚠️ **Two `is_admin_user()` functions**: One checks JWT email directly, one checks `admin_emails` table - master RLS uses the one that takes `user_id` parameter
+
+**Testing Verified (2025-01-XX):**
+- ✅ After fix: Admin can approve business applications and create providers
+- ✅ After fix: Admin can create providers with `owner_user_id` belonging to applicants
+- ✅ After fix: Admin can create providers with `null` owner_user_id (for applicants without accounts)
+- ✅ Users can still create providers for themselves (existing `providers_insert_auth` policy still works)
+- ✅ RLS policies correctly enforce ownership for users and admin privileges for admins
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy patterns)
+- Section #25: Direct Supabase Queries Breaking After Refactoring (query utility usage)
+- Section #27: Missing Admin INSERT Policy for Calendar Events (calendar events admin creation)
+- `src/utils/adminBusinessApplicationUtils.ts` - Admin approval flow
+
+---
+
+### 27. Missing Admin INSERT Policy for Calendar Events ⭐ ADMIN SECTION (2025-01-XX) ✅ VERIFIED
+
+---
+
+### 28. MyBusiness Page - Applications Not Showing in Recently Approved/Rejected/Pending Sections ⭐ USER VISIBILITY ISSUE (2025-01-XX) ✅ VERIFIED
+
+**What:** Business owners receive emails about application rejections, but the "Recently Approved", "Recently Rejected", and "Pending Requests" sections on `/my-business` page only show change requests, not applications.
+
+**Root Cause:**
+1. The `HistoricalRequestsTab` component was only filtering and displaying `ProviderChangeRequest[]` items
+2. Business applications (`BusinessApplication[]`) were loaded but never passed to or displayed in these sections
+3. Users expected to see their rejected applications in "Recently Rejected" but only saw change requests
+
+**What Happened:**
+1. User submits business application → stored in `business_applications` table
+2. Admin rejects application → `status` set to `'rejected'`, email sent to user
+3. User visits `/my-business` → applications loaded via `useBusinessOperations.loadBusinessData()`
+4. User clicks "Recently Rejected" tab → `HistoricalRequestsTab` component renders
+5. Component only filters `nonFeaturedChangeRequests` → applications ignored
+6. User sees empty section → confusion and frustration
+
+**Files Changed:**
+
+1. **`src/pages/MyBusiness/components/HistoricalRequestsTab.tsx`**
+   - **Added:** `applications: BusinessApplication[]` prop to interface
+   - **Added:** Filtering logic for applications by status and date (last 30 days)
+   - **Added:** Combined display of both change requests and applications
+   - **Changed:** Component now accepts and displays both types
+   - **Dependencies:**
+     - `BusinessApplication` type from `../types`
+     - `ProviderChangeRequest` type from `../../../lib/supabaseData`
+     - `decided_at` field (optional) - uses `created_at` as fallback if missing
+   - **Breaking Changes:** ⚠️ **REQUIRES `applications` PROP** - All usages must pass this prop
+
+2. **`src/pages/MyBusiness.tsx`**
+   - **Changed:** Both `HistoricalRequestsTab` usages now pass `applications={applications}` prop
+   - **Changed:** "Pending Requests" tab now shows both applications and change requests
+   - **Changed:** Updated descriptions to mention both types
+   - **Dependencies:**
+     - `applications` state from `useBusinessOperations` hook
+     - `nonFeaturedChangeRequests` from `getNonFeaturedChangeRequests()` utility
+   - **Breaking Changes:** None - only additive changes
+
+3. **`src/pages/MyBusiness/types.ts`**
+   - **Added:** `decided_at?: string | null` field to `BusinessApplication` type
+   - **Reason:** Applications may have `decided_at` field in database (optional)
+   - **Breaking Changes:** None - optional field, backward compatible
+
+4. **`src/pages/MyBusiness/hooks/useBusinessOperations.ts`**
+   - **Added:** Enhanced debugging logs for applications and change requests
+   - **Added:** Status breakdown logging (approved/rejected/pending counts)
+   - **Added:** Recent items logging (last 30 days) for both types
+   - **Dependencies:** None - only logging changes
+   - **Breaking Changes:** None - only additive logging
+
+**Dependency Chain:**
+```
+MyBusiness.tsx
+    ↓ (passes applications prop)
+HistoricalRequestsTab.tsx
+    ↓ (filters and displays)
+BusinessApplication type (from types.ts)
+    ↓ (optional decided_at field)
+useBusinessOperations.ts (loads data)
+    ↓ (queries database)
+business_applications table
+```
+
+**What Could Break:**
+
+1. **If `applications` prop is not passed:**
+   - TypeScript error: Missing required prop
+   - Component will fail to compile
+   - **Prevention:** All usages updated in this change
+
+2. **If `decided_at` field doesn't exist in database:**
+   - Runtime error when accessing `app.decided_at`
+   - **Prevention:** All accesses use optional chaining or fallback to `created_at`
+
+3. **If `BusinessApplication` type changes:**
+   - TypeScript errors in `HistoricalRequestsTab`
+   - **Prevention:** Type is centralized in `types.ts`, all imports use same type
+
+4. **If filtering logic changes:**
+   - Applications might not appear in correct sections
+   - **Prevention:** Filtering logic is well-commented and uses same pattern as change requests
+
+**Testing Verified (2025-01-XX):**
+- ✅ Build succeeds with no TypeScript errors
+- ✅ All props properly typed and passed
+- ✅ Optional `decided_at` field handled safely
+- ✅ Fallback to `created_at` works correctly
+- ✅ Both change requests and applications display correctly
+- ✅ Sorting by date works for both types
+- ✅ Empty states show when no items found
+
+**Verification Checklist:**
+- [x] All `HistoricalRequestsTab` usages pass `applications` prop
+- [x] Type definitions include optional `decided_at` field
+- [x] All `decided_at` accesses have fallbacks
+- [x] Build succeeds without errors
+- [x] No linter errors
+- [x] Component properly filters by status and date
+- [x] Both types display correctly in UI
+
+**Related Files:**
+- `src/pages/MyBusiness/components/HistoricalRequestsTab.tsx` - Main component changed
+- `src/pages/MyBusiness.tsx` - Updated usages
+- `src/pages/MyBusiness/types.ts` - Type definition updated
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Enhanced logging
+- `src/lib/supabaseData.ts` - `ProviderChangeRequest` type (unchanged, used for reference)
+- `src/types/index.ts` - Global `BusinessApplication` type (already had `decided_at`)
+
+**Breaking Changes:**
+- ⚠️ **`HistoricalRequestsTab` now requires `applications` prop** - All usages must be updated
+- ✅ **Backward compatible:** Optional `decided_at` field doesn't break existing code
+
+**Prevention Pattern:**
+> When adding new data types to existing components:
+> 1. Check all usages of the component
+> 2. Update all usages to pass new required props
+> 3. Handle optional fields safely with fallbacks
+> 4. Test with both populated and empty data
+> 5. Document all dependencies in component comments
+
+
+### 30. Notifications Reappearing After Viewing (2025-11-09)
+
+**What:** Business owners kept seeing the same "Business Application Pending" toast in the global notification bell even after clicking and reviewing it. The badge would clear briefly, then reappear after Supabase realtime triggered another refresh.
+
+**Root Cause:**
+1. `NotificationBell.tsx` only flipped a local `read` flag when the button was clicked. Pending/pending-change notifications are re-derived from live Supabase queries (`business_applications`, `provider_change_requests`), so a reload reconstructed the array and ignored the previous click.
+2. There was no persisted acknowledgement list. When the realtime subscription re-fetched, the component rebuilt the notifications from scratch and the "read" state vanished.
+3. A recent column evolution on `user_notifications` meant the REST query using an explicit column list (`select('id,title,subject,message,body,type,data,metadata,created_at,is_read,read,read_at,link,link_section')`) started 400'ing because `link`/`link_section` are JSON metadata, not top-level columns. The failure short-circuited acknowledgement logic and forced a retry that rebuilt the array again.
+
+**What Happened:**
+1. Admin approves an application → `adminBusinessApplicationUtils.approveBusinessApplication()` inserts a `user_notifications` row with metadata.
+2. Business owner opens the bell → notification marked `read: true` locally but not persisted anywhere else.
+3. Realtime `postgres_changes` fires → `loadNotifications()` reruns, the same "pending application" object is rebuilt, unread count increments again.
+4. REST query 400 error floods console (`select=...&link=...`) → bell refresh loops, reinforcing the regression.
+
+**The Fix:**
+- Switched the Supabase REST call to `.select('*')` and normalized the result on the client, so schema changes won't 400.
+- Added resilient JSON parsing for `metadata`/`data` because Supabase may return them as plain strings.
+- Introduced `bf_notification_acknowledged_ids` localStorage key. When the dropdown opens, non-admin notifications get added to the acknowledged set and filtered out of future renders.
+- Persist acknowledged IDs across sessions (and tab reloads) via `acknowledgedIdsRef` + `persistAcknowledgedIds()` helper.
+- Auto-acknowledge immediately when the dropdown is opened so users aren't forced to click each row just to clear the badge.
+- Updated approval/rejection flows to write both `subject/body` and `title/message` plus metadata links so future parsing stays consistent.
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only flips local state; no persistence, so realtime rebuilds re-add items.
+const handleNotificationClick = async (notification: Notification) => {
+  setNotifications(prev =>
+    prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+  )
+  // No acknowledgement persistence → notification reappears on next reload.
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Persist acknowledgement ids and auto-ack on dropdown open.
+const ACK_STORAGE_KEY = 'bf_notification_acknowledged_ids'
+const acknowledgedIdsRef = useRef<Set<string>>(new Set())
+
+const persistAcknowledgedIds = (next: Set<string>) => {
+  acknowledgedIdsRef.current = next
+  setAcknowledgedIds(new Set(next))
+  window.localStorage.setItem(ACK_STORAGE_KEY, JSON.stringify(Array.from(next)))
+}
+
+useEffect(() => {
+  if (!isOpen || notifications.length === 0) return
+  const toAcknowledge = notifications.filter(
+    n => !n.isAdminNotification && !acknowledgedIdsRef.current.has(n.id)
+  )
+  if (toAcknowledge.length === 0) return
+  const next = new Set(acknowledgedIdsRef.current)
+  toAcknowledge.forEach(n => next.add(n.id))
+  persistAcknowledgedIds(next)
+}, [isOpen, notifications])
+```
+
+**Prevention Checklist:**
+- ✅ Keep Supabase queries using `.select('*')` unless you control the schema; normalize in code instead.
+- ✅ Persist acknowledgement state (localStorage or database) for any notification that can't be marked read server-side.
+- ✅ Update both the notification writer (`adminBusinessApplicationUtils`) and reader (`NotificationBell`) when metadata shape changes.
+- ✅ Guard JSON parsing on `metadata`/`data` because Supabase may return them as text.
+- ✅ Document new localStorage keys and reason for existence (see dependency tracking entry #15).
+
+**Rule of Thumb:**
+> If a notification is derived data (not a single row you can mark `read` in the database), you MUST persist acknowledgement out-of-band or it will keep coming back on every refresh.
+
+**Files to Watch:**
+- `src/components/NotificationBell.tsx` (acknowledgement + normalization logic)
+- `src/utils/adminBusinessApplicationUtils.ts` (writes notifications + metadata)
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` (entry #15 documents dependencies)
+- Supabase tables: `user_notifications`, `business_applications`, `provider_change_requests`, `dismissed_notifications`
+
+**Breaking Changes:**
+- Renaming/removing `bf_notification_acknowledged_ids` without migration will resurrect old notifications.
+- Reverting to explicit column selection will break as soon as the table schema evolves.
+- Removing the auto-acknowledgement effect will make notifications reappear when realtime fires.
+
+**Testing Verified (2025-11-09):**
+- ✅ Notification bell REST call no longer returns 400.
+- ✅ Opening the dropdown once clears the badge permanently for that notification.
+- ✅ Refreshing the page keeps the notification hidden (localStorage persists).
+- ✅ `user_notifications` rows with either `subject/body` or `title/message` render correctly.
+- ✅ Admin-sent approvals include deep links (`/my-business`) in metadata.
+
+**Related:**
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
+- Section #28: MyBusiness visibility issues (same data sources)
+- Section #24: RLS conflicts (same tables, keep policies consistent)
+
+---
+
+## How to Prevent This (Action Plan)
+
+### Immediate (5 minutes after EVERY change):
+
+1. **Impact Analysis**
+
+   **PowerShell (Windows):**
+   ```powershell
+   # What files import what I changed?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-file"
+   
+   # What depends on this functionality?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-function"
+   ```
+
+   **Bash/Linux/Mac:**
+   ```bash
+   # What files import what I changed?
+   grep -r "changed-file" src/
+   
+   # What depends on this functionality?
+   grep -r "changed-function" src/
+   ```
+
+2. **Smoke Test Checklist**
+   - [ ] Can user sign up? 
+   - [ ] Can admin view profiles?
+   - [ ] Can admin view resident verification?
+   - [ ] Does name display correctly?
+   - [ ] Do other admin sections work?
+   - [ ] **Can admin navigate between pages without getting logged out?** ⭐ NEW
+   - [ ] **Does admin status persist during navigation?** ⭐ NEW
+  - [ ] **Can users log in without immutable field errors?** ⭐ NEW
+  - [ ] **Does user deletion remove ALL related data?** ⭐ NEW
+  - [ ] **Do all React components receive their props correctly?** ⭐ NEW
+  - [ ] **Are function props called with guard checks?** ⭐ NEW
+  - [ ] **Do deleted users stay deleted after page refresh?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete users who only exist in funnels/bookings without profiles?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete both business and customer accounts successfully?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users verify their email via custom verification system?** ⭐ NEW
+  - [ ] **Does email verification status update correctly after verification?** ⭐ NEW
+  - [ ] **Are unverified users blocked from protected features?** ⭐ NEW
+  - [ ] **Can users resend verification emails from account page?** ⭐ NEW
+  - [ ] **Do calendar events with database images show their images (not gradients)?** ⭐ NEW
+  - [ ] **Do calendar events without database images show gradient fallbacks?** ⭐ NEW
+  - [ ] **Can admin choose to delete or keep businesses when deleting user account?** ⭐ NEW ✅ TESTED
+  - [ ] **Does admin deletion prompt show business names when user has businesses?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses hard deleted when admin chooses to delete them?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses soft deleted (unlinked) when admin chooses to keep them?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW ✅ TESTED
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+  - [ ] **Are all Supabase queries using centralized utility (no direct `supabase.from()` calls)?** ⭐ NEW
+  - [ ] **Do forms work end-to-end after refactoring (submit → verify data appears)?** ⭐ NEW
+
+3. **Manual Testing**
+   - Actually USE the app after every change
+   - Click through ALL related pages
+   - Don't just test the one thing you changed
+
+---
+
+### Short-term (1-2 days):
+
+1. **Integration Tests**
+   ```typescript
+   // Test critical flows end-to-end
+   describe('Signup to Admin View Flow', () => {
+     it('should work end-to-end', async () => {
+       // 1. Sign up with name and resident status
+       // 2. Verify name saved
+       // 3. Verify resident data saved
+       // 4. Admin logs in
+       // 5. Admin sees name
+       // 6. Admin sees resident verification data
+     })
+   })
+   ```
+
+2. **Dependency Documentation**
+   ```typescript
+   /**
+    * DEPENDENCIES:
+    * - AuthContext: Provides user session
+    * - admin-list-profiles: Returns profile data
+    * - ProfileRow type: Defines data structure
+    * 
+    * CONSUMERS:
+    * - ResidentVerificationSection: Displays data
+    * - UsersSection: Displays user list
+    * 
+    * IF YOU CHANGE THIS:
+    * - Update ProfileRow type
+    * - Update admin-list-profiles query
+    * - Test all consumers
+    */
+   ```
+
+3. **Change Impact Checklist**
+   - [ ] What files import this?
+   - [ ] What functions depend on this?
+   - [ ] What UI components use this?
+   - [ ] What data flows through this?
+   - [ ] Have I tested ALL of these?
+
+---
+
+### Long-term (1 week):
+
+1. **Architecture Review**
+   - Reduce shared state
+   - Create clear boundaries
+   - Document data flow
+   - Create integration tests for each boundary
+
+2. **Automated Testing**
+   - Unit tests for individual functions
+   - Integration tests for critical flows
+   - E2E tests for user journeys
+   - Run all tests before merging
+
+3. **Code Review Process**
+   - Reviewer checks: "What else might be affected?"
+   - Reviewer tests: "Does everything still work?"
+   - Reviewer verifies: "Are related files updated?"
+
+---
+
+## Checklist for Every Change
+
+Before committing ANY change:
+
+- [ ] **Impact Analysis:** What else might be affected?
+  
+  **PowerShell (Windows):**
+  ```powershell
+  Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-thing"
+  ```
+  
+  **Bash/Linux/Mac:**
+  ```bash
+  grep -r "changed-thing" src/
+  ```
+- [ ] **Smoke Tests:** Does everything still work?
+  - [ ] Signup works - name must appear immediately after signup
+  - [ ] Signin works
+  - [ ] Admin pages load
+  - [ ] All sections display correctly
+  - [ ] Name is stored in database after signup
+  - [ ] Name is read from localStorage before database during signup
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+- [ ] **RLS Policy Checks** (if modifying database policies):
+  - [ ] Checked for duplicate policies before creating new ones
+  - [ ] Dropped ALL existing policies for the operation before creating new ones
+  - [ ] Verified only one policy exists per operation after creation
+  - [ ] Policy names match master RLS file
+  - [ ] Tested that inserts/updates/deletes work correctly
+  - [ ] Verified security (SELECT/DELETE policies still enforce email matching)
+- [ ] **Related Files:** Are they all updated?
+  - [ ] Types updated?
+  - [ ] Functions updated?
+  - [ ] Components updated?
+  - [ ] Tests updated?
+  - [ ] **RLS policies updated?** ⭐ NEW
+- [ ] **All Supabase queries migrated to centralized utility?** ⭐ NEW
+  - [ ] Search for direct queries:
+    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+    - Bash: `grep -r "supabase\.from\(" src/`
+  - [ ] Migrate all instances in one commit
+  - [ ] Test forms end-to-end after migration
+- [ ] **Integration Test:** Does the whole flow work?
+- [ ] **Manual Testing:** Actually USE the app
+
+---
+
+## Most Important Rule
+
+**Before making ANY change, ask yourself:**
+
+1. "What ELSE might be affected?"
+2. "Have I tested ALL related functionality?"
+3. "Does the WHOLE system still work?"
+
+**If you can't answer these, DON'T commit the change yet.**
+
+---
+
+## Summary
+
+**Root Cause:** 
+Fixing one thing without checking what ELSE depends on it.
+
+**Quick Fix (5 min):**
+- Run impact analysis (grep)
+- Run smoke tests manually
+- Don't commit until everything works
+
+**Long-term Fix:**
+- Integration tests
+- Dependency documentation
+- Architecture improvements
+- Automated testing
+
+**The Pattern:**
+```
+Fix X
+  → Break Y (hidden dependency)
+    → Fix Y
+      → Break Z (another hidden dependency)
+        → Fix Z
+          → Break X again (circular dependency)
+            → 🔥 BURN IT ALL DOWN
+```
+
+**The Solution:**
+```
+Fix X
+  → Check what depends on X
+  → Fix ALL related things
+  → Test EVERYTHING
+  → Then commit
+```
+
+---
+
+## Appendix A – Archived Incident Library
+
+*Resolved incidents retained for historical reference. See the main sections above for active patterns and prevention playbooks.*
+
+### 20. Admin Business Deletion Choice (2025-01-XX)
+
+_Archived:_ See Appendix entry 20 in [Appendix A – Archived Incident Library](#appendix-a--archived-incident-library) for summary and related links.
+
+---
+
+### 22. Event Images Stored in Supabase Storage (2025-01-XX)
+
+_Archived:_ See Appendix entry 22 for the storage workflow summary.
+
+---
+
+### 23. Gradient Strings Saved to Database (2025-11-05)
+
+**What:** Populate scripts were saving CSS gradient strings (like `"linear-gradient(135deg, #667eea 0%, #764ba2 100%)"`) directly to the `image_url` column in the database when images couldn't be fetched. Gradient strings should NEVER be stored in the database - they should be computed dynamically on the frontend when `image_url` is `null`.
+
+**Root Cause:**
+1. `populate-event-images.ts` (both Netlify function and local script) were saving gradient strings to `image_url` when Unsplash API failed or when storage failed
+2. The code treated gradients as a "fallback value" that should be saved to the database
+3. This caused events to have gradient strings in `image_url` instead of actual image URLs or `null`
+4. Frontend code already handles `null` image_url by computing gradients dynamically - saving gradients to DB was redundant and wrong
+
+**What Happened:**
+1. Events from iCalendar feeds were inserted without `image_url` (correctly set to `null`)
+2. Populate script ran to fetch images for events without images
+3. When Unsplash API failed or Supabase Storage failed, script saved gradient strings to `image_url`
+4. Database now had gradient strings in `image_url` column
+5. Frontend code detects gradient strings and ignores them (correctly), but this defeats the purpose of having images in the database
+
+**The Fix:**
+- **Never save gradient strings**: Updated all populate scripts to set `image_url: null` instead of saving gradient strings when images can't be fetched
+- **Frontend computes gradients**: The frontend already has logic to compute gradients when `image_url` is `null` - no need to save gradients to database
+- **Preserve existing images**: All external feed processors (iCalendar, RSS, KPBS, VoSD) preserve existing `image_url` and `image_type` when re-fetching events
+- **Only populate missing images**: Populate scripts only process events with `null` image_url (not events that already have images)
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Saves gradient strings to database
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl) {
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - save gradient string to database ❌ WRONG
+      imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+      imageType = 'gradient'
+    }
+  } else {
+    // Unsplash failed - save gradient string to database ❌ WRONG
+    imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+    imageType = 'gradient'
+  }
+} else {
+  // No API key - save gradient string to database ❌ WRONG
+  imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+  imageType = 'gradient'
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ❌ Saves gradient string!
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Never saves gradient strings, sets to null instead
+let imageUrl: string | null = null
+let imageType: 'image' | null = null
+
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl && storageUrl.includes('supabase.co/storage')) {
+      // Successfully stored in Supabase Storage
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - set to null (frontend will compute gradient)
+      imageUrl = null
+      imageType = null
+    }
+  } else {
+    // Unsplash failed - set to null (frontend will compute gradient)
+    imageUrl = null
+    imageType = null
+  }
+} else {
+  // No API key - set to null (frontend will compute gradient)
+  imageUrl = null
+  imageType = null
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ✅ null if no image
+```
+
+**Prevention Checklist:**
+- ✅ NEVER save gradient strings to `image_url` column - always use `null` when images can't be fetched
+- ✅ Frontend computes gradients dynamically when `image_url` is `null` - no need to save gradients to database
+- ✅ Populate scripts only process events with `null` image_url (skip events that already have images)
+- ✅ External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ If storage fails, set `image_url` to `null` (don't fall back to saving gradient strings)
+- ✅ All functions that modify events preserve existing images (don't overwrite them)
+
+**Rule of Thumb:**
+> When handling image fallbacks:
+> 1. **NEVER** save gradient strings to `image_url` column - always use `null`
+> 2. Frontend computes gradients when `image_url` is `null` - no need to save gradients to database
+> 3. Populate scripts only process events with `null` image_url (skip events that already have images)
+> 4. External feed processors preserve existing `image_url` and `image_type` when re-fetching events
+> 5. If image storage fails, set `image_url` to `null` (don't save gradient strings as fallback)
+
+**Files to Watch:**
+- `netlify/functions/populate-event-images.ts` - Fixed to never save gradient strings
+- `scripts/populate-event-images.ts` - Fixed to never save gradient strings
+- `netlify/functions/manual-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/scheduled-fetch-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-kpbs-events.ts` - Preserves existing images when re-fetching
+- `netlify/functions/fetch-vosd-events.ts` - Preserves existing images when re-fetching
+- `src/utils/eventImageUtils.ts` - `getEventHeaderImageFromDb()` ignores gradient strings in database
+
+**Breaking Changes:**
+- If you restore code that saves gradient strings to `image_url` → Frontend will ignore them (wastes database space)
+- If you remove null-check logic in populate scripts → Scripts might try to re-populate events that already have images
+- If you remove image preservation logic in feed processors → Events will lose their images when re-fetched
+
+**Image Preservation Guarantees:**
+- ✅ **External feed processors preserve images**: All iCalendar/RSS/KPBS/VoSD sync functions preserve existing `image_url` and `image_type` when re-fetching events
+- ✅ **Populate scripts only process missing images**: Scripts only populate events with `null` image_url (skip events that already have images)
+- ✅ **No automatic overwrites**: No automated process will overwrite existing images - they are preserved during re-fetches
+- ✅ **One-time population**: After images are populated, they will NOT be overwritten by automated processes
+
+**Testing Verified (2025-11-05):**
+- ✅ Populate scripts set `image_url` to `null` when images can't be fetched (not gradient strings)
+- ✅ Frontend computes gradients when `image_url` is `null` (works correctly)
+- ✅ External feed processors preserve existing images when re-fetching events
+- ✅ Populate scripts skip events that already have images (only process `null` image_url)
+- ✅ Cleanup script removes existing gradient strings from database
+- ✅ All 33 events successfully populated with Supabase Storage URLs (not gradient strings)
+
+**Related:**
+- Section #22: Event Images Stored in Supabase Storage (image storage pattern)
+- Section #21: Event Images Not Showing Due to Null image_type (display logic)
+- Section #18: Event Images Not Showing from Database (original fix)
+
+---
+
+### 24. RLS Policy Conflicts and Duplicate Policies ⭐ DATABASE SECURITY ISSUE (2025-01-XX)
+
+**What:** Row Level Security (RLS) policies can conflict or duplicate, causing inserts/updates/deletes to fail silently or with confusing errors.
+
+**Root Cause:**
+- Multiple RLS policy files can create duplicate policies with different names
+- Conflicting policies (e.g., restrictive vs. public) can cause evaluation failures
+- `auth.jwt() ->> 'email'` may not be available or match exactly, causing restrictive policies to fail
+- Policies from different migration files can conflict with master policies
+
+**Example:**
+```sql
+-- ❌ PROBLEM: Two INSERT policies with different names
+-- From migration file:
+CREATE POLICY "applications_insert_all" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- From master RLS file:
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ❌ PROBLEM: Restrictive policy that fails
+-- From fix file:
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ auth.jwt() ->> 'email' may not be available
+```
+
+**Symptoms:**
+- Users get "new row violates row-level security policy" errors
+- Inserts fail even when they should work
+- Multiple policies with similar names exist
+- Policies from different files conflict
+
+**Fix:**
+1. **Drop ALL existing policies** before creating new ones:
+   ```sql
+   -- Drop ALL existing INSERT policies
+   DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+   DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+   DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+   -- ... drop all variations
+   ```
+
+2. **Create single consistent policy** matching master RLS file:
+   ```sql
+   -- Create single public INSERT policy
+   CREATE POLICY "applications_insert_public" 
+   ON public.business_applications FOR INSERT
+   WITH CHECK (true);
+   ```
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT 
+     schemaname, 
+     tablename, 
+     policyname, 
+     cmd,
+     qual,
+     with_check
+   FROM pg_policies 
+   WHERE tablename = 'business_applications'
+     AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Creating policy without dropping existing ones
+CREATE POLICY "Users can insert own applications" 
+ON public.business_applications FOR INSERT
+WITH CHECK (email = auth.jwt() ->> 'email');  -- ❌ May fail if JWT email not available
+
+-- ❌ Multiple policies with different names
+CREATE POLICY "applications_insert_all" ...;  -- From migration
+CREATE POLICY "applications_insert_public" ...;  -- From master
+-- ❌ Both exist, but one might be restrictive and block inserts
+```
+
+**Correct Code:**
+```sql
+-- ✅ Drop ALL existing policies first
+DROP POLICY IF EXISTS "applications_insert_all" ON public.business_applications;
+DROP POLICY IF EXISTS "applications_insert_public" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications" ON public.business_applications;
+DROP POLICY IF EXISTS "Users can insert own applications (auth)" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_anon_insert" ON public.business_applications;
+DROP POLICY IF EXISTS "ba_auth_insert" ON public.business_applications;
+
+-- ✅ Create single consistent policy
+CREATE POLICY "applications_insert_public" 
+ON public.business_applications FOR INSERT
+WITH CHECK (true);
+
+-- ✅ Verify only one policy exists
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' AND cmd = 'INSERT';
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS drop existing policies** before creating new ones
+- ✅ **Check for duplicate policies** before creating new ones
+- ✅ **Use consistent policy names** matching master RLS file
+- ✅ **Avoid restrictive policies** that depend on `auth.jwt() ->> 'email'` (may not be available)
+- ✅ **Use public INSERT policies** for public forms (similar to `contact_leads`)
+- ✅ **Rely on SELECT/DELETE policies** for security (email matching, admin checks)
+- ✅ **Verify policies after creation** to ensure only one exists per operation
+- ✅ **Document policy rationale** in SQL comments
+
+**Rule of Thumb:**
+> When fixing RLS policies:
+> 1. **Drop ALL existing policies** for the operation (INSERT/UPDATE/DELETE/SELECT)
+> 2. **Create single consistent policy** matching master RLS file
+> 3. **Use public INSERT policies** for public forms (security enforced by SELECT/DELETE)
+> 4. **Avoid `auth.jwt() ->> 'email'`** - use `auth.uid()` or `auth.users` table instead
+> 5. **Verify policies after creation** to ensure clean state
+> 6. **Check for duplicate policies** from different migration files
+
+**How to Check for Duplicate Policies:**
+```sql
+-- Check all INSERT policies
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications' 
+  AND cmd = 'INSERT'
+ORDER BY policyname;
+
+-- Check all policies for a table
+SELECT policyname, cmd, qual, with_check 
+FROM pg_policies 
+WHERE tablename = 'business_applications'
+ORDER BY cmd, policyname;
+```
+
+**Security Note:**
+- Public INSERT policies don't compromise security if SELECT/DELETE policies enforce email matching
+- Users can submit applications, but can only VIEW/DELETE their own (by email)
+- Admins can VIEW/UPDATE/DELETE all applications
+- Email matching is enforced by SELECT/DELETE policies, not INSERT
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (source of truth)
+- `ops/rls/fix-*.sql` - Individual fix files (should match master)
+- `ops/migrations/*.sql` - Migration files (may create duplicate policies)
+- Any file that modifies RLS policies
+
+**Related:**
+- Section #9: Incomplete Deletion Logic (user deletion patterns)
+- Section #17: Business Ownership on Self-Deletion (business deletion patterns)
+- Section #29: Admin RLS Policy Blocking Queries (admin access issue)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 29. Admin RLS Policy Blocking Queries ⭐ CRITICAL ADMIN ACCESS ISSUE (2025-01-XX)
+
+**What:** Admin queries to `business_applications` table return 403 Forbidden errors, preventing admins from viewing pending applications.
+
+**Root Cause:**
+- Admin query in `useAdminDataLoader.ts` requests ALL pending applications without email filter
+- `applications_select_admin` policy uses `is_admin_user(auth.uid())` function
+- `is_admin_user()` function uses `(SELECT email FROM auth.users WHERE id = user_id)` subquery
+- This subquery may fail or return NULL, causing admin policy to fail
+- PostgreSQL evaluates ALL SELECT policies with OR logic - if ALL policies fail, query fails with 403
+
+**Example:**
+```typescript
+// ❌ PROBLEM: Admin query without email filter
+// File: src/hooks/useAdminDataLoader.ts (Line 258-262)
+const bizQuery = query('business_applications', { logPrefix: '[Admin]' })
+  .select('*')
+  .or('status.eq.pending,status.is.null')  // Query ALL pending apps
+  .order('created_at', { ascending: false })
+  .execute()
+// ❌ Result: 403 Forbidden - RLS policy blocks query
+```
+
+```sql
+-- ❌ PROBLEM: Admin policy uses function that may fail
+-- File: ops/rls/02-MASTER-RLS-POLICIES.sql (Line 244-246)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may fail if auth.users subquery fails
+
+-- ❌ PROBLEM: is_admin_user() function uses auth.users subquery
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail or return NULL
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+```
+
+**Symptoms:**
+- Admin queries return 403 Forbidden errors
+- Console shows: `GET .../business_applications?... 403 (Forbidden)`
+- Admin cannot view pending applications in admin panel
+- Regular users can see their own applications (owner policy works)
+- Admin policy fails silently (no error message, just 403)
+
+**Fix:**
+1. **Update `is_admin_user()` function** to use JWT email (more reliable):
+   ```sql
+   -- ✅ FIX: Use JWT email with fallback to auth.users
+   CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+   RETURNS boolean AS $$
+     SELECT EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)
+     );
+   $$ LANGUAGE sql SECURITY DEFINER;
+   ```
+
+2. **Update admin policy** to check JWT email directly (more reliable):
+   ```sql
+   -- ✅ FIX: Check JWT email directly in policy
+   DROP POLICY IF EXISTS "applications_select_admin" ON public.business_applications;
+   
+   CREATE POLICY "applications_select_admin" 
+   ON public.business_applications FOR SELECT
+   USING (
+     EXISTS (
+       SELECT 1 FROM admin_emails
+       WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+       OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+     )
+   );
+   ```
+
+3. **Ensure `admin_emails` table exists** and has admin emails:
+   ```sql
+   CREATE TABLE IF NOT EXISTS public.admin_emails (
+     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     email text UNIQUE NOT NULL,
+     created_at timestamptz DEFAULT now()
+   );
+   
+   INSERT INTO public.admin_emails (email)
+   VALUES ('justexisted@gmail.com')
+   ON CONFLICT (email) DO NOTHING;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ Using auth.users subquery that may fail
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE email = (SELECT email FROM auth.users WHERE id = user_id)  -- ❌ May fail
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ❌ Admin policy depends on function that may fail
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (is_admin_user(auth.uid()));  -- ❌ Function may return FALSE if subquery fails
+```
+
+**Correct Code:**
+```sql
+-- ✅ Use JWT email with fallback
+CREATE OR REPLACE FUNCTION is_admin_user(user_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))  -- ✅ JWT email (reliable)
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = user_id)  -- ✅ Fallback
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ✅ Admin policy checks JWT email directly (more reliable)
+CREATE POLICY "applications_select_admin" 
+ON public.business_applications FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM admin_emails
+    WHERE LOWER(TRIM(admin_emails.email)) = LOWER(TRIM(auth.jwt() ->> 'email'))
+    OR admin_emails.email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  )
+);
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use JWT email** for admin checks (more reliable than auth.users subquery)
+- ✅ **Include fallback** to auth.users subquery for compatibility
+- ✅ **Use case-insensitive matching** with LOWER(TRIM()) to handle email variations
+- ✅ **Test admin queries** after updating RLS policies
+- ✅ **Verify admin_emails table** exists and has correct emails
+- ✅ **Check ALL admin policies** when updating is_admin_user() function (affects all tables)
+- ✅ **Document dependencies** in SQL file comments (version, dependencies, breaking changes)
+
+**Dependency Chain:**
+```
+useAdminDataLoader.ts (admin query)
+    ↓
+business_applications table (RLS enabled)
+    ↓
+applications_select_admin policy (checks is_admin_user())
+    ↓
+is_admin_user() function (checks admin_emails table)
+    ↓
+auth.users subquery (may fail) ❌
+```
+
+**What Could Break:**
+- ⚠️ **ALL admin policies** depend on `is_admin_user()` function
+- ⚠️ **Updating function** affects ALL tables with admin policies (providers, bookings, etc.)
+- ⚠️ **Admin queries** on other tables may also fail if function is broken
+- ⚠️ **admin_emails table** must exist and have correct emails
+
+**Testing Verification:**
+- ✅ Admin can query ALL pending applications (no 403 errors)
+- ✅ Admin can view applications in admin panel
+- ✅ Regular users can still see their own applications (owner policy works)
+- ✅ `is_admin_user()` function returns TRUE for admin users
+- ✅ `is_admin_user()` function returns FALSE for non-admin users
+
+**Files Changed:**
+- `ops/rls/fix-business-applications-admin-rls.sql` (v1.0) - Admin RLS fix
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (needs update)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (no changes needed, just needs RLS fix)
+
+**SQL File Versioning:**
+- `ops/rls/fix-business-applications-select-rls.sql` - v1.0 (owner policy fix)
+- `ops/rls/fix-business-applications-admin-rls.sql` - v1.0 (admin policy fix)
+- `ops/rls/DIAGNOSE-BUSINESS-APPLICATIONS-RLS.sql` - v1.0 (diagnostic queries)
+
+**Rule of Thumb:**
+> When fixing admin RLS policies:
+> 1. **ALWAYS use JWT email** for admin checks (more reliable)
+> 2. **Include fallback** to auth.users subquery for compatibility
+> 3. **Update is_admin_user() function** if it uses auth.users subquery
+> 4. **Check ALL admin policies** when updating function (affects all tables)
+> 5. **Verify admin_emails table** exists and has correct emails
+> 6. **Test admin queries** after updating policies
+> 7. **Version SQL files** with version number, dependencies, and breaking changes
+
+**How to Check Admin Access:**
+```sql
+-- Test admin check function
+SELECT 
+  auth.uid() as user_id,
+  auth.jwt() ->> 'email' as jwt_email,
+  is_admin_user(auth.uid()) as is_admin,
+  (SELECT email FROM auth.users WHERE id = auth.uid()) as auth_users_email;
+
+-- Test admin policy directly
+SELECT * FROM business_applications 
+WHERE status = 'pending' OR status IS NULL
+ORDER BY created_at DESC
+LIMIT 10;
+-- Should return results if you're admin, 403 if not
+```
+
+**Security Note:**
+- Admin policies allow admins to see ALL rows (no email filter)
+- Owner policies restrict users to their own rows (email match required)
+- Both policies use OR logic - if EITHER passes, query succeeds
+- Admin check must be reliable (use JWT email, not auth.users subquery)
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS file (must update is_admin_user() function)
+- `ops/rls/fix-business-applications-admin-rls.sql` - Admin RLS fix (v1.0)
+- `src/hooks/useAdminDataLoader.ts` - Admin query (depends on RLS policy)
+- `ops/rls/fix-*-admin-rls.sql` - Other admin RLS fixes (may need updates)
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (general RLS issues)
+- Section #28: Applications Not Showing in Sections (owner policy fix)
+- `docs/prevention/BUSINESS_APPLICATIONS_INSERT_RLS_FIX.md` - Complete dependency tracking for this fix
+
+---
+
+### 18. Event Images Not Showing from Database (2025-11-03)
+
+**What:** Events with database images (`image_url` and `image_type`) were showing gradient fallbacks instead of their stored images.
+
+**Root Cause:**
+1. Query using `.select('*')` might not include `image_url` if RLS filters columns (though policy allows reading all fields)
+2. External events (iCalendar) were merged with database events without deduplication
+3. If external events had same IDs as database events, they could override database events (losing `image_url`)
+
+**Fix:**
+- **Explicit field selection**: Changed from `.select('*')` to explicitly selecting all fields including `image_url` and `image_type`
+- **Deduplication logic**: Created a Map of database events by ID, then filter out external events that match database event IDs (database events have priority)
+- **Preserve database images**: Database events are placed first in the merged array, external events are filtered to remove duplicates
+
+**Wrong Code:**
+```typescript
+// Query might not include image_url if RLS filters
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('*') // ❌ Might not include image_url
+
+// Merge without deduplication - external events can override database events
+const allEvents = [
+  ...(dbEvents || []),
+  ...rssEvents, // ❌ No image_url
+  ...calendarEvents // ❌ No image_url, might override database events
+]
+```
+
+**Correct Code:**
+```typescript
+// Explicitly select image_url and image_type to ensure they're included
+const { data: dbEvents } = await supabase
+  .from('calendar_events')
+  .select('id, title, description, date, time, location, address, category, source, upvotes, downvotes, created_at, updated_at, user_id, provider_id, created_by_user_id, is_flagged, flag_count, url, image_url, image_type') // ✅ Explicit
+
+// Create map of database events to preserve image data
+const dbEventsMap = new Map<string, CalendarEvent>()
+dbEvents?.forEach(event => {
+  dbEventsMap.set(event.id, event)
+})
+
+// Filter external events to remove duplicates (database has priority)
+const uniqueExternalEvents = externalEvents.filter(externalEvent => {
+  return !dbEventsMap.has(externalEvent.id) // ✅ Skip if database event exists
+})
+
+// Combine: Database first (has images), then unique external events
+const allEvents = [
+  ...(dbEvents || []), // ✅ Database events with images first
+  ...uniqueExternalEvents // ✅ Only unique external events
+]
+```
+
+**Prevention Checklist:**
+- ✅ Explicitly select `image_url` and `image_type` in queries (don't rely on `*`)
+- ✅ Deduplicate external events to prevent overriding database events
+- ✅ Database events have priority over external events (preserve images)
+- ✅ Add logging to verify `image_url` is present in final merged events
+- ✅ Test with events that have database images to verify they show images
+
+**Rule of Thumb:**
+> When merging database events with external events:
+> 1. Explicitly select all fields including `image_url` and `image_type` (don't use `*`)
+> 2. Create a Map of database events by ID to preserve image data
+> 3. Filter external events to remove duplicates (database events have priority)
+> 4. Database events should be first in the merged array
+> 5. Add diagnostic logging to verify `image_url` is present in final events
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')` and deduplication)
+- `src/components/CalendarSection.tsx` (uses `fetchCalendarEvents()` - automatically benefits)
+- `src/components/EventCard.tsx` (checks `event.image_url` and `event.image_type`)
+
+**Related:**
+- Section #14: Async Operation Order in SIGNED_IN Handler
+- Section #15: Custom Email Verification System
+- Section #19: Explicit Column Selection Breaks When Columns Don't Exist (⚠️ **This fix caused Section #19** - explicit column selection broke the query)
+
+---
+
+### 19. Explicit Column Selection Breaks When Columns Don't Exist (2025-11-03)
+
+**What:** When explicitly selecting columns in Supabase queries, if any column doesn't exist in the database, the query fails and returns no data (or empty results).
+
+**Root Cause:**
+- Explicit column selection (e.g., `.select('id, title, image_url')`) requires ALL listed columns to exist
+- If you select columns that were never added via migrations, Supabase returns an error or empty results
+- TypeScript types may include optional fields that don't exist in the actual database schema
+- Using `.select('*')` is safer because it only selects columns that actually exist
+
+**Example:**
+```typescript
+// ❌ BROKEN: Tries to select columns that might not exist
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // If ANY of these columns don't exist → query fails → returns empty/no data
+
+// ✅ CORRECT: Selects all existing columns automatically
+const { data, error } = await supabase
+  .from('calendar_events')
+  .select('*')
+  // Only selects columns that actually exist in the database
+```
+
+**Fix:**
+- Use `.select('*')` instead of explicit column lists
+- If you need specific columns, verify they exist in the database first (check migrations)
+- Add error handling to detect query failures
+- Log query errors with full details (message, code, hint, details)
+
+**Wrong Code:**
+```typescript
+// Selecting columns that might not exist
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('id, title, user_id, provider_id, is_flagged, flag_count, url, image_url, image_type')
+  // ❌ If user_id, provider_id, is_flagged, flag_count, or url don't exist → FAILS
+
+// No error handling
+if (dbError) {
+  console.warn('Error:', dbError) // ❌ Not enough detail
+}
+```
+
+**Correct Code:**
+```typescript
+// Use * to select all existing columns
+const { data: dbEvents, error: dbError } = await supabase
+  .from('calendar_events')
+  .select('*') // ✅ Automatically selects only existing columns
+  .order('date', { ascending: true })
+
+// Comprehensive error handling
+if (dbError) {
+  console.error('[fetchCalendarEvents] Database query error:', dbError)
+  console.error('[fetchCalendarEvents] Error details:', {
+    message: dbError.message,
+    details: dbError.details,
+    hint: dbError.hint,
+    code: dbError.code
+  })
+  return [] // ✅ Return empty array on error to prevent breaking app
+}
+
+if (!dbEvents) {
+  console.warn('[fetchCalendarEvents] No events returned')
+  return []
+}
+```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use `.select('*')`** unless you're 100% certain all columns exist
+- ✅ **Check migrations** before explicitly selecting columns
+- ✅ **Add comprehensive error logging** to detect query failures
+- ✅ **Return empty array on error** to prevent breaking the app
+- ✅ **Verify database schema** matches TypeScript types before explicit selection
+- ✅ **Test with actual database** to ensure columns exist
+
+**Rule of Thumb:**
+> When querying Supabase:
+> 1. **Default to `.select('*')`** - it's safer and automatically selects existing columns
+> 2. **Only use explicit column selection** if you've verified all columns exist via migrations
+> 3. **Always check for errors** and log full error details (message, code, hint, details)
+> 4. **Return empty array on error** to prevent breaking the app
+> 5. **TypeScript types may include optional fields that don't exist** - don't assume types match database
+
+**How to Verify Database Schema:**
+1. Check migration files in `ops/migrations/` to see what columns were added
+2. Check base table creation in `scripts/create-*-tables.sql`
+3. Query database directly: `SELECT column_name FROM information_schema.columns WHERE table_name = 'table_name'`
+4. Use Supabase dashboard to inspect table structure
+
+**Files to Watch:**
+- `src/pages/Calendar.tsx` (`fetchCalendarEvents()` - uses `.select('*')`)
+- Any file using explicit column selection in Supabase queries
+- Migration files to verify which columns actually exist
+
+**Related:**
+- Section #18: Event Images Not Showing from Database
+- Section #15: Custom Email Verification System
+
+---
+
+### 25. Direct Supabase Queries Breaking After Refactoring ⭐ REFACTORING BREAKAGE (2025-01-XX)
+
+**What:** After refactoring to use centralized query utility, some files still use direct `supabase.from()` calls, causing RLS errors, inconsistent error handling, and broken functionality.
+
+**Root Cause:**
+1. Migration to centralized query utility (`src/lib/supabaseQuery.ts`) was incomplete
+2. Some files were missed during migration (e.g., `adminService.ts`, `BusinessPage.tsx`)
+3. Direct Supabase queries don't use centralized retry logic, error handling, or RLS policies correctly
+4. When RLS policies change, direct queries break but centralized utility handles them correctly
+5. Forms stop working after refactoring because they still use direct queries
+
+**Example:**
+```typescript
+// ❌ BROKEN: Direct Supabase query (no retry, inconsistent error handling)
+const { data, error } = await supabase
+  .from('business_applications')
+  .select('*')
+  .eq('email', auth.email)
+
+if (error) throw error // ❌ No retry, no error classification
+return data || []
+
+// ✅ CORRECT: Centralized query utility (retry, error handling, RLS compliance)
+const result = await query('business_applications', { logPrefix: '[MyBusiness]' })
+  .select('*')
+  .eq('email', auth.email.trim())
+  .order('created_at', { ascending: false })
+  .execute()
+
+if (result.error) {
+  console.error('[MyBusiness] ❌ Error loading applications:', result.error)
+  return [] // ✅ Graceful error handling
+}
+return result.data || []
+```
+
+**What Happened:**
+1. `useBusinessOperations.ts` was migrated to use centralized `query()` utility ✅
+2. `BusinessPage.tsx` was NOT migrated - still uses direct `supabase.from('business_applications').insert()` ❌
+3. `adminService.ts` was NOT migrated - still uses direct queries for SELECT/UPDATE/DELETE ❌
+4. When RLS policies changed, direct queries started failing with 403 errors
+5. Forms that worked before stopped working after refactoring other parts
+6. User gets "Success!" message but application doesn't appear (query fails silently)
+
+**The Fix:**
+1. **Migrate ALL direct Supabase queries** to use centralized utility:
+   ```typescript
+   // Replace ALL instances of:
+   supabase.from('business_applications').select() // ❌
+   supabase.from('business_applications').insert() // ❌
+   supabase.from('business_applications').update() // ❌
+   supabase.from('business_applications').delete() // ❌
+   
+   // With:
+   query('business_applications').select().execute() // ✅
+   insert('business_applications', [data]) // ✅
+   update('business_applications', data).eq('id', id).execute() // ✅
+   delete('business_applications').eq('id', id).execute() // ✅
+   ```
+
+2. **Add delay after insert** to ensure data is visible before querying:
+   ```typescript
+   await insert('business_applications', [applicationData])
+   await new Promise(resolve => setTimeout(resolve, 500)) // ✅ Wait for DB to process
+   await loadBusinessData() // ✅ Now query will find the new application
+   ```
+
+3. **Use `.trim()` on email** to prevent whitespace mismatches:
+   ```typescript
+   .eq('email', auth.email.trim()) // ✅ Prevents whitespace issues
+   ```
+
+**Prevention Checklist:**
+- ✅ **ALWAYS use centralized query utility** for all Supabase queries (no direct `supabase.from()` calls)
+- ✅ **Search for direct Supabase queries** before refactoring: `grep -r "supabase\.from\(" src/`
+- ✅ **Migrate ALL instances** when refactoring (don't leave some behind)
+- ✅ **Add delay after insert** before querying (ensure DB has processed the insert)
+- ✅ **Use `.trim()` on email** to prevent whitespace mismatches
+- ✅ **Test forms end-to-end** after refactoring (submit → verify it appears)
+- ✅ **Check for RLS errors** in console logs after refactoring
+- ✅ **Verify data appears** in UI after submission (not just "Success!" message)
+
+**Rule of Thumb:**
+> When refactoring to use centralized query utility:
+> 1. **Search for ALL direct Supabase queries** first: 
+>    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+>    - Bash: `grep -r "supabase\.from\(" src/`
+> 2. **Migrate ALL instances** in one commit (don't leave some behind)
+> 3. **Test forms end-to-end** after migration (submit → verify it appears)
+> 4. **Add delay after insert** before querying (ensure DB has processed)
+> 5. **Use `.trim()` on email** to prevent whitespace issues
+> 6. **Check console logs** for RLS errors after refactoring
+> 7. **Verify data appears** in UI (not just success message)
+
+**How to Find Direct Supabase Queries:**
+
+**PowerShell (Windows):**
+```powershell
+# Find all direct Supabase queries
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("
+
+# Find all business_applications queries specifically
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "business_applications"
+
+# Find all INSERT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.insert\("
+
+# Find all SELECT operations
+Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "\.select\("
+```
+
+**Bash/Linux/Mac:**
+```bash
+# Find all direct Supabase queries
+grep -r "supabase\.from\(" src/
+
+# Find all business_applications queries specifically
+grep -r "business_applications" src/ --include="*.ts" --include="*.tsx"
+
+# Find all INSERT operations
+grep -r "\.insert\(" src/ --include="*.ts" --include="*.tsx"
+
+# Find all SELECT operations
+grep -r "\.select\(" src/ --include="*.ts" --include="*.tsx"
+```
+
+**Files to Watch:**
+- `src/services/adminService.ts` - Still uses direct queries for business_applications
+- `src/pages/BusinessPage.tsx` - Still uses direct `insert()` for business_applications
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - ✅ Already migrated (use as reference)
+- Any file that was "missed" during migration
+
+**Breaking Changes:**
+- If you refactor one file to use centralized utility but leave others using direct queries → Forms break
+- If you change RLS policies but don't migrate all direct queries → Queries fail with 403 errors
+- If you don't add delay after insert → New data doesn't appear immediately (query runs too fast)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Direct queries cause 403 errors when RLS policies change
+- ✅ Centralized utility handles RLS correctly with retry logic
+- ✅ Adding delay after insert ensures data is visible before querying
+- ✅ Using `.trim()` on email prevents whitespace mismatches
+- ✅ Forms work correctly after migrating to centralized utility
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy changes)
+- Section #26: Missing Admin INSERT Policy for Providers (admin approval flow)
+- `docs/SUPABASE_QUERY_UTILITY.md` - Centralized query utility documentation
+- `docs/SUPABASE_QUERY_MIGRATION_TESTING.md` - Migration testing instructions
+
+---
+
+### 26. Missing Admin INSERT Policy for Providers ⭐ ADMIN APPROVAL FLOW (2025-01-XX) ✅ VERIFIED
+
+**What:** Admin cannot approve business applications because there's no admin INSERT policy for the `providers` table. When admin tries to create a provider on behalf of an applicant, they get "new row violates row-level security policy for table 'providers'".
+
+**Audit Results (2025-01-XX):**
+- ✅ **INSERT policy exists**: `providers_insert_auth` requires `owner_user_id = auth.uid()` (users can only create for themselves)
+- ❌ **Admin INSERT policy MISSING**: No `providers_insert_admin` policy exists
+- ✅ **UPDATE policy allows admin**: `providers_update_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ✅ **DELETE policy allows admin**: `providers_delete_owner` allows `((owner_user_id = auth.uid()) OR is_admin_user(auth.uid()))`
+- ⚠️ **Two `is_admin_user()` functions exist**: One checks JWT email directly, one checks `admin_emails` table (may need consolidation)
+
+**Root Cause:**
+1. The `providers` table has INSERT policy `providers_insert_auth` that requires `owner_user_id = auth.uid()` (users can only create providers for themselves)
+2. There's NO admin INSERT policy for providers (unlike UPDATE and DELETE which have admin policies)
+3. When admin approves a business application, they need to create a provider with `owner_user_id` belonging to the applicant (or null if applicant doesn't have an account)
+4. The INSERT policy blocks this because `owner_user_id` doesn't match admin's `auth.uid()`
+
+**What Happened:**
+1. Admin clicks "Approve & Create Provider" on a business application
+2. `approveApplication()` function tries to create a provider using centralized `insert()` utility
+3. Provider payload has `owner_user_id` belonging to the applicant (or null)
+4. RLS policy `providers_insert_auth` evaluates `owner_user_id = auth.uid()` → FALSE (admin's ID doesn't match applicant's ID)
+5. INSERT fails with "new row violates row-level security policy"
+6. Admin cannot approve applications
+
+**The Fix:**
+1. **Add admin INSERT policy** to match admin UPDATE and DELETE policies:
+   ```sql
+   CREATE POLICY "providers_insert_admin" 
+   ON public.providers FOR INSERT
+   WITH CHECK (is_admin_user(auth.uid()));
+   ```
+   
+   **Note:** The UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in the USING clause, but INSERT policies use `WITH CHECK` clause only (no USING clause). So the admin INSERT policy should be:
+   ```sql
+   WITH CHECK (is_admin_user(auth.uid()))
+   ```
+   
+   This allows admins to create providers with ANY `owner_user_id` (including null or applicant's ID).
+
+2. **Update master RLS file** to include admin INSERT policy (already done in fix)
+
+3. **Verify policies** after creation:
+   ```sql
+   SELECT policyname, cmd, with_check 
+   FROM pg_policies 
+   WHERE tablename = 'providers' AND cmd = 'INSERT'
+   ORDER BY policyname;
+   ```
+
+**Wrong Code:**
+```sql
+-- ❌ MISSING: No admin INSERT policy
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());  -- ❌ Only allows users to create for themselves
+
+-- Admin UPDATE and DELETE policies exist, but INSERT is missing ❌
+CREATE POLICY "providers_update_admin" ...;  -- ✅ Exists
+CREATE POLICY "providers_delete_admin" ...;  -- ✅ Exists
+-- ❌ providers_insert_admin is MISSING
+```
+
+**Correct Code:**
+```sql
+-- ✅ Users can create providers for themselves
+CREATE POLICY "providers_insert_auth" 
+ON public.providers FOR INSERT
+WITH CHECK (owner_user_id = auth.uid());
+
+-- ✅ Admins can create providers for anyone (including null owner_user_id)
+CREATE POLICY "providers_insert_admin" 
+ON public.providers FOR INSERT
+WITH CHECK (is_admin_user(auth.uid()));
+
+-- ✅ Admin UPDATE and DELETE policies already exist
+CREATE POLICY "providers_update_admin" ...;
+CREATE POLICY "providers_delete_admin" ...;
+```
+
+**Prevention Checklist:**
+- ✅ **Check for admin policies** when adding RLS policies for any table (INSERT, UPDATE, DELETE, SELECT)
+- ✅ **Admin policies should allow admins to create/update/delete any record** (not just their own)
+- ✅ **Use `is_admin_user(auth.uid())`** helper function for admin checks (consistent across all policies)
+- ✅ **Match pattern from other tables** - if UPDATE/DELETE have admin policies, INSERT should too
+- ✅ **Test admin flows** after adding RLS policies (approve applications, create providers, etc.)
+- ✅ **Verify policies exist** for all CRUD operations admin needs to perform
+
+**Rule of Thumb:**
+> When adding RLS policies for a table that admins need to manage:
+> 1. **Add policies for ALL operations** admins need (INSERT, UPDATE, DELETE, SELECT)
+> 2. **Use consistent naming** (`table_insert_admin`, `table_update_admin`, etc.)
+> 3. **Use `is_admin_user(auth.uid())`** helper function for admin checks
+> 4. **Test admin flows** after adding policies (don't just test user flows)
+> 5. **Check master RLS file** to ensure all admin policies are included
+
+**How to Check for Missing Admin Policies:**
+```sql
+-- Check all policies for providers table
+SELECT policyname, cmd, with_check 
+FROM pg_policies 
+WHERE tablename = 'providers'
+ORDER BY cmd, policyname;
+
+-- Should see:
+-- INSERT: providers_insert_auth, providers_insert_admin
+-- UPDATE: providers_update_owner, providers_update_admin
+-- DELETE: providers_delete_owner, providers_delete_admin
+-- SELECT: providers_select_all (or similar)
+```
+
+**Files to Watch:**
+- `ops/rls/02-MASTER-RLS-POLICIES.sql` - Master RLS policies (must include admin INSERT policy)
+- `ops/rls/fix-providers-admin-insert-rls.sql` - Fix file for missing admin INSERT policy
+- `src/utils/adminBusinessApplicationUtils.ts` - `approveApplication()` function (creates providers)
+- Any file that creates providers on behalf of others (admin approval flows)
+
+**Breaking Changes:**
+- If you remove admin INSERT policy → Admin cannot approve business applications
+- If you change `is_admin_user()` function → Admin policies break
+- If you change admin policy naming → Fix files won't drop old policies correctly
+
+**Audit Verification (2025-01-XX):**
+- ✅ **Current state confirmed**: Only `providers_insert_auth` exists (requires `owner_user_id = auth.uid()`)
+- ❌ **Missing policy confirmed**: No `providers_insert_admin` policy exists
+- ✅ **Fix will work**: Adding `providers_insert_admin` with `WITH CHECK (is_admin_user(auth.uid()))` will allow admins to create providers for anyone
+- ✅ **Pattern matches UPDATE/DELETE**: UPDATE and DELETE policies use `OR is_admin_user(auth.uid())` in USING clause, INSERT uses `WITH CHECK` clause
+- ⚠️ **Two `is_admin_user()` functions**: One checks JWT email directly, one checks `admin_emails` table - master RLS uses the one that takes `user_id` parameter
+
+**Testing Verified (2025-01-XX):**
+- ✅ After fix: Admin can approve business applications and create providers
+- ✅ After fix: Admin can create providers with `owner_user_id` belonging to applicants
+- ✅ After fix: Admin can create providers with `null` owner_user_id (for applicants without accounts)
+- ✅ Users can still create providers for themselves (existing `providers_insert_auth` policy still works)
+- ✅ RLS policies correctly enforce ownership for users and admin privileges for admins
+
+**Related:**
+- Section #24: RLS Policy Conflicts and Duplicate Policies (RLS policy patterns)
+- Section #25: Direct Supabase Queries Breaking After Refactoring (query utility usage)
+- Section #27: Missing Admin INSERT Policy for Calendar Events (calendar events admin creation)
+- `src/utils/adminBusinessApplicationUtils.ts` - Admin approval flow
+
+---
+
+### 27. Missing Admin INSERT Policy for Calendar Events ⭐ ADMIN SECTION (2025-01-XX) ✅ VERIFIED
+
+---
+
+### 28. MyBusiness Page - Applications Not Showing in Recently Approved/Rejected/Pending Sections ⭐ USER VISIBILITY ISSUE (2025-01-XX) ✅ VERIFIED
+
+**What:** Business owners receive emails about application rejections, but the "Recently Approved", "Recently Rejected", and "Pending Requests" sections on `/my-business` page only show change requests, not applications.
+
+**Root Cause:**
+1. The `HistoricalRequestsTab` component was only filtering and displaying `ProviderChangeRequest[]` items
+2. Business applications (`BusinessApplication[]`) were loaded but never passed to or displayed in these sections
+3. Users expected to see their rejected applications in "Recently Rejected" but only saw change requests
+
+**What Happened:**
+1. User submits business application → stored in `business_applications` table
+2. Admin rejects application → `status` set to `'rejected'`, email sent to user
+3. User visits `/my-business` → applications loaded via `useBusinessOperations.loadBusinessData()`
+4. User clicks "Recently Rejected" tab → `HistoricalRequestsTab` component renders
+5. Component only filters `nonFeaturedChangeRequests` → applications ignored
+6. User sees empty section → confusion and frustration
+
+**Files Changed:**
+
+1. **`src/pages/MyBusiness/components/HistoricalRequestsTab.tsx`**
+   - **Added:** `applications: BusinessApplication[]` prop to interface
+   - **Added:** Filtering logic for applications by status and date (last 30 days)
+   - **Added:** Combined display of both change requests and applications
+   - **Changed:** Component now accepts and displays both types
+   - **Dependencies:**
+     - `BusinessApplication` type from `../types`
+     - `ProviderChangeRequest` type from `../../../lib/supabaseData`
+     - `decided_at` field (optional) - uses `created_at` as fallback if missing
+   - **Breaking Changes:** ⚠️ **REQUIRES `applications` PROP** - All usages must pass this prop
+
+2. **`src/pages/MyBusiness.tsx`**
+   - **Changed:** Both `HistoricalRequestsTab` usages now pass `applications={applications}` prop
+   - **Changed:** "Pending Requests" tab now shows both applications and change requests
+   - **Changed:** Updated descriptions to mention both types
+   - **Dependencies:**
+     - `applications` state from `useBusinessOperations` hook
+     - `nonFeaturedChangeRequests` from `getNonFeaturedChangeRequests()` utility
+   - **Breaking Changes:** None - only additive changes
+
+3. **`src/pages/MyBusiness/types.ts`**
+   - **Added:** `decided_at?: string | null` field to `BusinessApplication` type
+   - **Reason:** Applications may have `decided_at` field in database (optional)
+   - **Breaking Changes:** None - optional field, backward compatible
+
+4. **`src/pages/MyBusiness/hooks/useBusinessOperations.ts`**
+   - **Added:** Enhanced debugging logs for applications and change requests
+   - **Added:** Status breakdown logging (approved/rejected/pending counts)
+   - **Added:** Recent items logging (last 30 days) for both types
+   - **Dependencies:** None - only logging changes
+   - **Breaking Changes:** None - only additive logging
+
+**Dependency Chain:**
+```
+MyBusiness.tsx
+    ↓ (passes applications prop)
+HistoricalRequestsTab.tsx
+    ↓ (filters and displays)
+BusinessApplication type (from types.ts)
+    ↓ (optional decided_at field)
+useBusinessOperations.ts (loads data)
+    ↓ (queries database)
+business_applications table
+```
+
+**What Could Break:**
+
+1. **If `applications` prop is not passed:**
+   - TypeScript error: Missing required prop
+   - Component will fail to compile
+   - **Prevention:** All usages updated in this change
+
+2. **If `decided_at` field doesn't exist in database:**
+   - Runtime error when accessing `app.decided_at`
+   - **Prevention:** All accesses use optional chaining or fallback to `created_at`
+
+3. **If `BusinessApplication` type changes:**
+   - TypeScript errors in `HistoricalRequestsTab`
+   - **Prevention:** Type is centralized in `types.ts`, all imports use same type
+
+4. **If filtering logic changes:**
+   - Applications might not appear in correct sections
+   - **Prevention:** Filtering logic is well-commented and uses same pattern as change requests
+
+**Testing Verified (2025-01-XX):**
+- ✅ Build succeeds with no TypeScript errors
+- ✅ All props properly typed and passed
+- ✅ Optional `decided_at` field handled safely
+- ✅ Fallback to `created_at` works correctly
+- ✅ Both change requests and applications display correctly
+- ✅ Sorting by date works for both types
+- ✅ Empty states show when no items found
+
+**Verification Checklist:**
+- [x] All `HistoricalRequestsTab` usages pass `applications` prop
+- [x] Type definitions include optional `decided_at` field
+- [x] All `decided_at` accesses have fallbacks
+- [x] Build succeeds without errors
+- [x] No linter errors
+- [x] Component properly filters by status and date
+- [x] Both types display correctly in UI
+
+**Related Files:**
+- `src/pages/MyBusiness/components/HistoricalRequestsTab.tsx` - Main component changed
+- `src/pages/MyBusiness.tsx` - Updated usages
+- `src/pages/MyBusiness/types.ts` - Type definition updated
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Enhanced logging
+- `src/lib/supabaseData.ts` - `ProviderChangeRequest` type (unchanged, used for reference)
+- `src/types/index.ts` - Global `BusinessApplication` type (already had `decided_at`)
+
+**Breaking Changes:**
+- ⚠️ **`HistoricalRequestsTab` now requires `applications` prop** - All usages must be updated
+- ✅ **Backward compatible:** Optional `decided_at` field doesn't break existing code
+
+**Prevention Pattern:**
+> When adding new data types to existing components:
+> 1. Check all usages of the component
+> 2. Update all usages to pass new required props
+> 3. Handle optional fields safely with fallbacks
+> 4. Test with both populated and empty data
+> 5. Document all dependencies in component comments
+
+
+### 30. Notifications Reappearing After Viewing (2025-11-09)
+
+**What:** Business owners kept seeing the same "Business Application Pending" toast in the global notification bell even after clicking and reviewing it. The badge would clear briefly, then reappear after Supabase realtime triggered another refresh.
+
+**Root Cause:**
+1. `NotificationBell.tsx` only flipped a local `read` flag when the button was clicked. Pending/pending-change notifications are re-derived from live Supabase queries (`business_applications`, `provider_change_requests`), so a reload reconstructed the array and ignored the previous click.
+2. There was no persisted acknowledgement list. When the realtime subscription re-fetched, the component rebuilt the notifications from scratch and the "read" state vanished.
+3. A recent column evolution on `user_notifications` meant the REST query using an explicit column list (`select('id,title,subject,message,body,type,data,metadata,created_at,is_read,read,read_at,link,link_section')`) started 400'ing because `link`/`link_section` are JSON metadata, not top-level columns. The failure short-circuited acknowledgement logic and forced a retry that rebuilt the array again.
+
+**What Happened:**
+1. Admin approves an application → `adminBusinessApplicationUtils.approveBusinessApplication()` inserts a `user_notifications` row with metadata.
+2. Business owner opens the bell → notification marked `read: true` locally but not persisted anywhere else.
+3. Realtime `postgres_changes` fires → `loadNotifications()` reruns, the same "pending application" object is rebuilt, unread count increments again.
+4. REST query 400 error floods console (`select=...&link=...`) → bell refresh loops, reinforcing the regression.
+
+**The Fix:**
+- Switched the Supabase REST call to `.select('*')` and normalized the result on the client, so schema changes won't 400.
+- Added resilient JSON parsing for `metadata`/`data` because Supabase may return them as plain strings.
+- Introduced `bf_notification_acknowledged_ids` localStorage key. When the dropdown opens, non-admin notifications get added to the acknowledged set and filtered out of future renders.
+- Persist acknowledged IDs across sessions (and tab reloads) via `acknowledgedIdsRef` + `persistAcknowledgedIds()` helper.
+- Auto-acknowledge immediately when the dropdown is opened so users aren't forced to click each row just to clear the badge.
+- Updated approval/rejection flows to write both `subject/body` and `title/message` plus metadata links so future parsing stays consistent.
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only flips local state; no persistence, so realtime rebuilds re-add items.
+const handleNotificationClick = async (notification: Notification) => {
+  setNotifications(prev =>
+    prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+  )
+  // No acknowledgement persistence → notification reappears on next reload.
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Persist acknowledgement ids and auto-ack on dropdown open.
+const ACK_STORAGE_KEY = 'bf_notification_acknowledged_ids'
+const acknowledgedIdsRef = useRef<Set<string>>(new Set())
+
+const persistAcknowledgedIds = (next: Set<string>) => {
+  acknowledgedIdsRef.current = next
+  setAcknowledgedIds(new Set(next))
+  window.localStorage.setItem(ACK_STORAGE_KEY, JSON.stringify(Array.from(next)))
+}
+
+useEffect(() => {
+  if (!isOpen || notifications.length === 0) return
+  const toAcknowledge = notifications.filter(
+    n => !n.isAdminNotification && !acknowledgedIdsRef.current.has(n.id)
+  )
+  if (toAcknowledge.length === 0) return
+  const next = new Set(acknowledgedIdsRef.current)
+  toAcknowledge.forEach(n => next.add(n.id))
+  persistAcknowledgedIds(next)
+}, [isOpen, notifications])
+```
+
+**Prevention Checklist:**
+- ✅ Keep Supabase queries using `.select('*')` unless you control the schema; normalize in code instead.
+- ✅ Persist acknowledgement state (localStorage or database) for any notification that can't be marked read server-side.
+- ✅ Update both the notification writer (`adminBusinessApplicationUtils`) and reader (`NotificationBell`) when metadata shape changes.
+- ✅ Guard JSON parsing on `metadata`/`data` because Supabase may return them as text.
+- ✅ Document new localStorage keys and reason for existence (see dependency tracking entry #15).
+
+**Rule of Thumb:**
+> If a notification is derived data (not a single row you can mark `read` in the database), you MUST persist acknowledgement out-of-band or it will keep coming back on every refresh.
+
+**Files to Watch:**
+- `src/components/NotificationBell.tsx` (acknowledgement + normalization logic)
+- `src/utils/adminBusinessApplicationUtils.ts` (writes notifications + metadata)
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` (entry #15 documents dependencies)
+- Supabase tables: `user_notifications`, `business_applications`, `provider_change_requests`, `dismissed_notifications`
+
+**Breaking Changes:**
+- Renaming/removing `bf_notification_acknowledged_ids` without migration will resurrect old notifications.
+- Reverting to explicit column selection will break as soon as the table schema evolves.
+- Removing the auto-acknowledgement effect will make notifications reappear when realtime fires.
+
+**Testing Verified (2025-11-09):**
+- ✅ Notification bell REST call no longer returns 400.
+- ✅ Opening the dropdown once clears the badge permanently for that notification.
+- ✅ Refreshing the page keeps the notification hidden (localStorage persists).
+- ✅ `user_notifications` rows with either `subject/body` or `title/message` render correctly.
+- ✅ Admin-sent approvals include deep links (`/my-business`) in metadata.
+
+**Related:**
+- `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
+- Section #28: MyBusiness visibility issues (same data sources)
+- Section #24: RLS conflicts (same tables, keep policies consistent)
+
+---
+
+## How to Prevent This (Action Plan)
+
+### Immediate (5 minutes after EVERY change):
+
+1. **Impact Analysis**
+
+   **PowerShell (Windows):**
+   ```powershell
+   # What files import what I changed?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-file"
+   
+   # What depends on this functionality?
+   Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-function"
+   ```
+
+   **Bash/Linux/Mac:**
+   ```bash
+   # What files import what I changed?
+   grep -r "changed-file" src/
+   
+   # What depends on this functionality?
+   grep -r "changed-function" src/
+   ```
+
+2. **Smoke Test Checklist**
+   - [ ] Can user sign up? 
+   - [ ] Can admin view profiles?
+   - [ ] Can admin view resident verification?
+   - [ ] Does name display correctly?
+   - [ ] Do other admin sections work?
+   - [ ] **Can admin navigate between pages without getting logged out?** ⭐ NEW
+   - [ ] **Does admin status persist during navigation?** ⭐ NEW
+  - [ ] **Can users log in without immutable field errors?** ⭐ NEW
+  - [ ] **Does user deletion remove ALL related data?** ⭐ NEW
+  - [ ] **Do all React components receive their props correctly?** ⭐ NEW
+  - [ ] **Are function props called with guard checks?** ⭐ NEW
+  - [ ] **Do deleted users stay deleted after page refresh?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete users who only exist in funnels/bookings without profiles?** ⭐ NEW ✅ TESTED
+  - [ ] **Can admin delete both business and customer accounts successfully?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users verify their email via custom verification system?** ⭐ NEW
+  - [ ] **Does email verification status update correctly after verification?** ⭐ NEW
+  - [ ] **Are unverified users blocked from protected features?** ⭐ NEW
+  - [ ] **Can users resend verification emails from account page?** ⭐ NEW
+  - [ ] **Do calendar events with database images show their images (not gradients)?** ⭐ NEW
+  - [ ] **Do calendar events without database images show gradient fallbacks?** ⭐ NEW
+  - [ ] **Can admin choose to delete or keep businesses when deleting user account?** ⭐ NEW ✅ TESTED
+  - [ ] **Does admin deletion prompt show business names when user has businesses?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses hard deleted when admin chooses to delete them?** ⭐ NEW ✅ TESTED
+  - [ ] **Are businesses soft deleted (unlinked) when admin chooses to keep them?** ⭐ NEW ✅ TESTED
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW ✅ TESTED
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+  - [ ] **Are all Supabase queries using centralized utility (no direct `supabase.from()` calls)?** ⭐ NEW
+  - [ ] **Do forms work end-to-end after refactoring (submit → verify data appears)?** ⭐ NEW
+
+3. **Manual Testing**
+   - Actually USE the app after every change
+   - Click through ALL related pages
+   - Don't just test the one thing you changed
+
+---
+
+### Short-term (1-2 days):
+
+1. **Integration Tests**
+   ```typescript
+   // Test critical flows end-to-end
+   describe('Signup to Admin View Flow', () => {
+     it('should work end-to-end', async () => {
+       // 1. Sign up with name and resident status
+       // 2. Verify name saved
+       // 3. Verify resident data saved
+       // 4. Admin logs in
+       // 5. Admin sees name
+       // 6. Admin sees resident verification data
+     })
+   })
+   ```
+
+2. **Dependency Documentation**
+   ```typescript
+   /**
+    * DEPENDENCIES:
+    * - AuthContext: Provides user session
+    * - admin-list-profiles: Returns profile data
+    * - ProfileRow type: Defines data structure
+    * 
+    * CONSUMERS:
+    * - ResidentVerificationSection: Displays data
+    * - UsersSection: Displays user list
+    * 
+    * IF YOU CHANGE THIS:
+    * - Update ProfileRow type
+    * - Update admin-list-profiles query
+    * - Test all consumers
+    */
+   ```
+
+3. **Change Impact Checklist**
+   - [ ] What files import this?
+   - [ ] What functions depend on this?
+   - [ ] What UI components use this?
+   - [ ] What data flows through this?
+   - [ ] Have I tested ALL of these?
+
+---
+
+### Long-term (1 week):
+
+1. **Architecture Review**
+   - Reduce shared state
+   - Create clear boundaries
+   - Document data flow
+   - Create integration tests for each boundary
+
+2. **Automated Testing**
+   - Unit tests for individual functions
+   - Integration tests for critical flows
+   - E2E tests for user journeys
+   - Run all tests before merging
+
+3. **Code Review Process**
+   - Reviewer checks: "What else might be affected?"
+   - Reviewer tests: "Does everything still work?"
+   - Reviewer verifies: "Are related files updated?"
+
+---
+
+## Checklist for Every Change
+
+Before committing ANY change:
+
+- [ ] **Impact Analysis:** What else might be affected?
+  
+  **PowerShell (Windows):**
+  ```powershell
+  Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "changed-thing"
+  ```
+  
+  **Bash/Linux/Mac:**
+  ```bash
+  grep -r "changed-thing" src/
+  ```
+- [ ] **Smoke Tests:** Does everything still work?
+  - [ ] Signup works - name must appear immediately after signup
+  - [ ] Signin works
+  - [ ] Admin pages load
+  - [ ] All sections display correctly
+  - [ ] Name is stored in database after signup
+  - [ ] Name is read from localStorage before database during signup
+  - [ ] **Can users submit business applications without RLS errors?** ⭐ NEW
+  - [ ] **Do business applications appear in user's "My Business" page after submission?** ⭐ NEW
+- [ ] **RLS Policy Checks** (if modifying database policies):
+  - [ ] Checked for duplicate policies before creating new ones
+  - [ ] Dropped ALL existing policies for the operation before creating new ones
+  - [ ] Verified only one policy exists per operation after creation
+  - [ ] Policy names match master RLS file
+  - [ ] Tested that inserts/updates/deletes work correctly
+  - [ ] Verified security (SELECT/DELETE policies still enforce email matching)
+- [ ] **Related Files:** Are they all updated?
+  - [ ] Types updated?
+  - [ ] Functions updated?
+  - [ ] Components updated?
+  - [ ] Tests updated?
+  - [ ] **RLS policies updated?** ⭐ NEW
+- [ ] **All Supabase queries migrated to centralized utility?** ⭐ NEW
+  - [ ] Search for direct queries:
+    - PowerShell: `Get-ChildItem -Path src -Include *.ts,*.tsx -Recurse | Select-String -Pattern "supabase\.from\("`
+    - Bash: `grep -r "supabase\.from\(" src/`
+  - [ ] Migrate all instances in one commit
+  - [ ] Test forms end-to-end after migration
+- [ ] **Integration Test:** Does the whole flow work?
+- [ ] **Manual Testing:** Actually USE the app
+
+---
+
+## Most Important Rule
+
+**Before making ANY change, ask yourself:**
+
+1. "What ELSE might be affected?"
+2. "Have I tested ALL related functionality?"
+3. "Does the WHOLE system still work?"
+
+**If you can't answer these, DON'T commit the change yet.**
+
+---
+
+## Summary
+
+**Root Cause:** 
+Fixing one thing without checking what ELSE depends on it.
+
+**Quick Fix (5 min):**
+- Run impact analysis (grep)
+- Run smoke tests manually
+- Don't commit until everything works
+
+**Long-term Fix:**
+- Integration tests
+- Dependency documentation
+- Architecture improvements
+- Automated testing
+
+**The Pattern:**
+```
+Fix X
+  → Break Y (hidden dependency)
+    → Fix Y
+      → Break Z (another hidden dependency)
+        → Fix Z
+          → Break X again (circular dependency)
+            → 🔥 BURN IT ALL DOWN
+```
+
+**The Solution:**
+```
+Fix X
+  → Check what depends on X
+  → Fix ALL related things
+  → Test EVERYTHING
+  → Then commit
+```
+
+---
+
+## Appendix A – Archived Incident Library
+
+*Resolved incidents retained for historical reference. See the main sections above for active patterns and prevention playbooks.*
+
+### 20. Admin Business Deletion Choice (2025-01-XX)
+
+_Archived:_ See Appendix entry 20 in [Appendix A – Archived Incident Library](#appendix-a--archived-incident-library) for summary and related links.
+
+---
+
+### 22. Event Images Stored in Supabase Storage (2025-01-XX)
+
+_Archived:_ See Appendix entry 22 for the storage workflow summary.
+
+---
+
+### 23. Gradient Strings Saved to Database (2025-11-05)
+
+**What:** Populate scripts were saving CSS gradient strings (like `"linear-gradient(135deg, #667eea 0%, #764ba2 100%)"`) directly to the `image_url` column in the database when images couldn't be fetched. Gradient strings should NEVER be stored in the database - they should be computed dynamically on the frontend when `image_url` is `null`.
+
+**Root Cause:**
+1. `populate-event-images.ts` (both Netlify function and local script) were saving gradient strings to `image_url` when Unsplash API failed or when storage failed
+2. The code treated gradients as a "fallback value" that should be saved to the database
+3. This caused events to have gradient strings in `image_url` instead of actual image URLs or `null`
+4. Frontend code already handles `null` image_url by computing gradients dynamically - saving gradients to DB was redundant and wrong
+
+**What Happened:**
+1. Events from iCalendar feeds were inserted without `image_url` (correctly set to `null`)
+2. Populate script ran to fetch images for events without images
+3. When Unsplash API failed or Supabase Storage failed, script saved gradient strings to `image_url`
+4. Database now had gradient strings in `image_url` column
+5. Frontend code detects gradient strings and ignores them (correctly), but this defeats the purpose of having images in the database
+
+**The Fix:**
+- **Never save gradient strings**: Updated all populate scripts to set `image_url: null` instead of saving gradient strings when images can't be fetched
+- **Frontend computes gradients**: The frontend already has logic to compute gradients when `image_url` is `null` - no need to save gradients to database
+- **Preserve existing images**: All external feed processors (iCalendar, RSS, KPBS, VoSD) preserve existing `image_url` and `image_type` when re-fetching events
+- **Only populate missing images**: Populate scripts only process events with `null` image_url (not events that already have images)
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Saves gradient strings to database
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl) {
+      imageUrl = storageUrl
+      imageType = 'image'
+    } else {
+      // Storage failed - save gradient string to database ❌ WRONG
+      imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+      imageType = 'gradient'
+    }
+  } else {
+    // Unsplash failed - save gradient string to database ❌ WRONG
+    imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+    imageType = 'gradient'
+  }
+} else {
+  // No API key - save gradient string to database ❌ WRONG
+  imageUrl = getEventGradient(event) // ❌ This is a CSS string!
+  imageType = 'gradient'
+}
+
+await supabase
+  .from('calendar_events')
+  .update({ image_url: imageUrl, image_type: imageType }) // ❌ Saves gradient string!
+```
+
+**Correct Code:**
+```typescript
+// ✅ CORRECT: Never saves gradient strings, sets to null instead
+let imageUrl: string | null = null
+let imageType: 'image' | null = null
+
+if (UNSPLASH_KEY) {
+  const unsplashUrl = await fetchUnsplashImage(keywords)
+  if (unsplashUrl) {
+    const storageUrl = await downloadAndStoreImage(unsplashUrl, event.id)
+    if (storageUrl

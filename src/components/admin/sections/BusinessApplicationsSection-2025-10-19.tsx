@@ -266,6 +266,36 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                             <span className="text-neutral-600">{parsed.images.length} image(s) uploaded</span>
                           </div>
                         )}
+                        {(() => {
+                          const updates = Array.isArray(parsed.update_requests)
+                            ? parsed.update_requests
+                            : parsed.update_request
+                            ? [parsed.update_request]
+                            : []
+
+                          if (!updates.length) return null
+
+                          return (
+                            <div>
+                              <span className="font-medium text-neutral-700">Owner Update Requests:</span>
+                              <ul className="mt-1 ml-4 space-y-1 list-disc text-neutral-600">
+                                {updates.map((req: any, idx: number) => (
+                                  <li key={idx}>
+                                    <span className="font-medium text-neutral-700">{req?.message || 'Update Requested'}</span>
+                                    {req?.requested_at && (
+                                      <span className="ml-2 text-xs text-neutral-500">
+                                        {new Date(req.requested_at).toLocaleString()}
+                                      </span>
+                                    )}
+                                    {req?.requested_by && (
+                                      <span className="ml-2 text-xs text-neutral-500">by {req.requested_by}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
                   )

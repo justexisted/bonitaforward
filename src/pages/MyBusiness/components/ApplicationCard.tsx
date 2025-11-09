@@ -5,7 +5,7 @@ import type { BusinessApplication } from '../types'
  * APPLICATION CARD COMPONENT
  * 
  * Displays a single business application with basic information
- * and action button to request a free listing from the application.
+ * and allows the owner to request a status update from the admin.
  * 
  * Extracted from MyBusiness.tsx for better maintainability.
  */
@@ -105,9 +105,25 @@ export function ApplicationCard({ application, onRequestFreeListing, onDeleteRej
       </span>
     )
   }
+
+  const updateRequestMeta = (() => {
+    if (!application.challenge) return { exists: false, latest: null as any }
+    try {
+      const parsed = JSON.parse(application.challenge)
+      const updates = Array.isArray(parsed.update_requests)
+        ? parsed.update_requests
+        : parsed.update_request
+        ? [parsed.update_request]
+        : []
+      if (updates.length === 0) return { exists: false, latest: null as any }
+      return { exists: true, latest: updates[updates.length - 1] }
+    } catch {
+      return { exists: false, latest: null as any }
+    }
+  })()
   
-  // Only show "Request Free Listing" button for pending applications
-  const showRequestButton = (application.status === 'pending' || !application.status)
+  // Only show "Request Update" button for pending applications without an open request
+  const showRequestButton = (application.status === 'pending' || !application.status) && !updateRequestMeta.exists
   
   return (
     <div key={application.id} className="rounded-2xl border border-neutral-100 p-6 bg-white">
@@ -146,9 +162,16 @@ export function ApplicationCard({ application, onRequestFreeListing, onDeleteRej
             </p>
           )}
           
-          {showRequestButton && (
-            <p className="text-sm text-amber-700 mt-3">
-              ⏳ Your application is under review. You'll be notified once a decision has been made.
+          <p className="text-sm text-amber-700 mt-3">
+            ⏳ Your application is under review. You'll be notified once a decision has been made.
+          </p>
+
+          {updateRequestMeta.exists && (
+            <p className="text-xs text-neutral-500 mt-2">
+              {updateRequestMeta.latest?.message || 'Update request sent.'}
+              {updateRequestMeta.latest?.requested_at && (
+                <> — {new Date(updateRequestMeta.latest.requested_at).toLocaleString()}</>
+              )}
             </p>
           )}
         </div>
@@ -158,7 +181,7 @@ export function ApplicationCard({ application, onRequestFreeListing, onDeleteRej
               onClick={() => onRequestFreeListing(application.id)}
               className="rounded-full bg-green-50 text-green-700 px-3 py-1.5 text-xs border border-green-200 hover:bg-green-100 transition-colors"
             >
-              Request Free Listing
+              Request Update
             </button>
           )}
           {onCancelPending && (application.status === 'pending' || !application.status) && (
