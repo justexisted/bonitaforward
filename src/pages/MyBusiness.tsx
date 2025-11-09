@@ -157,7 +157,6 @@ export default function MyBusinessPage() {
     setShowSubscriptionCard,
     setUserPlanChoice,
     setEditingListing,
-    setShowCreateForm,
     isUpdating,
     setIsUpdating,
     isSubmittingApplication,
