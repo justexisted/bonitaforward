@@ -110,24 +110,6 @@ export function BusinessListingForm({
       enable_email_contact: listing?.enable_email_contact || false
     })
   
-    // Restaurant tag options
-    const restaurantTagOptions = {
-      cuisine: [
-        'American', 'Italian', 'Mexican', 'Asian', 'Mediterranean', 'French', 'Indian', 
-        'Chinese', 'Japanese', 'Thai', 'Vietnamese', 'Korean', 'Middle Eastern', 'Latin American',
-        'Seafood', 'Steakhouse', 'Vegetarian', 'Vegan', 'Fusion', 'Other'
-      ],
-      occasion: [
-        'Casual', 'Family', 'Date', 'Business', 'Celebration', 'Quick Bite', 'Fine Dining',
-        'Takeout', 'Delivery', 'Outdoor Seating', 'Group Friendly'
-      ],
-      priceRange: ['$', '$$', '$$$', '$$$$'],
-      diningType: [
-        'Dine-in', 'Takeout', 'Delivery', 'Drive-through', 'Counter Service', 
-        'Full Service', 'Buffet', 'Café', 'Bar & Grill', 'Food Truck'
-      ]
-    }
-  
     // Update form data when listing changes (important for after successful updates)
     useEffect(() => {
       if (listing) {
@@ -178,32 +160,11 @@ export function BusinessListingForm({
       }
     }, [listing, defaultIsMember])
   
-    // Initialize restaurant tags when listing changes or when editing existing listing
-    useEffect(() => {
-      if (listing?.tags && formData.category_key === 'restaurants-cafes') {
-        const tags = listing.tags
-        setRestaurantTags({
-          cuisine: tags.find(tag => restaurantTagOptions.cuisine.includes(tag)) || '',
-          occasion: tags.find(tag => restaurantTagOptions.occasion.includes(tag)) || '',
-          priceRange: tags.find(tag => restaurantTagOptions.priceRange.includes(tag)) || '',
-          diningType: tags.find(tag => restaurantTagOptions.diningType.includes(tag)) || ''
-        })
-      }
-    }, [listing, formData.category_key])
-  
     const [newTag, setNewTag] = useState('')
     const [newSpecialty, setNewSpecialty] = useState('')
     const [newServiceArea, setNewServiceArea] = useState('')
     const [newSocialPlatform, setNewSocialPlatform] = useState('')
     const [newSocialUrl, setNewSocialUrl] = useState('')
-    
-    // Restaurant-specific tag selections
-    const [restaurantTags, setRestaurantTags] = useState({
-      cuisine: '',
-      occasion: '',
-      priceRange: '',
-      diningType: ''
-    })
     
   // Image upload state management
   const [uploadingImages, setUploadingImages] = useState(false)
@@ -372,32 +333,6 @@ export function BusinessListingForm({
         ...prev,
         service_areas: prev.service_areas?.filter(area => area !== areaToRemove) || []
       }))
-    }
-  
-    // Handle restaurant tag updates
-    const updateRestaurantTag = (type: keyof typeof restaurantTags, value: string) => {
-      const oldValue = restaurantTags[type]
-      
-      setRestaurantTags(prev => ({
-        ...prev,
-        [type]: value
-      }))
-  
-      // Remove old tag if it exists
-      if (oldValue) {
-        setFormData(prev => ({
-          ...prev,
-          tags: prev.tags?.filter(tag => tag !== oldValue) || []
-        }))
-      }
-  
-      // Add new tag if value is not empty
-      if (value && !formData.tags?.includes(value)) {
-        setFormData(prev => ({
-          ...prev,
-          tags: [...(prev.tags || []), value]
-        }))
-      }
     }
   
     const addSocialLink = () => {
@@ -1124,90 +1059,8 @@ export function BusinessListingForm({
                   Tags
                 </label>
                 
-                {/* Conditional restaurant tag guidance */}
-                {formData.category_key === 'restaurants-cafes' && (
-                  <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h4 className="text-sm font-medium text-blue-900 mb-3">
-                      🍽️ Restaurant Tags - Help customers find you!
-                    </h4>
-                    <p className="text-xs text-blue-700 mb-4">
-                      Select your restaurant characteristics below. These will be automatically added as tags to help customers discover your business.
-                    </p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Cuisine Type */}
-                      <div>
-                        <label className="block text-xs font-medium text-blue-800 mb-1">
-                          Cuisine Type *
-                        </label>
-                        <select
-                          value={restaurantTags.cuisine}
-                          onChange={(e) => updateRestaurantTag('cuisine', e.target.value)}
-                          className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select cuisine type</option>
-                          {restaurantTagOptions.cuisine.map(cuisine => (
-                            <option key={cuisine} value={cuisine}>{cuisine}</option>
-                          ))}
-                        </select>
-                      </div>
-  
-                      {/* Occasion */}
-                      <div>
-                        <label className="block text-xs font-medium text-blue-800 mb-1">
-                          Best For *
-                        </label>
-                        <select
-                          value={restaurantTags.occasion}
-                          onChange={(e) => updateRestaurantTag('occasion', e.target.value)}
-                          className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select occasion</option>
-                          {restaurantTagOptions.occasion.map(occasion => (
-                            <option key={occasion} value={occasion}>{occasion}</option>
-                          ))}
-                        </select>
-                      </div>
-  
-                      {/* Price Range */}
-                      <div>
-                        <label className="block text-xs font-medium text-blue-800 mb-1">
-                          Price Range *
-                        </label>
-                        <select
-                          value={restaurantTags.priceRange}
-                          onChange={(e) => updateRestaurantTag('priceRange', e.target.value)}
-                          className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select price range</option>
-                          {restaurantTagOptions.priceRange.map(price => (
-                            <option key={price} value={price}>
-                              {price} {price === '$' ? 'Budget-friendly' : price === '$$' ? 'Moderate' : price === '$$$' ? 'Upscale' : 'Fine dining'}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-  
-                      {/* Dining Type */}
-                      <div>
-                        <label className="block text-xs font-medium text-blue-800 mb-1">
-                          Dining Type *
-                        </label>
-                        <select
-                          value={restaurantTags.diningType}
-                          onChange={(e) => updateRestaurantTag('diningType', e.target.value)}
-                          className="w-full text-sm rounded-lg border border-blue-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select dining type</option>
-                          {restaurantTagOptions.diningType.map(type => (
-                            <option key={type} value={type}>{type}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-  
+                {/* Legacy restaurant-specific select UI removed to avoid duplicate tag pickers;
+                    the responsive selector now handles restaurant presets upstream. */}
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
