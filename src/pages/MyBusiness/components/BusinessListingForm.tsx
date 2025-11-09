@@ -53,13 +53,15 @@ export function BusinessListingForm({
     onSave, 
     onCancel,
     isUpdating = false,
-    isSubmittingApplication = false
+    isSubmittingApplication = false,
+    defaultIsMember = false
   }: { 
     listing: BusinessListing | null
     onSave: (data: Partial<BusinessListing>) => void
     onCancel: () => void
     isUpdating?: boolean
     isSubmittingApplication?: boolean
+    defaultIsMember?: boolean
   }) {
     console.log('[BusinessListingForm] Rendering with listing:', listing?.id, listing?.name)
     
@@ -79,7 +81,7 @@ export function BusinessListingForm({
       rating: listing?.rating || null,
       badges: listing?.badges || [],
       published: listing?.published || false,
-      is_member: listing?.is_member || false,
+      is_member: listing?.is_member ?? defaultIsMember ?? false,
       
       // Enhanced business management fields (now properly stored in database)
       description: listing?.description || '',
@@ -166,8 +168,13 @@ export function BusinessListingForm({
           enable_call_contact: listing.enable_call_contact || false,
           enable_email_contact: listing.enable_email_contact || false
         })
+      } else if (typeof defaultIsMember === 'boolean') {
+        setFormData(prev => ({
+          ...prev,
+          is_member: defaultIsMember
+        }))
       }
-    }, [listing])
+    }, [listing, defaultIsMember])
   
     // Initialize restaurant tags when listing changes or when editing existing listing
     useEffect(() => {
@@ -207,6 +214,16 @@ export function BusinessListingForm({
       { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
       { key: 'professional-services', name: 'Professional Services' }
     ]
+  
+    const handlePlanSelect = (plan: 'free' | 'featured') => {
+      if (listing) return
+      setFormData(prev => ({
+        ...prev,
+        is_member: plan === 'featured'
+      }))
+    }
+
+    const isFeaturedSelected = Boolean(formData.is_member)
   
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault()
@@ -534,6 +551,49 @@ export function BusinessListingForm({
             </div>
   
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Listing Plan Selection */}
+              {!listing ? (
+                <div className="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-800">Listing Plan</p>
+                      <p className="text-xs text-neutral-600">This matches what you selected in Step 1 and controls available features.</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${isFeaturedSelected ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700'}`}>
+                      {isFeaturedSelected ? 'Featured listing' : 'Free listing'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handlePlanSelect('free')}
+                      className={`rounded-lg border px-4 py-3 text-left transition-colors ${!isFeaturedSelected ? 'border-green-500 bg-white shadow-sm' : 'border-neutral-200 bg-white hover:border-neutral-300'}`}
+                    >
+                      <p className="text-sm font-semibold text-neutral-800 mb-1">Free Listing</p>
+                      <p className="text-xs text-neutral-600">Core business info, 200 character description, 1 image.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePlanSelect('featured')}
+                      className={`rounded-lg border px-4 py-3 text-left transition-colors ${isFeaturedSelected ? 'border-yellow-500 bg-white shadow-sm' : 'border-neutral-200 bg-white hover:border-neutral-300'}`}
+                    >
+                      <p className="text-sm font-semibold text-neutral-800 mb-1">Featured Listing</p>
+                      <p className="text-xs text-neutral-600">Priority placement, 500 character description, multiple images & booking tools.</p>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between border border-neutral-200 rounded-lg px-4 py-3 bg-neutral-50">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-800">Listing Plan</p>
+                    <p className="text-xs text-neutral-600">Plan type is managed through account upgrades.</p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${isFeaturedSelected ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700'}`}>
+                    {isFeaturedSelected ? 'Featured listing' : 'Free listing'}
+                  </span>
+                </div>
+              )}
+
               {/* Basic Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

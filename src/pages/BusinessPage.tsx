@@ -36,7 +36,7 @@ async function createBusinessApplication(params: { full_name?: string; business_
         category: params.category || null,
         challenge: params.challenge || null,
         tier_requested: (params.tier || 'free') as 'free' | 'featured',
-        status: 'pending' as 'pending' | 'approved' | 'rejected'
+        status: 'pending' as 'pending' | 'approved' | 'rejected' | 'cancelled'
       }],
       { logPrefix: '[BusinessApp]' }
     )

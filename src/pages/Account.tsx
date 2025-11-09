@@ -14,6 +14,8 @@ import {
   loadPendingApplications,
   loadMyBusinesses,
   requestApplicationUpdate,
+  cancelPendingApplication,
+  deleteRejectedApplication,
   updateEvent,
   deleteEvent
 } from './account/dataLoader'
@@ -123,23 +125,102 @@ export default function AccountPage() {
     if (!confirmed) return
     
     try {
-      const { error } = await supabase
-        .from('business_applications')
-        .delete()
-        .eq('id', appId)
-      
-      if (error) {
-        setMessage(`Failed to cancel application: ${error.message}`)
-      } else {
-        // Remove from local state
-        setData(prev => ({
-          ...prev,
-          pendingApps: prev.pendingApps.filter(app => app.id !== appId)
-        }))
-        setMessage(`Application for "${businessName}" has been cancelled`)
+      console.log('[Account] cancelApplication clicked:', {
+        appId,
+        businessName,
+        userEmail: auth.email,
+        pendingAppsCount: data.pendingApps.length
+      })
+
+      setMessage(null)
+      setMessageType('info')
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+
+      if (!accessToken) {
+        console.error('[Account] cancelApplication missing access token')
+        setMessage('Failed to cancel application: missing authentication token. Please sign in again.')
+        setMessageType('error')
+        return
       }
+
+      const result = await cancelPendingApplication(appId, accessToken)
+
+      console.log('[Account] cancelApplication supabase response:', {
+        success: result.success,
+        error: result.error
+      })
+
+      if (!result.success) {
+        setMessage(`Failed to cancel application: ${result.error || 'Unknown error'}`)
+        setMessageType('error')
+        return
+      }
+
+      // Remove from local state so the UI updates immediately
+      setData(prev => ({
+        ...prev,
+        pendingApps: prev.pendingApps.filter(app => app.id !== appId)
+      }))
+      setMessage(`Application for "${businessName}" has been cancelled`)
+      setMessageType('success')
     } catch (err: any) {
+      console.error('[Account] cancelApplication unexpected error:', err)
       setMessage(`Error cancelling application: ${err.message}`)
+      setMessageType('error')
+    }
+  }
+
+  async function deleteApplication(appId: string, businessName: string) {
+    const confirmed = confirm(`Delete the application "${businessName}" from your list? Admins will retain a record for reporting.`)
+    if (!confirmed) return
+
+    try {
+      console.log('[Account] deleteApplication clicked:', {
+        appId,
+        businessName,
+        userEmail: auth.email,
+        pendingAppsCount: data.pendingApps.length
+      })
+
+      setMessage(null)
+      setMessageType('info')
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+
+      if (!accessToken) {
+        console.error('[Account] deleteApplication missing access token')
+        setMessage('Failed to delete application: missing authentication token. Please sign in again.')
+        setMessageType('error')
+        return
+      }
+
+      const result = await deleteRejectedApplication(appId, accessToken)
+
+      console.log('[Account] deleteApplication function response:', {
+        success: result.success,
+        error: result.error
+      })
+
+      if (!result.success) {
+        setMessage(`Failed to delete application: ${result.error || 'Unknown error'}`)
+        setMessageType('error')
+        return
+      }
+
+      setData(prev => ({
+        ...prev,
+        pendingApps: prev.pendingApps.filter(app => app.id !== appId)
+      }))
+
+      setMessage(`Application "${businessName}" removed from your list.`)
+      setMessageType('success')
+    } catch (err: any) {
+      console.error('[Account] deleteApplication unexpected error:', err)
+      setMessage(`Error deleting application: ${err.message}`)
+      setMessageType('error')
     }
   }
 
@@ -781,13 +862,21 @@ export default function AccountPage() {
                             </h3>
                             <div className="flex items-center gap-2">
                               <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                                app.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                app.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
+                                app.status === 'approved'
+                                  ? 'bg-green-100 text-green-700'
+                                  : app.status === 'rejected'
+                                  ? 'bg-red-100 text-red-700'
+                                  : app.status === 'cancelled'
+                                  ? 'bg-neutral-200 text-neutral-600'
+                                  : 'bg-yellow-100 text-yellow-700'
                               }`}>
-                                {app.status === 'approved' ? '✓ Approved' :
-                                 app.status === 'rejected' ? '✗ Rejected' :
-                                 '⏳ Pending Review'}
+                                {app.status === 'approved'
+                                  ? '✓ Approved'
+                                  : app.status === 'rejected'
+                                  ? '✗ Rejected'
+                                  : app.status === 'cancelled'
+                                  ? 'Cancelled'
+                                  : '⏳ Pending Review'}
                               </span>
                               {app.tier_requested && (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
@@ -841,6 +930,15 @@ export default function AccountPage() {
                                   Cancel
                                 </button>
                               </>
+                            )}
+                            {(app.status === 'rejected' || app.status === 'cancelled') && (
+                              <button
+                                onClick={() => deleteApplication(app.id, app.business_name || 'Untitled Application')}
+                                className="flex-shrink-0 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors flex items-center gap-2"
+                                title="Remove this application from your list"
+                              >
+                                Delete
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1396,13 +1494,21 @@ export default function AccountPage() {
                             </h3>
                             <div className="flex items-center gap-2">
                               <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                                app.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                app.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
+                                app.status === 'approved'
+                                  ? 'bg-green-100 text-green-700'
+                                  : app.status === 'rejected'
+                                  ? 'bg-red-100 text-red-700'
+                                  : app.status === 'cancelled'
+                                  ? 'bg-neutral-200 text-neutral-600'
+                                  : 'bg-yellow-100 text-yellow-700'
                               }`}>
-                                {app.status === 'approved' ? '✓ Approved' :
-                                 app.status === 'rejected' ? '✗ Rejected' :
-                                 '⏳ Pending Review'}
+                                {app.status === 'approved'
+                                  ? '✓ Approved'
+                                  : app.status === 'rejected'
+                                  ? '✗ Rejected'
+                                  : app.status === 'cancelled'
+                                  ? 'Cancelled'
+                                  : '⏳ Pending Review'}
                               </span>
                               {app.tier_requested && (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
@@ -1456,6 +1562,15 @@ export default function AccountPage() {
                                   Cancel
                                 </button>
                               </>
+                            )}
+                            {app.status === 'rejected' && (
+                              <button
+                                onClick={() => deleteApplication(app.id, app.business_name || 'Untitled Application')}
+                                className="flex-shrink-0 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors flex items-center gap-2"
+                                title="Remove this application from your list"
+                              >
+                                Delete
+                              </button>
                             )}
                           </div>
                         </div>

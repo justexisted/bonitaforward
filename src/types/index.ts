@@ -264,8 +264,9 @@ export type BusinessApplication = {
   challenge?: string | null
   created_at: string
   tier_requested?: 'free' | 'featured' | null
-  status?: 'pending' | 'approved' | 'rejected' | null
+  status?: 'pending' | 'approved' | 'rejected' | 'cancelled' | null
   decided_at?: string | null
+  owner_hidden_at?: string | null
 }
 
 // ============================================================================

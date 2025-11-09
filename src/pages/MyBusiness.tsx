@@ -65,7 +65,7 @@
  * FOR SELECT USING (bucket_id = 'business-images');
  */
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { type PlanChoice } from '../utils/planChoiceDb'
@@ -126,6 +126,10 @@ export default function MyBusinessPage() {
   
   // Check if user has chosen a plan (free, featured, or featured-pending)
   const hasPlanChosen = userPlanChoice !== null && userPlanChoice !== undefined
+  const defaultPlanIsFeatured = useMemo(
+    () => userPlanChoice === 'featured' || userPlanChoice === 'featured-pending',
+    [userPlanChoice]
+  )
   
   // Reference for plan selection section (for scrolling)
   const planSelectionRef = useRef<HTMLDivElement>(null)
@@ -173,7 +177,9 @@ export default function MyBusinessPage() {
     promptAndUploadImages,
     createBusinessListing,
     updateBusinessListing,
-    deleteBusinessListing
+    deleteBusinessListing,
+    deleteBusinessApplication,
+    cancelBusinessApplication
   } = businessOps
   
   // Wrapper for upgradeToFeatured that shows the modal after submission
@@ -865,6 +871,12 @@ export default function MyBusinessPage() {
                       key={app.id}
                       application={app}
                       onRequestFreeListing={requestFreeListingFromApp}
+                      onDeleteRejected={(applicationId) => {
+                        void deleteBusinessApplication(applicationId)
+                      }}
+                      onCancelPending={(applicationId, businessName) => {
+                        void cancelBusinessApplication(applicationId, businessName)
+                      }}
                     />
                   ))
                 )}
@@ -1086,11 +1098,17 @@ export default function MyBusinessPage() {
                 updateBusinessListing(editingListing.id, updates)
               } :
               (data) => {
-                createBusinessListing(data)
+                createBusinessListing(data).then((result) => {
+                  if (result?.closed === true) {
+                    setShowCreateForm(false)
+                    setEditingListing(null)
+                  }
+                })
               }
             }
             isUpdating={isUpdating}
             isSubmittingApplication={isSubmittingApplication}
+            defaultIsMember={defaultPlanIsFeatured}
             onCancel={() => {
               setShowCreateForm(false)
               setEditingListing(null)

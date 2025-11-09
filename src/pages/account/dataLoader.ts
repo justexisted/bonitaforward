@@ -264,7 +264,10 @@ export async function loadPendingApplications(email: string): Promise<PendingApp
       return []
     }
     
-    const applications = (result.data || []).map((r: any) => ({
+    const applications = (result.data || [])
+      // Skip applications hidden by owner or cancelled
+      .filter((r: any) => r.status !== 'cancelled' && !r.owner_hidden_at)
+      .map((r: any) => ({
       id: r.id,
       business_name: r.business_name,
       full_name: r.full_name,
@@ -276,6 +279,7 @@ export async function loadPendingApplications(email: string): Promise<PendingApp
       status: r.status,
       created_at: r.created_at,
       updated_at: r.updated_at,
+      owner_hidden_at: r.owner_hidden_at,
     }))
     
     console.log('[Account] ✅ Loaded applications:', {
@@ -315,6 +319,101 @@ export async function requestApplicationUpdate(applicationId: string, message: s
   } catch (err: any) {
     console.error('[Account] Error requesting update:', err)
     return { success: false, error: err.message || 'Failed to request update' }
+  }
+}
+
+export async function cancelPendingApplication(applicationId: string, accessToken: string): Promise<{ success: boolean, error?: string }> {
+  try {
+    const timestamp = new Date().toISOString()
+
+    console.log('[Account] cancelPendingApplication invoked:', {
+      applicationId,
+      timestamp,
+      updatePayload: {
+        status: 'cancelled',
+        decided_at: timestamp,
+        updated_at: timestamp
+      }
+    })
+
+    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const endpoint = isLocal
+      ? 'http://localhost:8888/.netlify/functions/cancel-business-application'
+      : '/.netlify/functions/cancel-business-application'
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        application_id: applicationId
+      })
+    })
+
+    const responseBody = await response.json().catch(() => ({}))
+
+    console.log('[Account] cancelPendingApplication function response:', {
+      status: response.status,
+      ok: response.ok,
+      body: responseBody
+    })
+
+    if (!response.ok || responseBody?.success === false) {
+      const errorMessage = responseBody?.error || `Request failed with status ${response.status}`
+      return { success: false, error: errorMessage }
+    }
+
+    const statusFromFunction = responseBody?.status || responseBody?.data?.status
+    if (statusFromFunction && statusFromFunction !== 'cancelled') {
+      return { success: false, error: `Unexpected application status "${statusFromFunction}" from cancel function` }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Account] Error cancelling application:', err)
+    return { success: false, error: err?.message || 'Failed to cancel application' }
+  }
+}
+
+export async function deleteRejectedApplication(applicationId: string, accessToken: string): Promise<{ success: boolean, error?: string }> {
+  try {
+    console.log('[Account] deleteRejectedApplication invoked:', { applicationId })
+
+    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const endpoint = isLocal
+      ? 'http://localhost:8888/.netlify/functions/delete-business-application'
+      : '/.netlify/functions/delete-business-application'
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        application_id: applicationId
+      })
+    })
+
+    const responseBody = await response.json().catch(() => ({}))
+
+    console.log('[Account] deleteRejectedApplication function response:', {
+      status: response.status,
+      ok: response.ok,
+      body: responseBody
+    })
+
+    if (!response.ok || responseBody?.success === false) {
+      const errorMessage = responseBody?.error || `Request failed with status ${response.status}`
+      return { success: false, error: errorMessage }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Account] Error deleting application:', err)
+    return { success: false, error: err?.message || 'Failed to delete application' }
   }
 }
 

@@ -61,9 +61,10 @@ export type BusinessApplication = {
   category: string | null
   challenge: string | null
   tier_requested: 'free' | 'featured' | null
-  status: 'pending' | 'approved' | 'rejected' | null
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | null
   created_at: string
   decided_at?: string | null  // Optional field - may not exist in all database schemas
+  owner_hidden_at?: string | null
 }
 
 // Type definition for job posts in the provider_job_posts table

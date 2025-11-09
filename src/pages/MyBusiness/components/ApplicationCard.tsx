@@ -13,9 +13,11 @@ import type { BusinessApplication } from '../types'
 interface ApplicationCardProps {
   application: BusinessApplication
   onRequestFreeListing: (applicationId: string) => void
+  onDeleteRejected?: (applicationId: string) => void
+  onCancelPending?: (applicationId: string, businessName: string) => void
 }
 
-export function ApplicationCard({ application, onRequestFreeListing }: ApplicationCardProps) {
+export function ApplicationCard({ application, onRequestFreeListing, onDeleteRejected, onCancelPending }: ApplicationCardProps) {
   // Determine status badge styling based on application status
   const getStatusBadge = () => {
     const status = application.status || 'pending'
@@ -58,6 +60,27 @@ export function ApplicationCard({ application, onRequestFreeListing }: Applicati
             />
           </svg>
           <span>Rejected</span>
+        </span>
+      )
+    }
+
+    if (status === 'cancelled') {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-neutral-100 text-neutral-600 border border-neutral-200">
+          <svg 
+            className="w-3.5 h-3.5" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              d="M6 18L18 6M6 6l12 12" 
+            />
+          </svg>
+          <span>Cancelled</span>
         </span>
       )
     }
@@ -116,6 +139,12 @@ export function ApplicationCard({ application, onRequestFreeListing }: Applicati
               ❌ Your application was not approved. Please review the requirements and submit a new application if needed.
             </p>
           )}
+
+          {application.status === 'cancelled' && (
+            <p className="text-sm text-neutral-600 mt-3 font-medium">
+              ✅ You cancelled this application. Submit a new one whenever you are ready.
+            </p>
+          )}
           
           {showRequestButton && (
             <p className="text-sm text-amber-700 mt-3">
@@ -130,6 +159,22 @@ export function ApplicationCard({ application, onRequestFreeListing }: Applicati
               className="rounded-full bg-green-50 text-green-700 px-3 py-1.5 text-xs border border-green-200 hover:bg-green-100 transition-colors"
             >
               Request Free Listing
+            </button>
+          )}
+          {onCancelPending && (application.status === 'pending' || !application.status) && (
+            <button
+              onClick={() => onCancelPending(application.id, application.business_name || 'Untitled Application')}
+              className="flex-shrink-0 px-3 py-2 text-sm text-amber-700 hover:text-amber-900 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+          {onDeleteRejected && (application.status === 'rejected' || application.status === 'cancelled') && (
+            <button
+              onClick={() => onDeleteRejected(application.id)}
+              className="flex-shrink-0 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors"
+            >
+              Delete
             </button>
           )}
         </div>

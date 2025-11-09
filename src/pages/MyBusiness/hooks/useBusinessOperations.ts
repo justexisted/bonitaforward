@@ -7,6 +7,7 @@
 
 import { supabase } from '../../../lib/supabase'
 import { insert, query } from '../../../lib/supabaseQuery'
+import { cancelPendingApplication } from '../../account/dataLoader'
 import { createProviderChangeRequest, getDismissedNotifications, type ProviderChangeRequest, type DismissedNotification } from '../../../lib/supabaseData'
 import { getUserPlanChoice, setUserPlanChoice as savePlanChoice, migratePlanChoiceToDatabase, type PlanChoice } from '../../../utils/planChoiceDb'
 import type { BusinessListing, BusinessApplication, JobPost } from '../types'
@@ -172,6 +173,8 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       // First, try querying ALL applications (no email filter) to see if RLS allows access
       const allAppsTest = await query('business_applications', { logPrefix: '[MyBusiness]' })
         .select('*')
+        .is('owner_hidden_at', null)
+        .not('status', 'eq', 'cancelled')
         .order('created_at', { ascending: false })
         .limit(10)
         .execute()
@@ -190,6 +193,8 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       const appsResult = await query('business_applications', { logPrefix: '[MyBusiness]' })
         .select('*')
         .eq('email', auth.email.trim())
+        .is('owner_hidden_at', null)
+        .not('status', 'eq', 'cancelled')
         .order('created_at', { ascending: false })
         .execute()
 
@@ -874,6 +879,8 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       return
     }
     
+    let submissionSucceeded = false
+    
     try {
       // Track submission state so the UI can show loading feedback and prevent duplicates
       setIsSubmittingApplication(true)
@@ -883,14 +890,16 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       // This requires admin approval before becoming a live listing
       // IMPORTANT: business_applications table uses 'category' NOT 'category_key'
       // IMPORTANT: Always use auth.email so the application shows up in the user's account
+      const isFeaturedRequest = listingData.is_member === true
+
       const applicationData = {
         business_name: listingData.name,
         full_name: auth.name || 'Business Owner',
         email: auth.email,  // Always use auth.email to ensure application shows in My Business page
         phone: listingData.phone || '',
         category: listingData.category_key || 'professional-services',  // Note: 'category' not 'category_key'
-        status: 'pending' as 'pending' | 'approved' | 'rejected', // Set initial status as pending
-        tier_requested: 'free' as 'free' | 'featured', // Default to free tier
+        status: 'pending' as 'pending' | 'approved' | 'rejected' | 'cancelled', // Set initial status as pending
+        tier_requested: (isFeaturedRequest ? 'featured' : 'free') as 'free' | 'featured',
         // Store additional details as JSON string in the challenge field
         // Store the business contact email separately from the details
         challenge: JSON.stringify({
@@ -919,25 +928,43 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         { logPrefix: '[MyBusiness]' }
       )
 
-      console.log('[MyBusiness] Application insert result:', { 
-        data: result.data, 
-        error: result.error,
-        insertedCount: result.data?.length || 0,
-        insertedId: result.data?.[0]?.id || null
-      })
+      console.log('[MyBusiness] Application insert result:', result)
 
       if (result.error) {
         console.error('[MyBusiness] ❌ INSERT FAILED:', result.error)
         throw new Error(result.error.message || 'Failed to submit application')
       }
 
-      // CRITICAL: Verify the insert actually succeeded
-      if (!result.data || result.data.length === 0) {
-        console.error('[MyBusiness] ❌ INSERT RETURNED NO DATA:', result)
-        throw new Error('Application submitted but no confirmation received. Please check your Applications tab.')
+      let insertedApplication = result.data?.[0] ?? null
+
+      if (!insertedApplication) {
+        console.warn('[MyBusiness] Insert returned no data, running verification query...')
+        let verifyQuery = supabase
+          .from('business_applications')
+          .select('*')
+          .eq('email', auth.email.trim())
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (listingData.name) {
+          verifyQuery = verifyQuery.eq('business_name', listingData.name)
+        }
+
+        const { data: verifyData, error: verifyError } = await verifyQuery
+
+        if (verifyError) {
+          console.error('[MyBusiness] Verification query failed:', verifyError)
+          throw new Error('Application submitted but verification failed. Please check your Applications tab.')
+        }
+
+        insertedApplication = verifyData?.[0] ?? null
+
+        if (!insertedApplication) {
+          console.error('[MyBusiness] ❌ Verification returned no data either. Something is wrong.')
+          throw new Error('Application submitted but no confirmation received. Please check your Applications tab.')
+        }
       }
 
-      const insertedApplication = result.data[0]
       console.log('[MyBusiness] ✅ INSERT SUCCEEDED:', {
         applicationId: insertedApplication.id,
         businessName: insertedApplication.business_name,
@@ -945,25 +972,38 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
         status: insertedApplication.status
       })
 
+      submissionSucceeded = true
+
       // CRITICAL: Set success message BEFORE delay to ensure it's visible
       setMessage(`Success! Your business application "${insertedApplication.business_name || 'application'}" has been submitted and is pending admin approval. You can view it in the Applications tab.`)
       
       // CRITICAL: Wait a moment for the database to process the insert before reloading
       // This ensures the new application is visible when we query
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       // Refresh data to show new application in pending state
       console.log('[MyBusiness] Refreshing data to show new application...')
       console.log('[MyBusiness] Query email will be:', auth.email.trim())
-      await loadBusinessData() 
+      try {
+        await loadBusinessData()
+      } catch (loadError: any) {
+        console.error('[MyBusiness] Error refreshing data after application submission:', loadError)
+      }
       
       // Note: applications state will be updated by loadBusinessData via setApplications
       // Don't log applications.length here - it's still the old state (closure)
       console.log('[MyBusiness] Data refreshed. Application should appear in Applications tab.')
-      
-      setShowCreateForm(false)
+      return {
+        applicationId: insertedApplication.id,
+        closed: true
+      }
     } catch (error: any) {
-      setMessage(`Error submitting application: ${error.message}`)
+      if (submissionSucceeded) {
+        console.error('[MyBusiness] Submission succeeded but follow-up failed:', error)
+      } else {
+        setMessage(`Error submitting application: ${error.message}`)
+      }
+      return { closed: false, error: error.message }
     } finally {
       // Ensure UI loading state is always cleared
       setIsSubmittingApplication(false)
@@ -1143,6 +1183,93 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
     }
   }
 
+  /**
+   * DELETE BUSINESS APPLICATION (OWNER HIDE)
+   *
+   * Allows business owner to hide a rejected application from their dashboard
+   * while keeping the record for admin visibility.
+   */
+  const deleteBusinessApplication = async (applicationId: string) => {
+    if (!confirm('Delete this application from your view? Admins will still be able to see it.')) {
+      return
+    }
+
+    try {
+      setMessage('Removing application...')
+
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      const endpoint = isLocal
+        ? 'http://localhost:8888/.netlify/functions/delete-business-application'
+        : '/.netlify/functions/delete-business-application'
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ application_id: applicationId })
+      })
+
+      const result = await response.json().catch(() => ({}))
+
+      console.log('[MyBusiness] deleteBusinessApplication response:', {
+        status: response.status,
+        ok: response.ok,
+        result
+      })
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || `Failed to delete application (HTTP ${response.status})`)
+      }
+
+      setMessage('Application removed from your dashboard.')
+
+      setApplications(prev => prev.filter(app => app.id !== applicationId))
+    } catch (error: any) {
+      console.error('[MyBusiness] Error deleting application:', error)
+      setMessage(`Failed to remove application: ${error.message || error}`)
+    }
+  }
+
+  const cancelBusinessApplication = async (applicationId: string, businessName: string) => {
+    if (!confirm(`Cancel your application for "${businessName}"?\n\nThis action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      setMessage('Cancelling application...')
+
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const result = await cancelPendingApplication(applicationId, session.access_token)
+
+      console.log('[MyBusiness] cancelBusinessApplication response:', result)
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to cancel application')
+      }
+
+      setMessage(`Application "${businessName}" cancelled.`)
+      setApplications(prev => prev.filter(app => app.id !== applicationId))
+      // Reload to ensure consistency across all tabs
+      await loadBusinessData()
+    } catch (error: any) {
+      console.error('[MyBusiness] Error cancelling application:', error)
+      setMessage(`Failed to cancel application: ${error.message || error}`)
+    }
+  }
+
   return {
     loadBusinessData,
     checkUserPlanChoice,
@@ -1153,7 +1280,9 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
     promptAndUploadImages,
     createBusinessListing,
     updateBusinessListing,
-    deleteBusinessListing
+    deleteBusinessListing,
+    deleteBusinessApplication,
+    cancelBusinessApplication
   }
 }
 

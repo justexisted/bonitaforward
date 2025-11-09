@@ -69,9 +69,10 @@ export interface PendingApplication {
   category: string | null
   challenge: string | null
   tier_requested: 'free' | 'featured' | null
-  status: 'pending' | 'approved' | 'rejected' | null
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | null
   created_at: string
   updated_at: string | null
+  owner_hidden_at?: string | null
 }
 
 export interface MyBusiness {

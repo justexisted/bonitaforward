@@ -472,6 +472,14 @@ export class QueryBuilder<T = any> {
   }
 
   /**
+   * IS filter (supports checking for NULL)
+   */
+  is(column: string, value: any): this {
+    this.builder = (this.builder as any).is(column, value)
+    return this
+  }
+
+  /**
    * Filter by greater than or equal (maintains Supabase API)
    */
   gte(column: string, value: any): this {
