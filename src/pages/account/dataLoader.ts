@@ -6,7 +6,8 @@
 
 import { supabase } from '../../lib/supabase'
 import { query, update, deleteRows } from '../../lib/supabaseQuery'
-import { generateSlug } from '../../utils/helpers'
+import { generateSlug, isUserAdmin } from '../../utils/helpers'
+import { evaluateEventDeletionPermission } from '../../utils/eventOwnership'
 import { updateUserProfile } from '../../utils/profileUtils'
 import type { Booking, SavedBusiness, SavedCoupon, PendingApplication, MyBusiness } from './types'
 import type { CalendarEvent } from '../Calendar'
@@ -664,20 +665,98 @@ export async function unsaveBusiness(savedId: string): Promise<{ success: boolea
 
 export async function deleteEvent(eventId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const result = await deleteRows(
-      'calendar_events',
-      { id: eventId },
-      { logPrefix: '[Account]' }
-    )
-    
-    if (result.error) {
-      // Error already logged by query utility
-      return { success: false, error: result.error.message }
+    // Verify current session (RLS guard rails)
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    if (userError) {
+      console.error('[Account] Failed to load current user before deleting event:', userError)
+      return { success: false, error: 'Session expired. Please sign in again.' }
     }
-    
+
+    const currentUserId = userData?.user?.id ?? null
+    const currentUserEmail = userData?.user?.email ?? undefined
+
+    if (!currentUserId) {
+      return { success: false, error: 'You must be signed in to delete events.' }
+    }
+
+    const isAdminUser = isUserAdmin(currentUserEmail)
+
+    // Load minimal ownership metadata for the target event
+    const { data: existingEvent, error: fetchError } = await supabase
+      .from('calendar_events')
+      .select('id, created_by_user_id, source, origin_type')
+      .eq('id', eventId)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error('[Account] Failed to load event before delete:', {
+        eventId,
+        errorMessage: fetchError.message,
+        errorCode: (fetchError as any)?.code,
+        details: (fetchError as any)?.details
+      })
+
+      return { success: false, error: 'Unable to verify event ownership. Please try again.' }
+    }
+
+    if (!existingEvent) {
+      return {
+        success: false,
+        error: 'Event not found or you do not have permission to delete it.'
+      }
+    }
+
+    const permission = evaluateEventDeletionPermission(existingEvent, currentUserId, isAdminUser)
+
+    if (!permission.allowed) {
+      return {
+        success: false,
+        error: permission.reason || 'You do not have permission to delete this event.'
+      }
+    }
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+    if (sessionError) {
+      console.error('[Account] Failed to get session before delete:', sessionError)
+      return { success: false, error: 'Session expired. Please sign in again.' }
+    }
+
+    const accessToken = sessionData?.session?.access_token
+
+    if (!accessToken) {
+      return { success: false, error: 'Session expired. Please sign in again.' }
+    }
+
+    try {
+      const response = await fetch('/.netlify/functions/delete-calendar-event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ event_id: eventId })
+      })
+
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok || !payload?.success) {
+        const errorMessage =
+          payload?.error ||
+          payload?.message ||
+          'Failed to delete event. Please contact support if the issue persists.'
+
+        return { success: false, error: errorMessage }
+      }
+    } catch (error: any) {
+      console.error('[Account] Network error deleting event:', error)
+      return { success: false, error: error?.message || 'Failed to delete event.' }
+    }
+
     return { success: true }
   } catch (error: any) {
-    return { success: false, error: error.message }
+    console.error('[Account] Exception deleting event:', error)
+    return { success: false, error: error?.message || 'Failed to delete event.' }
   }
 }
 

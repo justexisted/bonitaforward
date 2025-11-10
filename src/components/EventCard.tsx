@@ -82,6 +82,7 @@ export function EventCard({ event, onClick, savedEventIds, onToggleSave, isAuthe
           <EventIcons 
             title={event.title} 
             description={event.description} 
+            category={event.category}
             className="w-6 h-6 text-white drop-shadow-lg" 
           />
         </div>

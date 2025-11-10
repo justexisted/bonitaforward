@@ -286,6 +286,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                                 <EventIcons 
                                   title={event.title} 
                                   description={event.description} 
+                                  category={event.category}
                                   className="w-3 h-3 flex-shrink-0" 
                                 />
                                 <span className="truncate">
@@ -474,6 +475,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                       <EventIcons 
                         title={event.title} 
                         description={event.description} 
+                        category={event.category}
                         className="w-4 h-4 flex-shrink-0 text-neutral-600" 
                       />
                     </div>
@@ -520,6 +522,7 @@ export default function Calendar({ events, className = '' }: CalendarProps) {
                   <EventIcons 
                     title={selectedEvent.title} 
                     description={selectedEvent.description} 
+                    category={selectedEvent.category}
                     className="w-5 h-5 md:w-6 md:h-6 text-white flex-shrink-0" 
                   />
                 </div>

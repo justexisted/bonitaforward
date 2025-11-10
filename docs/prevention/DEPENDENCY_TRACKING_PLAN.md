@@ -862,6 +862,35 @@ See: `docs/CUSTOM_EMAIL_VERIFICATION_SETUP.md`
 - If you remove image preservation logic in feed processors → Events will lose their images when re-fetched
 - If you change populate script logic to save gradients → Violates the "never save gradients" rule
 
+### Calendar Event Ownership & Deletion (2025-11-10)
+
+**Problem Prevented:** User-created events must remain user-managed, while auto-imported events must stay under admin control. Legacy rows with missing ownership metadata should never be deleted silently or mutate image data.
+
+**Implementation Notes:**
+- `created_by_user_id` (added via `add-user-tracking-to-calendar-events.sql`) tracks the user who created a `Local` event.
+- Auto-import pipelines (Netlify cron jobs, manual fetchers) populate `source` with third-party provider names and leave `created_by_user_id` null.
+- Frontend helper `evaluateEventDeletionPermission` (in `src/utils/eventOwnership.ts`) classifies events and enforces:
+  - `source === 'Local'` + matching `created_by_user_id` → user can delete.
+  - Any other source → only admins (emails from `VITE_ADMIN_EMAILS`) may delete.
+  - Missing ownership metadata → deletion blocked with an actionable error; prompts admin intervention.
+- `origin_type` and `origin_identifier` columns (2025-11-10 update) explicitly mark how the event was created:
+  - `'local'` with `origin_identifier = 'calendar_form'` for user submissions
+  - `'auto_netlify'` / `'auto_manual'` (etc.) for job-based imports, with the function name in `origin_identifier`
+  - `'unknown'` captures legacy rows lacking metadata
+- Deletion path (`src/pages/account/dataLoader.ts`) logs RLS failures, verifies rows are removed, and never mutates image fields.
+
+**Dependencies:**
+- RLS policies on `calendar_events` rely on `created_by_user_id = auth.uid()`—session must be valid before delete attempts.
+- Admin detection uses `isUserAdmin` helper (environment-driven) to avoid touching database roles.
+- Image preservation (bulletproof trigger + populate scripts) is untouched by the deletion logic.
+- All creation paths must populate `origin_type`/`origin_identifier` to keep audit trail intact.
+
+**Breaking-Change Awareness:**
+- If auto-import scripts start populating `created_by_user_id`, update ownership rules accordingly.
+- If `source` values change (e.g., renaming `Local`), update the helper or migrate data to avoid misclassification.
+- Never backfill `created_by_user_id` automatically for legacy rows without confirming ownership; doing so could grant delete rights to the wrong user.
+- If a new import job is added, remember to register its identifier to keep the provenance trail accurate.
+
 **Prevention:** Documented in `CASCADING_FAILURES.md` (#23). NEVER save gradient strings to `image_url` column - always use `null` when images can't be fetched. Frontend computes gradients dynamically when `image_url` is `null`.
 
 **Image Preservation Guarantees:**

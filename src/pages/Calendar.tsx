@@ -510,7 +510,11 @@ export default function CalendarPage() {
       // After inserting event, update with actual event ID if we used temp ID
       // (We'll handle this after insert)
 
-      // Insert event with image
+      // Only persist actual Supabase image URLs; gradients are rendered dynamically when image_url is null
+      const imageUrlToSave = headerImage.type === 'image' ? headerImage.value : null
+      const imageTypeToSave: 'image' | null = headerImage.type === 'image' ? 'image' : null
+
+      // Insert event with image metadata
       const { error } = await supabase
         .from('calendar_events')
         .insert([{
@@ -522,12 +526,14 @@ export default function CalendarPage() {
           address: newEvent.address || null,
           category: newEvent.category,
           source: 'Local',
+          origin_type: 'local',
+          origin_identifier: 'calendar_form',
           upvotes: 0,
           downvotes: 0,
           created_at: new Date().toISOString(),
           created_by_user_id: auth.userId || null,
-          image_url: headerImage.value,
-          image_type: headerImage.type
+          image_url: imageUrlToSave,
+          image_type: imageTypeToSave
         }])
 
       if (error) throw error
@@ -976,11 +982,12 @@ export default function CalendarPage() {
                           
                           {/* Event icons on image */}
                           <div className="absolute top-3 right-3 z-20">
-                            <EventIcons 
-                              title={event.title} 
-                              description={event.description} 
-                              className="w-6 h-6 text-white drop-shadow-lg" 
-                            />
+                          <EventIcons 
+                            title={event.title} 
+                            description={event.description} 
+                            category={event.category}
+                            className="w-6 h-6 text-white drop-shadow-lg" 
+                          />
                           </div>
                           
                           {/* Saved badge */}
@@ -1135,11 +1142,12 @@ export default function CalendarPage() {
                           
                           {/* Event icons on image */}
                           <div className="absolute top-3 right-3 z-10">
-                            <EventIcons 
-                              title={event.title} 
-                              description={event.description} 
-                              className="w-6 h-6 text-white drop-shadow-lg" 
-                            />
+                          <EventIcons 
+                            title={event.title} 
+                            description={event.description} 
+                            category={event.category}
+                            className="w-6 h-6 text-white drop-shadow-lg" 
+                          />
                           </div>
                         </div>
 
@@ -1287,11 +1295,12 @@ export default function CalendarPage() {
                           
                           {/* Event icons on image */}
                           <div className="absolute top-3 right-3 z-10">
-                            <EventIcons 
-                              title={event.title} 
-                              description={event.description} 
-                              className="w-6 h-6 text-white drop-shadow-lg" 
-                            />
+                          <EventIcons 
+                            title={event.title} 
+                            description={event.description} 
+                            category={event.category}
+                            className="w-6 h-6 text-white drop-shadow-lg" 
+                          />
                           </div>
                         </div>
 

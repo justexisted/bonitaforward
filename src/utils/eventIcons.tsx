@@ -1,4 +1,22 @@
-import { Baby, Palette, Scissors, Ghost, Theater, UserSquare, Pencil, Heart, Music, BookOpen, Wrench } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { 
+  Baby,
+  Palette,
+  Scissors,
+  Ghost,
+  Theater,
+  UserSquare,
+  Pencil,
+  Heart,
+  Music,
+  BookOpen,
+  Wrench,
+  Users,
+  Briefcase,
+  GraduationCap,
+  Dumbbell,
+  UtensilsCrossed
+} from 'lucide-react'
 
 /**
  * EVENT ICONS UTILITY
@@ -23,14 +41,14 @@ import { Baby, Palette, Scissors, Ghost, Theater, UserSquare, Pencil, Heart, Mus
 
 export interface IconKeyword {
   keywords: string[]
-  icon: React.ComponentType<{ className?: string }>
+  icon: ComponentType<{ className?: string }>
   label: string
 }
 
 // Icon keyword mappings
 const ICON_MAPPINGS: IconKeyword[] = [
   {
-    keywords: ['kids', 'toddler', 'children', 'child'],
+    keywords: ['kids', 'toddler', 'children', 'child', 'family'],
     icon: Baby,
     label: 'Kids'
   },
@@ -40,7 +58,7 @@ const ICON_MAPPINGS: IconKeyword[] = [
     label: 'Ceramics'
   },
   {
-    keywords: ['art', 'painting', 'artistic'],
+    keywords: ['art', 'painting', 'artistic', 'culture', 'cultural', 'gallery'],
     icon: Palette,
     label: 'Art'
   },
@@ -88,6 +106,32 @@ const ICON_MAPPINGS: IconKeyword[] = [
     keywords: ['workshop', 'class', 'training', 'seminar'],
     icon: Wrench,
     label: 'Workshop'
+  },
+  {
+    // Category-based icons (ensures dropdown selections still render icons even if keywords are missing)
+    keywords: ['community', 'neighborhood', 'residents', 'community meetup', 'community event'],
+    icon: Users,
+    label: 'Community'
+  },
+  {
+    keywords: ['career', 'corporate', 'commerce', 'business'],
+    icon: Briefcase,
+    label: 'Business'
+  },
+  {
+    keywords: ['graduation', 'campus', 'education', 'student', 'school'],
+    icon: GraduationCap,
+    label: 'Education'
+  },
+  {
+    keywords: ['sport', 'sports', 'fitness', 'yoga', 'athletic', 'training session'],
+    icon: Dumbbell,
+    label: 'Sports'
+  },
+  {
+    keywords: ['food', 'dining', 'culinary', 'cooking', 'tasting', 'restaurant'],
+    icon: UtensilsCrossed,
+    label: 'Food'
   }
 ]
 
@@ -95,8 +139,9 @@ const ICON_MAPPINGS: IconKeyword[] = [
  * Detects keywords in text and returns matching icon mappings
  * Limits to 2 icons maximum
  */
-export function detectEventIcons(title: string, description?: string | null): IconKeyword[] {
-  const combinedText = `${title} ${description || ''}`.toLowerCase()
+export function detectEventIcons(title: string, description?: string | null, category?: string | null): IconKeyword[] {
+  // Include category text so manual event submissions (which always have a category) still get icons
+  const combinedText = `${title} ${description || ''} ${category || ''}`.toLowerCase()
   const matches: IconKeyword[] = []
   const seenLabels = new Set<string>()
 
@@ -132,12 +177,13 @@ export function detectEventIcons(title: string, description?: string | null): Ic
 interface EventIconsProps {
   title: string
   description?: string | null
+  category?: string | null
   className?: string
   showLabel?: boolean
 }
 
-export function EventIcons({ title, description, className = 'w-5 h-5', showLabel = false }: EventIconsProps) {
-  const icons = detectEventIcons(title, description)
+export function EventIcons({ title, description, category, className = 'w-5 h-5', showLabel = false }: EventIconsProps) {
+  const icons = detectEventIcons(title, description, category)
 
   if (icons.length === 0) return null
 

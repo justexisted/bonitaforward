@@ -161,6 +161,8 @@ export type CalendarEvent = {
   url?: string | null
   image_url?: string | null
   image_type?: 'image' | 'gradient' | null
+  origin_type?: 'local' | 'auto_netlify' | 'auto_manual' | 'auto_other' | 'unknown' | null
+  origin_identifier?: string | null
 }
 
 // ============================================================================
