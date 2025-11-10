@@ -162,9 +162,11 @@ export function ApplicationCard({ application, onRequestFreeListing, onDeleteRej
             </p>
           )}
           
-          <p className="text-sm text-amber-700 mt-3">
-            ⏳ Your application is under review. You'll be notified once a decision has been made.
-          </p>
+          {(application.status === 'pending' || !application.status) && (
+            <p className="text-sm text-amber-700 mt-3">
+              ⏳ Your application is under review. You'll be notified once a decision has been made.
+            </p>
+          )}
 
           {updateRequestMeta.exists && (
             <p className="text-xs text-neutral-500 mt-2">

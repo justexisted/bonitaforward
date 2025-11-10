@@ -207,8 +207,11 @@ export async function approveApplication(
     google_maps_url: (challengeData.google_maps_url || null) as any,
     bonita_resident_discount: (challengeData.bonita_resident_discount || null) as any,
     owner_user_id: (ownerUserId || null) as any,
-    published: false,  // Keep unpublished until admin manually publishes
-    is_member: false   // Default to free tier
+    published: true,  // Auto-publish when approved so business is immediately visible in directory
+    // Set tier based on what was requested in the application
+    is_member: app.tier_requested === 'featured',  // Set to true if featured tier was requested
+    is_featured: app.tier_requested === 'featured',  // Also set is_featured for consistency
+    featured_since: app.tier_requested === 'featured' ? new Date().toISOString() : null  // Set featured_since timestamp if featured
   }
   
   console.log('[Admin] Approving application with payload:', payload)
@@ -291,7 +294,7 @@ export async function approveApplication(
         app.email,
         businessName,
         draft.category,
-        'free' // Current implementation always creates free tier providers
+        (app.tier_requested === 'featured' ? 'featured' : 'free') as 'free' | 'featured'  // Use the tier that was requested and approved
       )
       console.log('[Admin] ✅ Approval email sent successfully')
     } catch (err) {

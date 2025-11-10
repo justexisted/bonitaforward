@@ -186,9 +186,17 @@ export function ChangeRequestsSection({
           await supabase.from('providers').update({ badges: next as any }).eq('id', req.provider_id)
         }
       } else if (req.type === 'feature_request') {
+        // Always update both is_featured and is_member to ensure consistent state
+        // Follow the same pattern as adminProviderUtils.ts toggleFeaturedStatus
+        const updateData = {
+          is_featured: true,
+          is_member: true, // Keep both fields in sync
+          featured_since: new Date().toISOString(), // Set featured_since timestamp
+          updated_at: new Date().toISOString()
+        }
         const { error } = await supabase
           .from('providers')
-          .update({ is_member: true })
+          .update(updateData)
           .eq('id', req.provider_id)
         if (error) throw new Error(error.message)
       } else if (req.type === 'claim') {
