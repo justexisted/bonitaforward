@@ -1,3 +1,48 @@
+/**
+ * DELETE BUSINESS APPLICATION NETLIFY FUNCTION
+ * 
+ * Allows business owners to delete (hide) approved, rejected, or cancelled applications
+ * from their dashboard while keeping the record for admin visibility.
+ * 
+ * DEPENDENCY TRACKING:
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - business_applications.status: Must allow 'deleted' status (requires database migration)
+ * - business_applications.owner_hidden_at: Used for filtering applications from UI
+ * - application.email: Must match authenticated user's email (or user must be admin)
+ * - extractAndVerifyToken: Validates user authentication
+ * - checkIsAdmin: Validates admin permissions
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - ApplicationCard: Calls this function when delete button is clicked
+ * - useBusinessOperations: deleteBusinessApplication function calls this endpoint
+ * - MyBusiness page: Displays applications filtered by owner_hidden_at === null
+ * 
+ * BREAKING CHANGES:
+ * - If you remove 'deleted' from status CHECK constraint → Update will fail (run migration first)
+ * - If you change filtering logic from owner_hidden_at === null → Deleted applications will appear in UI
+ * - If you remove owner_hidden_at update → Applications won't be hidden from UI (filtering won't work)
+ * - If you change status restriction → Users won't be able to delete approved applications
+ * 
+ * RECENT CHANGES (2025-01-XX):
+ * - ✅ Removed restriction that only allowed rejected/cancelled applications
+ * - ✅ Now allows deletion of approved, rejected, or cancelled applications
+ * - ✅ Implemented Option B: Sets both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+ * - ✅ Updated to set status='deleted' instead of just owner_hidden_at
+ * 
+ * RELATED FILES:
+ * - src/pages/MyBusiness/components/ApplicationCard.tsx: Delete button display logic
+ * - src/pages/MyBusiness/hooks/useBusinessOperations.ts: Frontend delete function
+ * - src/pages/MyBusiness/hooks/useBusinessOperations.ts: Filtering logic (lines 174, 194) - **DO NOT CHANGE**
+ * - ops/migrations/add-deleted-status-to-business-applications.sql: Database migration
+ * 
+ * CRITICAL NOTES:
+ * - Filtering logic uses owner_hidden_at === null, NOT status - DO NOT change this
+ * - Always set both fields when deleting: owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+ * 
+ * See: docs/prevention/CASCADING_FAILURES.md - Section #31 (Business Application Delete Button)
+ */
+
 import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import { extractAndVerifyToken } from './utils/auth'
@@ -72,8 +117,9 @@ export const handler: Handler = async (event) => {
       return errorResponse(403, 'Permission denied', 'You can only delete your own applications')
     }
 
-    if (application.status !== 'rejected' && application.status !== 'cancelled') {
-      return errorResponse(400, 'Only rejected or cancelled applications can be deleted')
+    // Allow deletion of approved, rejected, or cancelled applications
+    if (application.status !== 'approved' && application.status !== 'rejected' && application.status !== 'cancelled') {
+      return errorResponse(400, 'Only approved, rejected, or cancelled applications can be deleted')
     }
 
     if (application.owner_hidden_at) {
@@ -86,10 +132,13 @@ export const handler: Handler = async (event) => {
 
     const timestamp = new Date().toISOString()
 
+    // Option B: Set both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+    // Filtering logic uses owner_hidden_at === null, so this will hide the application from UI
     const { error: updateError } = await supabaseClient
       .from('business_applications')
       .update({
-        owner_hidden_at: timestamp,
+        owner_hidden_at: timestamp,  // This is what actually hides it from UI (filtering checks this)
+        status: 'deleted',  // For record-keeping
         updated_at: timestamp
       })
       .eq('id', applicationId)

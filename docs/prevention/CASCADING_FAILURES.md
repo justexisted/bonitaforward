@@ -55,6 +55,22 @@ You're experiencing **cascading failures** - fixing one issue creates another:
 - ✅ Security maintained: SELECT/DELETE policies still enforce email matching
 - **Status:** ✅ Fixed - See Section #24 for detailed pattern and prevention
 
+**Business Application Approval - Tier and Publication Fixes - FIXED (2025-01-XX):**
+- ✅ Fixed businesses not appearing in directory after approval (changed published: false → published: true)
+- ✅ Fixed featured tier not being set on approval (now respects tier_requested field)
+- ✅ Fixed duplicate notification messages (conditional display based on status)
+- ✅ Fixed featured upgrade approval not setting both is_member and is_featured
+- ✅ Updated email notifications to use correct tier (was always 'free', now uses actual tier)
+- **Status:** ✅ Fixed - See Section #29 for detailed pattern and prevention
+
+**Business Application Delete Button for Approved Applications - FIXED (2025-01-XX):**
+- ✅ Added delete button for approved applications in ApplicationCard
+- ✅ Updated Netlify function to allow deletion of approved applications
+- ✅ Implemented Option B: Sets both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+- ✅ Updated TypeScript types to include 'deleted' status
+- ✅ Created database migration to add 'deleted' to status CHECK constraint
+- **Status:** ✅ Fixed - See Section #31 for detailed pattern and prevention
+
 ---
 
 ## Why This Happens
@@ -2229,6 +2245,108 @@ useEffect(() => {
 - `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
 - Section #28: MyBusiness visibility issues (same data sources)
 - Section #24: RLS conflicts (same tables, keep policies consistent)
+- Section #31: Business Application Delete Button for Approved Applications (same table, filtering logic)
+
+---
+
+### 31. Business Application Delete Button for Approved Applications ⭐ USER FEATURE REQUEST (2025-01-XX) ✅ VERIFIED
+
+**What:** Users could not delete approved applications from their `/my-business` page. Approved applications would remain visible with "Approved" status even after attempting to delete them.
+
+**Root Cause:**
+1. `ApplicationCard` component only showed delete button for `rejected` or `cancelled` applications (line 197)
+2. `delete-business-application.ts` Netlify function only allowed deletion of `rejected` or `cancelled` applications (line 75)
+3. **CRITICAL**: The system filters applications using `owner_hidden_at === null`, NOT by status
+4. Approved applications had no way to be deleted/hidden from user's view
+
+**What Happened:**
+1. User submits business application → Admin approves → Application shows as "Approved"
+2. User wants to remove approved application from their view → No delete button available
+3. Even if delete button existed, Netlify function would reject deletion of approved applications
+4. Applications remained visible indefinitely
+
+**The Fix:**
+1. **Added delete button for approved applications** - Extended ApplicationCard condition to include `status === 'approved'`
+2. **Updated Netlify function** - Removed restriction that only allowed rejected/cancelled applications
+3. **Implemented Option B** - Sets both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+4. **Updated TypeScript types** - Added 'deleted' to status union type
+5. **Created database migration** - Adds 'deleted' and 'cancelled' to status CHECK constraint
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only shows delete button for rejected/cancelled
+{onDeleteRejected && (application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ❌ BROKEN: Only allows deletion of rejected/cancelled
+if (application.status !== 'rejected' && application.status !== 'cancelled') {
+  return errorResponse(400, 'Only rejected or cancelled applications can be deleted')
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Shows delete button for approved, rejected, or cancelled
+{onDeleteRejected && (application.status === 'approved' || application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ✅ FIXED: Allows deletion of approved, rejected, or cancelled
+// Option B: Set both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+const { error: updateError } = await supabaseClient
+  .from('business_applications')
+  .update({
+    owner_hidden_at: timestamp,  // This is what actually hides it from UI (filtering checks this)
+    status: 'deleted',  // For record-keeping
+    updated_at: timestamp
+  })
+  .eq('id', applicationId)
+```
+
+**Prevention Checklist:**
+- ✅ **CRITICAL**: Filtering logic uses `owner_hidden_at === null`, NOT status - DO NOT change this
+- ✅ **Always set both fields** when deleting: `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+- ✅ **Verify database constraint** allows 'deleted' status before updating (may need migration)
+- ✅ **Update TypeScript types** to include 'deleted' in status union
+- ✅ **Test filtering** - Deleted applications should not appear in UI (filtered by `owner_hidden_at`)
+
+**Rule of Thumb:**
+> When implementing deletion for business applications:
+> 1. **Use Option B pattern**: Set both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+> 2. **DO NOT change filtering logic** - It correctly uses `owner_hidden_at === null`
+> 3. **Verify database constraint** allows 'deleted' status (may need migration)
+> 4. **Update TypeScript types** to include 'deleted' in status union
+
+**Files to Watch:**
+- `src/pages/MyBusiness/components/ApplicationCard.tsx` - Delete button display logic
+- `netlify/functions/delete-business-application.ts` - Deletion logic and status update
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Delete function and confirmation message
+- `src/pages/MyBusiness/types.ts` and `src/types/index.ts` - Status type definitions
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194) - **DO NOT CHANGE**
+
+**Breaking Changes:**
+- If you remove 'deleted' from status type → TypeScript errors when setting status='deleted'
+- If you change filtering logic from `owner_hidden_at === null` → Deleted applications will appear in UI
+- If you remove `owner_hidden_at` update → Applications won't be hidden from UI (filtering won't work)
+- If database constraint doesn't allow 'deleted' → Update will fail (run migration first)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Delete button appears for approved applications
+- ✅ Delete button appears for rejected applications
+- ✅ Delete button appears for cancelled applications
+- ✅ Deleted applications disappear from UI (filtered by `owner_hidden_at`)
+- ✅ Status is updated to 'deleted' in database (for record-keeping)
+- ✅ Confirmation message is appropriate for approved applications
+
+**Related:**
+- Section #29: Business Application Approval - Tier and Publication Fixes (same table, related workflow)
+- Section #28: MyBusiness Page - Applications Not Showing (same data sources, filtering logic)
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194)
 
 ---
 
@@ -3690,6 +3808,108 @@ useEffect(() => {
 - `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
 - Section #28: MyBusiness visibility issues (same data sources)
 - Section #24: RLS conflicts (same tables, keep policies consistent)
+- Section #31: Business Application Delete Button for Approved Applications (same table, filtering logic)
+
+---
+
+### 31. Business Application Delete Button for Approved Applications ⭐ USER FEATURE REQUEST (2025-01-XX) ✅ VERIFIED
+
+**What:** Users could not delete approved applications from their `/my-business` page. Approved applications would remain visible with "Approved" status even after attempting to delete them.
+
+**Root Cause:**
+1. `ApplicationCard` component only showed delete button for `rejected` or `cancelled` applications (line 197)
+2. `delete-business-application.ts` Netlify function only allowed deletion of `rejected` or `cancelled` applications (line 75)
+3. **CRITICAL**: The system filters applications using `owner_hidden_at === null`, NOT by status
+4. Approved applications had no way to be deleted/hidden from user's view
+
+**What Happened:**
+1. User submits business application → Admin approves → Application shows as "Approved"
+2. User wants to remove approved application from their view → No delete button available
+3. Even if delete button existed, Netlify function would reject deletion of approved applications
+4. Applications remained visible indefinitely
+
+**The Fix:**
+1. **Added delete button for approved applications** - Extended ApplicationCard condition to include `status === 'approved'`
+2. **Updated Netlify function** - Removed restriction that only allowed rejected/cancelled applications
+3. **Implemented Option B** - Sets both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+4. **Updated TypeScript types** - Added 'deleted' to status union type
+5. **Created database migration** - Adds 'deleted' and 'cancelled' to status CHECK constraint
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only shows delete button for rejected/cancelled
+{onDeleteRejected && (application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ❌ BROKEN: Only allows deletion of rejected/cancelled
+if (application.status !== 'rejected' && application.status !== 'cancelled') {
+  return errorResponse(400, 'Only rejected or cancelled applications can be deleted')
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Shows delete button for approved, rejected, or cancelled
+{onDeleteRejected && (application.status === 'approved' || application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ✅ FIXED: Allows deletion of approved, rejected, or cancelled
+// Option B: Set both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+const { error: updateError } = await supabaseClient
+  .from('business_applications')
+  .update({
+    owner_hidden_at: timestamp,  // This is what actually hides it from UI (filtering checks this)
+    status: 'deleted',  // For record-keeping
+    updated_at: timestamp
+  })
+  .eq('id', applicationId)
+```
+
+**Prevention Checklist:**
+- ✅ **CRITICAL**: Filtering logic uses `owner_hidden_at === null`, NOT status - DO NOT change this
+- ✅ **Always set both fields** when deleting: `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+- ✅ **Verify database constraint** allows 'deleted' status before updating (may need migration)
+- ✅ **Update TypeScript types** to include 'deleted' in status union
+- ✅ **Test filtering** - Deleted applications should not appear in UI (filtered by `owner_hidden_at`)
+
+**Rule of Thumb:**
+> When implementing deletion for business applications:
+> 1. **Use Option B pattern**: Set both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+> 2. **DO NOT change filtering logic** - It correctly uses `owner_hidden_at === null`
+> 3. **Verify database constraint** allows 'deleted' status (may need migration)
+> 4. **Update TypeScript types** to include 'deleted' in status union
+
+**Files to Watch:**
+- `src/pages/MyBusiness/components/ApplicationCard.tsx` - Delete button display logic
+- `netlify/functions/delete-business-application.ts` - Deletion logic and status update
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Delete function and confirmation message
+- `src/pages/MyBusiness/types.ts` and `src/types/index.ts` - Status type definitions
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194) - **DO NOT CHANGE**
+
+**Breaking Changes:**
+- If you remove 'deleted' from status type → TypeScript errors when setting status='deleted'
+- If you change filtering logic from `owner_hidden_at === null` → Deleted applications will appear in UI
+- If you remove `owner_hidden_at` update → Applications won't be hidden from UI (filtering won't work)
+- If database constraint doesn't allow 'deleted' → Update will fail (run migration first)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Delete button appears for approved applications
+- ✅ Delete button appears for rejected applications
+- ✅ Delete button appears for cancelled applications
+- ✅ Deleted applications disappear from UI (filtered by `owner_hidden_at`)
+- ✅ Status is updated to 'deleted' in database (for record-keeping)
+- ✅ Confirmation message is appropriate for approved applications
+
+**Related:**
+- Section #29: Business Application Approval - Tier and Publication Fixes (same table, related workflow)
+- Section #28: MyBusiness Page - Applications Not Showing (same data sources, filtering logic)
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194)
 
 ---
 
@@ -5151,6 +5371,108 @@ useEffect(() => {
 - `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
 - Section #28: MyBusiness visibility issues (same data sources)
 - Section #24: RLS conflicts (same tables, keep policies consistent)
+- Section #31: Business Application Delete Button for Approved Applications (same table, filtering logic)
+
+---
+
+### 31. Business Application Delete Button for Approved Applications ⭐ USER FEATURE REQUEST (2025-01-XX) ✅ VERIFIED
+
+**What:** Users could not delete approved applications from their `/my-business` page. Approved applications would remain visible with "Approved" status even after attempting to delete them.
+
+**Root Cause:**
+1. `ApplicationCard` component only showed delete button for `rejected` or `cancelled` applications (line 197)
+2. `delete-business-application.ts` Netlify function only allowed deletion of `rejected` or `cancelled` applications (line 75)
+3. **CRITICAL**: The system filters applications using `owner_hidden_at === null`, NOT by status
+4. Approved applications had no way to be deleted/hidden from user's view
+
+**What Happened:**
+1. User submits business application → Admin approves → Application shows as "Approved"
+2. User wants to remove approved application from their view → No delete button available
+3. Even if delete button existed, Netlify function would reject deletion of approved applications
+4. Applications remained visible indefinitely
+
+**The Fix:**
+1. **Added delete button for approved applications** - Extended ApplicationCard condition to include `status === 'approved'`
+2. **Updated Netlify function** - Removed restriction that only allowed rejected/cancelled applications
+3. **Implemented Option B** - Sets both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+4. **Updated TypeScript types** - Added 'deleted' to status union type
+5. **Created database migration** - Adds 'deleted' and 'cancelled' to status CHECK constraint
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only shows delete button for rejected/cancelled
+{onDeleteRejected && (application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ❌ BROKEN: Only allows deletion of rejected/cancelled
+if (application.status !== 'rejected' && application.status !== 'cancelled') {
+  return errorResponse(400, 'Only rejected or cancelled applications can be deleted')
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Shows delete button for approved, rejected, or cancelled
+{onDeleteRejected && (application.status === 'approved' || application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ✅ FIXED: Allows deletion of approved, rejected, or cancelled
+// Option B: Set both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+const { error: updateError } = await supabaseClient
+  .from('business_applications')
+  .update({
+    owner_hidden_at: timestamp,  // This is what actually hides it from UI (filtering checks this)
+    status: 'deleted',  // For record-keeping
+    updated_at: timestamp
+  })
+  .eq('id', applicationId)
+```
+
+**Prevention Checklist:**
+- ✅ **CRITICAL**: Filtering logic uses `owner_hidden_at === null`, NOT status - DO NOT change this
+- ✅ **Always set both fields** when deleting: `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+- ✅ **Verify database constraint** allows 'deleted' status before updating (may need migration)
+- ✅ **Update TypeScript types** to include 'deleted' in status union
+- ✅ **Test filtering** - Deleted applications should not appear in UI (filtered by `owner_hidden_at`)
+
+**Rule of Thumb:**
+> When implementing deletion for business applications:
+> 1. **Use Option B pattern**: Set both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+> 2. **DO NOT change filtering logic** - It correctly uses `owner_hidden_at === null`
+> 3. **Verify database constraint** allows 'deleted' status (may need migration)
+> 4. **Update TypeScript types** to include 'deleted' in status union
+
+**Files to Watch:**
+- `src/pages/MyBusiness/components/ApplicationCard.tsx` - Delete button display logic
+- `netlify/functions/delete-business-application.ts` - Deletion logic and status update
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Delete function and confirmation message
+- `src/pages/MyBusiness/types.ts` and `src/types/index.ts` - Status type definitions
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194) - **DO NOT CHANGE**
+
+**Breaking Changes:**
+- If you remove 'deleted' from status type → TypeScript errors when setting status='deleted'
+- If you change filtering logic from `owner_hidden_at === null` → Deleted applications will appear in UI
+- If you remove `owner_hidden_at` update → Applications won't be hidden from UI (filtering won't work)
+- If database constraint doesn't allow 'deleted' → Update will fail (run migration first)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Delete button appears for approved applications
+- ✅ Delete button appears for rejected applications
+- ✅ Delete button appears for cancelled applications
+- ✅ Deleted applications disappear from UI (filtered by `owner_hidden_at`)
+- ✅ Status is updated to 'deleted' in database (for record-keeping)
+- ✅ Confirmation message is appropriate for approved applications
+
+**Related:**
+- Section #29: Business Application Approval - Tier and Publication Fixes (same table, related workflow)
+- Section #28: MyBusiness Page - Applications Not Showing (same data sources, filtering logic)
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194)
 
 ---
 
@@ -6612,6 +6934,108 @@ useEffect(() => {
 - `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
 - Section #28: MyBusiness visibility issues (same data sources)
 - Section #24: RLS conflicts (same tables, keep policies consistent)
+- Section #31: Business Application Delete Button for Approved Applications (same table, filtering logic)
+
+---
+
+### 31. Business Application Delete Button for Approved Applications ⭐ USER FEATURE REQUEST (2025-01-XX) ✅ VERIFIED
+
+**What:** Users could not delete approved applications from their `/my-business` page. Approved applications would remain visible with "Approved" status even after attempting to delete them.
+
+**Root Cause:**
+1. `ApplicationCard` component only showed delete button for `rejected` or `cancelled` applications (line 197)
+2. `delete-business-application.ts` Netlify function only allowed deletion of `rejected` or `cancelled` applications (line 75)
+3. **CRITICAL**: The system filters applications using `owner_hidden_at === null`, NOT by status
+4. Approved applications had no way to be deleted/hidden from user's view
+
+**What Happened:**
+1. User submits business application → Admin approves → Application shows as "Approved"
+2. User wants to remove approved application from their view → No delete button available
+3. Even if delete button existed, Netlify function would reject deletion of approved applications
+4. Applications remained visible indefinitely
+
+**The Fix:**
+1. **Added delete button for approved applications** - Extended ApplicationCard condition to include `status === 'approved'`
+2. **Updated Netlify function** - Removed restriction that only allowed rejected/cancelled applications
+3. **Implemented Option B** - Sets both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+4. **Updated TypeScript types** - Added 'deleted' to status union type
+5. **Created database migration** - Adds 'deleted' and 'cancelled' to status CHECK constraint
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only shows delete button for rejected/cancelled
+{onDeleteRejected && (application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ❌ BROKEN: Only allows deletion of rejected/cancelled
+if (application.status !== 'rejected' && application.status !== 'cancelled') {
+  return errorResponse(400, 'Only rejected or cancelled applications can be deleted')
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Shows delete button for approved, rejected, or cancelled
+{onDeleteRejected && (application.status === 'approved' || application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ✅ FIXED: Allows deletion of approved, rejected, or cancelled
+// Option B: Set both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+const { error: updateError } = await supabaseClient
+  .from('business_applications')
+  .update({
+    owner_hidden_at: timestamp,  // This is what actually hides it from UI (filtering checks this)
+    status: 'deleted',  // For record-keeping
+    updated_at: timestamp
+  })
+  .eq('id', applicationId)
+```
+
+**Prevention Checklist:**
+- ✅ **CRITICAL**: Filtering logic uses `owner_hidden_at === null`, NOT status - DO NOT change this
+- ✅ **Always set both fields** when deleting: `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+- ✅ **Verify database constraint** allows 'deleted' status before updating (may need migration)
+- ✅ **Update TypeScript types** to include 'deleted' in status union
+- ✅ **Test filtering** - Deleted applications should not appear in UI (filtered by `owner_hidden_at`)
+
+**Rule of Thumb:**
+> When implementing deletion for business applications:
+> 1. **Use Option B pattern**: Set both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+> 2. **DO NOT change filtering logic** - It correctly uses `owner_hidden_at === null`
+> 3. **Verify database constraint** allows 'deleted' status (may need migration)
+> 4. **Update TypeScript types** to include 'deleted' in status union
+
+**Files to Watch:**
+- `src/pages/MyBusiness/components/ApplicationCard.tsx` - Delete button display logic
+- `netlify/functions/delete-business-application.ts` - Deletion logic and status update
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Delete function and confirmation message
+- `src/pages/MyBusiness/types.ts` and `src/types/index.ts` - Status type definitions
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194) - **DO NOT CHANGE**
+
+**Breaking Changes:**
+- If you remove 'deleted' from status type → TypeScript errors when setting status='deleted'
+- If you change filtering logic from `owner_hidden_at === null` → Deleted applications will appear in UI
+- If you remove `owner_hidden_at` update → Applications won't be hidden from UI (filtering won't work)
+- If database constraint doesn't allow 'deleted' → Update will fail (run migration first)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Delete button appears for approved applications
+- ✅ Delete button appears for rejected applications
+- ✅ Delete button appears for cancelled applications
+- ✅ Deleted applications disappear from UI (filtered by `owner_hidden_at`)
+- ✅ Status is updated to 'deleted' in database (for record-keeping)
+- ✅ Confirmation message is appropriate for approved applications
+
+**Related:**
+- Section #29: Business Application Approval - Tier and Publication Fixes (same table, related workflow)
+- Section #28: MyBusiness Page - Applications Not Showing (same data sources, filtering logic)
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194)
 
 ---
 
@@ -8073,6 +8497,108 @@ useEffect(() => {
 - `docs/prevention/DEPENDENCY_TRACKING_COMPLETE.md` → High Priority #15
 - Section #28: MyBusiness visibility issues (same data sources)
 - Section #24: RLS conflicts (same tables, keep policies consistent)
+- Section #31: Business Application Delete Button for Approved Applications (same table, filtering logic)
+
+---
+
+### 31. Business Application Delete Button for Approved Applications ⭐ USER FEATURE REQUEST (2025-01-XX) ✅ VERIFIED
+
+**What:** Users could not delete approved applications from their `/my-business` page. Approved applications would remain visible with "Approved" status even after attempting to delete them.
+
+**Root Cause:**
+1. `ApplicationCard` component only showed delete button for `rejected` or `cancelled` applications (line 197)
+2. `delete-business-application.ts` Netlify function only allowed deletion of `rejected` or `cancelled` applications (line 75)
+3. **CRITICAL**: The system filters applications using `owner_hidden_at === null`, NOT by status
+4. Approved applications had no way to be deleted/hidden from user's view
+
+**What Happened:**
+1. User submits business application → Admin approves → Application shows as "Approved"
+2. User wants to remove approved application from their view → No delete button available
+3. Even if delete button existed, Netlify function would reject deletion of approved applications
+4. Applications remained visible indefinitely
+
+**The Fix:**
+1. **Added delete button for approved applications** - Extended ApplicationCard condition to include `status === 'approved'`
+2. **Updated Netlify function** - Removed restriction that only allowed rejected/cancelled applications
+3. **Implemented Option B** - Sets both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+4. **Updated TypeScript types** - Added 'deleted' to status union type
+5. **Created database migration** - Adds 'deleted' and 'cancelled' to status CHECK constraint
+
+**Wrong Code:**
+```typescript
+// ❌ BROKEN: Only shows delete button for rejected/cancelled
+{onDeleteRejected && (application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ❌ BROKEN: Only allows deletion of rejected/cancelled
+if (application.status !== 'rejected' && application.status !== 'cancelled') {
+  return errorResponse(400, 'Only rejected or cancelled applications can be deleted')
+}
+```
+
+**Correct Code:**
+```typescript
+// ✅ FIXED: Shows delete button for approved, rejected, or cancelled
+{onDeleteRejected && (application.status === 'approved' || application.status === 'rejected' || application.status === 'cancelled') && (
+  <button onClick={() => onDeleteRejected(application.id)}>Delete</button>
+)}
+```
+
+```typescript
+// ✅ FIXED: Allows deletion of approved, rejected, or cancelled
+// Option B: Set both owner_hidden_at (for filtering) and status='deleted' (for record-keeping)
+const { error: updateError } = await supabaseClient
+  .from('business_applications')
+  .update({
+    owner_hidden_at: timestamp,  // This is what actually hides it from UI (filtering checks this)
+    status: 'deleted',  // For record-keeping
+    updated_at: timestamp
+  })
+  .eq('id', applicationId)
+```
+
+**Prevention Checklist:**
+- ✅ **CRITICAL**: Filtering logic uses `owner_hidden_at === null`, NOT status - DO NOT change this
+- ✅ **Always set both fields** when deleting: `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+- ✅ **Verify database constraint** allows 'deleted' status before updating (may need migration)
+- ✅ **Update TypeScript types** to include 'deleted' in status union
+- ✅ **Test filtering** - Deleted applications should not appear in UI (filtered by `owner_hidden_at`)
+
+**Rule of Thumb:**
+> When implementing deletion for business applications:
+> 1. **Use Option B pattern**: Set both `owner_hidden_at` (for filtering) and `status='deleted'` (for record-keeping)
+> 2. **DO NOT change filtering logic** - It correctly uses `owner_hidden_at === null`
+> 3. **Verify database constraint** allows 'deleted' status (may need migration)
+> 4. **Update TypeScript types** to include 'deleted' in status union
+
+**Files to Watch:**
+- `src/pages/MyBusiness/components/ApplicationCard.tsx` - Delete button display logic
+- `netlify/functions/delete-business-application.ts` - Deletion logic and status update
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Delete function and confirmation message
+- `src/pages/MyBusiness/types.ts` and `src/types/index.ts` - Status type definitions
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194) - **DO NOT CHANGE**
+
+**Breaking Changes:**
+- If you remove 'deleted' from status type → TypeScript errors when setting status='deleted'
+- If you change filtering logic from `owner_hidden_at === null` → Deleted applications will appear in UI
+- If you remove `owner_hidden_at` update → Applications won't be hidden from UI (filtering won't work)
+- If database constraint doesn't allow 'deleted' → Update will fail (run migration first)
+
+**Testing Verified (2025-01-XX):**
+- ✅ Delete button appears for approved applications
+- ✅ Delete button appears for rejected applications
+- ✅ Delete button appears for cancelled applications
+- ✅ Deleted applications disappear from UI (filtered by `owner_hidden_at`)
+- ✅ Status is updated to 'deleted' in database (for record-keeping)
+- ✅ Confirmation message is appropriate for approved applications
+
+**Related:**
+- Section #29: Business Application Approval - Tier and Publication Fixes (same table, related workflow)
+- Section #28: MyBusiness Page - Applications Not Showing (same data sources, filtering logic)
+- `src/pages/MyBusiness/hooks/useBusinessOperations.ts` - Filtering logic (lines 174, 194)
 
 ---
 

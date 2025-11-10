@@ -81,11 +81,48 @@ export type ProviderRow = {
  * - Parses challenge data (JSON with business details)
  * - Combines admin-edited tags with application tags
  * - Links provider to user profile if email matches
- * - Creates unpublished provider (admin must manually publish)
+ * - Auto-publishes provider (published: true) so business is immediately visible in directory
+ * - Respects tier_requested field: Sets is_member/is_featured based on requested tier
+ * - Sets featured_since timestamp for featured tier applications
  * - Updates application status to 'approved'
  * - Refreshes providers list
  * 
  * CRITICAL: Immediately removes from UI to prevent double-clicks
+ * 
+ * DEPENDENCY TRACKING:
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - app.tier_requested: Must be 'free' or 'featured' to set correct tier
+ * - app.challenge: Contains JSON with all business details (website, address, images, etc.)
+ * - app.email: Used to find owner_user_id and send notifications
+ * - appEdits: Admin-edited category and tags
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - Admin.tsx: Calls this function when approving applications
+ * - BusinessListingCard: Displays businesses created by this function (checks is_member for featured status)
+ * - fetchProvidersFromSupabase: Filters by published=true (businesses created here are now published)
+ * - NotificationBell: Displays notifications sent by this function
+ * - EmailNotificationService: Sends approval emails with tier information
+ * 
+ * BREAKING CHANGES:
+ * - If you change published default → Businesses won't appear in directory (fixed: now always published)
+ * - If you change tier logic → Featured businesses won't show correctly (fixed: now respects tier_requested)
+ * - If you change is_member/is_featured logic → BusinessListingCard will show wrong tier
+ * - If you change email notification tier → Users will get wrong tier info in emails
+ * 
+ * RECENT CHANGES (2025-01-XX):
+ * - ✅ Changed published: false → published: true (businesses now immediately visible after approval)
+ * - ✅ Added tier_requested support: Sets is_member/is_featured based on app.tier_requested
+ * - ✅ Added featured_since timestamp for featured tier applications
+ * - ✅ Updated email notification to use correct tier (was always 'free', now uses actual tier)
+ * 
+ * RELATED FILES:
+ * - src/components/admin/sections/BusinessApplicationsSection-2025-10-19.tsx: Displays tier_requested to admin
+ * - src/components/admin/sections/ChangeRequestsSection-2025-10-19.tsx: Similar tier logic for featured upgrades
+ * - src/pages/MyBusiness/components/BusinessListingCard.tsx: Displays tier based on is_member
+ * - src/lib/supabaseData.ts: fetchProvidersFromSupabase filters by published=true
+ * 
+ * See: docs/prevention/CASCADING_FAILURES.md - Section #26 (Admin INSERT Policy)
  */
 export async function approveApplication(
   appId: string,

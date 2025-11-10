@@ -1200,11 +1200,54 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
   /**
    * DELETE BUSINESS APPLICATION (OWNER HIDE)
    *
-   * Allows business owner to hide a rejected application from their dashboard
+   * Allows business owner to hide an approved, rejected, or cancelled application from their dashboard
    * while keeping the record for admin visibility.
+   * 
+   * Sets both owner_hidden_at (for filtering) and status='deleted' (for record-keeping).
+   * The filtering logic uses owner_hidden_at === null, so this will hide the application from UI.
+   * 
+   * DEPENDENCY TRACKING:
+   * 
+   * WHAT THIS DEPENDS ON:
+   * - delete-business-application.ts: Netlify function that performs the deletion
+   * - application.status: Must be 'approved', 'rejected', or 'cancelled' to allow deletion
+   * - supabase.auth.getSession(): Provides authentication token
+   * - applications state: Used to find application and customize confirmation message
+   * 
+   * WHAT DEPENDS ON THIS:
+   * - ApplicationCard: Calls this function when delete button is clicked
+   * - MyBusiness page: Uses this function to delete applications
+   * 
+   * BREAKING CHANGES:
+   * - If you change confirmation message logic → Users won't get appropriate warnings
+   * - If you remove owner_hidden_at filtering → Deleted applications will appear in UI
+   * - If you change application filtering (lines 174, 194) → Deleted applications will appear in UI
+   * 
+   * RECENT CHANGES (2025-01-XX):
+   * - ✅ Added support for deleting approved applications (was only rejected/cancelled)
+   * - ✅ Updated confirmation message to differentiate between approved and other statuses
+   * - ✅ Updated to work with new delete-business-application function that sets status='deleted'
+   * 
+   * RELATED FILES:
+   * - src/pages/MyBusiness/components/ApplicationCard.tsx: Delete button display logic
+   * - netlify/functions/delete-business-application.ts: Backend deletion logic
+   * - src/pages/MyBusiness/hooks/useBusinessOperations.ts: Filtering logic (lines 174, 194) - **DO NOT CHANGE**
+   * 
+   * CRITICAL NOTES:
+   * - Filtering logic uses owner_hidden_at === null, NOT status - DO NOT change this
+   * - Applications are filtered in queries at lines 174 and 194 - these must remain unchanged
+   * 
+   * See: docs/prevention/CASCADING_FAILURES.md - Section #31 (Business Application Delete Button)
    */
   const deleteBusinessApplication = async (applicationId: string) => {
-    if (!confirm('Delete this application from your view? Admins will still be able to see it.')) {
+    // Find the application to customize the confirmation message
+    const app = applications.find(a => a.id === applicationId)
+    const isApproved = app?.status === 'approved'
+    const confirmMessage = isApproved
+      ? 'Delete this approved application from your view? The business listing will remain active, but this application record will be hidden. Admins will still be able to see it.'
+      : 'Delete this application from your view? Admins will still be able to see it.'
+    
+    if (!confirm(confirmMessage)) {
       return
     }
 

@@ -61,7 +61,7 @@ export type BusinessApplication = {
   category: string | null
   challenge: string | null
   tier_requested: 'free' | 'featured' | null
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | null
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'deleted' | null
   created_at: string
   decided_at?: string | null  // Optional field - may not exist in all database schemas
   owner_hidden_at?: string | null

@@ -8,6 +8,36 @@ import type { BusinessApplication } from '../types'
  * and allows the owner to request a status update from the admin.
  * 
  * Extracted from MyBusiness.tsx for better maintainability.
+ * 
+ * DEPENDENCY TRACKING:
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - application.status: Must be 'pending' | 'approved' | 'rejected' | 'cancelled' | 'deleted' | null
+ * - application.challenge: Contains JSON with update request metadata
+ * - onDeleteRejected: Function to delete approved, rejected, or cancelled applications
+ * - onCancelPending: Function to cancel pending applications
+ * - onRequestFreeListing: Function to request status update for pending applications
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - MyBusiness.tsx: Renders ApplicationCard for each application
+ * - useBusinessOperations: Provides delete/cancel/request functions
+ * 
+ * BREAKING CHANGES:
+ * - If you change status values → Delete button won't show for approved applications (fixed: now includes 'approved')
+ * - If you change delete button condition → Users won't be able to delete approved applications
+ * - If you remove 'deleted' status badge → Deleted applications won't display correctly
+ * 
+ * RECENT CHANGES (2025-01-XX):
+ * - ✅ Added delete button for approved applications (was only for rejected/cancelled)
+ * - ✅ Added 'deleted' status badge display
+ * - ✅ Updated delete button condition to include 'approved' status
+ * 
+ * RELATED FILES:
+ * - src/pages/MyBusiness/hooks/useBusinessOperations.ts: Provides delete function
+ * - netlify/functions/delete-business-application.ts: Backend deletion logic
+ * - src/pages/MyBusiness/types.ts: BusinessApplication type definition
+ * 
+ * See: docs/prevention/CASCADING_FAILURES.md - Section #31 (Business Application Delete Button)
  */
 
 interface ApplicationCardProps {
@@ -81,6 +111,27 @@ export function ApplicationCard({ application, onRequestFreeListing, onDeleteRej
             />
           </svg>
           <span>Cancelled</span>
+        </span>
+      )
+    }
+
+    if (status === 'deleted') {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+          <svg 
+            className="w-3.5 h-3.5" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+            />
+          </svg>
+          <span>Deleted</span>
         </span>
       )
     }
@@ -194,7 +245,7 @@ export function ApplicationCard({ application, onRequestFreeListing, onDeleteRej
               Cancel
             </button>
           )}
-          {onDeleteRejected && (application.status === 'rejected' || application.status === 'cancelled') && (
+          {onDeleteRejected && (application.status === 'approved' || application.status === 'rejected' || application.status === 'cancelled') && (
             <button
               onClick={() => onDeleteRejected(application.id)}
               className="flex-shrink-0 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 border border-neutral-200 rounded-lg transition-colors"
