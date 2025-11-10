@@ -13,6 +13,43 @@ import type { ProviderChangeRequest } from '../../../lib/supabaseData'
  * - Action buttons (downgrade, delete)
  * 
  * This component was extracted from MyBusiness.tsx to improve maintainability.
+ * 
+ * DEPENDENCY TRACKING:
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - listing.is_member: Must be true to show Google Calendar section
+ * - listing.booking_enabled OR listing.enable_calendar_booking: Either must be true to show section
+ * - listing.google_calendar_connected: Used to show connection status and button state
+ * - listing.enable_calendar_booking: Used to show "(Required)" on button when enabled but not connected
+ * - onConnectGoogleCalendar: Function to initiate OAuth flow
+ * - onDisconnectGoogleCalendar: Function to disconnect calendar
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - ListingsTab: Renders BusinessListingCard for each listing
+ * - MyBusiness page: Provides connection/disconnection functions
+ * 
+ * BREAKING CHANGES:
+ * - If you change button visibility condition → Connection button won't appear when it should
+ * - If you remove "(Required)" indicator → Users won't know connection is needed
+ * - If you change button color logic → Visual feedback will be wrong
+ * 
+ * RECENT CHANGES (2025-01-XX):
+ * - ✅ Fixed button visibility condition to show when enable_calendar_booking is true (not just booking_enabled)
+ * - ✅ Enhanced button to show "(Required)" when calendar booking is enabled but not connected
+ * - ✅ Changed button color to amber when connection is required
+ * 
+ * RELATED FILES:
+ * - src/pages/MyBusiness/components/BusinessListingForm.tsx: Form where users enable calendar booking
+ * - src/pages/MyBusiness.tsx: Provides connection/disconnection functions
+ * - netlify/functions/google-calendar-connect.ts: OAuth initiation
+ * - netlify/functions/google-calendar-callback.ts: OAuth callback
+ * 
+ * CRITICAL NOTES:
+ * - Button visibility condition: `is_member && (booking_enabled || enable_calendar_booking)`
+ * - Button shows "(Required)" when: `enable_calendar_booking && !google_calendar_connected`
+ * 
+ * See: docs/prevention/GOOGLE_CALENDAR_CONNECTION_FIX.md - Detailed analysis
+ * See: docs/prevention/CASCADING_FAILURES.md - General prevention guide
  */
 
 interface BusinessListingCardProps {
@@ -326,7 +363,7 @@ export function BusinessListingCard({
         )}
 
         {/* Google Calendar Integration - Featured accounts only */}
-        {listing.is_member && listing.booking_enabled && (
+        {listing.is_member && (listing.booking_enabled || listing.enable_calendar_booking) && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -412,7 +449,11 @@ export function BusinessListingCard({
                 <button
                   onClick={() => onConnectGoogleCalendar(listing.id)}
                   disabled={connectingCalendar}
-                  className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`inline-flex items-center justify-center px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    listing.enable_calendar_booking && !listing.google_calendar_connected
+                      ? 'bg-amber-600 hover:bg-amber-700' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                 >
                   {connectingCalendar ? (
                     <>
@@ -427,7 +468,9 @@ export function BusinessListingCard({
                       <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972-3.332 0-6.033-2.701-6.033-6.032s2.701-6.032 6.033-6.032c1.498 0 2.866.549 3.921 1.453l2.814-2.814C17.503 2.988 15.139 2 12.545 2 7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z" />
                       </svg>
-                      Connect Google Calendar
+                      {listing.enable_calendar_booking && !listing.google_calendar_connected
+                        ? 'Connect Google Calendar (Required)'
+                        : 'Connect Google Calendar'}
                     </>
                   )}
                 </button>

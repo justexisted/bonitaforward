@@ -71,6 +71,15 @@ You're experiencing **cascading failures** - fixing one issue creates another:
 - ✅ Created database migration to add 'deleted' to status CHECK constraint
 - **Status:** ✅ Fixed - See Section #31 for detailed pattern and prevention
 
+**Google Calendar Connection Flow - FIXED (2025-01-XX):**
+- ✅ Fixed form initialization to use `??` instead of `||` for boolean fields
+- ✅ Fixed button visibility to show when `enable_calendar_booking` is true
+- ✅ Added connection prompt in form when calendar booking is enabled but not connected
+- ✅ Enhanced connection button to show "(Required)" when connection is needed
+- ✅ Improved error messages in booking function with clear guidance
+- ✅ Added logging to verify booking fields are being saved
+- **Status:** ✅ Fixed - See `docs/prevention/GOOGLE_CALENDAR_CONNECTION_FIX.md` for detailed analysis
+
 ---
 
 ## Why This Happens

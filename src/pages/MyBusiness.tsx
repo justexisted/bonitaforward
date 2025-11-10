@@ -1093,8 +1093,9 @@ export default function MyBusinessPage() {
           <BusinessListingForm
             listing={editingListing}
             onSave={editingListing ? 
-              (updates) => {
-                updateBusinessListing(editingListing.id, updates)
+              async (updates) => {
+                await updateBusinessListing(editingListing.id, updates)
+                // Note: updateBusinessListing already calls loadBusinessData() internally
               } :
               (data) => {
                 createBusinessListing(data).then((result) => {

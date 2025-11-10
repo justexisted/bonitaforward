@@ -49,6 +49,38 @@ import type { CategoryKey } from '../../../types'
  * - Image management
  * - Google Maps integration
  * - Booking system settings (for featured listings)
+ * 
+ * DEPENDENCY TRACKING:
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - listing prop: Must include all booking fields (booking_enabled, enable_calendar_booking, etc.)
+ * - listing.google_calendar_connected: Used to show connection prompt (must be loaded with .select('*'))
+ * - Database defaults: Booking fields default to FALSE in database
+ * - onSave callback: Must handle async save and refresh data
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - MyBusiness.tsx: Renders form and handles save
+ * - BusinessListingCard: Shows connection button based on enable_calendar_booking
+ * - ProviderPage: Shows booking section based on enable_calendar_booking
+ * 
+ * BREAKING CHANGES:
+ * - If you change boolean field initialization from `??` to `||` → Form will show wrong state for null values
+ * - If you remove connection prompt → Users won't know they need to connect calendar
+ * - If you change booking field names → Database updates will fail
+ * 
+ * RECENT CHANGES (2025-01-XX):
+ * - ✅ Fixed form initialization to use `??` instead of `||` for boolean fields (booking_enabled, enable_calendar_booking, etc.)
+ * - ✅ Added connection prompt when calendar booking is enabled but not connected
+ * - ✅ Fixed published and is_member initialization to use `??` instead of `||`
+ * 
+ * RELATED FILES:
+ * - src/pages/MyBusiness/components/BusinessListingCard.tsx: Shows connection button
+ * - src/pages/MyBusiness/hooks/useBusinessOperations.ts: Save logic
+ * - src/pages/MyBusiness.tsx: Renders form and handles save
+ * - src/pages/ProviderPage.tsx: Uses enable_calendar_booking to show booking section
+ * 
+ * See: docs/prevention/GOOGLE_CALENDAR_CONNECTION_FIX.md - Detailed analysis
+ * See: docs/prevention/CASCADING_FAILURES.md - General prevention guide
  */
 export function BusinessListingForm({ 
     listing, 
@@ -101,13 +133,13 @@ export function BusinessListingForm({
       coupon_expires_at: listing?.coupon_expires_at || null,
       
       // Booking system fields
-      booking_enabled: listing?.booking_enabled || false,
+      booking_enabled: listing?.booking_enabled ?? false,
       booking_type: listing?.booking_type || null,
       booking_instructions: listing?.booking_instructions || '',
       booking_url: listing?.booking_url || '',
-      enable_calendar_booking: listing?.enable_calendar_booking || false,
-      enable_call_contact: listing?.enable_call_contact || false,
-      enable_email_contact: listing?.enable_email_contact || false
+      enable_calendar_booking: listing?.enable_calendar_booking ?? false,
+      enable_call_contact: listing?.enable_call_contact ?? false,
+      enable_email_contact: listing?.enable_email_contact ?? false
     })
   
     // Update form data when listing changes (important for after successful updates)
@@ -125,8 +157,8 @@ export function BusinessListingForm({
           images: listing.images || [],
           rating: listing.rating || null,
           badges: listing.badges || [],
-          published: listing.published || false,
-          is_member: listing.is_member || false,
+          published: listing.published ?? false,
+          is_member: listing.is_member ?? false,
           
           // Enhanced business management fields
           description: listing.description || '',
@@ -144,13 +176,13 @@ export function BusinessListingForm({
           coupon_expires_at: listing.coupon_expires_at || null,
           
           // Booking system fields
-          booking_enabled: listing.booking_enabled || false,
+          booking_enabled: listing.booking_enabled ?? false,
           booking_type: listing.booking_type || null,
           booking_instructions: listing.booking_instructions || '',
           booking_url: listing.booking_url || '',
-          enable_calendar_booking: listing.enable_calendar_booking || false,
-          enable_call_contact: listing.enable_call_contact || false,
-          enable_email_contact: listing.enable_email_contact || false
+          enable_calendar_booking: listing.enable_calendar_booking ?? false,
+          enable_call_contact: listing.enable_call_contact ?? false,
+          enable_email_contact: listing.enable_email_contact ?? false
         })
       } else if (typeof defaultIsMember === 'boolean') {
         setFormData(prev => ({
@@ -1428,6 +1460,23 @@ export function BusinessListingForm({
                             />
                           </button>
                         </div>
+                        
+                        {/* Connection prompt when calendar booking is enabled but not connected */}
+                        {formData.enable_calendar_booking && !listing?.google_calendar_connected && (
+                          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <div>
+                                <p className="text-sm font-medium text-blue-800">Connect Google Calendar</p>
+                                <p className="text-xs text-blue-700 mt-1">
+                                  After saving, you'll need to connect your Google Calendar in the listing card to enable appointment bookings.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
   
                         {/* Call Contact Toggle */}
                         <div className="flex items-center justify-between">

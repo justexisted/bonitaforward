@@ -3,6 +3,43 @@
  * 
  * This function creates a booking event in the business owner's Google Calendar.
  * It handles token refresh automatically if the access token has expired.
+ * 
+ * DEPENDENCY TRACKING:
+ * 
+ * WHAT THIS DEPENDS ON:
+ * - provider.google_calendar_connected: Must be true to create events
+ * - provider.google_calendar_sync_enabled: Must be true to create events
+ * - provider.google_calendar_id: Used to create events in correct calendar
+ * - provider.google_access_token: Used to authenticate with Google API
+ * - provider.google_refresh_token: Used to refresh expired tokens
+ * - provider.owner_user_id: Used to get owner email for notifications
+ * 
+ * WHAT DEPENDS ON THIS:
+ * - ProviderPage: Calls this function when customer books appointment
+ * - MyBusiness page: Users enable calendar booking to allow this function to work
+ * 
+ * BREAKING CHANGES:
+ * - If you change error message format → Frontend error handling might break
+ * - If you remove requires_connection field → Frontend can't detect connection requirement
+ * - If you change validation order → Error messages might be less helpful
+ * 
+ * RECENT CHANGES (2025-01-XX):
+ * - ✅ Enhanced error messages to provide clear guidance when calendar is not connected
+ * - ✅ Split validation into separate checks for connection and sync status
+ * - ✅ Added requires_connection and requires_sync_enable fields to error response
+ * 
+ * RELATED FILES:
+ * - src/pages/ProviderPage.tsx: Calls this function when booking
+ * - src/pages/MyBusiness/components/BusinessListingCard.tsx: Shows connection button
+ * - netlify/functions/google-calendar-connect.ts: Initiates OAuth flow
+ * - netlify/functions/google-calendar-callback.ts: Handles OAuth callback
+ * 
+ * CRITICAL NOTES:
+ * - Always check google_calendar_connected before google_calendar_sync_enabled
+ * - Provide clear, actionable error messages
+ * - Include requires_connection/requires_sync_enable fields for frontend handling
+ * 
+ * See: docs/prevention/GOOGLE_CALENDAR_CONNECTION_FIX.md - Detailed analysis
  */
 
 import type { Handler, HandlerEvent } from '@netlify/functions'
@@ -153,10 +190,23 @@ export const handler: Handler = async (event: HandlerEvent) => {
       // Continue without owner email notification
     }
 
-    if (!provider.google_calendar_connected || !provider.google_calendar_sync_enabled) {
+    if (!provider.google_calendar_connected) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Google Calendar is not connected or sync is disabled' })
+        body: JSON.stringify({ 
+          error: 'Google Calendar is not connected. Please connect your Google Calendar in the My Business page to enable bookings.',
+          requires_connection: true
+        })
+      }
+    }
+
+    if (!provider.google_calendar_sync_enabled) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: 'Google Calendar sync is disabled. Please enable sync in the My Business page.',
+          requires_sync_enable: true
+        })
       }
     }
 

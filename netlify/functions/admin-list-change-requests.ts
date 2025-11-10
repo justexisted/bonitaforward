@@ -33,6 +33,9 @@
  * RECENT BREAKS:
  * - Wrong table name (2025-01-XX): Used owner_change_requests instead of provider_change_requests
  *   → Fix: Changed to provider_change_requests (correct table name)
+ * - Field name mismatch (2025-01-XX): Returned 'provider'/'owner' but component expects 'providers'/'profiles'
+ *   → Fix: Changed to return 'providers' and 'profiles' (plural) to match component expectations
+ *   → Impact: Component was showing "Unknown Business" and "Loading..." for owner info
  * 
  * See: docs/prevention/CASCADING_FAILURES.md
  */
@@ -103,8 +106,11 @@ export const handler: Handler = async (event) => {
 
         return {
           ...request,
-          provider: providerInfo,
-          owner: ownerProfile
+          // CRITICAL: Field names must match ChangeRequestsSection component expectations
+          // Component expects: r.providers?.name and r.profiles?.email
+          // DO NOT change these to singular (provider/owner) - component will show "Unknown Business" and "Loading..."
+          providers: providerInfo,  // Changed from 'provider' to 'providers' to match component expectations
+          profiles: ownerProfile    // Changed from 'owner' to 'profiles' to match component expectations
         }
       })
     )

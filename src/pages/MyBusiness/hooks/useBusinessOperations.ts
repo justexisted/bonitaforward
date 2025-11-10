@@ -1030,6 +1030,41 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
    * For featured businesses: All changes are applied immediately.
    * For non-featured businesses: Creates a change request that requires admin approval.
    */
+  /**
+   * UPDATE BUSINESS LISTING
+   * 
+   * Updates a business listing in the database. For featured businesses, changes are applied immediately.
+   * For free businesses, changes require admin approval.
+   * 
+   * DEPENDENCY TRACKING:
+   * 
+   * WHAT THIS DEPENDS ON:
+   * - updates object: Must include all fields being updated (booking_enabled, enable_calendar_booking, etc.)
+   * - listing.is_member: Determines if changes are applied immediately or require approval
+   * - Supabase providers table: Must have all booking fields (booking_enabled, enable_calendar_booking, etc.)
+   * - loadBusinessData: Called after save to refresh listings state
+   * 
+   * WHAT DEPENDS ON THIS:
+   * - BusinessListingForm: Calls this function when form is saved
+   * - MyBusiness.tsx: Provides this function to form
+   * - BusinessListingCard: Displays updated state after save
+   * 
+   * BREAKING CHANGES:
+   * - If you remove booking field logging → Harder to debug persistence issues
+   * - If you change loadBusinessData call → Form won't reflect updated state
+   * - If you remove setEditingListing(null) → Form won't close after save
+   * 
+   * RECENT CHANGES (2025-01-XX):
+   * - ✅ Added logging for booking fields being saved (booking_enabled, enable_calendar_booking, etc.)
+   * - ✅ Ensures all booking fields are saved correctly
+   * 
+   * RELATED FILES:
+   * - src/pages/MyBusiness/components/BusinessListingForm.tsx: Form that calls this function
+   * - src/pages/MyBusiness/components/BusinessListingCard.tsx: Displays updated state
+   * - src/pages/MyBusiness.tsx: Provides this function to form
+   * 
+   * See: docs/prevention/GOOGLE_CALENDAR_CONNECTION_FIX.md - Detailed analysis
+   */
   const updateBusinessListing = async (listingId: string, updates: Partial<BusinessListing>) => {
     // Prevent multiple simultaneous updates
     if (isUpdating) {
@@ -1059,6 +1094,20 @@ export function useBusinessOperations(props: UseBusinessOperationsProps) {
       if (isFeatured) {
         // Featured businesses: Apply ALL changes immediately
         console.log('[MyBusiness] ⚡ Applying all changes immediately for featured business:', updates)
+        
+        // Log booking fields being saved
+        if (updates.booking_enabled !== undefined || updates.enable_calendar_booking !== undefined || 
+            updates.enable_call_contact !== undefined || updates.enable_email_contact !== undefined) {
+          console.log('[MyBusiness] Saving booking fields:', {
+            booking_enabled: updates.booking_enabled,
+            enable_calendar_booking: updates.enable_calendar_booking,
+            enable_call_contact: updates.enable_call_contact,
+            enable_email_contact: updates.enable_email_contact,
+            booking_type: updates.booking_type,
+            booking_instructions: updates.booking_instructions,
+            booking_url: updates.booking_url
+          })
+        }
         
         const { error } = await supabase
           .from('providers')
