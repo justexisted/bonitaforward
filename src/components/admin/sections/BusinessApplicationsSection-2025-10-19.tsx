@@ -36,15 +36,16 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
   onDeleteApplication
 }) => {
   return (
-    <div className="mt-4 rounded-2xl border border-neutral-100 p-6 bg-white hover-gradient interactive-card">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-semibold text-neutral-900">Business Applications</h2>
-          <p className="text-sm text-neutral-600 mt-1">
+    <div className="mt-4 rounded-2xl border border-neutral-100 p-3 md:p-6 bg-white hover-gradient interactive-card">
+      {/* Header: Stack on mobile, side-by-side on desktop */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4 md:mb-6">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base md:text-lg font-semibold text-neutral-900">Business Applications</h2>
+          <p className="text-xs md:text-sm text-neutral-600 mt-1">
             Review and approve new business listing requests from community members.
           </p>
         </div>
-        <div className="text-sm text-neutral-500">
+        <div className="text-xs md:text-sm text-neutral-500 flex-shrink-0">
           {bizApps.length} pending application{bizApps.length !== 1 ? 's' : ''}
         </div>
       </div>
@@ -58,43 +59,46 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 md:space-y-4">
           {bizApps.map((app) => (
             <div 
               key={app.id} 
-              className={`rounded-xl border-2 p-4 ${
+              className={`rounded-xl border-2 p-3 md:p-4 ${
                 app.tier_requested === 'featured' 
                   ? 'border-yellow-400 bg-yellow-50' 
                   : 'border-green-300 bg-white'
               }`}
             >
               {/* TIER REQUESTED - CRITICAL INFORMATION */}
+              {/* Badge: Block on mobile for better visibility, inline on desktop */}
               <div className="mb-3">
-                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold ${
+                <div className={`inline-block w-full sm:w-auto px-3 py-1.5 md:px-3 md:py-1.5 rounded-full text-xs md:text-sm font-bold text-center sm:text-left ${
                   app.tier_requested === 'featured'
                     ? 'bg-yellow-200 text-yellow-900 border-2 border-yellow-400'
                     : 'bg-green-100 text-green-900 border-2 border-green-400'
                 }`}>
                   {app.tier_requested === 'featured' ? '⭐ FEATURED TIER REQUESTED ($97/YEAR)' : '🆓 FREE TIER REQUESTED (NO PAYMENT)'}
-                </span>
+                </div>
               </div>
 
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <div className="font-medium text-neutral-900 text-lg">
+              {/* Business info: Stack on mobile, side-by-side on desktop */}
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-neutral-900 text-base md:text-lg break-words">
                     {app.business_name || 'Unnamed Business'}
                   </div>
-                  <div className="text-sm text-neutral-600 mt-1">
-                    Submitted by: {app.full_name || 'Unknown'} • {app.email}
+                  <div className="text-xs md:text-sm text-neutral-600 mt-1 break-words">
+                    <span className="block sm:inline">Submitted by: {app.full_name || 'Unknown'}</span>
+                    <span className="hidden sm:inline"> • </span>
+                    <span className="block sm:inline break-all">{app.email}</span>
                   </div>
                   {app.phone && (
-                    <div className="text-sm text-neutral-600">Phone: {app.phone}</div>
+                    <div className="text-xs md:text-sm text-neutral-600 break-words">Phone: {app.phone}</div>
                   )}
                 </div>
-                <div className="text-xs text-neutral-500 text-right">
-                  {new Date(app.created_at).toLocaleDateString()}
-                  <br />
-                  {new Date(app.created_at).toLocaleTimeString()}
+                <div className="text-xs text-neutral-500 sm:text-right flex-shrink-0">
+                  <div>{new Date(app.created_at).toLocaleDateString()}</div>
+                  <div>{new Date(app.created_at).toLocaleTimeString()}</div>
                 </div>
               </div>
 
@@ -137,16 +141,16 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                 </div>
               </div>
 
-              {/* TIER INFORMATION PANEL */}
+              {/* TIER INFORMATION PANEL - Mobile optimized */}
               {app.tier_requested === 'featured' && (
-                <div className="mb-4 p-3 bg-yellow-100 border-2 border-yellow-400 rounded-lg">
-                  <div className="text-sm font-bold text-yellow-900 mb-2">
+                <div className="mb-4 p-2 md:p-3 bg-yellow-100 border-2 border-yellow-400 rounded-lg">
+                  <div className="text-xs md:text-sm font-bold text-yellow-900 mb-2 break-words">
                     ⭐ FEATURED TIER APPLICATION ⭐
                   </div>
                   <div className="text-xs text-yellow-900 space-y-1">
-                    <div className="font-bold">💰 PRICING: $97/year (PAYMENT REQUIRED)</div>
+                    <div className="font-bold break-words">💰 PRICING: $97/year (PAYMENT REQUIRED)</div>
                     <div className="font-semibold mt-2">What They Get:</div>
-                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                    <ul className="list-disc list-inside space-y-0.5 ml-2 break-words">
                       <li>Priority placement in search results</li>
                       <li>Enhanced business description</li>
                       <li>Multiple images support</li>
@@ -154,7 +158,7 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                       <li>Booking system</li>
                       <li>Analytics and insights</li>
                     </ul>
-                    <div className="mt-2 font-bold text-red-800">
+                    <div className="mt-2 font-bold text-red-800 break-words">
                       ⚠️ COLLECT PAYMENT BEFORE ACTIVATING FEATURED STATUS
                     </div>
                   </div>
@@ -162,11 +166,11 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
               )}
               
               {app.tier_requested !== 'featured' && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded-lg">
-                  <div className="text-sm font-bold text-green-900 mb-1">
+                <div className="mb-4 p-2 md:p-3 bg-green-50 border border-green-300 rounded-lg">
+                  <div className="text-xs md:text-sm font-bold text-green-900 mb-1 break-words">
                     🆓 FREE TIER APPLICATION
                   </div>
-                  <div className="text-xs text-green-800">
+                  <div className="text-xs text-green-800 break-words">
                     ✅ No payment required. This is a standard free listing request.
                   </div>
                 </div>
@@ -180,65 +184,65 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                       <label className="block text-xs font-medium text-neutral-700 mb-2">
                         Additional Information
                       </label>
-                      <div className="text-sm bg-white rounded-lg border border-neutral-200 p-3 space-y-2">
+                      <div className="text-xs md:text-sm bg-white rounded-lg border border-neutral-200 p-2 md:p-3 space-y-2">
                         {parsed.website && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Website:</span>{' '}
-                            <a href={parsed.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            <a href={parsed.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
                               {parsed.website}
                             </a>
                           </div>
                         )}
                         {parsed.address && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Address:</span>{' '}
                             <span className="text-neutral-600">{parsed.address}</span>
                           </div>
                         )}
                         {parsed.description && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Description:</span>{' '}
                             <span className="text-neutral-600">{parsed.description}</span>
                           </div>
                         )}
                         {parsed.google_maps_url && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Google Maps:</span>{' '}
-                            <a href={parsed.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            <a href={parsed.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
                               View on Google Maps
                             </a>
                           </div>
                         )}
                         {parsed.bonita_resident_discount && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Bonita Resident Discount:</span>{' '}
                             <span className="text-neutral-600">{parsed.bonita_resident_discount}</span>
                           </div>
                         )}
                         {parsed.tags && Array.isArray(parsed.tags) && parsed.tags.length > 0 && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Tags:</span>{' '}
                             <span className="text-neutral-600">{parsed.tags.join(', ')}</span>
                           </div>
                         )}
                         {parsed.specialties && Array.isArray(parsed.specialties) && parsed.specialties.length > 0 && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Specialties:</span>{' '}
                             <span className="text-neutral-600">{parsed.specialties.join(', ')}</span>
                           </div>
                         )}
                         {parsed.service_areas && Array.isArray(parsed.service_areas) && parsed.service_areas.length > 0 && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Service Areas:</span>{' '}
                             <span className="text-neutral-600">{parsed.service_areas.join(', ')}</span>
                           </div>
                         )}
                         {parsed.business_hours && typeof parsed.business_hours === 'object' && Object.keys(parsed.business_hours).length > 0 && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Business Hours:</span>
-                            <div className="ml-4 mt-1 space-y-1">
+                            <div className="ml-2 md:ml-4 mt-1 space-y-1">
                               {Object.entries(parsed.business_hours).map(([day, hours]) => (
-                                <div key={day} className="text-neutral-600">
+                                <div key={day} className="text-neutral-600 break-words">
                                   <span className="font-medium capitalize">{day}:</span> {hours as string}
                                 </div>
                               ))}
@@ -246,13 +250,13 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                           </div>
                         )}
                         {parsed.social_links && typeof parsed.social_links === 'object' && Object.keys(parsed.social_links).length > 0 && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Social Links:</span>
-                            <div className="ml-4 mt-1 space-y-1">
+                            <div className="ml-2 md:ml-4 mt-1 space-y-1">
                               {Object.entries(parsed.social_links).map(([platform, url]) => (
-                                <div key={platform}>
+                                <div key={platform} className="break-words">
                                   <span className="font-medium capitalize text-neutral-600">{platform}:</span>{' '}
-                                  <a href={url as string} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                                  <a href={url as string} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
                                     {url as string}
                                   </a>
                                 </div>
@@ -261,7 +265,7 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                           </div>
                         )}
                         {parsed.images && Array.isArray(parsed.images) && parsed.images.length > 0 && (
-                          <div>
+                          <div className="break-words">
                             <span className="font-medium text-neutral-700">Images:</span>{' '}
                             <span className="text-neutral-600">{parsed.images.length} image(s) uploaded</span>
                           </div>
@@ -276,19 +280,19 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                           if (!updates.length) return null
 
                           return (
-                            <div>
+                            <div className="break-words">
                               <span className="font-medium text-neutral-700">Owner Update Requests:</span>
-                              <ul className="mt-1 ml-4 space-y-1 list-disc text-neutral-600">
+                              <ul className="mt-1 ml-2 md:ml-4 space-y-1 list-disc text-neutral-600">
                                 {updates.map((req: any, idx: number) => (
-                                  <li key={idx}>
+                                  <li key={idx} className="break-words">
                                     <span className="font-medium text-neutral-700">{req?.message || 'Update Requested'}</span>
                                     {req?.requested_at && (
-                                      <span className="ml-2 text-xs text-neutral-500">
+                                      <span className="ml-1 md:ml-2 text-xs text-neutral-500 block sm:inline">
                                         {new Date(req.requested_at).toLocaleString()}
                                       </span>
                                     )}
                                     {req?.requested_by && (
-                                      <span className="ml-2 text-xs text-neutral-500">by {req.requested_by}</span>
+                                      <span className="ml-1 md:ml-2 text-xs text-neutral-500 block sm:inline">by {req.requested_by}</span>
                                     )}
                                   </li>
                                 ))}
@@ -306,7 +310,7 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                       <label className="block text-xs font-medium text-neutral-700 mb-1">
                         Additional Information
                       </label>
-                      <div className="text-sm text-neutral-600 bg-white rounded-lg border border-neutral-200 px-3 py-2">
+                      <div className="text-xs md:text-sm text-neutral-600 bg-white rounded-lg border border-neutral-200 p-2 md:px-3 md:py-2 break-words">
                         {app.challenge}
                       </div>
                     </div>
@@ -314,16 +318,17 @@ export const BusinessApplicationsSection: React.FC<BusinessApplicationsSectionPr
                 }
               })()}
 
-              <div className="flex items-center gap-3">
+              {/* Action buttons: Stack on mobile, side-by-side on desktop */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                 <button 
                   onClick={() => onApproveApplication(app.id)} 
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-medium text-sm transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-medium text-sm transition-colors"
                 >
                   ✓ Approve & Create Provider
                 </button>
                 <button 
                   onClick={() => onDeleteApplication(app.id)} 
-                  className="px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 border border-red-200 font-medium text-sm transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 border border-red-200 font-medium text-sm transition-colors"
                 >
                   ✗ Reject Application
                 </button>

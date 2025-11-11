@@ -118,27 +118,33 @@ export function BookingConfirmation({
 }
 
 // Styles
+// Reduced size so "Bonita Forward" remains the primary large title
 const h1 = {
   color: '#1a1a1a',
-  fontSize: '28px',
-  fontWeight: 'bold',
+  fontSize: '20px',
+  fontWeight: '600',
   margin: '0 0 16px 0',
   padding: '0',
+  textAlign: 'center' as const,
 }
 
+// Centered text alignment for consistent layout
 const text = {
   color: '#374151',
   fontSize: '16px',
   lineHeight: '24px',
   margin: '0 0 16px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for details box
 const detailsBox = {
   backgroundColor: '#f9fafb',
   border: '1px solid #e5e7eb',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const detailsTitle = {
@@ -146,11 +152,13 @@ const detailsTitle = {
   fontSize: '14px',
   fontWeight: '600',
   margin: '0 0 12px 0',
+  textAlign: 'center' as const,
 }
 
 const detailsTable = {
   width: '100%',
   borderCollapse: 'collapse' as const,
+  margin: '0 auto',
 }
 
 const labelCell = {
@@ -160,6 +168,7 @@ const labelCell = {
   verticalAlign: 'top',
   fontWeight: '500',
   width: '100px',
+  textAlign: 'right' as const,
 }
 
 const valueCell = {
@@ -167,6 +176,7 @@ const valueCell = {
   fontSize: '14px',
   padding: '4px 0',
   verticalAlign: 'top',
+  textAlign: 'left' as const,
 }
 
 const link = {
@@ -174,12 +184,14 @@ const link = {
   textDecoration: 'none',
 }
 
+// Centered alignment for booking box
 const bookingBox = {
   backgroundColor: '#eff6ff',
   border: '1px solid #93c5fd',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const bookingTitle = {
@@ -187,13 +199,16 @@ const bookingTitle = {
   fontSize: '14px',
   fontWeight: '600',
   margin: '0 0 12px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for message box
 const messageBox = {
   backgroundColor: '#f9fafb',
   borderLeft: '4px solid #5469d4',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const messageTitle = {
@@ -201,6 +216,7 @@ const messageTitle = {
   fontSize: '14px',
   fontWeight: '600',
   margin: '0 0 8px 0',
+  textAlign: 'center' as const,
 }
 
 const messageText = {
@@ -209,14 +225,17 @@ const messageText = {
   lineHeight: '20px',
   margin: '0',
   fontStyle: 'italic',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for action box
 const actionBox = {
   backgroundColor: '#fef3c7',
   border: '1px solid #fbbf24',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const actionText = {
@@ -224,6 +243,7 @@ const actionText = {
   fontSize: '14px',
   lineHeight: '20px',
   margin: '0',
+  textAlign: 'center' as const,
 }
 
 const buttonSection = {
@@ -237,5 +257,6 @@ const footerNote = {
   lineHeight: '20px',
   margin: '16px 0 0 0',
   fontStyle: 'italic',
+  textAlign: 'center' as const,
 }
 

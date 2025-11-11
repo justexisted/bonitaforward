@@ -110,27 +110,33 @@ export function AccountDeletionConfirmation({
 }
 
 // Styles
+// Reduced size so "Bonita Forward" remains the primary large title
 const h1 = {
   color: '#1a1a1a',
-  fontSize: '28px',
-  fontWeight: 'bold',
+  fontSize: '20px',
+  fontWeight: '600',
   margin: '0 0 16px 0',
   padding: '0',
+  textAlign: 'center' as const,
 }
 
+// Centered text alignment for consistent layout
 const text = {
   color: '#374151',
   fontSize: '16px',
   lineHeight: '24px',
   margin: '0 0 16px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for info box
 const infoBox = {
   backgroundColor: '#f9fafb',
   border: '1px solid #e5e7eb',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const infoTitle = {
@@ -138,6 +144,7 @@ const infoTitle = {
   fontSize: '14px',
   fontWeight: '600',
   margin: '0 0 12px 0',
+  textAlign: 'center' as const,
 }
 
 const infoText = {
@@ -145,11 +152,14 @@ const infoText = {
   fontSize: '14px',
   lineHeight: '20px',
   margin: '0 0 12px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered table for better email client compatibility
 const detailsTable = {
   width: '100%',
   borderCollapse: 'collapse' as const,
+  margin: '0 auto',
 }
 
 const detailIcon = {
@@ -158,6 +168,7 @@ const detailIcon = {
   padding: '4px 8px 4px 0',
   verticalAlign: 'top',
   width: '24px',
+  textAlign: 'center' as const,
 }
 
 const detailText = {
@@ -165,14 +176,17 @@ const detailText = {
   fontSize: '14px',
   padding: '4px 0',
   verticalAlign: 'top',
+  textAlign: 'left' as const,
 }
 
+// Centered alignment for business box
 const businessBox = {
   backgroundColor: '#fef3c7',
   border: '1px solid #fbbf24',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const businessTitle = {
@@ -180,6 +194,7 @@ const businessTitle = {
   fontSize: '14px',
   fontWeight: '600',
   margin: '0 0 8px 0',
+  textAlign: 'center' as const,
 }
 
 const businessText = {
@@ -187,14 +202,17 @@ const businessText = {
   fontSize: '14px',
   lineHeight: '20px',
   margin: '4px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for action box
 const actionBox = {
   backgroundColor: '#fef2f2',
   border: '1px solid #fca5a5',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const actionText = {
@@ -202,14 +220,17 @@ const actionText = {
   fontSize: '14px',
   lineHeight: '20px',
   margin: '0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for help box
 const helpBox = {
   backgroundColor: '#f0fdf4',
   border: '1px solid #10b981',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const helpTitle = {
@@ -217,6 +238,7 @@ const helpTitle = {
   fontSize: '14px',
   fontWeight: '600',
   margin: '0 0 8px 0',
+  textAlign: 'center' as const,
 }
 
 const helpText = {
@@ -224,6 +246,7 @@ const helpText = {
   fontSize: '14px',
   lineHeight: '20px',
   margin: '0',
+  textAlign: 'center' as const,
 }
 
 const link = {

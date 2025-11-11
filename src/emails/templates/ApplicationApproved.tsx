@@ -46,13 +46,11 @@ export function ApplicationApproved({
 
       <Section style={nextStepsBox}>
         <Text style={nextStepsTitle}>Next Steps:</Text>
-        <ul style={nextStepsList}>
-          <li style={nextStepItem}>Add photos and detailed information</li>
-          <li style={nextStepItem}>Set up your business hours</li>
-          <li style={nextStepItem}>Connect your Google Calendar for bookings</li>
-          <li style={nextStepItem}>Post job openings if you're hiring</li>
-          <li style={nextStepItem}>Share your listing on social media</li>
-        </ul>
+        <Text style={nextStepItem}>• Add photos and detailed information</Text>
+        <Text style={nextStepItem}>• Set up your business hours</Text>
+        <Text style={nextStepItem}>• Connect your Google Calendar for bookings</Text>
+        <Text style={nextStepItem}>• Post job openings if you're hiring</Text>
+        <Text style={nextStepItem}>• Share your listing on social media</Text>
       </Section>
 
       <Section style={buttonSection}>
@@ -69,19 +67,23 @@ export function ApplicationApproved({
 }
 
 // Styles
+// Reduced size so "Bonita Forward" remains the primary large title
 const h1 = {
   color: '#1a1a1a',
-  fontSize: '28px',
-  fontWeight: 'bold',
+  fontSize: '20px',
+  fontWeight: '600',
   margin: '0 0 16px 0',
   padding: '0',
+  textAlign: 'center' as const,
 }
 
+// Centered text alignment for consistent layout
 const text = {
   color: '#374151',
   fontSize: '16px',
   lineHeight: '24px',
   margin: '0 0 16px 0',
+  textAlign: 'center' as const,
 }
 
 const successBox = {
@@ -93,11 +95,13 @@ const successBox = {
   textAlign: 'center' as const,
 }
 
+// Centered title for success box
 const successTitle = {
   color: '#166534',
   fontSize: '18px',
   fontWeight: '600',
   margin: '0 0 8px 0',
+  textAlign: 'center' as const,
 }
 
 const successText = {
@@ -107,12 +111,14 @@ const successText = {
   margin: '0',
 }
 
+// Centered alignment for featured box
 const featuredBox = {
   backgroundColor: '#fef3c7',
   border: '2px solid #fbbf24',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const featuredText = {
@@ -123,12 +129,14 @@ const featuredText = {
   textAlign: 'center' as const,
 }
 
+// Centered alignment for next steps box
 const nextStepsBox = {
   backgroundColor: '#eff6ff',
   border: '1px solid #93c5fd',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const nextStepsTitle = {
@@ -136,18 +144,16 @@ const nextStepsTitle = {
   fontSize: '16px',
   fontWeight: '600',
   margin: '0 0 12px 0',
+  textAlign: 'center' as const,
 }
 
-const nextStepsList = {
+// Centered list items for better email client compatibility
+const nextStepItem = {
   color: '#1e40af',
   fontSize: '14px',
   lineHeight: '24px',
-  margin: '0',
-  paddingLeft: '20px',
-}
-
-const nextStepItem = {
   margin: '6px 0',
+  textAlign: 'center' as const,
 }
 
 const buttonSection = {

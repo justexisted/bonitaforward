@@ -39,13 +39,11 @@ export function ChangeRequestApproved({
       {requestType === 'update' && changedFields.length > 0 && (
         <Section style={changeBox}>
           <Text style={changeTitle}>The following changes are now live:</Text>
-          <ul style={changeList}>
-            {changedFields.map((field) => (
-              <li key={field} style={changeItem}>
-                {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </li>
-            ))}
-          </ul>
+          {changedFields.map((field) => (
+            <Text key={field} style={changeItem}>
+              • {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </Text>
+          ))}
         </Section>
       )}
 
@@ -71,27 +69,33 @@ export function ChangeRequestApproved({
 }
 
 // Styles
+// Reduced size so "Bonita Forward" remains the primary large title
 const h1 = {
   color: '#1a1a1a',
-  fontSize: '28px',
-  fontWeight: 'bold',
+  fontSize: '20px',
+  fontWeight: '600',
   margin: '0 0 16px 0',
   padding: '0',
+  textAlign: 'center' as const,
 }
 
+// Centered text alignment for consistent layout
 const text = {
   color: '#374151',
   fontSize: '16px',
   lineHeight: '24px',
   margin: '0 0 16px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for change box
 const changeBox = {
   backgroundColor: '#f0fdf4',
   border: '1px solid #86efac',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const changeTitle = {
@@ -99,26 +103,26 @@ const changeTitle = {
   fontSize: '14px',
   fontWeight: '600',
   margin: '0 0 8px 0',
+  textAlign: 'center' as const,
 }
 
-const changeList = {
+// Centered list items for better email client compatibility
+const changeItem = {
   color: '#166534',
   fontSize: '14px',
   lineHeight: '20px',
-  margin: '0',
-  paddingLeft: '20px',
-}
-
-const changeItem = {
   margin: '4px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for success box
 const successBox = {
   backgroundColor: '#fef3c7',
   border: '1px solid #fbbf24',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const successText = {
@@ -126,6 +130,7 @@ const successText = {
   fontSize: '14px',
   lineHeight: '20px',
   margin: '0',
+  textAlign: 'center' as const,
 }
 
 const buttonSection = {
@@ -139,5 +144,6 @@ const footerNote = {
   lineHeight: '20px',
   margin: '16px 0 0 0',
   fontStyle: 'italic',
+  textAlign: 'center' as const,
 }
 

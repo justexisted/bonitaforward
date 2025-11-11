@@ -68,27 +68,33 @@ export function EmailVerification({
 }
 
 // Styles
+// Reduced size so "Bonita Forward" remains the primary large title
 const h1 = {
   color: '#1a1a1a',
-  fontSize: '28px',
-  fontWeight: 'bold',
+  fontSize: '20px',
+  fontWeight: '600',
   margin: '0 0 16px 0',
   padding: '0',
+  textAlign: 'center' as const,
 }
 
+// Centered text alignment for consistent layout
 const text = {
   color: '#374151',
   fontSize: '16px',
   lineHeight: '24px',
   margin: '0 0 16px 0',
+  textAlign: 'center' as const,
 }
 
+// Centered alignment for info box
 const infoBox = {
   backgroundColor: '#eff6ff',
   border: '1px solid #93c5fd',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const infoText = {
@@ -96,6 +102,7 @@ const infoText = {
   fontSize: '14px',
   lineHeight: '20px',
   margin: '0',
+  textAlign: 'center' as const,
 }
 
 const buttonSection = {
@@ -117,12 +124,14 @@ const link = {
   textDecoration: 'underline',
 }
 
+// Centered alignment for warning box (already has textAlign center on text)
 const warningBox = {
   backgroundColor: '#fef3c7',
   border: '1px solid #fbbf24',
   borderRadius: '8px',
   padding: '16px',
   margin: '16px 0',
+  textAlign: 'center' as const,
 }
 
 const warningText = {
