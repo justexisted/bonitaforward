@@ -17,7 +17,7 @@ import type { ProviderChangeRequest } from '../../../lib/supabaseData'
  * DEPENDENCY TRACKING:
  * 
  * WHAT THIS DEPENDS ON:
- * - listing.is_member: Must be true to show Google Calendar section
+ * - listing.is_member OR listing.is_featured: Must be true to show Google Calendar section (checks both for consistency)
  * - listing.booking_enabled OR listing.enable_calendar_booking: Either must be true to show section
  * - listing.google_calendar_connected: Used to show connection status and button state
  * - listing.enable_calendar_booking: Used to show "(Required)" on button when enabled but not connected
@@ -45,7 +45,8 @@ import type { ProviderChangeRequest } from '../../../lib/supabaseData'
  * - netlify/functions/google-calendar-callback.ts: OAuth callback
  * 
  * CRITICAL NOTES:
- * - Button visibility condition: `is_member && (booking_enabled || enable_calendar_booking)`
+ * - Featured status check: `is_member || is_featured` (checks both for consistency with provider page)
+ * - Button visibility condition: `isFeatured && (booking_enabled || enable_calendar_booking)`
  * - Button shows "(Required)" when: `enable_calendar_booking && !google_calendar_connected`
  * 
  * See: docs/prevention/GOOGLE_CALENDAR_CONNECTION_FIX.md - Detailed analysis
@@ -82,6 +83,10 @@ export function BusinessListingCard({
   const hasPendingChanges = changeRequests.some(
     req => req.provider_id === listing.id && req.status === 'pending'
   )
+  
+  // CRITICAL: Check both is_member and is_featured for featured status to ensure consistency
+  // This matches the logic used on the provider page (isFeaturedProvider helper)
+  const isFeatured = Boolean(listing.is_member || listing.is_featured)
 
   /**
    * OPEN IMAGE IN FULL SCREEN MODAL
@@ -121,11 +126,11 @@ export function BusinessListingCard({
             </h3>
             <div className="flex flex-wrap gap-2 my-business-gap-2 justify-center sm:justify-start">
               <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium my-business-badge ${
-                listing.is_member 
+                isFeatured 
                   ? 'bg-yellow-100 text-yellow-800' 
                   : 'bg-green-100 text-green-800'
               }`}>
-                {listing.is_member ? '⭐ Featured' : '📋 Free'}
+                {isFeatured ? '⭐ Featured' : '📋 Free'}
               </span>
               {hasPendingChanges ? (
                 <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800 my-business-badge">
@@ -141,7 +146,7 @@ export function BusinessListingCard({
           
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-2 my-business-action-group my-business-gap-2">
-            {!listing.is_member && (
+            {!isFeatured && (
               <div className="space-y-2">
                 <button
                   onClick={() => onUpgradeToFeatured(listing.id)}
@@ -363,7 +368,7 @@ export function BusinessListingCard({
         )}
 
         {/* Google Calendar Integration - Featured accounts only */}
-        {listing.is_member && (listing.booking_enabled || listing.enable_calendar_booking) && (
+        {isFeatured && (listing.booking_enabled || listing.enable_calendar_booking) && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -482,7 +487,7 @@ export function BusinessListingCard({
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-200">
           {/* Downgrade button - only for featured listings */}
-          {listing.is_member && (
+          {isFeatured && (
             <button
               onClick={() => {
                 if (confirm('Are you sure you want to downgrade to Free? You will lose Featured benefits including priority placement, enhanced visibility, and immediate updates. This action requires admin approval.')) {

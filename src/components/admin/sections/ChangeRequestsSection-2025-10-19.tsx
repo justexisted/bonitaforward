@@ -163,9 +163,30 @@ export function ChangeRequestsSection({
         const diff = computeChangeDiff(currentProvider, req.changes)
         changedFields = diff.map(d => d.fieldLabel)
         
+        // CRITICAL: Keep is_member and is_featured in sync when either is updated
+        // This ensures consistent featured status display across all pages
+        const updateData = { ...req.changes }
+        if ('is_member' in updateData || 'is_featured' in updateData) {
+          // If either field is being updated, set both to the same value
+          // Priority: Use is_member if present, otherwise use is_featured, otherwise false
+          const newFeaturedValue = 'is_member' in updateData 
+            ? Boolean(updateData.is_member)
+            : ('is_featured' in updateData 
+              ? Boolean(updateData.is_featured)
+              : false)
+          updateData.is_member = newFeaturedValue
+          updateData.is_featured = newFeaturedValue
+          
+          // Update featured_since timestamp if being set to featured
+          if (newFeaturedValue) {
+            updateData.featured_since = new Date().toISOString()
+          }
+          updateData.updated_at = new Date().toISOString()
+        }
+        
         const { error } = await supabase
           .from('providers')
-          .update(req.changes as any)
+          .update(updateData as any)
           .eq('id', req.provider_id)
         if (error) throw new Error(error.message)
       } else if (req.type === 'delete') {
@@ -363,7 +384,9 @@ export function ChangeRequestsSection({
       booking_type: 'Booking Type',
       booking_instructions: 'Booking Instructions',
       booking_url: 'Booking URL',
-      google_maps_url: 'Google Maps URL'
+      google_maps_url: 'Google Maps URL',
+      is_member: 'Featured Status',
+      is_featured: 'Featured Status'
     }
 
     // Helper function to normalize values for comparison

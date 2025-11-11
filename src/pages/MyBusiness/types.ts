@@ -19,6 +19,7 @@ export type BusinessListing = {
   images: string[] | null
   owner_user_id: string | null
   is_member: boolean | null  // This indicates if the provider is featured (admin-approved)
+  is_featured: boolean | null  // Also check is_featured for consistency (should match is_member)
   published: boolean | null
   created_at: string | null  // Now available in database
   updated_at: string | null  // Now available in database

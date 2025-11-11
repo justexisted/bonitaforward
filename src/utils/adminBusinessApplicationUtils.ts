@@ -246,6 +246,8 @@ export async function approveApplication(
     owner_user_id: (ownerUserId || null) as any,
     published: true,  // Auto-publish when approved so business is immediately visible in directory
     // Set tier based on what was requested in the application
+    // CRITICAL: Always set both is_member and is_featured to the same value to keep them in sync
+    // This ensures consistent featured status display across all pages (business page, provider page, etc.)
     is_member: app.tier_requested === 'featured',  // Set to true if featured tier was requested
     is_featured: app.tier_requested === 'featured',  // Also set is_featured for consistency
     featured_since: app.tier_requested === 'featured' ? new Date().toISOString() : null  // Set featured_since timestamp if featured
