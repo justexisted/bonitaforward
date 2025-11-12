@@ -834,14 +834,87 @@ export function ChangeRequestsSection({
                         {requests
                           .filter(r => r.status === 'approved')
                           .slice(0, 5)
-                          .map((r) => (
-                            <div key={r.id} className="rounded-xl border border-green-200 p-3 bg-green-50 text-xs">
-                              <div className="flex justify-between">
-                                <span className="font-medium">{r.type}</span>
-                                <span className="text-green-600">{new Date(r.created_at).toLocaleString()}</span>
+                          .map((r) => {
+                            // Get changed fields for display
+                            let changedFieldsDisplay: string[] = []
+                            
+                            // Field label mapping for better display
+                            const fieldLabels: Record<string, string> = {
+                              name: 'Business Name',
+                              category_key: 'Category',
+                              phone: 'Phone Number',
+                              email: 'Email Address',
+                              website: 'Website',
+                              address: 'Address',
+                              description: 'Description',
+                              tags: 'Tags',
+                              specialties: 'Specialties',
+                              service_areas: 'Service Areas',
+                              bonita_resident_discount: 'Bonita Resident Discount',
+                              booking_enabled: 'Online Booking',
+                              booking_type: 'Booking Type',
+                              booking_instructions: 'Booking Instructions',
+                              booking_url: 'Booking URL',
+                              google_maps_url: 'Google Maps URL',
+                              is_member: 'Featured Status',
+                              is_featured: 'Featured Status'
+                            }
+                            
+                            // First, try to extract from reason field if it has the summary format
+                            if (r.reason?.startsWith('Fields updated:')) {
+                              changedFieldsDisplay = r.reason.replace('Fields updated: ', '').split(', ')
+                            } else if (r.type === 'update' && r.changes) {
+                              // Extract field names from changes object and map to human-readable labels
+                              changedFieldsDisplay = Object.keys(r.changes)
+                                .filter(key => !['updated_at', 'created_at'].includes(key)) // Exclude timestamp fields
+                                .map(key => fieldLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))
+                            }
+                            
+                            return (
+                              <div key={r.id} className="rounded-xl border border-green-200 p-3 bg-green-50 text-xs">
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="font-medium text-green-900 capitalize">
+                                      {r.type === 'update' ? 'Listing Update' : 
+                                       r.type === 'feature_request' ? 'Featured Upgrade' :
+                                       r.type === 'delete' ? 'Delete Request' :
+                                       r.type === 'claim' ? 'Business Claim' :
+                                       r.type}
+                                    </span>
+                                    {r.type === 'update' && changedFieldsDisplay.length > 0 && (
+                                      <div className="text-green-700 mt-1">
+                                        <span className="font-semibold">Changed:</span>{' '}
+                                        {changedFieldsDisplay.join(', ')}
+                                      </div>
+                                    )}
+                                    {r.type === 'update' && changedFieldsDisplay.length === 0 && (
+                                      <div className="text-green-600 italic">
+                                        Change details not available
+                                      </div>
+                                    )}
+                                    {r.type === 'feature_request' && (
+                                      <div className="text-green-700 mt-1">
+                                        ⭐ Featured listing upgrade approved
+                                      </div>
+                                    )}
+                                    {r.type === 'delete' && (
+                                      <div className="text-green-700 mt-1">
+                                        🗑️ Business deletion approved
+                                      </div>
+                                    )}
+                                    {r.type === 'claim' && (
+                                      <div className="text-green-700 mt-1">
+                                        ✋ Business claim approved
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="text-green-600 whitespace-nowrap ml-2">
+                                    {new Date(r.decided_at || r.created_at).toLocaleString()}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                       </div>
                     </div>
                   )}
