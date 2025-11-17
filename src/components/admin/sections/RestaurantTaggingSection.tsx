@@ -1,11 +1,15 @@
 /**
- * RESTAURANT TAGGING SECTION
+ * CATEGORY TAGGING SECTION
  * 
- * Allows admins to quickly tag restaurants/cafes with:
- * - Price Range ($, $$, $$$, $$$$)
- * - Cuisine Type (american, italian, mexican, asian, mediterranean)
- * - Occasions (casual, date-night, family, business, celebration, quick-bite)
- * - Dietary Options (vegetarian, vegan, gluten-free, keto)
+ * Allows admins to quickly tag businesses in any category with category-specific fields.
+ * Fields are dynamically loaded from funnelQuestions.ts to match the customer funnel.
+ * 
+ * Category-specific fields:
+ * - Restaurants & Cafés: Occasion, Cuisine, Price Range, Dietary
+ * - Home Services: Service Type, Timeline, Budget, Property Type
+ * - Real Estate: Need, Timeline, Budget, Bedrooms
+ * - Health & Wellness: Service Type, Frequency, Experience, Location
+ * - Professional Services: Service, Urgency, Business Size, Budget
  * 
  * Tags are automatically added to the provider's tags array and match
  * the funnel question IDs for accurate matching in the booking flow.
@@ -13,6 +17,9 @@
 
 import { useState, useMemo } from 'react'
 import type { ProviderRow } from '../../../types/admin'
+import { CATEGORY_OPTIONS } from '../../../constants/categories'
+import type { CategoryKey } from '../../../types'
+import { funnelConfig } from '../../../utils/funnelQuestions'
 
 interface RestaurantTaggingSectionProps {
   providers: ProviderRow[]
@@ -20,99 +27,74 @@ interface RestaurantTaggingSectionProps {
   loading?: boolean
 }
 
-// Funnel question options matching src/utils/funnelQuestions.ts
-const OCCASION_OPTIONS = [
-  { id: 'casual', label: 'Casual dining' },
-  { id: 'date-night', label: 'Date night' },
-  { id: 'family', label: 'Family meal' },
-  { id: 'business', label: 'Business meeting' },
-  { id: 'celebration', label: 'Celebration' },
-  { id: 'quick-bite', label: 'Quick bite' },
-]
-
-const CUISINE_OPTIONS = [
-  { id: 'american', label: 'American' },
-  { id: 'italian', label: 'Italian' },
-  { id: 'mexican', label: 'Mexican' },
-  { id: 'asian', label: 'Asian' },
-  { id: 'mediterranean', label: 'Mediterranean' },
-]
-
-const PRICE_RANGE_OPTIONS = [
-  { id: 'budget', label: '$ (Budget-friendly)', tagValue: '$' },
-  { id: 'moderate', label: '$$ (Moderate)', tagValue: '$$' },
-  { id: 'upscale', label: '$$$ (Upscale)', tagValue: '$$$' },
-  { id: 'fine-dining', label: '$$$$ (Fine dining)', tagValue: '$$$$' },
-]
-
-const DIETARY_OPTIONS = [
-  { id: 'vegetarian', label: 'Vegetarian' },
-  { id: 'vegan', label: 'Vegan' },
-  { id: 'gluten-free', label: 'Gluten-free' },
-  { id: 'keto', label: 'Keto' },
-]
+// Price range tag mapping (for restaurants-cafes)
+const PRICE_RANGE_TAG_MAP: Record<string, string> = {
+  'budget': '$',
+  'moderate': '$$',
+  'upscale': '$$$',
+  'fine-dining': '$$$$'
+}
 
 export function RestaurantTaggingSection({
   providers,
   onUpdateProvider,
   loading = false
 }: RestaurantTaggingSectionProps) {
+  const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('restaurants-cafes')
   const [searchTerm, setSearchTerm] = useState('')
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set())
   
-  // Track pending changes (unsaved selections)
-  const [pendingChanges, setPendingChanges] = useState<Map<string, {
-    priceRange?: string
-    cuisine?: string
-    occasions?: string[]
-    dietary?: string[]
-  }>>(new Map())
+  // Get funnel questions for the selected category
+  const categoryQuestions = useMemo(() => {
+    return funnelConfig[selectedCategory] || []
+  }, [selectedCategory])
 
-  // Filter to restaurants-cafes only
-  const restaurants = useMemo(() => {
-    return providers.filter(p => p.category_key === 'restaurants-cafes')
-  }, [providers])
+  // Track pending changes (unsaved selections) - dynamic based on category
+  const [pendingChanges, setPendingChanges] = useState<Map<string, Record<string, string | string[]>>>(new Map())
+
+  // Get category display name
+  const selectedCategoryName = useMemo(() => {
+    return CATEGORY_OPTIONS.find(c => c.key === selectedCategory)?.name || selectedCategory
+  }, [selectedCategory])
+
+  // Filter to selected category only
+  const businesses = useMemo(() => {
+    return providers.filter(p => p.category_key === selectedCategory)
+  }, [providers, selectedCategory])
 
   // Filter by search term
-  const filteredRestaurants = useMemo(() => {
-    if (!searchTerm.trim()) return restaurants
+  const filteredBusinesses = useMemo(() => {
+    if (!searchTerm.trim()) return businesses
     const term = searchTerm.toLowerCase()
-    return restaurants.filter(r => 
-      r.name.toLowerCase().includes(term) ||
-      r.description?.toLowerCase().includes(term) ||
-      r.tags?.some(tag => tag.toLowerCase().includes(term))
+    return businesses.filter(b => 
+      b.name.toLowerCase().includes(term) ||
+      b.description?.toLowerCase().includes(term) ||
+      b.tags?.some(tag => tag.toLowerCase().includes(term))
     )
-  }, [restaurants, searchTerm])
+  }, [businesses, searchTerm])
 
   // Track pending changes locally (doesn't save to database yet)
   const trackPendingChange = (
     providerId: string,
-    updates: {
-      priceRange?: string
-      cuisine?: string
-      occasions?: string[]
-      dietary?: string[]
-    }
+    fieldId: string,
+    value: string | string[]
   ) => {
     setPendingChanges(prev => {
       const next = new Map(prev)
       const existing = next.get(providerId) || {}
       
-      // Merge new updates with existing pending changes
+      // Merge new update with existing pending changes
       const merged = {
         ...existing,
-        ...(updates.priceRange !== undefined && { priceRange: updates.priceRange }),
-        ...(updates.cuisine !== undefined && { cuisine: updates.cuisine }),
-        ...(updates.occasions !== undefined && { occasions: updates.occasions }),
-        ...(updates.dietary !== undefined && { dietary: updates.dietary }),
+        [fieldId]: value
       }
       
       // Remove empty changes
       const hasChanges = Object.keys(merged).some(key => {
-        const value = merged[key as keyof typeof merged]
-        return value !== undefined && 
-               value !== '' && 
-               (Array.isArray(value) ? value.length > 0 : true)
+        const val = merged[key]
+        return val !== undefined && 
+               val !== '' && 
+               (Array.isArray(val) ? val.length > 0 : true)
       })
       
       if (hasChanges) {
@@ -125,68 +107,63 @@ export function RestaurantTaggingSection({
     })
   }
 
+  // Get all possible tag values for a question (for filtering old tags)
+  // Returns both option IDs and any mapped tag values (e.g., 'budget' and '$' for price-range)
+  const getQuestionTagValues = (questionId: string): string[] => {
+    const question = categoryQuestions.find(q => q.id === questionId)
+    if (!question) return []
+    
+    const values: string[] = []
+    question.options.forEach(opt => {
+      // Always include the option ID
+      values.push(opt.id)
+      
+      // Special handling for price-range: also include the mapped tag value
+      if (questionId === 'price-range' && PRICE_RANGE_TAG_MAP[opt.id]) {
+        values.push(PRICE_RANGE_TAG_MAP[opt.id])
+      }
+    })
+    
+    return values
+  }
+
   // Apply pending changes to tags and save to database
   const applyPendingChangesToTags = (
     provider: ProviderRow,
-    pending: {
-      priceRange?: string
-      cuisine?: string
-      occasions?: string[]
-      dietary?: string[]
-    }
+    pending: Record<string, string | string[]>
   ): string[] => {
     let tags = [...(provider.tags || [])]
 
-    // If price range is being updated, remove only old price range tags
-    if (pending.priceRange !== undefined) {
+    // Process each field in pending changes
+    Object.entries(pending).forEach(([fieldId, value]) => {
+      // Get all possible tag values for this field to remove old ones
+      const fieldTagValues = getQuestionTagValues(fieldId)
+      
+      // Remove old tags for this field
       tags = tags.filter(t => {
         const tagLower = t.toLowerCase()
-        return !['$', '$$', '$$$', '$$$$', 'budget', 'moderate', 'upscale', 'fine-dining'].includes(tagLower)
+        return !fieldTagValues.some(fieldTag => {
+          const fieldTagLower = fieldTag.toLowerCase()
+          return tagLower === fieldTagLower || tagLower.includes(fieldTagLower) || fieldTagLower.includes(tagLower)
+        })
       })
-      // Add new price range tag
-      if (pending.priceRange) {
-        const priceOption = PRICE_RANGE_OPTIONS.find(o => o.id === pending.priceRange)
-        if (priceOption) {
-          tags.push(priceOption.tagValue)
+      
+      // Add new tag(s)
+      if (Array.isArray(value)) {
+        // Multi-select field (e.g., occasions, dietary)
+        value.forEach(v => {
+          if (v) tags.push(v)
+        })
+      } else if (value) {
+        // Single-select field
+        // Special handling for price-range
+        if (fieldId === 'price-range' && PRICE_RANGE_TAG_MAP[value]) {
+          tags.push(PRICE_RANGE_TAG_MAP[value])
+        } else {
+          tags.push(value)
         }
       }
-    }
-
-    // If cuisine is being updated, remove only old cuisine tags
-    if (pending.cuisine !== undefined) {
-      tags = tags.filter(t => {
-        const tagLower = t.toLowerCase()
-        return !['american', 'italian', 'mexican', 'asian', 'mediterranean'].includes(tagLower)
-      })
-      // Add new cuisine tag
-      if (pending.cuisine) {
-        tags.push(pending.cuisine)
-      }
-    }
-
-    // If occasions are being updated, remove only old occasion tags
-    if (pending.occasions !== undefined) {
-      tags = tags.filter(t => {
-        const tagLower = t.toLowerCase()
-        return !['casual', 'date-night', 'family', 'business', 'celebration', 'quick-bite'].includes(tagLower)
-      })
-      // Add new occasion tags
-      pending.occasions.forEach(occasion => {
-        tags.push(occasion)
-      })
-    }
-
-    // If dietary options are being updated, remove only old dietary tags
-    if (pending.dietary !== undefined) {
-      tags = tags.filter(t => {
-        const tagLower = t.toLowerCase()
-        return !['vegetarian', 'vegan', 'gluten-free', 'keto'].includes(tagLower)
-      })
-      // Add new dietary tags
-      pending.dietary.forEach(dietary => {
-        tags.push(dietary)
-      })
-    }
+    })
 
     return tags
   }
@@ -200,7 +177,7 @@ export function RestaurantTaggingSection({
     try {
       // Save all changes in parallel
       const savePromises = Array.from(pendingChanges.entries()).map(async ([providerId, pending]) => {
-        const provider = restaurants.find(p => p.id === providerId)
+        const provider = businesses.find(p => p.id === providerId)
         if (!provider) return
 
         const newTags = applyPendingChangesToTags(provider, pending)
@@ -218,69 +195,108 @@ export function RestaurantTaggingSection({
     }
   }
 
+  // Determine if a field is multi-select based on field ID and category
+  const isMultiSelectField = (fieldId: string): boolean => {
+    // Fields that are always multi-select
+    const multiSelectFields: Record<CategoryKey, string[]> = {
+      'restaurants-cafes': ['occasion', 'dietary'],
+      'home-services': ['type'], // Service type can have multiple
+      'health-wellness': ['type'], // Service type can have multiple
+      'professional-services': ['service'], // Service can have multiple
+      'real-estate': [] // All single-select
+    }
+    
+    return multiSelectFields[selectedCategory]?.includes(fieldId) || false
+  }
+
+  // Get field display label
+  const getFieldLabel = (fieldId: string): string => {
+    const labelMap: Record<string, string> = {
+      'occasion': 'Occasions',
+      'cuisine': 'Cuisine',
+      'price-range': 'Price Range',
+      'dietary': 'Dietary',
+      'type': 'Service Type',
+      'timeline': 'Timeline',
+      'budget': 'Budget',
+      'property-type': 'Property Type',
+      'need': 'Need',
+      'beds': 'Bedrooms',
+      'frequency': 'Frequency',
+      'experience': 'Experience',
+      'location': 'Location',
+      'service': 'Service',
+      'urgency': 'Urgency',
+      'business-size': 'Business Size'
+    }
+    
+    return labelMap[fieldId] || fieldId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }
+
   // Get current selections - combines saved tags with pending changes
-  const getCurrentSelections = (provider: ProviderRow) => {
+  const getCurrentSelections = (provider: ProviderRow): Record<string, string | string[]> => {
     const tags = provider.tags || []
     const pending = pendingChanges.get(provider.id)
-    
-    // Start with saved tags, but apply pending changes if they exist
-    let priceRange = ''
-    let cuisine = ''
-    let occasions: string[] = []
-    let dietary: string[] = []
+    const selections: Record<string, string | string[]> = {}
 
-    // If there's a pending change, use it; otherwise read from tags
-    if (pending?.priceRange !== undefined) {
-      priceRange = pending.priceRange
-    } else {
-      // Read from saved tags
-      const priceTag = tags.find(t => {
-        const tagLower = t.toLowerCase()
-        return ['$', '$$', '$$$', '$$$$', 'budget', 'moderate', 'upscale', 'fine-dining'].includes(tagLower)
-      })
+    // For each question in the category, get the current selection
+    categoryQuestions.forEach(question => {
+      const fieldId = question.id
       
-      if (priceTag) {
-        const tagLower = priceTag.toLowerCase()
-        const directMatch = PRICE_RANGE_OPTIONS.find(o => o.tagValue === priceTag)
-        if (directMatch) {
-          priceRange = directMatch.id
+      // If there's a pending change, use it; otherwise read from tags
+      if (pending && pending[fieldId] !== undefined) {
+        selections[fieldId] = pending[fieldId]
+      } else {
+        // Read from saved tags
+        if (fieldId === 'price-range') {
+          // Special handling for price range (maps $, $$, etc. back to budget, moderate, etc.)
+          const priceTag = tags.find(t => {
+            const tagLower = t.toLowerCase()
+            return ['$', '$$', '$$$', '$$$$', 'budget', 'moderate', 'upscale', 'fine-dining'].includes(tagLower)
+          })
+          
+          if (priceTag) {
+            const tagLower = priceTag.toLowerCase()
+            // Map tag values back to option IDs
+            if (tagLower === '$' || tagLower === 'budget') selections[fieldId] = 'budget'
+            else if (tagLower === '$$' || tagLower === 'moderate') selections[fieldId] = 'moderate'
+            else if (tagLower === '$$$' || tagLower === 'upscale') selections[fieldId] = 'upscale'
+            else if (tagLower === '$$$$' || tagLower === 'fine-dining') selections[fieldId] = 'fine-dining'
+            else selections[fieldId] = ''
+          } else {
+            selections[fieldId] = ''
+          }
         } else {
-          if (tagLower === 'budget') priceRange = 'budget'
-          else if (tagLower === 'moderate') priceRange = 'moderate'
-          else if (tagLower === 'upscale') priceRange = 'upscale'
-          else if (tagLower === 'fine-dining') priceRange = 'fine-dining'
+          // Find matching options from tags
+          const matchingOptions = question.options.filter(opt => {
+            const optId = opt.id.toLowerCase()
+            return tags.some(tag => {
+              const tagLower = tag.toLowerCase()
+              return tagLower === optId || tagLower.includes(optId) || optId.includes(tagLower)
+            })
+          })
+          
+          if (isMultiSelectField(fieldId)) {
+            // Multi-select field
+            selections[fieldId] = matchingOptions.map(opt => opt.id)
+          } else {
+            // Single-select field
+            selections[fieldId] = matchingOptions[0]?.id || ''
+          }
         }
       }
-    }
+    })
 
-    if (pending?.cuisine !== undefined) {
-      cuisine = pending.cuisine
-    } else {
-      cuisine = CUISINE_OPTIONS.find(c => tags.includes(c.id))?.id || ''
-    }
-
-    if (pending?.occasions !== undefined) {
-      occasions = pending.occasions
-    } else {
-      occasions = OCCASION_OPTIONS.filter(o => tags.includes(o.id)).map(o => o.id)
-    }
-
-    if (pending?.dietary !== undefined) {
-      dietary = pending.dietary
-    } else {
-      dietary = DIETARY_OPTIONS.filter(d => tags.includes(d.id)).map(d => d.id)
-    }
-
-    return { priceRange, cuisine, occasions, dietary }
+    return selections
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Restaurant & Cafe Tagging</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Category Tagging</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Tag restaurants with price range, cuisine, occasions, and dietary options for better customer matching
+            Tag businesses with price range, cuisine, occasions, and dietary options for better customer matching
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -297,32 +313,55 @@ export function RestaurantTaggingSection({
             {updatingIds.size > 0 ? 'Saving...' : `Save ${pendingChanges.size > 0 ? `${pendingChanges.size} ` : ''}Changes`}
           </button>
           <div className="text-sm text-gray-600">
-            {filteredRestaurants.length} of {restaurants.length} restaurants
+            {filteredBusinesses.length} of {businesses.length} businesses
           </div>
         </div>
+      </div>
+
+      {/* Category Selector */}
+      <div>
+        <label htmlFor="category-select" className="block text-sm font-medium text-gray-700 mb-2">
+          Select Category
+        </label>
+        <select
+          id="category-select"
+          value={selectedCategory}
+          onChange={(e) => {
+            setSelectedCategory(e.target.value as CategoryKey)
+            setSearchTerm('') // Clear search when changing category
+            setPendingChanges(new Map()) // Clear pending changes when changing category
+          }}
+          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+        >
+          {CATEGORY_OPTIONS.map(category => (
+            <option key={category.key} value={category.key}>
+              {category.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Search Bar */}
       <div>
         <input
           type="text"
-          placeholder="Search restaurants by name, description, or tags..."
+          placeholder={`Search ${selectedCategoryName.toLowerCase()} by name, description, or tags...`}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
         />
       </div>
 
-      {/* Restaurants Table */}
+      {/* Businesses Table */}
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading restaurants...</p>
+          <p className="mt-4 text-gray-600">Loading businesses...</p>
         </div>
-      ) : filteredRestaurants.length === 0 ? (
+      ) : filteredBusinesses.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <p className="text-gray-600">
-            {searchTerm ? 'No restaurants match your search.' : 'No restaurants found.'}
+            {searchTerm ? `No ${selectedCategoryName.toLowerCase()} match your search.` : `No ${selectedCategoryName.toLowerCase()} found in this category.`}
           </p>
         </div>
       ) : (
@@ -332,60 +371,62 @@ export function RestaurantTaggingSection({
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Restaurant
+                    Business
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Price Range
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Cuisine
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Occasions
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Dietary
-                  </th>
+                  {categoryQuestions.map(question => (
+                    <th key={question.id} className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      {getFieldLabel(question.id)}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredRestaurants.map((restaurant) => {
-                  const isUpdating = updatingIds.has(restaurant.id)
-                  const hasPendingChanges = pendingChanges.has(restaurant.id)
-                  const selections = getCurrentSelections(restaurant)
+                {filteredBusinesses.map((business) => {
+                  const isUpdating = updatingIds.has(business.id)
+                  const hasPendingChanges = pendingChanges.has(business.id)
+                  const selections = getCurrentSelections(business)
 
                   return (
-                    <tr key={restaurant.id} className={`hover:bg-gray-50 ${hasPendingChanges ? 'bg-orange-50' : ''}`}>
+                    <tr key={business.id} className={`hover:bg-gray-50 ${hasPendingChanges ? 'bg-orange-50' : ''}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <div className="font-medium text-gray-900">{restaurant.name}</div>
+                          <div className="font-medium text-gray-900">{business.name}</div>
                           {hasPendingChanges && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
                               Unsaved
                             </span>
                           )}
                         </div>
-                        {restaurant.description && (
+                        {business.description && (
                           <div className="text-sm text-gray-500 mt-1 max-w-xs truncate">
-                            {restaurant.description}
+                            {business.description}
                           </div>
                         )}
                         {/* Display current tags */}
-                        {(restaurant.tags && restaurant.tags.length > 0) && (
+                        {(business.tags && business.tags.length > 0) && (
                           <div className="mt-2 flex flex-wrap gap-1">
-                            {restaurant.tags.map((tag, idx) => {
-                              // Highlight restaurant classification tags
-                              const isRestaurantTag = ['$', '$$', '$$$', '$$$$', 'budget', 'moderate', 'upscale', 'fine-dining', 'american', 'italian', 'mexican', 'asian', 'mediterranean', 'casual', 'date-night', 'family', 'business', 'celebration', 'quick-bite', 'vegetarian', 'vegan', 'gluten-free', 'keto'].includes(tag.toLowerCase())
+                            {business.tags.map((tag, idx) => {
+                              // Get all possible tag values for this category to highlight classification tags
+                              const allCategoryTagValues = categoryQuestions.flatMap(q => 
+                                getQuestionTagValues(q.id)
+                              )
+                              const isClassificationTag = allCategoryTagValues.some(categoryTag => {
+                                const tagLower = tag.toLowerCase()
+                                const categoryTagLower = categoryTag.toLowerCase()
+                                return tagLower === categoryTagLower || 
+                                       tagLower.includes(categoryTagLower) || 
+                                       categoryTagLower.includes(tagLower)
+                              })
                               
                               return (
                                 <span
                                   key={idx}
                                   className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
-                                    isRestaurantTag
+                                    isClassificationTag
                                       ? 'bg-green-100 text-green-700 border border-green-200'
                                       : 'bg-gray-100 text-gray-600 border border-gray-200'
                                   }`}
-                                  title={isRestaurantTag ? 'Restaurant classification tag' : 'Other tag'}
+                                  title={isClassificationTag ? 'Classification tag' : 'Other tag'}
                                 >
                                   {tag}
                                 </span>
@@ -395,101 +436,61 @@ export function RestaurantTaggingSection({
                         )}
                       </td>
 
-                      {/* Price Range */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          value={selections.priceRange}
-                          onChange={(e) => {
-                            trackPendingChange(restaurant.id, {
-                              priceRange: e.target.value || undefined
-                            })
-                          }}
-                          disabled={isUpdating}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select...</option>
-                          {PRICE_RANGE_OPTIONS.map(option => (
-                            <option key={option.id} value={option.id}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                      {/* Dynamic fields based on category */}
+                      {categoryQuestions.map(question => {
+                        const fieldId = question.id
+                        const isMulti = isMultiSelectField(fieldId)
+                        const currentValue = selections[fieldId]
+                        const currentArray = Array.isArray(currentValue) ? currentValue : []
+                        const currentString = typeof currentValue === 'string' ? currentValue : ''
 
-                      {/* Cuisine */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          value={selections.cuisine}
-                          onChange={(e) => {
-                            trackPendingChange(restaurant.id, {
-                              cuisine: e.target.value || undefined
-                            })
-                          }}
-                          disabled={isUpdating}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select...</option>
-                          {CUISINE_OPTIONS.map(option => (
-                            <option key={option.id} value={option.id}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Occasions (Multi-select) */}
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          {OCCASION_OPTIONS.map(option => (
-                            <label key={option.id} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selections.occasions.includes(option.id)}
+                        return (
+                          <td key={fieldId} className={`px-6 py-4 ${isMulti ? '' : 'whitespace-nowrap'}`}>
+                            {isMulti ? (
+                              // Multi-select (checkboxes)
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {question.options.map(option => {
+                                  const isChecked = currentArray.includes(option.id)
+                                  return (
+                                    <label key={option.id} className="flex items-center gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          const newArray = e.target.checked
+                                            ? [...currentArray, option.id]
+                                            : currentArray.filter(id => id !== option.id)
+                                          trackPendingChange(business.id, fieldId, newArray)
+                                        }}
+                                        disabled={isUpdating}
+                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50"
+                                      />
+                                      <span className="text-sm text-gray-700">{option.label}</span>
+                                    </label>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              // Single-select (dropdown)
+                              <select
+                                value={currentString}
                                 onChange={(e) => {
-                                  const currentOccasions = selections.occasions
-                                  const newOccasions = e.target.checked
-                                    ? [...currentOccasions, option.id]
-                                    : currentOccasions.filter(o => o !== option.id)
-                                  
-                                  trackPendingChange(restaurant.id, {
-                                    occasions: newOccasions
-                                  })
+                                  trackPendingChange(business.id, fieldId, e.target.value || '')
                                 }}
                                 disabled={isUpdating}
-                                className="rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50"
-                              />
-                              <span className="text-sm text-gray-700">{option.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* Dietary (Multi-select) */}
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          {DIETARY_OPTIONS.map(option => (
-                            <label key={option.id} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selections.dietary.includes(option.id)}
-                                onChange={(e) => {
-                                  const currentDietary = selections.dietary
-                                  const newDietary = e.target.checked
-                                    ? [...currentDietary, option.id]
-                                    : currentDietary.filter(d => d !== option.id)
-                                  
-                                  trackPendingChange(restaurant.id, {
-                                    dietary: newDietary
-                                  })
-                                }}
-                                disabled={isUpdating}
-                                className="rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50"
-                              />
-                              <span className="text-sm text-gray-700">{option.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </td>
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <option value="">Select...</option>
+                                {question.options.map(option => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </td>
+                        )
+                      })}
                     </tr>
                   )
                 })}
@@ -511,13 +512,14 @@ export function RestaurantTaggingSection({
             <h3 className="text-sm font-medium text-blue-800">How it works</h3>
             <div className="mt-2 text-sm text-blue-700">
               <p>
-                Tags are automatically added to each restaurant's tag list. These tags match the customer 
-                funnel questions, so restaurants will appear in search results when customers select matching 
-                preferences (e.g., "Italian" cuisine, "$$" price range, "date-night" occasion).
+                Tags are automatically added to each business's tag list. These tags match the customer 
+                funnel questions, so businesses will appear in search results when customers select matching 
+                preferences. Each category has its own set of relevant fields.
               </p>
               <p className="mt-2">
-                <strong>Tip:</strong> You can select multiple occasions and dietary options per restaurant. 
-                Changes save automatically when you make selections.
+                <strong>Tip:</strong> Fields marked with checkboxes allow multiple selections (e.g., service types, occasions). 
+                Dropdown fields allow single selection. Select a category above to manage tags for businesses in that category. 
+                Changes are saved when you click "Save Changes".
               </p>
             </div>
           </div>

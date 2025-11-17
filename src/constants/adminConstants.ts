@@ -13,8 +13,8 @@ export const ADMIN_SECTIONS: Record<AdminSection, { label: string; description: 
     description: 'Manage business providers and listings'
   },
   'restaurant-tagging': {
-    label: 'Restaurant Tagging',
-    description: 'Tag restaurants with price range, cuisine, occasions, and dietary options'
+    label: 'Category Tagging',
+    description: 'Tag businesses in any category with price range, cuisine, occasions, and dietary options'
   },
   'contact-leads': {
     label: 'Contact / Get Featured',
