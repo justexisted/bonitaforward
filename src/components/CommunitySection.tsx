@@ -1,9 +1,7 @@
 import { Link } from 'react-router-dom'
 import ScrollFloat from './ScrollFloat'
 import Container from './Container'
-
-// Type definition for category keys (consistent with other components)
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+import type { CategoryKey } from '../types'
 
 /**
  * CommunitySection component - Community showcase section
@@ -115,6 +113,3 @@ export default function CommunitySection() {
     </section>
   )
 }
-
-// Export the CategoryKey type for consistency with other components
-export type { CategoryKey }

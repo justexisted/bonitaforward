@@ -203,7 +203,8 @@ export function RestaurantTaggingSection({
       'home-services': ['type'], // Service type can have multiple
       'health-wellness': ['type'], // Service type can have multiple
       'professional-services': ['service'], // Service can have multiple
-      'real-estate': [] // All single-select
+      'real-estate': [], // All single-select
+      'retail': [] // All single-select (can be updated when retail funnel questions are defined)
     }
     
     return multiSelectFields[selectedCategory]?.includes(fieldId) || false
