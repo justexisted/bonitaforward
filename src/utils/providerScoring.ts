@@ -679,6 +679,7 @@ export function scoreProviders(
       return scoreHomeServices(providers, answers)
     
     case 'professional-services':
+    case 'retail':
     default:
       return scoreGeneric(providers, answers)
   }

@@ -29,6 +29,7 @@ export type CategoryKey =
   | 'health-wellness' 
   | 'restaurants-cafes' 
   | 'professional-services'
+  | 'retail'
 
 /**
  * Category display information

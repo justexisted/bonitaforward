@@ -8,7 +8,7 @@ import { fixImageUrl } from '../utils/imageUtils'
 // TYPES
 // ============================================================================
 
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services' | 'retail'
 
 // Provider type - compatible with full Provider type from CategoryPage
 type Provider = {

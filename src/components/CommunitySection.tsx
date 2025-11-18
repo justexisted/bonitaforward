@@ -46,6 +46,11 @@ export default function CommunitySection() {
       title: 'Top Professional Services of Bonita', 
       excerpt: 'Standout legal, accounting, and consulting pros.' 
     },
+    { 
+      category_key: 'retail' as CategoryKey, 
+      title: 'Top Retail Shops of Bonita', 
+      excerpt: 'Local shops and boutiques with unique finds.' 
+    },
   ]
 
   return (
@@ -70,6 +75,7 @@ export default function CommunitySection() {
               'health-wellness': "/images/community/health-wellness.png",
               'real-estate': "/images/community/real-estate.png",
               'professional-services': "/images/community/professional-services.png",
+              'retail': "/images/community/retail.png",
             }
             const bg = bgMap[c.category_key]
             

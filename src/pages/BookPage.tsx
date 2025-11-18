@@ -227,6 +227,7 @@ export default function BookPage(props: {
                                     case 'health-wellness': return 'Health & Wellness'
                                     case 'real-estate': return 'Real Estate'
                                     case 'professional-services': return 'Professional Services'
+                                    case 'retail': return 'Retail'
                                     default: return ''
                                   }
                                 })()
@@ -371,6 +372,7 @@ export default function BookPage(props: {
                                             case 'health-wellness': return 'Health & Wellness'
                                             case 'real-estate': return 'Real Estate'
                                             case 'professional-services': return 'Professional Services'
+                                            case 'retail': return 'Retail'
                                             default: return ''
                                           }
                                         })()

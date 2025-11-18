@@ -7,7 +7,7 @@ import SplitText from './SplitText'
 // TYPES
 // ============================================================================
 
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services' | 'retail'
 
 type Provider = {
   id: string
@@ -34,7 +34,7 @@ function Container(props: { children: React.ReactNode; className?: string }) {
  * Get all providers from all categories as a flat array
  */
 function getAllProviders(providersByCategory: Record<CategoryKey, Provider[]>): Provider[] {
-  const keys: CategoryKey[] = ['real-estate', 'home-services', 'health-wellness', 'restaurants-cafes', 'professional-services']
+  const keys: CategoryKey[] = ['real-estate', 'home-services', 'health-wellness', 'restaurants-cafes', 'professional-services', 'retail']
   return keys.flatMap((k) => providersByCategory[k] || [])
 }
 

@@ -100,6 +100,7 @@ async function main() {
     { key: 'health-wellness', name: 'Health & Wellness' },
     { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
     { key: 'professional-services', name: 'Professional Services' },
+    { key: 'retail', name: 'Retail' },
   ]
   for (const c of categories) {
     await sb.from('categories').upsert([{ key: c.key, name: c.name }])

@@ -214,7 +214,8 @@ export function BusinessListingForm({
       { key: 'home-services', name: 'Home Services' },
       { key: 'health-wellness', name: 'Health & Wellness' },
       { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
-      { key: 'professional-services', name: 'Professional Services' }
+      { key: 'professional-services', name: 'Professional Services' },
+      { key: 'retail', name: 'Retail' }
     ]
 
     const activeFunnelQuestions = useMemo<FunnelQuestion[]>(() => {

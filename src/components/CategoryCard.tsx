@@ -46,7 +46,7 @@ export default function CategoryCard({ cat }: CategoryCardProps) {
               src={cat.icon} 
               alt={`${cat.name} icon`}
               className="h-12 w-16 md:h-20 md:w-24 object-contain"
-              style={{ scale: 1.3 }}
+              style={{ scale: cat.key === 'retail' ? 0.9 : 1.3 }}
             />
           </span>
           <div className="flex-1">

@@ -16,6 +16,7 @@ export const CATEGORY_OPTIONS = [
   { key: 'health-wellness', name: 'Health & Wellness' },
   { key: 'restaurants-cafes', name: 'Restaurants & Cafés' },
   { key: 'professional-services', name: 'Professional Services' },
+  { key: 'retail', name: 'Retail' },
 ] as const
 
 export function useAdminProviders() {

@@ -16,7 +16,7 @@ import {
 // TYPES
 // ============================================================================
 
-type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services'
+type CategoryKey = 'real-estate' | 'home-services' | 'health-wellness' | 'restaurants-cafes' | 'professional-services' | 'retail'
 
 type Provider = {
   id: string
@@ -61,7 +61,7 @@ type Provider = {
  * Get all providers across all categories
  */
 function getAllProviders(providersByCategory: Record<CategoryKey, Provider[]>): Provider[] {
-  const keys: CategoryKey[] = ['real-estate', 'home-services', 'health-wellness', 'restaurants-cafes', 'professional-services']
+  const keys: CategoryKey[] = ['real-estate', 'home-services', 'health-wellness', 'restaurants-cafes', 'professional-services', 'retail']
   return keys.flatMap((k) => providersByCategory[k] || [])
 }
 

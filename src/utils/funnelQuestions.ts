@@ -10,6 +10,7 @@
  * - Health & Wellness (service type, frequency, experience, location)
  * - Restaurants & Cafes (occasion, cuisine, price range, dietary)
  * - Professional Services (service type, urgency, business size, budget)
+ * - Retail (product type, occasion, price range, preferences)
  * 
  * Each category has 4 questions to keep the funnel quick and user-friendly.
  */
@@ -246,6 +247,53 @@ export const funnelConfig: Record<CategoryKey, FunnelQuestion[]> = {
         { id: '1k-5k', label: '$1,000 - $5,000' },
         { id: '5k-15k', label: '$5,000 - $15,000' },
         { id: '15k-plus', label: '$15,000+' },
+      ],
+    },
+  ],
+  'retail': [
+    {
+      id: 'product-type',
+      prompt: 'What are you shopping for?',
+      options: [
+        { id: 'clothing', label: 'Clothing & Apparel' },
+        { id: 'electronics', label: 'Electronics' },
+        { id: 'home-goods', label: 'Home & Garden' },
+        { id: 'gifts', label: 'Gifts & Specialty Items' },
+        { id: 'sports', label: 'Sports & Outdoors' },
+        { id: 'beauty', label: 'Beauty & Personal Care' },
+        { id: 'other', label: 'Other' },
+      ],
+    },
+    {
+      id: 'occasion',
+      prompt: 'Shopping for?',
+      options: [
+        { id: 'personal', label: 'Personal use' },
+        { id: 'gift', label: 'Gift' },
+        { id: 'business', label: 'Business' },
+        { id: 'special-event', label: 'Special event' },
+        { id: 'browsing', label: 'Just browsing' },
+      ],
+    },
+    {
+      id: 'price-range',
+      prompt: 'Price range?',
+      options: [
+        { id: 'budget', label: 'Budget-friendly' },
+        { id: 'mid-range', label: 'Mid-range' },
+        { id: 'premium', label: 'Premium/Luxury' },
+        { id: 'any', label: 'Any price' },
+      ],
+    },
+    {
+      id: 'preferences',
+      prompt: 'What matters most?',
+      options: [
+        { id: 'local', label: 'Supporting local' },
+        { id: 'quality', label: 'Quality & durability' },
+        { id: 'unique', label: 'Unique items' },
+        { id: 'convenience', label: 'Convenience' },
+        { id: 'value', label: 'Best value' },
       ],
     },
   ],

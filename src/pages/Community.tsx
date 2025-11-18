@@ -9,6 +9,7 @@ const categoryToTitle: Record<string, string> = {
   'health-wellness': 'Wellness & Beauty Spotlight',
   'real-estate': 'Property Opportunities in Bonita',
   'professional-services': 'Top Professional Services of Bonita',
+  'retail': 'Top Retail Shops of Bonita',
 }
 
 export function CommunityIndex() {
@@ -23,6 +24,7 @@ export function CommunityIndex() {
     'health-wellness': '/images/community/health-wellness.png',
     'real-estate': '/images/community/real-estate.png',
     'professional-services': '/images/community/professional-services.png',
+    'retail': '/images/community/retail.png',
   }
 
   // Fetch blog posts for all categories

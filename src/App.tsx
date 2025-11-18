@@ -66,6 +66,12 @@ const categories: {
     description: 'Attorneys, accountants, and consultants serving the community.',
     icon: '/images/categories/Briefcase.png',
   },
+  {
+    key: 'retail',
+    name: 'Retail',
+    description: 'Local shops, boutiques, and retail stores offering unique products and services.',
+    icon: '/images/categories/ShoppingBag.svg',
+  },
 ]
 
 export default function App() {
@@ -75,6 +81,7 @@ export default function App() {
     'health-wellness': [],
     'restaurants-cafes': [],
     'professional-services': [],
+    'retail': [],
   })
 
   return (

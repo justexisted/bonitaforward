@@ -76,6 +76,12 @@ const categories: Category[] = [
     description: 'Legal, accounting, consulting, and other professional services.',
     icon: '/images/categories/Briefcase.png',
   },
+  {
+    key: 'retail',
+    name: 'Retail',
+    description: 'Local shops, boutiques, and retail stores offering unique products and services.',
+    icon: '/images/categories/ShoppingBag.svg',
+  },
 ]
 
 /**
@@ -137,6 +143,7 @@ export default function HomePage({ providersByCategory }: HomePageProps) {
             {categories.slice(0, 4).map((c) => (
               <CategoryCard cat={c} key={c.key} />
             ))}
+
             <div className="rounded-2xl p-4 bg-white">
               <button 
                 onClick={() => setShowMoreCategories(!showMoreCategories)}
@@ -157,17 +164,15 @@ export default function HomePage({ providersByCategory }: HomePageProps) {
                 </svg>
                 {showMoreCategories ? 'See less' : 'See more'}
               </button>
-              {showMoreCategories && (
-                <div className="mt-3">
-                  {categories.slice(4).map((c) => (
-                    <div key={c.key} className="mt-2">
-                      <CategoryCard cat={c} />
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
+          {showMoreCategories && (
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {categories.slice(4).map((c) => (
+                <CategoryCard cat={c} key={c.key} />
+              ))}
+            </div>
+          )}
         </Container>
       </section>
       <CalendarSection />

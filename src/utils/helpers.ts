@@ -204,7 +204,7 @@ export function ensureDemoMembers(input: Record<CategoryKey, Provider[]>): Recor
  * console.log(`Total: ${allProviders.length} businesses`)
  */
 export function getAllProviders(providersByCategory: Record<CategoryKey, Provider[]>): Provider[] {
-  const categories: CategoryKey[] = ['real-estate', 'home-services', 'health-wellness', 'restaurants-cafes', 'professional-services']
+  const categories: CategoryKey[] = ['real-estate', 'home-services', 'health-wellness', 'restaurants-cafes', 'professional-services', 'retail']
   return categories.flatMap((cat) => providersByCategory[cat] || [])
 }
 
