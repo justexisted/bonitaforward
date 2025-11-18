@@ -233,6 +233,205 @@ export function RestaurantTaggingSection({
     return labelMap[fieldId] || fieldId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }
 
+  // Auto-tag business based on keywords in name, description, and existing tags
+  const autoTagBusiness = (provider: ProviderRow): Record<string, string | string[]> => {
+    const textToSearch = [
+      provider.name || '',
+      provider.description || '',
+      ...(provider.tags || [])
+    ].join(' ').toLowerCase()
+
+    const suggestions: Record<string, string | string[]> = {}
+
+    // For each question in the category, try to match keywords
+    categoryQuestions.forEach(question => {
+      const fieldId = question.id
+      const isMulti = isMultiSelectField(fieldId)
+      const matches: string[] = []
+
+      question.options.forEach(option => {
+        const optionId = option.id.toLowerCase()
+        const optionLabel = option.label.toLowerCase()
+        
+        // Check if option ID or label appears in the text
+        if (textToSearch.includes(optionId) || textToSearch.includes(optionLabel)) {
+          matches.push(option.id)
+        } else {
+          // Check for partial matches and common variations
+          const optionWords = optionLabel.split(/\s+/)
+          const hasMatch = optionWords.some(word => {
+            if (word.length < 3) return false // Skip very short words
+            return textToSearch.includes(word)
+          })
+          
+          if (hasMatch) {
+            matches.push(option.id)
+          }
+        }
+
+        // Category-specific keyword matching
+        if (selectedCategory === 'restaurants-cafes') {
+          // Cuisine matching with common keywords
+          if (fieldId === 'cuisine') {
+            const cuisineKeywords: Record<string, string[]> = {
+              'mexican': ['taco', 'burrito', 'mexican', 'tex-mex', 'texmex', 'enchilada', 'quesadilla'],
+              'italian': ['pizza', 'pasta', 'italian', 'trattoria', 'ristorante', 'risotto', 'gelato'],
+              'asian': ['sushi', 'ramen', 'pho', 'chinese', 'japanese', 'thai', 'korean', 'indian', 'asian'],
+              'american': ['burger', 'bbq', 'barbecue', 'steak', 'steakhouse', 'american'],
+              'mediterranean': ['greek', 'falafel', 'hummus', 'gyro', 'mediterranean', 'middle eastern']
+            }
+            if (cuisineKeywords[optionId]?.some(keyword => textToSearch.includes(keyword))) {
+              matches.push(option.id)
+            }
+          }
+
+          // Price range matching
+          if (fieldId === 'price-range') {
+            const priceKeywords: Record<string, string[]> = {
+              'budget': ['budget', 'cheap', 'affordable', 'inexpensive', 'economical'],
+              'moderate': ['moderate', 'mid-range', 'reasonable', 'average'],
+              'upscale': ['upscale', 'premium', 'high-end', 'fine', 'elegant'],
+              'fine-dining': ['fine dining', 'gourmet', 'luxury', 'exclusive', 'upscale restaurant']
+            }
+            if (priceKeywords[optionId]?.some(keyword => textToSearch.includes(keyword))) {
+              matches.push(option.id)
+            }
+          }
+
+          // Dietary matching
+          if (fieldId === 'dietary') {
+            const dietaryKeywords: Record<string, string[]> = {
+              'vegetarian': ['vegetarian', 'veggie', 'plant-based'],
+              'vegan': ['vegan', 'plant-based', 'no animal'],
+              'gluten-free': ['gluten-free', 'gluten free', 'gf', 'celiac'],
+              'keto': ['keto', 'ketogenic', 'low-carb']
+            }
+            if (dietaryKeywords[optionId]?.some(keyword => textToSearch.includes(keyword))) {
+              matches.push(option.id)
+            }
+          }
+        }
+
+        if (selectedCategory === 'home-services') {
+          // Service type matching
+          if (fieldId === 'type') {
+            const serviceKeywords: Record<string, string[]> = {
+              'landscaping': ['landscaping', 'landscape', 'garden', 'gardening', 'lawn', 'yard', 'irrigation'],
+              'solar': ['solar', 'photovoltaic', 'pv', 'renewable energy'],
+              'cleaning': ['cleaning', 'clean', 'maid', 'janitorial', 'housekeeping'],
+              'remodeling': ['remodeling', 'renovation', 'remodel', 'renovate', 'construction', 'contractor'],
+              'plumbing': ['plumbing', 'plumber', 'pipe', 'drain', 'water heater', 'faucet'],
+              'electrical': ['electrical', 'electrician', 'wiring', 'outlet', 'lighting', 'electrical work'],
+              'hvac': ['hvac', 'heating', 'cooling', 'air conditioning', 'ac', 'furnace', 'thermostat']
+            }
+            if (serviceKeywords[optionId]?.some(keyword => textToSearch.includes(keyword))) {
+              matches.push(option.id)
+            }
+          }
+        }
+
+        if (selectedCategory === 'professional-services') {
+          // Service matching
+          if (fieldId === 'service') {
+            const serviceKeywords: Record<string, string[]> = {
+              'legal': ['legal', 'law', 'attorney', 'lawyer', 'litigation', 'legal services'],
+              'accounting': ['accounting', 'accountant', 'bookkeeping', 'tax', 'cpa', 'financial'],
+              'consulting': ['consulting', 'consultant', 'advisory', 'strategy'],
+              'marketing': ['marketing', 'advertising', 'promotion', 'branding', 'seo', 'social media'],
+              'insurance': ['insurance', 'insurer', 'coverage', 'policy'],
+              'financial': ['financial planning', 'financial advisor', 'investment', 'wealth management']
+            }
+            if (serviceKeywords[optionId]?.some(keyword => textToSearch.includes(keyword))) {
+              matches.push(option.id)
+            }
+          }
+        }
+
+        if (selectedCategory === 'health-wellness') {
+          // Service type matching
+          if (fieldId === 'type') {
+            const serviceKeywords: Record<string, string[]> = {
+              'dental': ['dental', 'dentist', 'dentistry', 'oral', 'orthodontist'],
+              'chiropractor': ['chiropractor', 'chiro', 'spinal', 'adjustment'],
+              'gym': ['gym', 'fitness', 'workout', 'training', 'exercise'],
+              'salon': ['salon', 'hair', 'beauty', 'haircut', 'styling', 'barber'],
+              'spa': ['spa', 'massage', 'facial', 'skincare', 'wellness'],
+              'medical': ['medical', 'doctor', 'physician', 'clinic', 'healthcare'],
+              'therapy': ['therapy', 'therapist', 'physical therapy', 'counseling']
+            }
+            if (serviceKeywords[optionId]?.some(keyword => textToSearch.includes(keyword))) {
+              matches.push(option.id)
+            }
+          }
+        }
+      })
+
+      if (matches.length > 0) {
+        if (isMulti) {
+          suggestions[fieldId] = matches
+        } else {
+          // For single-select, take the first match
+          suggestions[fieldId] = matches[0]
+        }
+      }
+    })
+
+    return suggestions
+  }
+
+  // Auto-tag all businesses in the current category
+  const autoTagAllBusinesses = () => {
+    const newPendingChanges = new Map(pendingChanges)
+    
+    filteredBusinesses.forEach(business => {
+      const suggestions = autoTagBusiness(business)
+      const currentSelections = getCurrentSelections(business)
+      
+      // Only add suggestions for fields that don't already have values
+      Object.entries(suggestions).forEach(([fieldId, value]) => {
+        const currentValue = currentSelections[fieldId]
+        const isEmpty = !currentValue || 
+          (typeof currentValue === 'string' && currentValue === '') ||
+          (Array.isArray(currentValue) && currentValue.length === 0)
+        
+        if (isEmpty) {
+          const existing = newPendingChanges.get(business.id) || {}
+          newPendingChanges.set(business.id, {
+            ...existing,
+            [fieldId]: value
+          })
+        }
+      })
+    })
+
+    setPendingChanges(newPendingChanges)
+  }
+
+  // Auto-tag a single business
+  const autoTagSingleBusiness = (business: ProviderRow) => {
+    const suggestions = autoTagBusiness(business)
+    const currentSelections = getCurrentSelections(business)
+    
+    // Only add suggestions for fields that don't already have values
+    const updates: Record<string, string | string[]> = {}
+    Object.entries(suggestions).forEach(([fieldId, value]) => {
+      const currentValue = currentSelections[fieldId]
+      const isEmpty = !currentValue || 
+        (typeof currentValue === 'string' && currentValue === '') ||
+        (Array.isArray(currentValue) && currentValue.length === 0)
+      
+      if (isEmpty) {
+        updates[fieldId] = value
+      }
+    })
+
+    if (Object.keys(updates).length > 0) {
+      Object.entries(updates).forEach(([fieldId, value]) => {
+        trackPendingChange(business.id, fieldId, value)
+      })
+    }
+  }
+
   // Get current selections - combines saved tags with pending changes
   const getCurrentSelections = (provider: ProviderRow): Record<string, string | string[]> => {
     const tags = provider.tags || []
@@ -296,7 +495,7 @@ export function RestaurantTaggingSection({
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Category Tagging</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Tag businesses with price range, cuisine, occasions, and dietary options for better customer matching
+            Tag businesses with category-specific fields for better customer matching. Use "Auto-Tag All" to automatically assign tags based on keywords in business names, descriptions, and existing tags.
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -305,6 +504,14 @@ export function RestaurantTaggingSection({
               {pendingChanges.size} unsaved change{pendingChanges.size !== 1 ? 's' : ''}
             </div>
           )}
+          <button
+            onClick={autoTagAllBusinesses}
+            disabled={updatingIds.size > 0}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            title="Automatically tag all businesses based on keywords in their name, description, and existing tags"
+          >
+            Auto-Tag All
+          </button>
           <button
             onClick={savePendingChanges}
             disabled={pendingChanges.size === 0 || updatingIds.size > 0}
@@ -396,6 +603,14 @@ export function RestaurantTaggingSection({
                               Unsaved
                             </span>
                           )}
+                          <button
+                            onClick={() => autoTagSingleBusiness(business)}
+                            disabled={isUpdating}
+                            className="ml-2 text-xs text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50"
+                            title="Auto-tag this business based on keywords"
+                          >
+                            Auto-Tag
+                          </button>
                         </div>
                         {business.description && (
                           <div className="text-sm text-gray-500 mt-1 max-w-xs truncate">
