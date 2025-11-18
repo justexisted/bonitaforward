@@ -73,6 +73,7 @@ export async function loadProvidersFromSupabase(
       'health-wellness': [],
       'restaurants-cafes': [],
       'professional-services': [],
+      'retail': [],
     }
     
     // Transform and group providers
@@ -174,6 +175,7 @@ export async function loadProvidersFromSheet(
       'health-wellness': [],
       'restaurants-cafes': [],
       'professional-services': [],
+      'retail': [],
     }
     
     mapped.forEach((sp: SheetProvider) => {

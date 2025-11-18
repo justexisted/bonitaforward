@@ -184,6 +184,7 @@ export function ensureDemoMembers(input: Record<CategoryKey, Provider[]>): Recor
     'health-wellness': [],
     'restaurants-cafes': [],
     'professional-services': [],
+    'retail': [],
   };
   (Object.keys(input) as CategoryKey[]).forEach((k: CategoryKey) => {
     const key = k
